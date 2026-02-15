@@ -1,6 +1,9 @@
 # @spaceflow/review
 
-Spaceflow AI 代码审查插件，使用 LLM 对 PR 代码进行自动审查。支持 OpenAI、Claude Code、Gemini 等多种 LLM 模式。
+[![npm version](https://img.shields.io/npm/v/@spaceflow/review?color=blue)](https://www.npmjs.com/package/@spaceflow/review)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+> Spaceflow AI 代码审查扩展，使用 LLM 对 PR 代码进行自动审查。支持 OpenAI、Claude Code、Gemini 等多种 LLM 模式。
 
 ## 安装
 
@@ -39,25 +42,25 @@ spaceflow review -p 123 --deletion-only -l openai
 
 ## 命令行参数
 
-| 参数 | 简写 | 说明 |
-| --- | --- | --- |
-| `--pr-number <number>` | `-p` | PR 编号 |
-| `--base <ref>` | `-b` | 基准分支/tag |
-| `--head <ref>` | | 目标分支/tag |
-| `--llm-mode <mode>` | `-l` | LLM 模式（`openai` / `claude-code` / `gemini`） |
-| `--files <files...>` | `-f` | 仅审查指定文件 |
-| `--commits <commits...>` | | 仅审查指定 commits |
-| `--includes <patterns...>` | `-i` | 文件 glob 过滤模式 |
-| `--verbose [level]` | `-v` | 详细输出（1: 过程日志，2: 含提示词） |
-| `--dry-run` | `-d` | 仅打印将要执行的操作 |
-| `--ci` | `-c` | 在 CI 环境中运行 |
-| `--verify-fixes` | | 验证历史问题是否已修复 |
-| `--no-verify-fixes` | | 禁用历史问题验证 |
-| `--analyze-deletions` | | 分析删除代码影响 |
-| `--deletion-only` | | 仅执行删除代码分析 |
-| `--deletion-analysis-mode <mode>` | | 删除分析模式（`openai` / `claude-code`） |
-| `--generate-description` | | 使用 AI 生成 PR 功能描述 |
-| `--output-format <format>` | `-o` | 输出格式（`markdown` / `terminal` / `json`） |
+| 参数                              | 简写 | 说明                                            |
+| --------------------------------- | ---- | ----------------------------------------------- |
+| `--pr-number <number>`            | `-p` | PR 编号                                         |
+| `--base <ref>`                    | `-b` | 基准分支/tag                                    |
+| `--head <ref>`                    |      | 目标分支/tag                                    |
+| `--llm-mode <mode>`               | `-l` | LLM 模式（`openai` / `claude-code` / `gemini`） |
+| `--files <files...>`              | `-f` | 仅审查指定文件                                  |
+| `--commits <commits...>`          |      | 仅审查指定 commits                              |
+| `--includes <patterns...>`        | `-i` | 文件 glob 过滤模式                              |
+| `--verbose [level]`               | `-v` | 详细输出（1: 过程日志，2: 含提示词）            |
+| `--dry-run`                       | `-d` | 仅打印将要执行的操作                            |
+| `--ci`                            | `-c` | 在 CI 环境中运行                                |
+| `--verify-fixes`                  |      | 验证历史问题是否已修复                          |
+| `--no-verify-fixes`               |      | 禁用历史问题验证                                |
+| `--analyze-deletions`             |      | 分析删除代码影响                                |
+| `--deletion-only`                 |      | 仅执行删除代码分析                              |
+| `--deletion-analysis-mode <mode>` |      | 删除分析模式（`openai` / `claude-code`）        |
+| `--generate-description`          |      | 使用 AI 生成 PR 功能描述                        |
+| `--output-format <format>`        | `-o` | 输出格式（`markdown` / `terminal` / `json`）    |
 
 ## 配置
 
@@ -108,13 +111,13 @@ jobs:
 
 ## 环境变量
 
-| 变量 | 说明 |
-| --- | --- |
-| `GITHUB_TOKEN` | GitHub API Token |
+| 变量                | 说明                          |
+| ------------------- | ----------------------------- |
+| `GITHUB_TOKEN`      | GitHub API Token              |
 | `GITHUB_REPOSITORY` | 仓库名称（`owner/repo` 格式） |
-| `OPENAI_BASE_URL` | OpenAI API 地址 |
-| `OPENAI_API_KEY` | OpenAI API Key |
-| `OPENAI_MODEL` | OpenAI 模型名称 |
+| `OPENAI_BASE_URL`   | OpenAI API 地址               |
+| `OPENAI_API_KEY`    | OpenAI API Key                |
+| `OPENAI_MODEL`      | OpenAI 模型名称               |
 
 ## 许可证
 
