@@ -7,14 +7,14 @@ import { createRequire } from "module";
 import { createPluginConfig, getDependencies } from "@spaceflow/core";
 import { shouldLog, type VerboseLevel, t } from "@spaceflow/core";
 
-export interface SkillInfo {
+export interface ExtensionInfo {
   name: string;
   path: string;
   hasPackageJson: boolean;
 }
 
 export interface BuildResult {
-  skill: string;
+  extension: string;
   success: boolean;
   duration?: number;
   errors?: string[];
@@ -51,20 +51,20 @@ export class BuildService {
   /**
    * 构建插件
    */
-  async build(skillName?: string, verbose: VerboseLevel = 1): Promise<BuildResult[]> {
-    const skills = await this.getSkillsToBuild(skillName);
+  async build(extensionName?: string, verbose: VerboseLevel = 1): Promise<BuildResult[]> {
+    const extensions = await this.getExtensionsToBuild(extensionName);
 
-    if (skills.length === 0) {
+    if (extensions.length === 0) {
       if (shouldLog(verbose, 1)) console.log(t("build:noPlugins"));
       return [];
     }
 
     if (shouldLog(verbose, 1))
-      console.log(t("build:startBuilding", { count: skills.length }) + "\n");
+      console.log(t("build:startBuilding", { count: extensions.length }) + "\n");
 
     const results: BuildResult[] = [];
-    for (const skill of skills) {
-      const result = await this.buildSkill(skill, verbose);
+    for (const ext of extensions) {
+      const result = await this.buildExtension(ext, verbose);
       results.push(result);
     }
 
@@ -79,19 +79,19 @@ export class BuildService {
   /**
    * 监听模式构建
    */
-  async watch(skillName?: string, verbose: VerboseLevel = 1): Promise<void> {
-    const skills = await this.getSkillsToBuild(skillName);
+  async watch(extensionName?: string, verbose: VerboseLevel = 1): Promise<void> {
+    const extensions = await this.getExtensionsToBuild(extensionName);
 
-    if (skills.length === 0) {
+    if (extensions.length === 0) {
       if (shouldLog(verbose, 1)) console.log(t("build:noPlugins"));
       return;
     }
 
     if (shouldLog(verbose, 1))
-      console.log(t("build:startWatching", { count: skills.length }) + "\n");
+      console.log(t("build:startWatching", { count: extensions.length }) + "\n");
 
     // 并行启动所有 watcher
-    await Promise.all(skills.map((skill) => this.watchSkill(skill, verbose)));
+    await Promise.all(extensions.map((ext) => this.watchExtension(ext, verbose)));
 
     // 保持进程运行
     await new Promise(() => {});
@@ -143,41 +143,41 @@ export class BuildService {
   }
 
   /**
-   * 获取需要构建的插件列表
+   * 获取需要构建的 Extension 列表
    */
-  private async getSkillsToBuild(skillName?: string): Promise<SkillInfo[]> {
-    // 如果没有指定插件名，检查是否在插件目录中运行
-    if (!skillName) {
-      const currentSkill = this.detectCurrentSkill();
-      if (currentSkill) {
-        return [currentSkill];
+  private async getExtensionsToBuild(extensionName?: string): Promise<ExtensionInfo[]> {
+    // 如果没有指定名称，检查是否在 Extension 目录中运行
+    if (!extensionName) {
+      const current = this.detectCurrentExtension();
+      if (current) {
+        return [current];
       }
     }
     // 从所有 extension 目录中扫描
-    const skills: SkillInfo[] = [];
+    const result: ExtensionInfo[] = [];
     for (const extDir of this.extensionDirs) {
       if (!existsSync(extDir)) continue;
       const entries = await readdir(extDir);
       for (const entry of entries) {
         if (entry.startsWith(".")) continue;
-        const skillPath = join(extDir, entry);
-        const stats = await stat(skillPath);
+        const extPath = join(extDir, entry);
+        const stats = await stat(extPath);
         if (!stats.isDirectory()) continue;
-        if (skillName && entry !== skillName) continue;
-        const packageJsonPath = join(skillPath, "package.json");
+        if (extensionName && entry !== extensionName) continue;
+        const packageJsonPath = join(extPath, "package.json");
         if (existsSync(packageJsonPath)) {
-          skills.push({ name: entry, path: skillPath, hasPackageJson: true });
+          result.push({ name: entry, path: extPath, hasPackageJson: true });
         }
       }
     }
-    return skills;
+    return result;
   }
 
   /**
-   * 检测当前目录是否为 spaceflow extension
+   * 检测当前目录是否为 spaceflow Extension
    * 通过检查 package.json 中的 spaceflow 配置判断，不依赖固定目录名
    */
-  private detectCurrentSkill(): SkillInfo | null {
+  private detectCurrentExtension(): ExtensionInfo | null {
     const cwd = process.cwd();
     const packageJsonPath = join(cwd, "package.json");
     if (!existsSync(packageJsonPath)) {
@@ -197,14 +197,14 @@ export class BuildService {
   }
 
   /**
-   * 构建单个插件
+   * 构建单个 Extension
    */
-  private async buildSkill(skill: SkillInfo, verbose: VerboseLevel = 1): Promise<BuildResult> {
+  private async buildExtension(ext: ExtensionInfo, verbose: VerboseLevel = 1): Promise<BuildResult> {
     const startTime = Date.now();
-    if (shouldLog(verbose, 1)) console.log(t("build:building", { name: skill.name }));
+    if (shouldLog(verbose, 1)) console.log(t("build:building", { name: ext.name }));
 
     try {
-      const config = await this.getConfig(skill);
+      const config = await this.getConfig(ext);
       const compiler = rspack(config);
 
       const stats = await new Promise<Stats>((resolve, reject) => {
@@ -225,41 +225,41 @@ export class BuildService {
         const errors = info.errors?.map((e) => e.message) || [];
         console.log(t("build:buildFailedWithDuration", { duration }));
         errors.forEach((e) => console.log(`      ${e}`));
-        return { skill: skill.name, success: false, duration, errors };
+        return { extension: ext.name, success: false, duration, errors };
       }
 
       if (stats.hasWarnings()) {
         const warnings = info.warnings?.map((w) => w.message) || [];
         if (shouldLog(verbose, 1))
           console.log(t("build:buildWarnings", { duration, count: warnings.length }));
-        return { skill: skill.name, success: true, duration, warnings };
+        return { extension: ext.name, success: true, duration, warnings };
       }
 
       if (shouldLog(verbose, 1)) console.log(t("build:buildSuccess", { duration }));
-      return { skill: skill.name, success: true, duration };
+      return { extension: ext.name, success: true, duration };
     } catch (error) {
       const duration = Date.now() - startTime;
       const message = error instanceof Error ? error.message : String(error);
       console.log(t("build:buildFailedWithMessage", { duration, message }));
-      return { skill: skill.name, success: false, duration, errors: [message] };
+      return { extension: ext.name, success: false, duration, errors: [message] };
     }
   }
 
   /**
-   * 监听单个插件
+   * 监听单个 Extension
    */
-  private async watchSkill(skill: SkillInfo, verbose: VerboseLevel = 1): Promise<void> {
-    if (shouldLog(verbose, 1)) console.log(t("build:watching", { name: skill.name }));
+  private async watchExtension(ext: ExtensionInfo, verbose: VerboseLevel = 1): Promise<void> {
+    if (shouldLog(verbose, 1)) console.log(t("build:watching", { name: ext.name }));
 
     try {
-      const config = await this.getConfig(skill);
+      const config = await this.getConfig(ext);
       const compiler = rspack(config);
 
-      this.watchers.set(skill.name, compiler);
+      this.watchers.set(ext.name, compiler);
 
       compiler.watch({}, (err, stats) => {
         if (err) {
-          console.log(t("build:watchError", { name: skill.name, message: err.message }));
+          console.log(t("build:watchError", { name: ext.name, message: err.message }));
           return;
         }
 
@@ -268,31 +268,30 @@ export class BuildService {
         const info = stats.toJson({ errors: true, warnings: true });
 
         if (stats.hasErrors()) {
-          console.log(t("build:watchBuildFailed", { name: skill.name }));
+          console.log(t("build:watchBuildFailed", { name: ext.name }));
           info.errors?.forEach((e) => console.log(`      ${e.message}`));
         } else if (stats.hasWarnings()) {
           if (shouldLog(verbose, 1))
             console.log(
-              t("build:watchBuildWarnings", { name: skill.name, count: info.warnings?.length }),
+              t("build:watchBuildWarnings", { name: ext.name, count: info.warnings?.length }),
             );
         } else {
           if (shouldLog(verbose, 1))
-            console.log(t("build:watchBuildSuccess", { name: skill.name }));
+            console.log(t("build:watchBuildSuccess", { name: ext.name }));
         }
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.log(t("build:watchInitFailed", { name: skill.name, message }));
+      console.log(t("build:watchInitFailed", { name: ext.name, message }));
     }
   }
 
   /**
-   * 获取插件的 rspack 配置
+   * 获取 Extension 的 rspack 配置
    */
-  private async getConfig(skill: SkillInfo): Promise<Configuration> {
-    // 检查是否有自定义配置
-    const customConfigPath = join(skill.path, "rspack.config.mjs");
-    const customConfigPathJs = join(skill.path, "rspack.config.js");
+  private async getConfig(ext: ExtensionInfo): Promise<Configuration> {
+    const customConfigPath = join(ext.path, "rspack.config.mjs");
+    const customConfigPathJs = join(ext.path, "rspack.config.js");
 
     if (existsSync(customConfigPath)) {
       const module = await import(customConfigPath);
@@ -304,18 +303,17 @@ export class BuildService {
       return module.default || module;
     }
 
-    // 使用默认配置
-    return this.getDefaultConfig(skill);
+    return this.getDefaultConfig(ext);
   }
 
   /**
    * 生成默认的 rspack 配置
    */
-  private getDefaultConfig(skill: SkillInfo): Configuration {
+  private getDefaultConfig(ext: ExtensionInfo): Configuration {
     return createPluginConfig(
       {
-        name: skill.name,
-        path: skill.path,
+        name: ext.name,
+        path: ext.path,
       },
       {
         coreRoot: this.coreRoot,

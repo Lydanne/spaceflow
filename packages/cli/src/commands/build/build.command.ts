@@ -4,7 +4,7 @@ import { BuildService } from "./build.service";
 import type { VerboseLevel } from "@spaceflow/core";
 
 export interface BuildOptions {
-  skill?: string;
+  extension?: string;
   watch?: boolean;
   verbose?: VerboseLevel;
 }
@@ -12,15 +12,15 @@ export interface BuildOptions {
 /**
  * 构建命令
  *
- * 用于构建 skills 目录下的插件包
+ * 用于构建 Extension 插件包
  *
  * 用法：
- *   spaceflow build [skill]        # 构建指定或所有插件
+ *   spaceflow build [extension]    # 构建指定或所有 Extension
  *   spaceflow build --watch        # 监听模式
  */
 @Command({
   name: "build",
-  arguments: "[skill]",
+  arguments: "[extension]",
   description: t("build:description"),
 })
 export class BuildCommand extends CommandRunner {
@@ -29,14 +29,14 @@ export class BuildCommand extends CommandRunner {
   }
 
   async run(passedParams: string[], options: BuildOptions): Promise<void> {
-    const skill = passedParams[0];
+    const extensionName = passedParams[0];
     const verbose = options.verbose ?? true;
 
     try {
       if (options.watch) {
-        await this.buildService.watch(skill, verbose);
+        await this.buildService.watch(extensionName, verbose);
       } else {
-        const results = await this.buildService.build(skill, verbose);
+        const results = await this.buildService.build(extensionName, verbose);
         const hasErrors = results.some((r) => !r.success);
         if (hasErrors) {
           process.exit(1);

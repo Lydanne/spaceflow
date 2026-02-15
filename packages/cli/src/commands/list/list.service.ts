@@ -13,7 +13,7 @@ import {
   t,
 } from "@spaceflow/core";
 
-interface SkillInfo {
+interface ExtensionListInfo {
   name: string;
   source: string;
   type: "npm" | "git" | "local";
@@ -69,35 +69,35 @@ export class ListService {
     const loadedExtensions = this.extensionLoader.getLoadedExtensions();
     const loadedMap = new Map(loadedExtensions.map((e) => [e.name, e]));
     const editors = await this.getSupportedEditors();
-    // 收集所有 skill 信息
-    const skillInfos: SkillInfo[] = [];
+    // 收集所有 Extension 信息
+    const extensionInfos: ExtensionListInfo[] = [];
     for (const [name, source] of Object.entries(skills)) {
       const type = getSourceType(source);
       const installed = await this.checkInstalled(name, source, type, editors);
       const loadedExt = loadedMap.get(name);
-      skillInfos.push({ name, source, type, installed, commands: loadedExt?.commands ?? [] });
+      extensionInfos.push({ name, source, type, installed, commands: loadedExt?.commands ?? [] });
     }
     if (!shouldLog(verbose, 1)) return;
     // 计算最大名称宽度用于对齐
-    const maxNameLen = Math.max(...skillInfos.map((s) => s.name.length), 10);
-    const installedCount = skillInfos.filter((s) => s.installed).length;
+    const maxNameLen = Math.max(...extensionInfos.map((e) => e.name.length), 10);
+    const installedCount = extensionInfos.filter((e) => e.installed).length;
     console.log(
-      t("list:installedExtensions", { installed: installedCount, total: skillInfos.length }) + "\n",
+      t("list:installedExtensions", { installed: installedCount, total: extensionInfos.length }) + "\n",
     );
-    for (const skill of skillInfos) {
-      const icon = skill.installed ? "\x1b[32m✔\x1b[0m" : "\x1b[33m○\x1b[0m";
+    for (const ext of extensionInfos) {
+      const icon = ext.installed ? "\x1b[32m✔\x1b[0m" : "\x1b[33m○\x1b[0m";
       const typeLabel =
-        skill.type === "local"
+        ext.type === "local"
           ? "\x1b[36mlocal\x1b[0m"
-          : skill.type === "npm"
+          : ext.type === "npm"
             ? "\x1b[35mnpm\x1b[0m"
             : "\x1b[33mgit\x1b[0m";
-      const displaySource = this.getDisplaySource(skill.source, skill.type);
-      console.log(`  ${icon} ${skill.name.padEnd(maxNameLen + 2)} ${typeLabel}  ${displaySource}`);
+      const displaySource = this.getDisplaySource(ext.source, ext.type);
+      console.log(`  ${icon} ${ext.name.padEnd(maxNameLen + 2)} ${typeLabel}  ${displaySource}`);
       // 显示命令列表
-      if (skill.commands.length > 0) {
+      if (ext.commands.length > 0) {
         console.log(
-          `    ${"".padEnd(maxNameLen)}  ${t("list:commands", { commands: skill.commands.join(", ") })}`,
+          `    ${"".padEnd(maxNameLen)}  ${t("list:commands", { commands: ext.commands.join(", ") })}`,
         );
       }
     }

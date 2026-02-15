@@ -6,10 +6,10 @@ import type { VerboseLevel } from "@spaceflow/core";
 /**
  * 开发命令
  *
- * 用于开发 skills 目录下的插件包（监听模式）
+ * 用于开发 Extension 插件包（监听模式）
  *
  * 用法：
- *   spaceflow dev [skill]        # 监听并构建指定或所有插件
+ *   spaceflow dev [extension]    # 监听并构建指定或所有 Extension
  */
 export interface DevOptions {
   verbose?: VerboseLevel;
@@ -17,7 +17,7 @@ export interface DevOptions {
 
 @Command({
   name: "dev",
-  arguments: "[skill]",
+  arguments: "[extension]",
   description: t("dev:description"),
 })
 export class DevCommand extends CommandRunner {
@@ -26,11 +26,11 @@ export class DevCommand extends CommandRunner {
   }
 
   async run(passedParams: string[], options: DevOptions): Promise<void> {
-    const skill = passedParams[0];
+    const extensionName = passedParams[0];
     const verbose = options.verbose ?? true;
 
     try {
-      await this.buildService.watch(skill, verbose);
+      await this.buildService.watch(extensionName, verbose);
     } catch (error) {
       if (error instanceof Error) {
         console.error(t("dev:startFailed", { error: error.message }));
