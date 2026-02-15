@@ -1,0 +1,15 @@
+# 自定义框架配置：匹配 @spaceflow/core 导出的 t() 函数
+languageIds:
+  - typescript
+
+# 匹配 t("key") 和 t("namespace:key") 调用
+usageMatchRegex:
+  - "\\Wt\\(\\s*['\"`]({key})['\"`]"
+
+# 提取模板
+refactorTemplates:
+  - "t('$1')"
+
+# 启用 namespace，使用 : 作为分隔符
+namespace: true
+namespaceDelimiter: ":"

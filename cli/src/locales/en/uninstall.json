@@ -1,0 +1,18 @@
+{
+  "description": "Uninstall a skill package",
+  "options.global": "Uninstall from global directory (~/.spaceflow) and clean up editor links",
+  "noName": "❌ Please specify the skill package name to uninstall",
+  "uninstallFailed": "❌ Uninstall failed: {{error}}",
+  "extensionDescription": "Uninstall installed plugins/skills",
+  "uninstallingExtension": "   Uninstalling extension: {{name}}",
+  "targetDir": "   Target directory: {{dir}}",
+  "extensionUninstallFailed": "   Warning: Extension uninstall failed: {{name}}",
+  "uninstallingGlobal": "🗑️  Uninstalling skill package: {{name}} (global)",
+  "uninstalling": "🗑️  Uninstalling skill package: {{name}}",
+  "foundDependency": "   Found dependency: {{key}} -> {{value}}",
+  "notRegistered": "Skill package \"{{name}}\" is not registered in config",
+  "uninstallDone": "✅ Uninstall complete",
+  "deletingSkill": "   Deleting: skills/{{entry}}",
+  "deletingCommand": "   Deleting: commands/{{entry}}",
+  "configUpdated": "   Config updated: {{path}}"
+}

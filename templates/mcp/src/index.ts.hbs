@@ -1,0 +1,27 @@
+import { SpaceflowExtension, SpaceflowExtensionMetadata } from "spaceflow";
+import { {{pascalName}}Module } from "./{{kebabName}}.module";
+
+/** {{pascalName}} Extension 元数据 */
+export const {{camelName}}Metadata: SpaceflowExtensionMetadata = {
+  name: "{{kebabName}}",
+  commands: [],
+  configKey: "{{kebabName}}",
+  version: "1.0.0",
+  description: "{{name}} MCP 工具插件",
+};
+
+export class {{pascalName}}Extension implements SpaceflowExtension {
+  getMetadata(): SpaceflowExtensionMetadata {
+    return {{camelName}}Metadata;
+  }
+
+  getModule() {
+    return {{pascalName}}Module;
+  }
+}
+
+export default {{pascalName}}Extension;
+
+export * from "./{{kebabName}}.module";
+export * from "./{{kebabName}}.mcp";
+export * from "./{{kebabName}}.service";

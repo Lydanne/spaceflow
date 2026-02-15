@@ -1,0 +1,9 @@
+import { Module } from "@spaceflow/core";
+import { {{pascalName}}Mcp } from "./{{kebabName}}.mcp";
+import { {{pascalName}}Service } from "./{{kebabName}}.service";
+
+@Module({
+  providers: [{{pascalName}}Service, {{pascalName}}Mcp],
+  exports: [{{pascalName}}Mcp],
+})
+export class {{pascalName}}Module {}

@@ -1,0 +1,9 @@
+import { SpaceflowPlugin, SpaceflowPluginMetadata } from "spaceflow"; import {
+{{pascalName}}Module } from "./{{kebabName}}.module"; export class
+{{pascalName}}Plugin implements SpaceflowPlugin { getMetadata(): SpaceflowPluginMetadata { return {
+name: "{{kebabName}}", commands: ["{{kebabName}}"], configKey: "{{kebabName}}", version: "1.0.0",
+description: "{{name}}
+命令插件", }; } getModule() { return
+{{pascalName}}Module; } } export default
+{{pascalName}}Plugin; export * from "./{{kebabName}}.command"; export * from "./{{kebabName}}.service";
+export * from "./{{kebabName}}.module";

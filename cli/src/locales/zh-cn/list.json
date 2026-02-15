@@ -1,0 +1,8 @@
+{
+  "description": "列出已安装的技能包",
+  "extensionDescription": "列出已安装的插件/技能",
+  "noSkills": "📦 没有已安装的技能包",
+  "installHint": "使用以下命令安装技能包:",
+  "installedExtensions": "📦 已安装的扩展 ({{installed}}/{{total}}):",
+  "commands": "命令: {{commands}}"
+}

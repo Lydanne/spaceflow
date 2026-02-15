@@ -1,0 +1,51 @@
+name: Test Branch Protection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Debug Tokens and Permissions
+        run: |
+          echo "=== Token Info ==="
+          echo "GITHUB_TOKEN length: ${#GITHUB_TOKEN}"
+          echo "GITHUB_TOKEN prefix: ${GITHUB_TOKEN:0:10}..."
+          echo ""
+          echo "=== Git Remote URL ==="
+          git remote -v
+          echo ""
+          echo "=== GitHub API User Info ==="
+          curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+            "https://api.github.com/user"
+          echo ""
+          echo ""
+          echo "=== Check Token Repo Permissions ==="
+          curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+            "https://api.github.com/repos/${{ github.repository }}" | grep -E '"permissions"|"admin"|"push"|"pull"'
+          echo ""
+          echo "=== Full Repo Info (permissions section) ==="
+          curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+            "https://api.github.com/repos/${{ github.repository }}" | jq '.permissions' 2>/dev/null || \
+          curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+            "https://api.github.com/repos/${{ github.repository }}" | grep -o '"permissions":{[^}]*}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Write ci.md and commit
+        run: |
+          echo "Test commit at $(date)" >> ci.md
+          git add ci.md
+          git commit -m "test: branch protection test [no ci]"
+          git push

@@ -1,0 +1,33 @@
+import { Command, CommandRunner, Option } from "nest-commander";
+import { {{pascalName}}Service } from "./{{kebabName}}.service";
+
+export interface {{pascalName}}Options {
+  verbose?: boolean;
+}
+
+@Command({
+  name: "{{kebabName}}",
+  description: "{{name}} 命令",
+})
+export class {{pascalName}}Command extends CommandRunner {
+  constructor(protected readonly {{camelName}}Service: {{pascalName}}Service) {
+    super();
+  }
+
+  async run(_passedParams: string[], options: {{pascalName}}Options): Promise<void> {
+    try {
+      await this.{{camelName}}Service.execute(options);
+    } catch (error) {
+      console.error("执行失败:", error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  }
+
+  @Option({
+    flags: "-v, --verbose",
+    description: "显示详细日志",
+  })
+  parseVerbose(): boolean {
+    return true;
+  }
+}

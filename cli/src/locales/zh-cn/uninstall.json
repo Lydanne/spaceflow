@@ -1,0 +1,18 @@
+{
+  "description": "卸载技能包",
+  "options.global": "从全局目录 (~/.spaceflow) 卸载并清理各个编辑器的关联",
+  "noName": "❌ 请指定要卸载的技能包名称",
+  "uninstallFailed": "❌ 卸载失败: {{error}}",
+  "extensionDescription": "卸载已安装的插件/技能",
+  "uninstallingExtension": "   卸载 Extension: {{name}}",
+  "targetDir": "   目标目录: {{dir}}",
+  "extensionUninstallFailed": "   警告: Extension 卸载失败: {{name}}",
+  "uninstallingGlobal": "🗑️  卸载技能包: {{name}} (全局)",
+  "uninstalling": "🗑️  卸载技能包: {{name}}",
+  "foundDependency": "   找到依赖: {{key}} -> {{value}}",
+  "notRegistered": "技能包 \"{{name}}\" 未在配置文件中注册",
+  "uninstallDone": "✅ 卸载完成",
+  "deletingSkill": "   删除: skills/{{entry}}",
+  "deletingCommand": "   删除: commands/{{entry}}",
+  "configUpdated": "   更新配置文件: {{path}}"
+}

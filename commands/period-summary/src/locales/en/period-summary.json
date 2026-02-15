@@ -1,0 +1,13 @@
+{
+  "description": "Period summary - aggregate PR contributions by time range, grouped by author",
+  "options.preset": "Time preset: this-week, last-week, this-month, last-month, last-7-days, last-15-days, last-30-days",
+  "options.since": "Start date (YYYY-MM-DD format), alternative to --preset",
+  "options.until": "End date (YYYY-MM-DD format), defaults to today",
+  "options.repository": "Repository path (owner/repo format), auto-detected from env by default",
+  "options.format": "Output format: table, json, markdown",
+  "options.output": "Output target: console, issue (create GitHub Issue), file (Markdown file)",
+  "options.outputFile": "Output file path (used when --output is file)",
+  "options.verbose": "Verbose log level (1: process logs, 2: detailed logs)",
+  "reportOutput": "✅ Report output to: {{location}}",
+  "extensionDescription": "Period summary - aggregate PR contributions by time range, grouped by author"
+}

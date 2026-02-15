@@ -1,0 +1,5 @@
+{
+  "description": "Dev mode - watch and auto-rebuild skill packages",
+  "startFailed": "❌ Dev mode failed to start: {{error}}",
+  "extensionDescription": "Start plugin dev mode (watch and auto-rebuild)"
+}

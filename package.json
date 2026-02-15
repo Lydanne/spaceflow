@@ -1,0 +1,24 @@
+{
+  "name": "spaceflow-project",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Spaceflow Monorepo",
+  "scripts": {
+    "setup": "pnpm --filter @spaceflow/core build && pnpm --filter @spaceflow/cli build && pnpm install && pnpm --filter \"!@spaceflow/core\" --filter \"!@spaceflow/cli\" build",
+    "build": "pnpm --filter @spaceflow/core build && pnpm --filter @spaceflow/cli build && pnpm --filter \"!@spaceflow/core\" --filter \"!@spaceflow/cli\" build",
+    "lint": "oxlint .",
+    "format": "oxfmt . --write",
+    "test": "pnpm --filter \"*\" test",
+    "test:cov": "pnpm --filter \"*\" test:cov",
+    "docs:dev": "pnpm --filter @spaceflow/docs docs:dev",
+    "docs:build": "pnpm --filter @spaceflow/docs docs:build",
+    "docs:preview": "pnpm --filter @spaceflow/docs docs:preview"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "typescript": "catalog:",
+    "@spaceflow/cli": "workspace:*"
+  }
+}

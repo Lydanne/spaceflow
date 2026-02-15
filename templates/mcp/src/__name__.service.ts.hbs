@@ -1,0 +1,19 @@
+import { Injectable } from "@spaceflow/core";
+
+export interface HelloResult {
+  readonly message: string;
+  readonly timestamp: string;
+}
+
+/** {{pascalName}} 业务逻辑服务 */
+@Injectable()
+export class {{pascalName}}Service {
+  /** 生成问候信息 */
+  hello(name: string, lang: string = "zh"): HelloResult {
+    const message = lang === "en" ? `Hello, ${name}!` : `你好，${name}！`;
+    return {
+      message,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}

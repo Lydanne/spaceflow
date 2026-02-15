@@ -1,0 +1,22 @@
+{
+  "description": "构建 skills 目录下的插件包",
+  "options.watch": "监听文件变化并自动重新构建",
+  "buildFailed": "❌ 构建失败: {{error}}",
+  "extensionDescription": "构建插件/技能",
+  "noPlugins": "📦 没有找到可构建的插件",
+  "startBuilding": "📦 开始构建 {{count}} 个插件...",
+  "buildComplete": "✅ 构建完成: {{success}} 成功, {{fail}} 失败",
+  "startWatching": "👀 开始监听 {{count}} 个插件...",
+  "stopWatching": "🛑 停止监听: {{name}}",
+  "building": "🔨 构建: {{name}}",
+  "buildSuccess": "   ✅ 完成 ({{duration}}ms)",
+  "buildFailedWithDuration": "   ❌ 失败 ({{duration}}ms)",
+  "buildFailedWithMessage": "   ❌ 失败 ({{duration}}ms): {{message}}",
+  "buildWarnings": "   ⚠️  完成 ({{duration}}ms) - {{count}} 警告",
+  "watching": "👀 监听: {{name}}",
+  "watchError": "   ❌ [{{name}}] 错误: {{message}}",
+  "watchBuildFailed": "   ❌ [{{name}}] 构建失败",
+  "watchBuildWarnings": "   ⚠️  [{{name}}] 构建完成 - {{count}} 警告",
+  "watchBuildSuccess": "   ✅ [{{name}}] 构建完成",
+  "watchInitFailed": "   ❌ [{{name}}] 初始化失败: {{message}}"
+}

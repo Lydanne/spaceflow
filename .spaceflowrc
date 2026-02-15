@@ -1,0 +1,4 @@
+{
+  "$schema": ".spaceflow/config-schema.json",
+  "support": ["claudeCode", "windsurf"]
+}

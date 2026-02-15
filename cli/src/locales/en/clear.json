@@ -1,0 +1,16 @@
+{
+  "description": "Clear all installed skill packages",
+  "options.global": "Clear installed content in global directory (~/.spaceflow)",
+  "clearFailed": "❌ Clear failed: {{error}}",
+  "extensionDescription": "Clear cache and temporary files",
+  "clearingGlobal": "🧹 Clearing all skill packages (global)",
+  "clearing": "🧹 Clearing all skill packages",
+  "clearDone": "✅ Clear complete",
+  "spaceflowNotExist": "   .spaceflow does not exist, skipping",
+  "spaceflowNoClean": "   .spaceflow has nothing to clean",
+  "clearingSpaceflow": "   Clearing .spaceflow ({{count}} items, preserving config files)",
+  "deleted": "     Deleted: {{entry}}",
+  "deleteFailed": "     Warning: Failed to delete {{entry}}:",
+  "clearingSkills": "   Clearing {{editor}}/skills ({{count}} items)",
+  "clearingCommands": "   Clearing {{editor}}/commands ({{count}} .md files)"
+}

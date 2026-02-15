@@ -1,0 +1,13 @@
+{
+  "description": "周期统计命令，根据时间范围统计 PR 贡献情况，按人员汇总并排序",
+  "options.preset": "时间预设: this-week(本周), last-week(上周), this-month(本月), last-month(上月), last-7-days, last-15-days, last-30-days",
+  "options.since": "开始日期 (YYYY-MM-DD 格式)，与 --preset 二选一",
+  "options.until": "结束日期 (YYYY-MM-DD 格式)，默认为今天",
+  "options.repository": "仓库路径 (owner/repo 格式)，默认从环境变量获取",
+  "options.format": "输出格式: table, json, markdown",
+  "options.output": "输出目标: console(控制台), issue(创建 GitHub Issue), file(Markdown 文件)",
+  "options.outputFile": "输出文件路径（当 --output 为 file 时使用）",
+  "options.verbose": "详细日志级别 (1: 过程日志, 2: 详细日志)",
+  "reportOutput": "✅ 报告已输出到: {{location}}",
+  "extensionDescription": "周期统计命令，根据时间范围统计 PR 贡献情况，按人员汇总并排序"
+}

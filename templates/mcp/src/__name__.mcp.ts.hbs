@@ -1,0 +1,22 @@
+/**
+ * {{pascalName}} MCP 服务
+ * 提供 {{name}} 相关的 MCP 工具
+ */
+
+import { McpServer, McpTool } from "@spaceflow/core";
+import { {{pascalName}}Service } from "./{{kebabName}}.service";
+import { {{pascalName}}HelloInput } from "./dto/mcp.dto";
+
+@McpServer({ name: "{{kebabName}}-mcp", version: "1.0.0", description: "{{name}} MCP 工具" })
+export class {{pascalName}}Mcp {
+  constructor(private readonly {{camelName}}Service: {{pascalName}}Service) {}
+
+  @McpTool({
+    name: "{{kebabName}}_hello",
+    description: "示例工具：返回问候信息",
+    dto: {{pascalName}}HelloInput,
+  })
+  async hello(input: {{pascalName}}HelloInput) {
+    return this.{{camelName}}Service.hello(input.name, input.lang);
+  }
+}

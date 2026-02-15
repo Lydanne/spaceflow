@@ -1,0 +1,33 @@
+{
+  "editor.formatOnSave": true,
+  "oxc.fmt.experimental": true,
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "[typescript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "cSpell.words": ["Gitea", "spaceflow"],
+  "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "i18n-ally-next.sourceLanguage": "zh-cn",
+  "i18n-ally-next.displayLanguage": "zh-cn",
+  "i18n-ally-next.keystyle": "flat",
+  "i18n-ally-next.extract.keygenStrategy": "template",
+  "i18n-ally-next.extract.keygenTemplate": "{{package_dirname}}:",
+  "i18n-ally-next.namespace": true,
+  "i18n-ally-next.defaultNamespace": "translation",
+  "i18n-ally-next.dirStructure": "dir",
+  "i18n-ally-next.pathMatcher": "{locale}/{namespace}.{ext}",
+  "i18n-ally-next.extract.targetPickingStrategy": "auto",
+  "i18n-ally-next.annotationInPlace": true,
+  "i18n-ally-next.annotationInPlaceFullMatch": true,
+  "i18n-ally-next.annotationBrackets": ["`", "`"],
+  "i18n-ally-next.enabledFrameworks": [ "custom" ],
+  "i18n-ally-next.localesPaths": [
+    "cli/src/locales",
+    "core/src/locales",
+    "commands/ci-scripts/src/locales",
+    "commands/ci-shell/src/locales",
+    "commands/period-summary/src/locales",
+    "commands/publish/src/locales",
+    "commands/review/src/locales"
+  ]
+}

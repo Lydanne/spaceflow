@@ -1,0 +1,26 @@
+{
+  "name": "@spaceflow/{{kebabName}}",
+  "version": "1.0.0",
+  "description": "Spaceflow {{name}} MCP 工具插件",
+  "main": "./dist/index.js",
+  "type": "module",
+  "spaceflow": {
+    "commands": ["."]
+  },
+  "scripts": {
+    "build": "spaceflow build",
+    "dev": "spaceflow dev"
+  },
+  "peerDependencies": {
+    "spaceflow": "workspace:*",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "nest-commander": "catalog:",
+    "class-validator": "catalog:",
+    "class-transformer": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}

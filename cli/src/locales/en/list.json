@@ -1,0 +1,8 @@
+{
+  "description": "List installed skill packages",
+  "extensionDescription": "List installed plugins/skills",
+  "noSkills": "📦 No skill packages installed",
+  "installHint": "Install skill packages with:",
+  "installedExtensions": "📦 Installed extensions ({{installed}}/{{total}}):",
+  "commands": "Commands: {{commands}}"
+}

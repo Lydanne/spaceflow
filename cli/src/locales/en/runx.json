@@ -1,0 +1,13 @@
+{
+  "description": "Install dependency globally and run command",
+  "options.name": "Specify command name (auto-detected from source by default)",
+  "noSource": "❌ Please specify the dependency source to run",
+  "usage": "   Usage: spaceflow x <source> [args...]",
+  "runFailed": "❌ Run failed: {{error}}",
+  "extensionDescription": "Execute scripts provided by plugins",
+  "runningCommand": "▶️  Running command: {{command}}",
+  "npxExitCode": "npx {{package}} exit code: {{code}}",
+  "commandNotInstalled": "Command {{name}} is not installed",
+  "commandNotBuilt": "Command {{name}} is not built, missing dist/index.js",
+  "pluginNoExport": "Plugin {{name}} has no default export"
+}

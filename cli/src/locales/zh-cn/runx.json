@@ -1,0 +1,13 @@
+{
+  "description": "全局安装依赖并运行命令",
+  "options.name": "指定命令名称（默认从 source 自动提取）",
+  "noSource": "❌ 请指定要运行的依赖源",
+  "usage": "   用法: spaceflow x <source> [args...]",
+  "runFailed": "❌ 运行失败: {{error}}",
+  "extensionDescription": "执行插件提供的脚本命令",
+  "runningCommand": "▶️  运行命令: {{command}}",
+  "npxExitCode": "npx {{package}} 退出码: {{code}}",
+  "commandNotInstalled": "命令 {{name}} 未安装",
+  "commandNotBuilt": "命令 {{name}} 未构建，缺少 dist/index.js",
+  "pluginNoExport": "插件 {{name}} 没有默认导出"
+}

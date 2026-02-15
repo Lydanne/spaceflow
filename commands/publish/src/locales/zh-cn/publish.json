@@ -1,0 +1,8 @@
+{
+  "description": "CI 发布命令，用于在发布流程中锁定/解锁分支",
+  "options.prerelease": "预发布标签，如 rc、beta、alpha、nightly 等",
+  "options.rehearsal": "预演模式：执行 hooks 但不修改文件/git，设置 PUBLISH_REHEARSAL=true 环境变量",
+  "rehearsalMode": "🎭 REHEARSAL mode: hooks will execute, but no file/git changes",
+  "dryRunMode": "🔍 DRY-RUN mode: no actual execution",
+  "extensionDescription": "CI 发布命令，用于在发布流程中锁定/解锁分支"
+}

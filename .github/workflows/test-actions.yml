@@ -1,0 +1,59 @@
+name: Test Actions
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Command to test"
+        required: true
+        type: choice
+        options:
+          - publish
+          - review
+          - ci-scripts
+          - ci-shell
+      args:
+        description: "Additional arguments for the command"
+        required: false
+        type: string
+        default: "--dry-run"
+      dev-mode:
+        description: "Enable development mode"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  test-action:
+    runs-on: ubuntu-node-20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set pnpm registry to npmmirror
+        run: |
+          pnpm config set registry https://registry.npmmirror.com
+          pnpm install -g @anthropic-ai/claude-code
+          pnpm install -g opencode-ai
+
+      - name: Test spaceflow action
+        uses: ./actions
+        env:
+          GIT_PROVIDER_TYPE: gitea
+          CLAUDE_CODE_BASE_URL: https://ark.cn-beijing.volces.com/api/coding
+          CLAUDE_CODE_AUTH_TOKEN: ${{ secrets.CLAUDE_CODE_AUTH_TOKEN }}
+          OPENAI_BASE_URL: https://ark.cn-beijing.volces.com/api/v3
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: deepseek-v3-2-251201
+          # OPENAI_MODEL: doubao-seed-code-preview-251028
+          # OPENAI_MODEL: glm-4-7-251222
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          command: ${{ inputs.command }}
+          args: ${{ inputs.args }}
+          dev-mode: ${{ inputs.dev-mode }}

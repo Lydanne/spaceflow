@@ -1,0 +1,14 @@
+{
+  "description": "初始化 spaceflow 配置文件",
+  "options.global": "生成全局配置到 ~/spaceflow/spaceflow.json（合并本地 .env 和 spaceflow.json）",
+  "setupFailed": "❌ 初始化失败: {{error}}",
+  "extensionDescription": "初始化 spaceflow 配置文件",
+  "dirCreated": "✅ 已创建目录: {{dir}}",
+  "configGenerated": "✅ 已生成配置文件: {{path}}",
+  "configExists": "ℹ️  配置文件已存在: {{path}}",
+  "localConfigRead": "📖 已读取本地配置",
+  "globalConfigGenerated": "✅ 已生成全局配置: {{path}}",
+  "envConfigMerged": "📝 已合并环境变量配置:",
+  "envRead": "📖 已读取环境变量: {{path}}",
+  "envReadFailed": "⚠️  无法读取 .env 文件: {{path}}"
+}

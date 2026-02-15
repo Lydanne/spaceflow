@@ -1,0 +1,16 @@
+{
+  "description": "清理所有安装的技能包",
+  "options.global": "清理全局目录 (~/.spaceflow) 的安装内容",
+  "clearFailed": "❌ 清理失败: {{error}}",
+  "extensionDescription": "清理缓存和临时文件",
+  "clearingGlobal": "🧹 清理所有技能包 (全局)",
+  "clearing": "🧹 清理所有技能包",
+  "clearDone": "✅ 清理完成",
+  "spaceflowNotExist": "   .spaceflow 不存在，跳过",
+  "spaceflowNoClean": "   .spaceflow 无需清理",
+  "clearingSpaceflow": "   清理 .spaceflow ({{count}} 项，保留配置文件)",
+  "deleted": "     删除: {{entry}}",
+  "deleteFailed": "     警告: 删除 {{entry}} 失败:",
+  "clearingSkills": "   清理 {{editor}}/skills ({{count}} 项)",
+  "clearingCommands": "   清理 {{editor}}/commands ({{count}} 个 .md 文件)"
+}

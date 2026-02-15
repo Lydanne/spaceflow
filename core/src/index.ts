@@ -1,0 +1,80 @@
+// ============ 插件系统 ============
+export * from "./extension-system";
+
+// ============ 基础能力模块 ============
+// Git Provider - 多平台 Git 托管 API 操作（GitHub、Gitea、GitLab）
+export * from "./shared/git-provider";
+
+// Git SDK - Git 命令操作
+export * from "./shared/git-sdk";
+
+// LLM Proxy - 多 LLM 适配器
+export * from "./shared/llm-proxy";
+
+// Feishu SDK - 飞书 API 操作
+export * from "./shared/feishu-sdk";
+
+// Storage - 存储服务
+export * from "./shared/storage";
+
+// Claude Setup - Claude Agent 配置
+export * from "./shared/claude-setup";
+
+// Parallel - 并行执行工具
+export * from "./shared/parallel";
+
+// Output - 输出服务
+export * from "./shared/output";
+
+// Verbose - 日志级别
+export * from "./shared/verbose";
+
+// Editor Config - 编辑器配置
+export * from "./shared/editor-config";
+
+// LLM JsonPut - JSON 结构化输出
+export * from "./shared/llm-jsonput";
+
+// Source Utils - 源类型判断工具
+export * from "./shared/source-utils";
+
+// Package Manager - 包管理器检测
+export * from "./shared/package-manager";
+
+// Spaceflow Dir - .spaceflow 目录管理
+export * from "./shared/spaceflow-dir";
+
+// Rspack Config - Rspack 配置工具
+export * from "./shared/rspack-config";
+
+// MCP - Model Context Protocol 支持
+export * from "./shared/mcp";
+
+// I18n - 国际化
+export * from "./shared/i18n";
+
+// Logger - 全局日志工具
+export * from "./shared/logger";
+
+// ============ 配置相关 ============
+export * from "./config";
+
+// ============ NestJS 重导出 ============
+export { Command, CommandRunner, Option, SubCommand } from "nest-commander";
+export { Module, Injectable, Inject, Global } from "@nestjs/common";
+export { ConfigModule, ConfigService } from "@nestjs/config";
+
+// ============ Zod 重导出 ============
+export { z } from "zod";
+
+// ============ Swagger DTO 重导出 ============
+export { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+export {
+  IsString,
+  IsNumber,
+  IsBoolean,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  IsNotEmpty,
+} from "class-validator";

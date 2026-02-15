@@ -1,0 +1,17 @@
+import { Injectable } from "@nestjs/common";
+
+export interface {{pascalName}}Options {
+  verbose?: boolean;
+}
+
+@Injectable()
+export class {{pascalName}}Service {
+  async execute(options: {{pascalName}}Options): Promise<void> {
+    if (options.verbose) {
+      console.log("执行 {{name}} 命令...");
+    }
+
+    // TODO: 实现命令逻辑
+    console.log("Hello from {{name}}!");
+  }
+}

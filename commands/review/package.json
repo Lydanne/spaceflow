@@ -1,0 +1,40 @@
+{
+  "name": "@spaceflow/review",
+  "version": "0.29.0",
+  "description": "Spaceflow 代码审查插件，使用 LLM 对 PR 代码进行自动审查",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "spaceflow build",
+    "dev": "spaceflow dev",
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage"
+  },
+  "dependencies": {
+    "micromatch": "^4.0.8"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "catalog:",
+    "@spaceflow/cli": "workspace:*",
+    "@swc/core": "catalog:",
+    "@types/micromatch": "^4.0.9",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "unplugin-swc": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@spaceflow/core": "workspace:*",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "nest-commander": "catalog:"
+  },
+  "spaceflow": {
+    "type": "flow",
+    "entry": "."
+  }
+}

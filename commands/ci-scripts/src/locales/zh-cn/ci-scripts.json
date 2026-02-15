@@ -1,0 +1,6 @@
+{
+  "description": "在分支锁定/解锁之间执行 JS 语句",
+  "argsDescription.script": "要执行的 JS 语句",
+  "noScript": "❌ 请提供要执行的 JS 语句",
+  "extensionDescription": "CI 脚本命令，用于在分支锁定/解锁之间执行 JS 语句"
+}

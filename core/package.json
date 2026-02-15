@@ -1,0 +1,120 @@
+{
+  "name": "@spaceflow/core",
+  "version": "0.1.0",
+  "description": "Spaceflow 核心能力库",
+  "license": "UNLICENSED",
+  "author": "",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./verbose": {
+      "types": "./src/shared/verbose/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./editor-config": {
+      "types": "./src/shared/editor-config/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./source-utils": {
+      "types": "./src/shared/source-utils/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./package-manager": {
+      "types": "./src/shared/package-manager/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./spaceflow-dir": {
+      "types": "./src/shared/spaceflow-dir/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./spaceflow.config": {
+      "types": "./src/config/spaceflow.config.ts",
+      "import": "./dist/index.js"
+    },
+    "./schema-generator.service": {
+      "types": "./src/config/schema-generator.service.ts",
+      "import": "./dist/index.js"
+    },
+    "./rspack-config": {
+      "types": "./src/shared/rspack-config/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./llm-proxy": {
+      "types": "./src/shared/llm-proxy/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./llm-jsonput": {
+      "types": "./src/shared/llm-jsonput/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./parallel": {
+      "types": "./src/shared/parallel/index.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rspack build -c rspack.config.mjs",
+    "format": "oxfmt src test --write",
+    "lint": "oxlint src test",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.7",
+    "@larksuiteoapi/node-sdk": "^1.55.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/event-emitter": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@opencode-ai/sdk": "^1.1.23",
+    "@release-it/conventional-changelog": "^10.0.4",
+    "@rspack/cli": "^1.7.4",
+    "@rspack/core": "^1.7.4",
+    "chalk": "^5.6.2",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "i18next": "^25.8.4",
+    "json-stringify-pretty-compact": "^4.0.0",
+    "jsonrepair": "^3.13.1",
+    "log-update": "^7.1.0",
+    "micromatch": "^4.0.8",
+    "nest-commander": "catalog:",
+    "openai": "^6.1.0",
+    "ora": "^9.3.0",
+    "reflect-metadata": "catalog:",
+    "release-it": "^19.2.2",
+    "release-it-gitea": "^1.8.0",
+    "rxjs": "catalog:",
+    "zod": "catalog:",
+    "zod-to-json-schema": "^3.25.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@swc/core": "catalog:",
+    "@types/express": "catalog:",
+    "@types/micromatch": "^4.0.10",
+    "@types/node": "catalog:",
+    "@types/supertest": "catalog:",
+    "source-map-support": "catalog:",
+    "supertest": "catalog:",
+    "ts-loader": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "unplugin-swc": "catalog:",
+    "vitest": "catalog:"
+  }
+}

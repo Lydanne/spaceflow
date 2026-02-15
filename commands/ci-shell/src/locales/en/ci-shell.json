@@ -1,0 +1,6 @@
+{
+  "description": "Execute shell commands between branch lock/unlock",
+  "argsDescription.command": "Shell command to execute",
+  "noCommand": "❌ Please provide a shell command to execute",
+  "extensionDescription": "CI shell command for executing shell commands between branch lock/unlock"
+}

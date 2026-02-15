@@ -1,0 +1,58 @@
+import swc from "unplugin-swc";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  plugins: [swc.vite()],
+  test: {
+    root: "src",
+    globals: true,
+    environment: "node",
+    include: ["**/*.spec.ts"],
+    alias: {
+      "^src/(.*)$": "$1",
+    },
+    coverage: {
+      provider: "v8",
+      include: ["shared/**/*.ts"],
+      exclude: [
+        "**/*.spec.ts",
+        "**/*.module.ts",
+        "**/index.ts",
+        "**/__mocks__/**",
+        "**/*.interface.ts",
+        "**/*.types.ts",
+        "**/types.ts",
+        "**/types/**",
+        "**/interfaces/**",
+        "**/feishu-sdk/**",
+        "**/storage/**",
+        "**/rspack-config/**",
+        "**/output/**",
+        "**/parallel/**",
+        "**/mcp/**",
+        "**/editor-config/**",
+        "**/package-manager/**",
+        "**/source-utils/**",
+        "**/spaceflow-dir/**",
+        "**/verbose/**",
+        "**/claude-setup/**",
+        "**/git-sdk/git-sdk.service.ts",
+        "**/i18n/locale-detect.ts",
+        "**/tui.renderer.ts",
+        "**/llm-jsonput/**",
+        "**/stream-logger.ts",
+        "**/open-code.adapter.ts",
+        "**/claude-code.adapter.ts",
+        "**/gitlab.adapter.ts",
+        "**/gitea.adapter.ts",
+        "**/github.adapter.ts",
+      ],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
+      },
+    },
+  },
+});

@@ -1,0 +1,48 @@
+name: "Spaceflow"
+description: "Run spaceflow CLI commands in CI workflows"
+author: "spaceflow"
+
+inputs:
+  command:
+    description: "The spaceflow command to run (e.g. review, publish, ci-scripts, ci-shell, or get-output for extracting cached values)"
+    required: true
+  args:
+    description: "Additional arguments to pass to the command"
+    required: false
+    default: ""
+  from-comment:
+    description: "Parse command from PR comment (e.g. '/review -v 2 -l openai')"
+    required: false
+    default: ""
+  provider-url:
+    description: "Git Provider server URL (e.g. https://api.github.com)"
+    required: false
+  provider-token:
+    description: "Git Provider API token"
+    required: false
+  working-directory:
+    description: "Working directory for the command"
+    required: false
+    default: "."
+  dev-mode:
+    description: "Enable development mode (install deps and use nest to run)"
+    required: false
+    default: "false"
+  event-action:
+    description: "PR event action (opened, synchronize, closed, etc.)"
+    required: false
+    default: ""
+
+outputs:
+  result:
+    description: "JSON string of all command outputs"
+  value:
+    description: "Extracted value from JSON (for get-output command)"
+
+runs:
+  using: "node20"
+  main: "dist/index.js"
+
+branding:
+  icon: "git-pull-request"
+  color: "green"

@@ -1,0 +1,8 @@
+{
+  "description": "CI publish command for branch lock/unlock during release",
+  "options.prerelease": "Prerelease tag, e.g. rc, beta, alpha, nightly",
+  "options.rehearsal": "Rehearsal mode: execute hooks but no file/git changes, sets PUBLISH_REHEARSAL=true",
+  "rehearsalMode": "🎭 REHEARSAL mode: hooks will execute, but no file/git changes",
+  "dryRunMode": "🔍 DRY-RUN mode: no actual execution",
+  "extensionDescription": "CI publish command for branch lock/unlock during release"
+}

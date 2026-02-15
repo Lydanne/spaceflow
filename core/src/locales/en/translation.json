@@ -1,0 +1,11 @@
+{
+  "common.executionFailed": "Execution failed: {{error}}",
+  "common.stackTrace": "\nStack trace:\n{{stack}}",
+  "common.options.dryRun": "Only print actions without executing",
+  "common.options.verbose": "Show verbose logs (-v: basic, -vv: detailed)",
+  "common.options.verboseDebug": "Show verbose logs (-v: basic, -vv: detailed, -vvv: debug)",
+  "common.options.ci": "Run in CI environment",
+  "config.parseWarning": "Warning: unable to parse config file {{path}}",
+  "config.validationFailed": "Spaceflow config validation failed:\n{{errors}}",
+  "extensionLoader.loadFailed": "⚠️ Failed to load Extension {{name}}: {{error}}"
+}

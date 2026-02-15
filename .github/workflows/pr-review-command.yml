@@ -1,0 +1,49 @@
+name: PR Review Command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    # 仅在 PR 评论中触发，且评论以 /review 或 /ai-review 开头
+    if: |
+      github.event.issue.pull_request &&
+      (startsWith(github.event.comment.body, '/review') || startsWith(github.event.comment.body, '/ai-review'))
+    runs-on: ubuntu-node-24
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set pnpm registry to npmmirror
+        run: |
+          pnpm config set registry https://registry.npmmirror.com
+          pnpm install -g @anthropic-ai/claude-code
+          pnpm install -g opencode-ai
+
+      - name: Run Review
+        uses: ./actions
+        env:
+          GIT_PROVIDER_TYPE: gitea
+          CLAUDE_CODE_BASE_URL: https://ark.cn-beijing.volces.com/api/coding
+          CLAUDE_CODE_AUTH_TOKEN: ${{ secrets.CLAUDE_CODE_AUTH_TOKEN }}
+          OPENAI_BASE_URL: https://ark.cn-beijing.volces.com/api/v3
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: deepseek-v3-2-251201
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          from-comment: ${{ github.event.comment.body }}
+          dev-mode: "true"

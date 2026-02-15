@@ -1,0 +1,19 @@
+{
+  "name": "spaceflow-actions",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Spaceflow Actions - GitHub/Gitea Actions for CI workflows",
+  "license": "UNLICENSED",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "ncc build src/index.js -o dist --source-map --license licenses.txt"
+  },
+  "dependencies": {
+    "@actions/cache": "^5.0.1",
+    "@actions/core": "^2.0.1",
+    "@actions/exec": "^2.0.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.3"
+  }
+}

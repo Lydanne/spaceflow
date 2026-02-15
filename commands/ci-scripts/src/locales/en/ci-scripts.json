@@ -1,0 +1,6 @@
+{
+  "description": "Execute JS statements between branch lock/unlock",
+  "argsDescription.script": "JS statement to execute",
+  "noScript": "❌ Please provide a JS statement to execute",
+  "extensionDescription": "CI script command for executing JS statements between branch lock/unlock"
+}

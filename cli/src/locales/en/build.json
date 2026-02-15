@@ -1,0 +1,22 @@
+{
+  "description": "Build skill packages in the skills directory",
+  "options.watch": "Watch for file changes and rebuild automatically",
+  "buildFailed": "❌ Build failed: {{error}}",
+  "extensionDescription": "Build plugins/skills",
+  "noPlugins": "📦 No buildable plugins found",
+  "startBuilding": "📦 Building {{count}} plugins...",
+  "buildComplete": "✅ Build complete: {{success}} succeeded, {{fail}} failed",
+  "startWatching": "👀 Watching {{count}} plugins...",
+  "stopWatching": "🛑 Stop watching: {{name}}",
+  "building": "🔨 Building: {{name}}",
+  "buildSuccess": "   ✅ Done ({{duration}}ms)",
+  "buildFailedWithDuration": "   ❌ Failed ({{duration}}ms)",
+  "buildFailedWithMessage": "   ❌ Failed ({{duration}}ms): {{message}}",
+  "buildWarnings": "   ⚠️  Done ({{duration}}ms) - {{count}} warnings",
+  "watching": "👀 Watching: {{name}}",
+  "watchError": "   ❌ [{{name}}] Error: {{message}}",
+  "watchBuildFailed": "   ❌ [{{name}}] Build failed",
+  "watchBuildWarnings": "   ⚠️  [{{name}}] Build complete - {{count}} warnings",
+  "watchBuildSuccess": "   ✅ [{{name}}] Build complete",
+  "watchInitFailed": "   ❌ [{{name}}] Init failed: {{message}}"
+}

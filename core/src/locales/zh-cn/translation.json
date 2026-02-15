@@ -1,0 +1,11 @@
+{
+  "common.executionFailed": "执行失败: {{error}}",
+  "common.stackTrace": "\n堆栈信息:\n{{stack}}",
+  "common.options.dryRun": "仅打印将要执行的操作，不实际执行",
+  "common.options.verbose": "显示详细日志 (-v: 基本日志, -vv: 详细日志)",
+  "common.options.verboseDebug": "显示详细日志 (-v: 基本日志, -vv: 详细日志, -vvv: 调试日志)",
+  "common.options.ci": "是否在 CI 环境中运行",
+  "config.parseWarning": "警告: 无法解析配置文件 {{path}}",
+  "config.validationFailed": "Spaceflow 配置验证失败:\n{{errors}}",
+  "extensionLoader.loadFailed": "⚠️ 加载 Extension {{name}} 失败: {{error}}"
+}

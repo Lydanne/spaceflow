@@ -1,0 +1,66 @@
+name: Publish
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run mode (不实际执行)"
+        required: false
+        default: false
+        type: boolean
+      rehearsal:
+        description: "Rehearsal mode (执行 hooks 但不修改文件/git)"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GIT_PROVIDER_TYPE: gitea
+  GITHUB_TOKEN: ${{ secrets.CI_GITEA_TOKEN }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-node-24
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.CI_GITEA_TOKEN }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Git and NPM
+        run: |
+          git config user.name "GiteaActions"
+          git config user.email "GiteaActions@users.noreply.gitea.com"
+          echo "@spaceflow:registry=https://git.bjxgj.com/api/packages/xgj/npm/" >> .npmrc
+          echo "//git.bjxgj.com/api/packages/xgj/npm/:_authToken=${{ secrets.CI_GITEA_TOKEN }}" >> .npmrc
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run setup
+
+      - name: Install Extensions
+        run: pnpm spaceflow install
+
+      - name: Publish (Dry Run)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        run: pnpm spaceflow publish --dry-run --ci
+
+      - name: Publish (Rehearsal)
+        if: ${{ github.event.inputs.rehearsal == 'true' && github.event.inputs.dry_run != 'true' }}
+        run: pnpm spaceflow publish --rehearsal --ci
+
+      - name: Publish
+        if: ${{ github.event.inputs.dry_run != 'true' && github.event.inputs.rehearsal != 'true' }}
+        run: pnpm spaceflow publish --ci

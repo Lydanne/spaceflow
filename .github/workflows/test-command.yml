@@ -1,0 +1,76 @@
+name: Run Spaceflow Command
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Command to run (publish, review, ci-scripts, ci-shell, claude-config)"
+        required: true
+        type: choice
+        options:
+          - publish
+          - review
+          - ci-scripts
+          - ci-shell
+          - claude-config
+      args:
+        description: "Additional arguments for the command"
+        required: false
+        type: string
+        default: ""
+      dry-run:
+        description: "Run in dry-run mode"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  run-command:
+    runs-on: ubuntu-node-20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # - name: Init submodules
+      #   run: |
+      #     git submodule sync --recursive
+      #     git submodule update --init --recursive
+
+      - name: Print environment variables
+        run: |
+          echo "=== Environment Variables ==="
+          env | sort
+          echo "============================="
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install dependencies
+        run: |
+          pnpm config set registry https://registry.npmmirror.com
+          pnpm install -g @anthropic-ai/claude-code
+          pnpm install -g opencode-ai
+          pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm run setup
+
+      - name: Install spaceflow plugins
+        run: pnpm spaceflow install --ignore-errors
+
+      - name: Run spaceflow command
+        env:
+          GIT_PROVIDER_TYPE: gitea
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLAUDE_CODE_BASE_URL: https://ark.cn-beijing.volces.com/api/coding
+          CLAUDE_CODE_AUTH_TOKEN: ${{ secrets.CLAUDE_CODE_AUTH_TOKEN }}
+          OPENAI_BASE_URL: https://ark.cn-beijing.volces.com/api/v3
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: deepseek-v3-2-251201
+        run: |
+          ARGS="${{ inputs.args }}"
+          if [ "${{ inputs.dry-run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          pnpm spaceflow ${{ inputs.command }} $ARGS

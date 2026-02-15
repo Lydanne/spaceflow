@@ -1,0 +1,6 @@
+{
+  "description": "在分支锁定/解锁之间执行 Shell 命令",
+  "argsDescription.command": "要执行的 Shell 命令",
+  "noCommand": "❌ 请提供要执行的 Shell 命令",
+  "extensionDescription": "CI Shell 命令，用于在分支锁定/解锁之间执行 Shell 命令"
+}

@@ -1,0 +1,50 @@
+{
+  "name": "@spaceflow/cli",
+  "version": "0.19.0",
+  "description": "Spaceflow CLI 工具",
+  "license": "UNLICENSED",
+  "author": "",
+  "bin": {
+    "space": "dist/cli.js",
+    "spaceflow": "dist/cli.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "rspack build -c rspack.config.mjs",
+    "format": "oxfmt src --write",
+    "lint": "oxlint src",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@rspack/cli": "^1.7.4",
+    "@rspack/core": "^1.7.4",
+    "@spaceflow/core": "workspace:*",
+    "json-stringify-pretty-compact": "^4.0.0",
+    "micromatch": "^4.0.8",
+    "zod-to-json-schema": "^3.25.1"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "nest-commander": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "vitest": "catalog:"
+  }
+}

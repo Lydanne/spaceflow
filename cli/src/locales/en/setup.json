@@ -1,0 +1,14 @@
+{
+  "description": "Initialize spaceflow configuration files",
+  "options.global": "Generate global config to ~/spaceflow/spaceflow.json (merge local .env and spaceflow.json)",
+  "setupFailed": "❌ Initialization failed: {{error}}",
+  "extensionDescription": "Initialize spaceflow configuration files",
+  "dirCreated": "✅ Directory created: {{dir}}",
+  "configGenerated": "✅ Config file generated: {{path}}",
+  "configExists": "ℹ️  Config file already exists: {{path}}",
+  "localConfigRead": "📖 Local config loaded",
+  "globalConfigGenerated": "✅ Global config generated: {{path}}",
+  "envConfigMerged": "📝 Merged environment variable config:",
+  "envRead": "📖 Environment variables loaded: {{path}}",
+  "envReadFailed": "⚠️  Failed to read .env file: {{path}}"
+}

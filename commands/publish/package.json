@@ -1,0 +1,30 @@
+{
+  "name": "@spaceflow/publish",
+  "version": "0.21.0",
+  "description": "Spaceflow CI 发布插件，用于在发布流程中锁定/解锁分支",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "spaceflow build",
+    "dev": "spaceflow dev"
+  },
+  "dependencies": {
+    "@release-it/conventional-changelog": "^10.0.4",
+    "release-it": "^19.2.2",
+    "release-it-gitea": "^1.8.0"
+  },
+  "devDependencies": {
+    "@spaceflow/cli": "workspace:*",
+    "@types/node": "catalog:"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@spaceflow/core": "workspace:*",
+    "nest-commander": "catalog:"
+  },
+  "spaceflow": {
+    "type": "flow",
+    "entry": "."
+  }
+}

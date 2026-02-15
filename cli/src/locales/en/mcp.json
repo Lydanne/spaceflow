@@ -1,0 +1,18 @@
+{
+  "description": "Start MCP Server with all installed extension tools",
+  "options.inspector": "Start MCP Inspector for interactive debugging",
+  "inspectorStarting": "🔍 Starting MCP Inspector...",
+  "inspectorDebugCmd": "   Debug command: pnpm space mcp",
+  "inspectorFailed": "❌ Failed to start MCP Inspector: {{error}}",
+  "extensionDescription": "Start MCP Server with all installed extension tools",
+  "scanning": "🔍 Scanning installed extensions...",
+  "foundExtensions": "   Found {{count}} extensions",
+  "checkingExport": "     Checking {{key}}: __mcp_server__={{hasMcpServer}}",
+  "containerSuccess": "     ✅ Got {{key}} instance from container",
+  "containerFailed": "     ⚠️ Failed to get {{key}} from container: {{error}}",
+  "loadToolsFailed": "   ⚠️ {{name}}: Failed to load MCP tools",
+  "noToolsFound": "❌ No MCP tools found",
+  "noToolsHint": "   Hint: Make sure you have installed MCP-enabled extensions that export mcpService or getMcpTools",
+  "toolsFound": "✅ Found {{count}} MCP tools",
+  "serverStarted": "🚀 MCP Server started with {{count}} tools"
+}
