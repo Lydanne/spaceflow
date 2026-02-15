@@ -1,6 +1,9 @@
 # @spaceflow/core
 
-Spaceflow 核心能力库，提供共享模块、插件系统基础设施和平台适配层。
+[![npm version](https://img.shields.io/npm/v/@spaceflow/core?color=blue)](https://www.npmjs.com/package/@spaceflow/core)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+> Spaceflow 核心能力库，提供共享模块、扩展系统基础设施和平台适配层。
 
 ## 安装
 
@@ -10,7 +13,7 @@ pnpm add @spaceflow/core
 
 ## 共享模块
 
-核心库导出以下共享模块，供插件开发使用：
+核心库导出以下共享模块，供扩展开发使用：
 
 | 模块              | 导入路径                          | 说明                                      |
 | ----------------- | --------------------------------- | ----------------------------------------- |
@@ -28,7 +31,7 @@ pnpm add @spaceflow/core
 | `package-manager` | `@spaceflow/core/package-manager` | 包管理器抽象                              |
 | `rspack-config`   | `@spaceflow/core/rspack-config`   | Rspack 构建配置                           |
 
-## 作为库使用
+## 快速上手
 
 ```typescript
 import {
@@ -53,7 +56,7 @@ import {
 core/
 ├── src/
 │   ├── config/              # 配置管理（Zod Schema）
-│   ├── extension-system/    # 插件系统核心
+│   ├── extension-system/    # 扩展系统核心
 │   ├── locales/             # 国际化资源（i18next）
 │   ├── shared/              # 共享模块
 │   │   ├── git-provider/    # Git 平台适配器
@@ -95,11 +98,11 @@ pnpm run format
 
 - **NestJS** — 依赖注入框架
 - **nest-commander** — CLI 命令框架
-- **rspack** — 构建工具
+- **Rspack** — 构建工具
 - **i18next** — 国际化
 - **Zod** — 配置校验
 - **TypeScript** — 类型系统
 
 ## 许可证
 
-[MIT](../LICENSE)
+[MIT](../../LICENSE)
