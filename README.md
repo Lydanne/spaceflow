@@ -47,7 +47,6 @@ spaceflow/
 │   │           ├── logger/         # 日志系统（TUI/Plain）
 │   │           ├── parallel/       # 并行执行工具
 │   │           └── storage/        # 通用存储服务
-│   └── spaceflow/      # 代理包（spaceflow）
 ├── extensions/         # 外部插件
 │   ├── review/         # AI 代码审查（@spaceflow/review）
 │   ├── publish/        # 自动化发布（@spaceflow/publish）

@@ -518,12 +518,6 @@ importers:
         specifier: 'catalog:'
         version: 4.0.18(@types/node@22.19.1)(jiti@2.6.1)(terser@5.44.1)
 
-  packages/spaceflow:
-    dependencies:
-      '@spaceflow/cli':
-        specifier: workspace:*
-        version: link:../cli
-
 packages:
 
   '@actions/cache@5.0.1':
