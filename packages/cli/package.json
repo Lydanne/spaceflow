@@ -1,6 +1,6 @@
 {
   "name": "@spaceflow/cli",
-  "version": "0.19.1",
+  "version": "0.19.2",
   "description": "Spaceflow CLI 工具",
   "license": "MIT",
   "author": "Lydanne",
