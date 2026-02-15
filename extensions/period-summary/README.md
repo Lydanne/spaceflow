@@ -1,6 +1,9 @@
 # @spaceflow/period-summary
 
-Spaceflow 周期统计插件，根据时间范围统计 PR 贡献情况，按人员汇总并排序。支持输出到控制台、GitHub Issue 或 Markdown 文件。
+[![npm version](https://img.shields.io/npm/v/@spaceflow/period-summary?color=blue)](https://www.npmjs.com/package/@spaceflow/period-summary)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+> Spaceflow 周期统计扩展，根据时间范围统计 PR 贡献情况，按人员汇总并排序。支持输出到控制台、GitHub Issue 或 Markdown 文件。
 
 ## 安装
 
