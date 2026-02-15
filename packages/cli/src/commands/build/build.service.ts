@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { rspack, type Compiler, type Configuration, type Stats } from "@rspack/core";
 import { readdir, stat } from "fs/promises";
-import { join, dirname } from "path";
-import { existsSync } from "fs";
-import { createPluginConfig } from "@spaceflow/core";
+import { join, dirname, resolve } from "path";
+import { existsSync, readFileSync } from "fs";
+import { createRequire } from "module";
+import { createPluginConfig, getDependencies } from "@spaceflow/core";
 import { shouldLog, type VerboseLevel, t } from "@spaceflow/core";
 
 export interface SkillInfo {
@@ -23,9 +24,8 @@ export interface BuildResult {
 @Injectable()
 export class BuildService {
   private readonly projectRoot = this.findProjectRoot();
-  private readonly skillsDir = join(this.projectRoot, "skills");
-  private readonly commandsDir = join(this.projectRoot, "commands");
-  private readonly coreRoot = join(this.projectRoot, "core");
+  private readonly extensionDirs = this.discoverExtensionDirs();
+  private readonly coreRoot = this.resolveCoreRoot();
   private watchers: Map<string, Compiler> = new Map();
 
   /**
@@ -113,6 +113,36 @@ export class BuildService {
   }
 
   /**
+   * 从 spaceflow.json 的 dependencies 中发现本地 extension 所在的目录
+   * 解析所有 link: 路径，收集去重后的父目录
+   */
+  private discoverExtensionDirs(): string[] {
+    const dependencies = getDependencies(this.projectRoot);
+    const parentDirs = new Set<string>();
+    for (const source of Object.values(dependencies)) {
+      if (!source.startsWith("link:")) continue;
+      const linkPath = source.slice(5);
+      const absolutePath = resolve(this.projectRoot, linkPath);
+      parentDirs.add(dirname(absolutePath));
+    }
+    return Array.from(parentDirs);
+  }
+
+  /**
+   * 动态解析 @spaceflow/core 的根目录
+   * 优先通过 require.resolve 定位，回退到 node_modules
+   */
+  private resolveCoreRoot(): string {
+    try {
+      const req = createRequire(join(this.projectRoot, "package.json"));
+      const corePkgPath = req.resolve("@spaceflow/core/package.json");
+      return dirname(corePkgPath);
+    } catch {
+      return join(this.projectRoot, "node_modules", "@spaceflow", "core");
+    }
+  }
+
+  /**
    * 获取需要构建的插件列表
    */
   private async getSkillsToBuild(skillName?: string): Promise<SkillInfo[]> {
@@ -123,64 +153,47 @@ export class BuildService {
         return [currentSkill];
       }
     }
-
-    if (!existsSync(this.skillsDir)) {
-      return [];
-    }
-
-    const entries = await readdir(this.skillsDir);
+    // 从所有 extension 目录中扫描
     const skills: SkillInfo[] = [];
-
-    for (const entry of entries) {
-      if (entry.startsWith(".")) continue;
-
-      const skillPath = join(this.skillsDir, entry);
-      const stats = await stat(skillPath);
-
-      if (!stats.isDirectory()) continue;
-
-      if (skillName && entry !== skillName) continue;
-
-      const packageJsonPath = join(skillPath, "package.json");
-      const hasPackageJson = existsSync(packageJsonPath);
-
-      if (hasPackageJson) {
-        skills.push({
-          name: entry,
-          path: skillPath,
-          hasPackageJson,
-        });
+    for (const extDir of this.extensionDirs) {
+      if (!existsSync(extDir)) continue;
+      const entries = await readdir(extDir);
+      for (const entry of entries) {
+        if (entry.startsWith(".")) continue;
+        const skillPath = join(extDir, entry);
+        const stats = await stat(skillPath);
+        if (!stats.isDirectory()) continue;
+        if (skillName && entry !== skillName) continue;
+        const packageJsonPath = join(skillPath, "package.json");
+        if (existsSync(packageJsonPath)) {
+          skills.push({ name: entry, path: skillPath, hasPackageJson: true });
+        }
       }
     }
-
     return skills;
   }
 
   /**
-   * 检测当前是否在插件目录中运行
+   * 检测当前目录是否为 spaceflow extension
+   * 通过检查 package.json 中的 spaceflow 配置判断，不依赖固定目录名
    */
   private detectCurrentSkill(): SkillInfo | null {
     const cwd = process.cwd();
     const packageJsonPath = join(cwd, "package.json");
-
-    // 检查当前目录是否有 package.json
     if (!existsSync(packageJsonPath)) {
       return null;
     }
-
-    // 检查是否在 skills 或 commands 目录下
-    if (!cwd.startsWith(this.skillsDir) && !cwd.startsWith(this.commandsDir)) {
+    try {
+      const content = readFileSync(packageJsonPath, "utf-8");
+      const pkg = JSON.parse(content);
+      if (!pkg.spaceflow) {
+        return null;
+      }
+      const name = cwd.split("/").pop() || "";
+      return { name, path: cwd, hasPackageJson: true };
+    } catch {
       return null;
     }
-
-    // 获取插件名（当前目录名）
-    const name = cwd.split("/").pop() || "";
-
-    return {
-      name,
-      path: cwd,
-      hasPackageJson: true,
-    };
   }
 
   /**
