@@ -441,6 +441,9 @@ importers:
       release-it:
         specifier: ^19.2.2
         version: 19.2.2(@types/node@22.19.1)(magicast@0.5.2)
+      release-it-gitea:
+        specifier: ^1.8.0
+        version: 1.8.0(release-it@19.2.2(@types/node@22.19.1)(magicast@0.5.2))
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
