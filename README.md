@@ -1,189 +1,169 @@
-# spaceflow
+# Spaceflow
 
-Spaceflow 的工作流系统，提供统一的 CI/CD 管理和 AI 代码审查能力。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+可扩展的 AI 工程化工作流平台，提供插件化的 CI/CD 管理、AI 代码审查和多编辑器集成能力。
 
 ## 功能特性
 
-- **统一管理手动触发的 CI**：提供统一的 UI 系统管理手动触发的 CI 任务
-- **可扩展的 UI 界面**：支持命令行、Web 界面、飞书对话机器人等多种交互方式
-- **可自定义的通知消息模板**：灵活配置通知消息格式
-- **可扩展的通知方式**：支持多种通知渠道
-- **按仓库隔离**：各仓库配置独立，互不干扰
-- **PR 流程自动化**：AI 审核、ESLint 检查、重复代码检查、自定义仓库脚本等
+- **AI 代码审查**：基于 LLM（OpenAI、Claude、Gemini）的自动化 PR 审查，支持行级评论和增量审查
+- **自动化发布**：基于 Conventional Commits 的版本管理，支持 Monorepo 拓扑排序发布
+- **插件系统**：通过 NestJS 模块化架构，支持自定义命令和技能扩展
+- **多编辑器集成**：自动关联插件到 Claude Code、Windsurf、Cursor、OpenCode 等编辑器
+- **多平台适配**：支持 GitHub、Gitea、GitLab 等 Git 托管平台
+- **CI 流程编排**：分支锁定保护下执行 Shell 命令或 JS 脚本
+
+## 快速开始
+
+```bash
+# 安装 CLI
+pnpm add -D @spaceflow/cli
+
+# 初始化项目配置
+pnpm spaceflow setup
+
+# 安装插件
+pnpm spaceflow install @spaceflow/review
+pnpm spaceflow install @spaceflow/publish
+```
 
 ## 项目结构
 
-```bash
+```text
 spaceflow/
-├── actions/           # GitHub Actions
-├── core/              # 核心服务（NestJS 应用）
+├── cli/                # CLI 入口（@spaceflow/cli）
+├── core/               # 核心能力库（@spaceflow/core）
 │   └── src/
-│       ├── commands/  # CLI 命令模块
-│       │   ├── review/          # 代码审查
-│       │   ├── publish/         # CI 发布
-│       │   ├── ci-scripts/      # 自定义脚本执行
-│       │   ├── ci-shell/        # Shell 命令执行
-│       │   ├── claude-setup/    # Claude 配置
-│       │   └── period-summary/  # 周期总结
-│       └── shared/   # 共享模块
-│           ├── feishu-sdk/      # 飞书 SDK
-│           ├── git-sdk/         # Git 命令封装
-│           ├── git-provider/    # Git Provider 适配器
-│           ├── llm-proxy/       # LLM 统一代理
-│           ├── review-spec/     # 审查规范管理
-│           ├── review-report/   # 审查报告格式化
-│           └── storage/         # 通用存储模块
-├── .github/
-│   └── workflows/     # GitHub Actions 工作流文件
-└── spaceflow.json  # 项目配置
+│       ├── config/             # 配置管理
+│       ├── extension-system/   # 插件系统
+│       ├── locales/            # 国际化资源
+│       └── shared/             # 共享模块
+│           ├── git-provider/   # Git 平台适配器
+│           ├── git-sdk/        # Git 命令封装
+│           ├── llm-proxy/      # LLM 统一代理
+│           ├── llm-jsonput/    # JSON 结构化输出
+│           ├── feishu-sdk/     # 飞书 SDK
+│           ├── logger/         # 日志系统（TUI/Plain）
+│           ├── parallel/       # 并行执行工具
+│           └── storage/        # 通用存储服务
+├── commands/           # 外部插件
+│   ├── review/         # AI 代码审查（@spaceflow/review）
+│   ├── publish/        # 自动化发布（@spaceflow/publish）
+│   ├── ci-scripts/     # CI 脚本执行（@spaceflow/ci-scripts）
+│   ├── ci-shell/       # CI Shell 执行（@spaceflow/ci-shell）
+│   └── period-summary/ # 周期统计（@spaceflow/period-summary）
+├── actions/            # GitHub Actions
+├── docs/               # 文档站点（VitePress）
+└── templates/          # 插件模板
 ```
 
-## 核心命令
+## 包一览
 
-### review
+| 包名                        | 说明                                       |
+| --------------------------- | ------------------------------------------ |
+| `@spaceflow/cli`            | CLI 工具，提供 `spaceflow` / `space` 命令  |
+| `@spaceflow/core`           | 核心能力库，提供共享模块和插件系统基础设施 |
+| `@spaceflow/review`         | AI 代码审查插件                            |
+| `@spaceflow/publish`        | 自动化版本发布插件                         |
+| `@spaceflow/ci-scripts`     | CI 环境下执行 JS 脚本                      |
+| `@spaceflow/ci-shell`       | CI 环境下执行 Shell 命令                   |
+| `@spaceflow/period-summary` | PR 贡献周期统计                            |
 
-基于 LLM 的自动化代码审查，支持 OpenAI、Claude 等多种 LLM 模式。
+## 内置命令
 
-```bash
-# 审查 PR
-npx spaceflow review -p 123 -l openai
-
-# 审查两个分支之间的差异
-npx spaceflow review -b main --head feature/xxx -l openai
-
-# 仅分析删除代码
-npx spaceflow review -p 123 --deletion-only -l openai
-```
-
-详细文档：[Review 模块文档](core/src/commands/review/README.md)
-
-### publish
-
-自动化版本发布，基于 release-it 实现版本管理和变更日志生成。
-
-### ci-scripts
-
-执行仓库中的自定义脚本。
-
-### ci-shell
-
-执行自定义 Shell 命令。
-
-### claude-setup
-
-配置 Claude CLI 工具。
-
-### period-summary
-
-生成周期性工作总结，支持飞书消息推送。
+| 命令         | 说明                  |
+| ------------ | --------------------- |
+| `install`    | 安装插件（命令/技能） |
+| `uninstall`  | 卸载插件              |
+| `build`      | 构建插件              |
+| `dev`        | 开发模式运行          |
+| `create`     | 创建新插件            |
+| `list`       | 列出已安装插件        |
+| `clear`      | 清理缓存              |
+| `runx` / `x` | 执行插件命令          |
+| `schema`     | 生成配置 JSON Schema  |
+| `commit`     | AI 智能提交           |
+| `setup`      | 初始化项目配置        |
+| `mcp`        | 启动 MCP Server       |
 
 ## 配置
 
-在项目根目录创建 `spaceflow.json` 配置文件：
+在项目根目录创建 `spaceflow.json`：
 
-```javascript
-export default {
-  changelog: {
-    preset: {
-      type: [
-        { type: "feat", section: "新特性" },
-        { type: "fix", section: "修复BUG" },
-        // 更多配置...
-      ],
-    },
+```json
+{
+  "support": ["claudeCode", "windsurf", "cursor"],
+  "dependencies": {
+    "@spaceflow/review": "latest",
+    "@spaceflow/publish": "latest"
   },
-  review: {
-    claudeCode: {
-      baseUrl: process.env.CLAUDE_CODE_BASE_URL,
-      authToken: process.env.CLAUDE_CODE_AUTH_TOKEN,
-      model: process.env.CLAUDE_CODE_MODEL || "ark-code-latest",
-    },
-    openai: {
-      baseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
-      apiKey: process.env.OPENAI_API_KEY,
-      model: process.env.OPENAI_MODEL || "gpt-4o",
-    },
-    includes: ["*/**/*.ts", "!*/**/*.spec.*", "!*/**/*.config.*"],
-    generateDescription: true,
-    lineComments: true,
-    verifyFixes: true,
-    analyzeDeletions: true,
-    concurrency: 10,
-    retries: 3,
+  "review": {
+    "includes": ["*/**/*.ts", "!*/**/*.spec.*"],
+    "generateDescription": true,
+    "lineComments": true,
+    "verifyFixes": true,
+    "concurrency": 5,
+    "retries": 3
   },
-  /**
-   * 支持的编辑器列表，用于自动关联插件到对应的配置目录
-   * 可选值: "claudeCode" (.claude), "windsurf" (.windsurf), "cursor" (.cursor), "opencode" (.opencode)
-   * 默认值: ["claudeCode"]
-   */
-  support: ["claudeCode", "windsurf", "cursor"],
-};
+  "publish": {
+    "monorepo": { "enabled": true, "propagateDeps": true },
+    "npm": { "publish": true, "packageManager": "pnpm" },
+    "git": { "lockBranch": true }
+  }
+}
 ```
 
-## 插件系统
+## 编辑器集成
 
-Spaceflow 支持将插件自动关联到多个编辑器的配置目录中。通过在 `spaceflow.json` 中配置 `support` 字段，你可以让安装的技能和命令同时支持多个 AI 编程工具。
+通过 `support` 字段配置，`spaceflow install` 会自动将插件关联到对应编辑器目录：
 
-### 支持的编辑器
+| 编辑器      | 配置目录     |
+| ----------- | ------------ |
+| Claude Code | `.claude/`   |
+| Windsurf    | `.windsurf/` |
+| Cursor      | `.cursor/`   |
+| OpenCode    | `.opencode/` |
 
-- **claudeCode**: 关联到 `.claude/`
-- **windsurf**: 关联到 `.windsurf/`
-- **cursor**: 关联到 `.cursor/`
-- **opencode**: 关联到 `.opencode/`
+## 环境变量
 
-### 自动关联逻辑
-
-当你运行 `spaceflow install` 时，系统会：
-
-1. 下载/链接插件到 `.spaceflow/` 目录。
-2. 根据 `support` 配置，在对应的编辑器目录下创建 `skills` 或 `commands` 的符号链接。
-3. 如果是全局安装 (`-g`)，则会关联到家目录下的对应编辑器目录（如 `~/.claude/`）。
+| 变量                | 说明                                          |
+| ------------------- | --------------------------------------------- |
+| `GITHUB_TOKEN`      | GitHub API Token                              |
+| `GITEA_TOKEN`       | Gitea API Token                               |
+| `GITLAB_TOKEN`      | GitLab API Token                              |
+| `GIT_PROVIDER_TYPE` | Git 平台类型（`github` / `gitea` / `gitlab`） |
+| `OPENAI_BASE_URL`   | OpenAI API 地址                               |
+| `OPENAI_API_KEY`    | OpenAI API Key                                |
+| `OPENAI_MODEL`      | OpenAI 模型名称                               |
 
 ## 开发
 
-### 安装依赖
-
 ```bash
+# 安装依赖
 pnpm install
-```
 
-### 构建
-
-```bash
+# 构建全部
 pnpm build
-```
 
-### 运行测试
-
-```bash
+# 运行测试
 pnpm test
-```
 
-### 代码检查
-
-```bash
+# 代码检查
 pnpm lint
-```
 
-### 代码格式化
-
-```bash
+# 代码格式化
 pnpm format
 ```
 
-## GitHub Actions 工作流
+## GitHub Actions
 
-项目包含多个预配置的 GitHub Actions 工作流：
+项目提供预配置的 GitHub Actions 工作流：
 
-- `pr-review.yml`：自动 PR AI 审查
-- `pr-review-command.yml`：手动触发 PR 审查
-- `core-command.yml`：运行任意 spaceflow 命令
-- `actions-test.yml`：Actions 测试
-
-## Git Flow
-
-参考飞书文档
+- **pr-review.yml** — PR 提交时自动触发 AI 审查
+- **pr-review-command.yml** — 通过 PR 评论手动触发审查
+- **publish.yml** — 推送到 main 分支时自动发布
+- **test-command.yml** — 手动运行任意 spaceflow 命令
 
 ## 许可证
 
-UNLICENSED
+[MIT](LICENSE)

@@ -4,12 +4,12 @@ Spaceflow CI 发布插件，基于 [release-it](https://github.com/release-it/re
 
 ## 功能特性
 
-- **Monorepo 支持**：自动检测变更包，按依赖拓扑顺序发布
-- **分支保护**：发布期间自动锁定分支，防止其他推送干扰
-- **Conventional Changelog**：基于 conventional commits 自动生成 CHANGELOG
-- **GitHub Release**：自动创建 GitHub Release 并上传资产文件
-- **预发布支持**：支持 rc、beta、alpha 等预发布版本
-- **进程退出保护**：即使发布失败也能自动解锁分支
+- **Monorepo 支持** — 自动检测变更包，按依赖拓扑顺序发布
+- **分支保护** — 发布期间自动锁定分支，防止其他推送干扰
+- **Conventional Changelog** — 基于 conventional commits 自动生成 CHANGELOG
+- **GitHub Release** — 自动创建 GitHub Release 并上传资产文件
+- **预发布支持** — 支持 rc、beta、alpha 等预发布版本
+- **进程退出保护** — 即使发布失败也能自动解锁分支
 
 ## 安装
 
@@ -57,65 +57,49 @@ spaceflow publish --rehearsal
 
 ## 配置
 
-在 `spaceflow.config.ts` 中配置 `publish` 插件：
+在 `spaceflow.json` 中配置 `publish` 字段：
 
-```typescript
-export default {
-  plugins: {
-    publish: {
-      // Monorepo 发布模式配置
-      monorepo: {
-        enabled: true, // 启用 monorepo 模式
-        propagateDeps: true, // 依赖的包变更时，依赖方也发布
-      },
-
-      // Changelog 配置
-      changelog: {
-        infileDir: ".", // CHANGELOG 文件输出目录
-        preset: {
-          name: "conventionalcommits",
-          type: [
-            { type: "feat", section: "新功能" },
-            { type: "fix", section: "Bug 修复" },
-            { type: "refactor", section: "代码重构" },
-            { type: "perf", section: "性能优化" },
-            { type: "docs", section: "文档更新" },
-          ],
-        },
-      },
-
-      // NPM 发布配置
-      npm: {
-        publish: true, // 是否发布到 npm registry
-        packageManager: "pnpm", // 包管理器：npm 或 pnpm
-        registry: "https://registry.npmjs.org",
-        tag: "latest", // npm tag
-        ignoreVersion: true, // 忽略 package.json 中的版本号
-        versionArgs: ["--workspaces false"],
-        publishArgs: [],
-      },
-
-      // GitHub Release 配置
-      release: {
-        host: "https://github.com",
-        assets: [{ path: "dist/*.zip", name: "dist.zip", type: "zip" }],
-      },
-
-      // Git 配置
-      git: {
-        requireBranch: ["main", "dev", "develop"], // 允许发布的分支
-        lockBranch: true, // 发布时锁定分支
-        pushWhitelistUsernames: ["github-actions[bot]"], // 锁定期间允许推送的用户
-      },
-
-      // release-it hooks
-      hooks: {
-        "before:bump": "echo 'Before bump'",
-        "after:bump": ["pnpm build", "pnpm test"],
-      },
+```json
+{
+  "publish": {
+    "monorepo": {
+      "enabled": true,
+      "propagateDeps": true
     },
-  },
-};
+    "changelog": {
+      "preset": {
+        "type": [
+          { "type": "feat", "section": "新功能" },
+          { "type": "fix", "section": "Bug 修复" },
+          { "type": "refactor", "section": "代码重构" },
+          { "type": "perf", "section": "性能优化" },
+          { "type": "docs", "section": "文档更新" }
+        ]
+      }
+    },
+    "npm": {
+      "publish": true,
+      "packageManager": "pnpm",
+      "registry": "https://registry.npmjs.org",
+      "tag": "latest",
+      "ignoreVersion": true,
+      "versionArgs": ["--workspaces false"]
+    },
+    "release": {
+      "host": "https://github.com",
+      "assets": [{ "path": "dist/*.zip", "name": "dist.zip", "type": "zip" }]
+    },
+    "git": {
+      "requireBranch": ["main", "dev", "develop"],
+      "lockBranch": true,
+      "pushWhitelistUsernames": ["github-actions[bot]"]
+    },
+    "hooks": {
+      "before:bump": "echo 'Before bump'",
+      "after:bump": ["pnpm build", "pnpm test"]
+    }
+  }
+}
 ```
 
 ## 配置项说明
