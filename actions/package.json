@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Spaceflow Actions - GitHub/Gitea Actions for CI workflows",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "main": "dist/index.js",
   "scripts": {
     "build": "ncc build src/index.js -o dist --source-map --license licenses.txt"

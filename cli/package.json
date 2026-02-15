@@ -2,8 +2,13 @@
   "name": "@spaceflow/cli",
   "version": "0.19.0",
   "description": "Spaceflow CLI 工具",
-  "license": "UNLICENSED",
-  "author": "",
+  "license": "MIT",
+  "author": "Lydanne",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lydanne/spaceflow.git",
+    "directory": "cli"
+  },
   "bin": {
     "space": "dist/cli.js",
     "spaceflow": "dist/cli.js"

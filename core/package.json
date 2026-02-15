@@ -2,8 +2,13 @@
   "name": "@spaceflow/core",
   "version": "0.1.0",
   "description": "Spaceflow 核心能力库",
-  "license": "UNLICENSED",
-  "author": "",
+  "license": "MIT",
+  "author": "Lydanne",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lydanne/spaceflow.git",
+    "directory": "core"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./src/index.ts",

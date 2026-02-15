@@ -43,6 +43,6 @@
       "ignoreVersion": true,
       "versionArgs": ["--workspaces false"]
     },
-    "git": { "pushWhitelistUsernames": ["GiteaActions"] }
+    "git": { "pushWhitelistUsernames": ["github-actions[bot]"] }
   }
 }

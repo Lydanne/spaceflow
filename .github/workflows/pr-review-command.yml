@@ -15,7 +15,7 @@ jobs:
     if: |
       github.event.issue.pull_request &&
       (startsWith(github.event.comment.body, '/review') || startsWith(github.event.comment.body, '/ai-review'))
-    runs-on: ubuntu-node-24
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
       - name: Run Review
         uses: ./actions
         env:
-          GIT_PROVIDER_TYPE: gitea
+          GIT_PROVIDER_TYPE: github
           CLAUDE_CODE_BASE_URL: https://ark.cn-beijing.volces.com/api/coding
           CLAUDE_CODE_AUTH_TOKEN: ${{ secrets.CLAUDE_CODE_AUTH_TOKEN }}
           OPENAI_BASE_URL: https://ark.cn-beijing.volces.com/api/v3

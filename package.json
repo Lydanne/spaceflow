@@ -3,6 +3,16 @@
   "version": "0.0.0",
   "private": true,
   "description": "Spaceflow Monorepo",
+  "license": "MIT",
+  "author": "Lydanne",
+  "homepage": "https://github.com/Lydanne/spaceflow#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lydanne/spaceflow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Lydanne/spaceflow/issues"
+  },
   "scripts": {
     "setup": "pnpm --filter @spaceflow/core build && pnpm --filter @spaceflow/cli build && pnpm install && pnpm --filter \"!@spaceflow/core\" --filter \"!@spaceflow/cli\" build",
     "build": "pnpm --filter @spaceflow/core build && pnpm --filter @spaceflow/cli build && pnpm --filter \"!@spaceflow/core\" --filter \"!@spaceflow/cli\" build",

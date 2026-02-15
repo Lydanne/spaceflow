@@ -2,6 +2,13 @@
   "name": "@spaceflow/publish",
   "version": "0.21.0",
   "description": "Spaceflow CI 发布插件，用于在发布流程中锁定/解锁分支",
+  "license": "MIT",
+  "author": "Lydanne",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lydanne/spaceflow.git",
+    "directory": "commands/publish"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {

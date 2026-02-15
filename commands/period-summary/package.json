@@ -2,6 +2,13 @@
   "name": "@spaceflow/period-summary",
   "version": "0.19.0",
   "description": "Spaceflow 周期统计命令，根据时间范围统计 PR 贡献情况，按人员汇总并排序",
+  "license": "MIT",
+  "author": "Lydanne",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lydanne/spaceflow.git",
+    "directory": "commands/period-summary"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {

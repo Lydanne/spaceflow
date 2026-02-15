@@ -6,7 +6,6 @@
     "@spaceflow/ci-shell": "link:../commands/ci-shell",
     "@spaceflow/core": "link:../core",
     "@spaceflow/publish": "link:../commands/publish",
-    "@spaceflow/review": "link:../commands/review",
-    "review-spec.git": "git+ssh://git@git.bjxgj.com/xgj/review-spec.git"
+    "@spaceflow/review": "link:../commands/review"
   }
 }

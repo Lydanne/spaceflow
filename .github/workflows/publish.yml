@@ -18,17 +18,21 @@ on:
         type: boolean
 
 env:
-  GIT_PROVIDER_TYPE: gitea
-  GITHUB_TOKEN: ${{ secrets.CI_GITEA_TOKEN }}
+  GIT_PROVIDER_TYPE: github
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+permissions:
+  contents: write
+  packages: write
 
 jobs:
   publish:
-    runs-on: ubuntu-node-24
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.CI_GITEA_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -37,12 +41,16 @@ jobs:
         with:
           version: 10
 
-      - name: Setup Git and NPM
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup Git
         run: |
-          git config user.name "GiteaActions"
-          git config user.email "GiteaActions@users.noreply.gitea.com"
-          echo "@spaceflow:registry=https://git.bjxgj.com/api/packages/xgj/npm/" >> .npmrc
-          echo "//git.bjxgj.com/api/packages/xgj/npm/:_authToken=${{ secrets.CI_GITEA_TOKEN }}" >> .npmrc
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -56,11 +64,17 @@ jobs:
       - name: Publish (Dry Run)
         if: ${{ github.event.inputs.dry_run == 'true' }}
         run: pnpm spaceflow publish --dry-run --ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish (Rehearsal)
         if: ${{ github.event.inputs.rehearsal == 'true' && github.event.inputs.dry_run != 'true' }}
         run: pnpm spaceflow publish --rehearsal --ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish
         if: ${{ github.event.inputs.dry_run != 'true' && github.event.inputs.rehearsal != 'true' }}
         run: pnpm spaceflow publish --ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

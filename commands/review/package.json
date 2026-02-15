@@ -2,6 +2,13 @@
   "name": "@spaceflow/review",
   "version": "0.29.0",
   "description": "Spaceflow 代码审查插件，使用 LLM 对 PR 代码进行自动审查",
+  "license": "MIT",
+  "author": "Lydanne",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lydanne/spaceflow.git",
+    "directory": "commands/review"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
