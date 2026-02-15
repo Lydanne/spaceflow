@@ -1,13 +1,13 @@
 {
-  "name": "@spaceflow/ci-shell",
+  "name": "@spaceflow/period-summary",
   "version": "0.19.0",
-  "description": "Spaceflow CI Shell 插件，用于在分支锁定/解锁之间执行 Shell 命令",
+  "description": "Spaceflow 周期统计命令，根据时间范围统计 PR 贡献情况，按人员汇总并排序",
   "license": "MIT",
   "author": "Lydanne",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Lydanne/spaceflow.git",
-    "directory": "commands/ci-shell"
+    "directory": "extensions/period-summary"
   },
   "type": "module",
   "main": "./dist/index.js",

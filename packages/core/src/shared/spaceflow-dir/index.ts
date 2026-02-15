@@ -54,7 +54,7 @@ export function getSpaceflowCliPath(isGlobal: boolean = false, cwd?: string): st
   if (isGlobal) {
     // 全局安装：尝试找到 @spaceflow/cli 的实际路径进行 link
     // 优先从当前项目的 cli 目录 link
-    const cliPath = join(workDir, "cli");
+    const cliPath = join(workDir, "packages", "cli");
     if (existsSync(join(cliPath, PACKAGE_JSON))) {
       try {
         const content = readFileSync(join(cliPath, PACKAGE_JSON), "utf-8");

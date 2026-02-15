@@ -21,9 +21,10 @@ spaceflow/
 │           ├── parallel/      # 并行执行工具
 │           └── ...
 │
-├── cli/                   # @spaceflow/cli — CLI 入口
-│   └── src/
-│       ├── commands/      # 内置命令
+├── packages/
+│   ├── cli/               # @spaceflow/cli — CLI 入口
+│   │   └── src/
+│   │       ├── commands/   # 内置命令
 │       │   ├── install/   # 安装 Extension
 │       │   ├── uninstall/ # 卸载 Extension
 │       │   ├── build/     # 构建 Extension
@@ -40,7 +41,7 @@ spaceflow/
 │       ├── extension-loader/  # Extension 加载器
 │       └── locales/       # CLI i18n 资源
 │
-├── commands/              # 外部 Extension（独立 npm 包）
+├── extensions/            # 外部 Extension（独立 npm 包）
 │   ├── review/            # @spaceflow/review — AI 代码审查
 │   ├── publish/           # @spaceflow/publish — 版本发布
 │   ├── ci-scripts/        # @spaceflow/ci-scripts — 脚本执行
@@ -90,13 +91,13 @@ CLI 入口包，包含所有内置命令和 Extension 加载器。通过 `bin` �
 
 ### 外部 Extension
 
-位于 `commands/` 目录下，每个 Extension 是独立的 npm 包，拥有自己的 `package.json`、构建配置和测试。
+位于 `extensions/` 目录下，每个 Extension 是独立的 npm 包，拥有自己的 `package.json`、构建配置和测试。
 
 ## 配置文件
 
-| 文件 | 说明 |
-|------|------|
-| `spaceflow.json` / `.spaceflow/spaceflow.json` | 项目配置 |
-| `.spaceflow/package.json` | Extension 依赖管理 |
-| `pnpm-workspace.yaml` | Monorepo 工作区配置 |
-| `references/*.md` | 代码审查规范文件 |
+| 文件                                           | 说明                |
+| ---------------------------------------------- | ------------------- |
+| `spaceflow.json` / `.spaceflow/spaceflow.json` | 项目配置            |
+| `.spaceflow/package.json`                      | Extension 依赖管理  |
+| `pnpm-workspace.yaml`                          | Monorepo 工作区配置 |
+| `references/*.md`                              | 代码审查规范文件    |

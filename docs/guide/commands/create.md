@@ -28,10 +28,10 @@ spaceflow create --from git@github.com:org/tpl.git --ref v1.0 api my-api
 
 模板动态读取自项目的 `templates/` 目录。内置模板包括：
 
-| 模板 | 说明 |
-|------|------|
-| `command` | 命令型 Extension，提供 CLI 命令 |
-| `skills` | 技能型 Extension，提供编辑器 AI 技能文件 |
+| 模板      | 说明                                     |
+| --------- | ---------------------------------------- |
+| `command` | 命令型 Extension，提供 CLI 命令          |
+| `skills`  | 技能型 Extension，提供编辑器 AI 技能文件 |
 
 ## 远程模板
 
@@ -68,13 +68,13 @@ my-cmd/
 
 ## 命令行选项
 
-| 选项 | 简写 | 说明 |
-|------|------|------|
-| `--directory <dir>` | `-d` | 指定输出目录 |
-| `--list` | `-l` | 列出可用模板 |
-| `--from <repo>` | `-f` | 远程模板仓库 URL |
-| `--ref <ref>` | `-r` | 远程仓库的分支/标签/commit |
-| `--verbose` | `-v` | 详细日志 |
+| 选项                | 简写 | 说明                       |
+| ------------------- | ---- | -------------------------- |
+| `--directory <dir>` | `-d` | 指定输出目录               |
+| `--list`            | `-l` | 列出可用模板               |
+| `--from <repo>`     | `-f` | 远程模板仓库 URL           |
+| `--ref <ref>`       | `-r` | 远程仓库的分支/标签/commit |
+| `--verbose`         | `-v` | 详细日志                   |
 
 ## 示例
 
@@ -86,5 +86,5 @@ spaceflow create --list
 spaceflow create --from https://github.com/org/templates --list
 
 # 创建并指定目录
-spaceflow create command my-review -d ./commands/my-review
+spaceflow create command my-review -d ./extensions/my-review
 ```

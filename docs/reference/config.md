@@ -61,10 +61,10 @@
     }
   },
   "dependencies": {
-    "@spaceflow/review": "link:./commands/review",
-    "@spaceflow/publish": "link:./commands/publish",
-    "@spaceflow/ci-shell": "link:./commands/ci-shell",
-    "@spaceflow/ci-scripts": "link:./commands/ci-scripts"
+    "@spaceflow/review": "link:./extensions/review",
+    "@spaceflow/publish": "link:./extensions/publish",
+    "@spaceflow/ci-shell": "link:./extensions/ci-shell",
+    "@spaceflow/ci-scripts": "link:./extensions/ci-scripts"
   }
 }
 ```

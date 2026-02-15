@@ -1,24 +1,19 @@
 {
-  "name": "@spaceflow/publish",
-  "version": "0.21.0",
-  "description": "Spaceflow CI 发布插件，用于在发布流程中锁定/解锁分支",
+  "name": "@spaceflow/ci-scripts",
+  "version": "0.19.0",
+  "description": "Spaceflow CI 脚本插件，用于在分支锁定/解锁之间执行 JS 语句",
   "license": "MIT",
   "author": "Lydanne",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Lydanne/spaceflow.git",
-    "directory": "commands/publish"
+    "directory": "extensions/ci-scripts"
   },
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
     "build": "spaceflow build",
     "dev": "spaceflow dev"
-  },
-  "dependencies": {
-    "@release-it/conventional-changelog": "^10.0.4",
-    "release-it": "^19.2.2",
-    "release-it-gitea": "^1.8.0"
   },
   "devDependencies": {
     "@spaceflow/cli": "workspace:*",

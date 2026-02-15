@@ -97,9 +97,9 @@ AI 代码审查相关配置。
 ```json
 {
   "dependencies": {
-    "@spaceflow/review": "link:./commands/review",
-    "@spaceflow/publish": "link:./commands/publish",
-    "@spaceflow/ci-shell": "link:./commands/ci-shell"
+    "@spaceflow/review": "link:./extensions/review",
+    "@spaceflow/publish": "link:./extensions/publish",
+    "@spaceflow/ci-shell": "link:./extensions/ci-shell"
   }
 }
 ```
@@ -108,7 +108,7 @@ AI 代码审查相关配置。
 
 | 格式            | 类型     | 示例                                    |
 | --------------- | -------- | --------------------------------------- |
-| `link:./path`   | 本地链接 | `link:./commands/review`                |
+| `link:./path`   | 本地链接 | `link:./extensions/review`              |
 | `^1.0.0`        | npm 版本 | `^1.0.0`                                |
 | `git+ssh://...` | Git 仓库 | `git+ssh://git@github.com/org/repo.git` |
 

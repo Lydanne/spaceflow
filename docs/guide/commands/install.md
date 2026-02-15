@@ -9,7 +9,7 @@
 spaceflow install @spaceflow/review
 
 # 安装本地路径
-spaceflow install ./commands/my-plugin
+spaceflow install ./extensions/my-plugin
 
 # 安装 git 仓库
 spaceflow install git@github.com:org/plugin.git
@@ -23,11 +23,11 @@ spaceflow install @spaceflow/review -g
 
 ## 支持的 source 类型
 
-| 类型 | 示例 | 说明 |
-|------|------|------|
-| npm 包 | `@spaceflow/review` | 执行 `pnpm add <package>` |
-| 本地路径 | `./commands/my-plugin` | 注册 `link:` 引用到 `spaceflow.json` |
-| git 仓库 | `git@github.com:org/plugin.git` | 克隆到 `.spaceflow/deps/` |
+| 类型     | 示例                            | 说明                                 |
+| -------- | ------------------------------- | ------------------------------------ |
+| npm 包   | `@spaceflow/review`             | 执行 `pnpm add <package>`            |
+| 本地路径 | `./extensions/my-plugin`        | 注册 `link:` 引用到 `spaceflow.json` |
+| git 仓库 | `git@github.com:org/plugin.git` | 克隆到 `.spaceflow/deps/`            |
 
 ## 安装流程
 
@@ -58,12 +58,12 @@ spaceflow install @spaceflow/review -g
 
 ## 命令行选项
 
-| 选项 | 简写 | 说明 |
-|------|------|------|
-| `--name <name>` | `-n` | 自定义 Extension 名称 |
-| `--global` | `-g` | 全局安装 |
-| `--verbose` | `-v` | 详细日志 |
-| `--ignore-errors` | | 忽略错误，不退出进程 |
+| 选项              | 简写 | 说明                  |
+| ----------------- | ---- | --------------------- |
+| `--name <name>`   | `-n` | 自定义 Extension 名称 |
+| `--global`        | `-g` | 全局安装              |
+| `--verbose`       | `-v` | 详细日志              |
+| `--ignore-errors` |      | 忽略错误，不退出进程  |
 
 ## 示例
 
@@ -72,7 +72,7 @@ spaceflow install @spaceflow/review -g
 spaceflow install @spaceflow/review --name review
 
 # 安装本地开发中的 Extension
-spaceflow install ./commands/review
+spaceflow install ./extensions/review
 
 # CI 中安装所有依赖（忽略错误）
 spaceflow install --ignore-errors

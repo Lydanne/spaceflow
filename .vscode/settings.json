@@ -22,12 +22,12 @@
   "i18n-ally-next.annotationBrackets": ["`", "`"],
   "i18n-ally-next.enabledFrameworks": [ "custom" ],
   "i18n-ally-next.localesPaths": [
-    "cli/src/locales",
-    "core/src/locales",
-    "commands/ci-scripts/src/locales",
-    "commands/ci-shell/src/locales",
-    "commands/period-summary/src/locales",
-    "commands/publish/src/locales",
-    "commands/review/src/locales"
+    "packages/cli/src/locales",
+    "packages/core/src/locales",
+    "extensions/ci-scripts/src/locales",
+    "extensions/ci-shell/src/locales",
+    "extensions/period-summary/src/locales",
+    "extensions/publish/src/locales",
+    "extensions/review/src/locales"
   ]
 }

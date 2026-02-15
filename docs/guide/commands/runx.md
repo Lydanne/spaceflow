@@ -9,7 +9,7 @@
 spaceflow x @spaceflow/review --help
 
 # 运行本地路径的 Extension
-spaceflow x ./commands/ci-scripts -- --script ./deploy.sh
+spaceflow x ./extensions/ci-scripts -- --script ./deploy.sh
 
 # 使用完整命令名
 spaceflow runx @spaceflow/review -- -p 123
@@ -38,23 +38,23 @@ spaceflow x @spaceflow/review -- --help
 spaceflow x @spaceflow/review -- -p 123
 
 # 指定名称并传递参数
-spaceflow x ./commands/ci-scripts -n ci-scripts -- --script ./test.sh
+spaceflow x ./extensions/ci-scripts -n ci-scripts -- --script ./test.sh
 ```
 
 ## 与 install 的区别
 
-| 特性 | `install` | `runx` |
-|------|-----------|--------|
-| 安装位置 | 本地项目（默认） | 全局 |
-| 持久化 | 写入 `spaceflow.json` | 不修改配置 |
-| 用途 | 长期使用的 Extension | 临时运行 |
+| 特性     | `install`             | `runx`     |
+| -------- | --------------------- | ---------- |
+| 安装位置 | 本地项目（默认）      | 全局       |
+| 持久化   | 写入 `spaceflow.json` | 不修改配置 |
+| 用途     | 长期使用的 Extension  | 临时运行   |
 
 ## 命令行选项
 
-| 选项 | 简写 | 说明 |
-|------|------|------|
+| 选项            | 简写 | 说明                  |
+| --------------- | ---- | --------------------- |
 | `--name <name>` | `-n` | 自定义 Extension 名称 |
-| `--verbose` | `-v` | 详细日志 |
+| `--verbose`     | `-v` | 详细日志              |
 
 ## 示例
 
@@ -63,5 +63,5 @@ spaceflow x ./commands/ci-scripts -n ci-scripts -- --script ./test.sh
 spaceflow x @spaceflow/review -- -p 42
 
 # 临时运行本地 Extension
-spaceflow x ./commands/my-tool -- --config custom.json
+spaceflow x ./extensions/my-tool -- --config custom.json
 ```

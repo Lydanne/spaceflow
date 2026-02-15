@@ -7,7 +7,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Lydanne/spaceflow.git",
-    "directory": "cli"
+    "directory": "packages/cli"
   },
   "bin": {
     "space": "dist/cli.js",

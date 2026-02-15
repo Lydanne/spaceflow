@@ -1,19 +1,24 @@
 {
-  "name": "@spaceflow/period-summary",
-  "version": "0.19.0",
-  "description": "Spaceflow 周期统计命令，根据时间范围统计 PR 贡献情况，按人员汇总并排序",
+  "name": "@spaceflow/publish",
+  "version": "0.21.0",
+  "description": "Spaceflow CI 发布插件，用于在发布流程中锁定/解锁分支",
   "license": "MIT",
   "author": "Lydanne",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Lydanne/spaceflow.git",
-    "directory": "commands/period-summary"
+    "directory": "extensions/publish"
   },
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
     "build": "spaceflow build",
     "dev": "spaceflow dev"
+  },
+  "dependencies": {
+    "@release-it/conventional-changelog": "^10.0.4",
+    "release-it": "^19.2.2",
+    "release-it-gitea": "^1.8.0"
   },
   "devDependencies": {
     "@spaceflow/cli": "workspace:*",

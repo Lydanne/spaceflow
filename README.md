@@ -31,22 +31,24 @@ pnpm spaceflow install @spaceflow/publish
 
 ```text
 spaceflow/
-├── cli/                # CLI 入口（@spaceflow/cli）
-├── core/               # 核心能力库（@spaceflow/core）
-│   └── src/
-│       ├── config/             # 配置管理
-│       ├── extension-system/   # 插件系统
-│       ├── locales/            # 国际化资源
-│       └── shared/             # 共享模块
-│           ├── git-provider/   # Git 平台适配器
-│           ├── git-sdk/        # Git 命令封装
-│           ├── llm-proxy/      # LLM 统一代理
-│           ├── llm-jsonput/    # JSON 结构化输出
-│           ├── feishu-sdk/     # 飞书 SDK
-│           ├── logger/         # 日志系统（TUI/Plain）
-│           ├── parallel/       # 并行执行工具
-│           └── storage/        # 通用存储服务
-├── commands/           # 外部插件
+├── packages/
+│   ├── cli/            # CLI 入口（@spaceflow/cli）
+│   ├── core/           # 核心能力库（@spaceflow/core）
+│   │   └── src/
+│   │       ├── config/             # 配置管理
+│   │       ├── extension-system/   # 插件系统
+│   │       ├── locales/            # 国际化资源
+│   │       └── shared/             # 共享模块
+│   │           ├── git-provider/   # Git 平台适配器
+│   │           ├── git-sdk/        # Git 命令封装
+│   │           ├── llm-proxy/      # LLM 统一代理
+│   │           ├── llm-jsonput/    # JSON 结构化输出
+│   │           ├── feishu-sdk/     # 飞书 SDK
+│   │           ├── logger/         # 日志系统（TUI/Plain）
+│   │           ├── parallel/       # 并行执行工具
+│   │           └── storage/        # 通用存储服务
+│   └── spaceflow/      # 代理包（spaceflow）
+├── extensions/         # 外部插件
 │   ├── review/         # AI 代码审查（@spaceflow/review）
 │   ├── publish/        # 自动化发布（@spaceflow/publish）
 │   ├── ci-scripts/     # CI 脚本执行（@spaceflow/ci-scripts）

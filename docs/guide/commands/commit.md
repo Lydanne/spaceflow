@@ -44,9 +44,9 @@ spaceflow commit --no-verify
 Spaceflow 会自动根据文件所属的 `package.json` 推断 scope：
 
 ```text
-cli/src/commands/build/build.service.ts  → scope: cli
-core/src/shared/logger/logger.ts         → scope: core
-commands/review/src/review.service.ts    → scope: review
+packages/cli/src/commands/build/build.service.ts  → scope: cli
+packages/core/src/shared/logger/logger.ts         → scope: core
+extensions/review/src/review.service.ts            → scope: review
 package.json                             → scope: (空，根目录)
 ```
 
@@ -54,16 +54,16 @@ package.json                             → scope: (空，根目录)
 
 类型列表从 `spaceflow.json` 的 `publish.changelog.preset.type` 读取，默认值：
 
-| 类型 | 含义 |
-|------|------|
-| `feat` | 新特性 |
-| `fix` | 修复 BUG |
-| `perf` | 性能优化 |
+| 类型       | 含义     |
+| ---------- | -------- |
+| `feat`     | 新特性   |
+| `fix`      | 修复 BUG |
+| `perf`     | 性能优化 |
 | `refactor` | 代码重构 |
-| `docs` | 文档更新 |
-| `style` | 代码格式 |
-| `test` | 测试用例 |
-| `chore` | 其他修改 |
+| `docs`     | 文档更新 |
+| `style`    | 代码格式 |
+| `test`     | 测试用例 |
+| `chore`    | 其他修改 |
 
 ## Scope 配置
 
@@ -84,20 +84,20 @@ package.json                             → scope: (空，根目录)
 
 ### 策略说明
 
-| 策略 | 说明 |
-|------|------|
-| `package` | 按 `package.json` 所属包推断 scope（默认） |
-| `rules` | 仅使用自定义 glob 规则匹配 |
-| `rules-first` | 优先规则匹配，未匹配的回退到包推断 |
+| 策略          | 说明                                       |
+| ------------- | ------------------------------------------ |
+| `package`     | 按 `package.json` 所属包推断 scope（默认） |
+| `rules`       | 仅使用自定义 glob 规则匹配                 |
+| `rules-first` | 优先规则匹配，未匹配的回退到包推断         |
 
 ## 命令行选项
 
-| 选项 | 简写 | 说明 |
-|------|------|------|
-| `--dry-run` | `-d` | 试运行，仅生成 message 不提交 |
-| `--split` | `-s` | 智能拆分为多个 commit |
-| `--no-verify` | `-n` | 跳过 git hooks |
-| `--verbose` | `-v` | 详细日志（`-v` 基本，`-vv` 详细） |
+| 选项          | 简写 | 说明                              |
+| ------------- | ---- | --------------------------------- |
+| `--dry-run`   | `-d` | 试运行，仅生成 message 不提交     |
+| `--split`     | `-s` | 智能拆分为多个 commit             |
+| `--no-verify` | `-n` | 跳过 git hooks                    |
+| `--verbose`   | `-v` | 详细日志（`-v` 基本，`-vv` 详细） |
 
 ## 示例
 

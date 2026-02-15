@@ -126,7 +126,7 @@ export class MonorepoService {
 
     for (const pattern of patterns) {
       if (pattern.includes("*")) {
-        // 使用 glob 展开，这里简化处理，只支持 commands/* 这种模式
+        // 使用 glob 展开，这里简化处理，只支持 extensions/* 这种模式
         const baseDir = pattern.replace("/*", "");
         const basePath = join(this.cwd, baseDir);
         if (existsSync(basePath)) {

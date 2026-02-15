@@ -1,8 +1,7 @@
 packages:
-  - core
-  - cli
+  - packages/*
+  - extensions/*
   - actions
-  - commands/*
   - docs
 
 catalogs:

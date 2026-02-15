@@ -14,7 +14,7 @@ export interface RunxCommandOptions {
  *
  * 用法：
  *   spaceflow x <source> [args...]
- *   spaceflow x ./commands/ci-scripts --help
+ *   spaceflow x ./extensions/ci-scripts --help
  *
  * 功能：
  * 1. 全局安装指定的依赖（如果未安装）

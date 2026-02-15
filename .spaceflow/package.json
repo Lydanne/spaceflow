@@ -2,10 +2,10 @@
   "name": "spaceflow-local",
   "private": true,
   "dependencies": {
-    "@spaceflow/ci-scripts": "link:../commands/ci-scripts",
-    "@spaceflow/ci-shell": "link:../commands/ci-shell",
-    "@spaceflow/core": "link:../core",
-    "@spaceflow/publish": "link:../commands/publish",
-    "@spaceflow/review": "link:../commands/review"
+    "@spaceflow/ci-scripts": "link:../extensions/ci-scripts",
+    "@spaceflow/ci-shell": "link:../extensions/ci-shell",
+    "@spaceflow/core": "link:../packages/core",
+    "@spaceflow/publish": "link:../extensions/publish",
+    "@spaceflow/review": "link:../extensions/review"
   }
 }
