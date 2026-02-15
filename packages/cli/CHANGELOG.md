@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.19.1](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@0.19.0...@spaceflow/cli@0.19.1) (2026-02-15)
+
+### 代码重构
+
+* 优化插件发现机制，支持动态解析扩展目录 ([31d6ff9](https://github.com/Lydanne/spaceflow/commit/31d6ff9f306b28607994ad50b9e40d550f3a646b))
+* 统一术语，将 skill 重命名为 extension ([cdf0736](https://github.com/Lydanne/spaceflow/commit/cdf073630708875cb814a555d407393c075fbff1))
+* 调整项目目录结构，统一包管理规范 ([5f89adb](https://github.com/Lydanne/spaceflow/commit/5f89adbb17b40ebe8bdd045a85c4c337fa385c43))
+
+### 文档更新
+
+* 重写 README 并添加各插件文档 ([066b10a](https://github.com/Lydanne/spaceflow/commit/066b10acb869de30e3af0ece59ab5d81ec78d668))
+
+### 其他修改
+
+* **core:** released version 0.1.1 [no ci] ([45f4c0c](https://github.com/Lydanne/spaceflow/commit/45f4c0c5092beacf3459c16b46e517227caff91e))
+* 为所有包添加 npm 公开发布配置 ([b9d2dcc](https://github.com/Lydanne/spaceflow/commit/b9d2dccd8e7bd4a74f6f0db83ee68dfb892b2d51))
+* 优化 GitHub Actions 工作流和 npm 发布配置 ([7ae7cc5](https://github.com/Lydanne/spaceflow/commit/7ae7cc51ff0c865527f2b835bfaf26227372fd36))
+* 初始化仓库 ([08d011d](https://github.com/Lydanne/spaceflow/commit/08d011d63f1852ecd9ae47425e743f4eb55fceb3))
+* 添加 release-it-gitea 依赖 ([9c5d5d6](https://github.com/Lydanne/spaceflow/commit/9c5d5d6a56de621a8bff9cb2b3c29c6e0843b98b))
+* 添加文档部署工作流并更新配置 ([0cc52fd](https://github.com/Lydanne/spaceflow/commit/0cc52fdef24f4d8696d0601cd001f6d470291ecc))
+* 移除 administration 权限并禁用分支锁定 ([cc51fa5](https://github.com/Lydanne/spaceflow/commit/cc51fa50d20159ee4fd273560364ee945213018c))
+
 ## [0.19.0](https://git.bjxgj.com/xgj/spaceflow/compare/@spaceflow/cli@0.18.0...@spaceflow/cli@0.19.0) (2026-02-15)
 
 ### 新特性
