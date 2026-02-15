@@ -43,6 +43,9 @@
       "ignoreVersion": true,
       "versionArgs": ["--workspaces false"]
     },
-    "git": { "pushWhitelistUsernames": ["github-actions[bot]"] }
+    "git": {
+      "lockBranch": false,
+      "pushWhitelistUsernames": ["github-actions[bot]"]
+    }
   }
 }
