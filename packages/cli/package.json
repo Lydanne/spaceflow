@@ -9,6 +9,9 @@
     "url": "git+https://github.com/Lydanne/spaceflow.git",
     "directory": "packages/cli"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "space": "dist/cli.js",
     "spaceflow": "dist/cli.js"
