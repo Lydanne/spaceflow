@@ -1,6 +1,9 @@
 # @spaceflow/ci-scripts
 
-Spaceflow CI 脚本插件，在分支锁定/解锁保护下执行 JavaScript 语句。适用于 CI 环境中需要原子性执行脚本的场景。
+[![npm version](https://img.shields.io/npm/v/@spaceflow/ci-scripts?color=blue)](https://www.npmjs.com/package/@spaceflow/ci-scripts)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+> Spaceflow CI 脚本扩展，在分支锁定/解锁保护下执行 JavaScript 语句。适用于 CI 环境中需要原子性执行脚本的场景。
 
 ## 安装
 
