@@ -4,6 +4,7 @@ export default defineConfig({
   title: "Spaceflow",
   description: "可扩展的 AI 工作流引擎，统一 CI/CD 管理与 AI 代码审查",
   lang: "zh-CN",
+  base: "/spaceflow/",
 
   head: [["link", { rel: "icon", type: "image/svg+xml", href: "/logo.svg" }]],
 
@@ -101,10 +102,10 @@ export default defineConfig({
       ],
     },
 
-    socialLinks: [{ icon: "github", link: "https://github.com/nicepkg/spaceflow" }],
+    socialLinks: [{ icon: "github", link: "https://github.com/Lydanne/spaceflow" }],
 
     footer: {
-      message: "基于 UNLICENSED 许可发布",
+      message: "基于 MIT 许可发布",
       copyright: "Copyright © 2024-present Spaceflow Contributors",
     },
 

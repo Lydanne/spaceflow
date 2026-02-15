@@ -11,7 +11,7 @@ hero:
       link: /guide/getting-started
     - theme: alt
       text: 查看 GitHub
-      link: https://github.com/nicepkg/spaceflow
+      link: https://github.com/Lydanne/spaceflow
 
 features:
   - icon: 🤖
