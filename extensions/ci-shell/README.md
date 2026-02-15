@@ -1,6 +1,9 @@
 # @spaceflow/ci-shell
 
-Spaceflow CI Shell 插件，在分支锁定/解锁保护下执行 Shell 命令。适用于 CI 环境中需要原子性执行命令的场景。
+[![npm version](https://img.shields.io/npm/v/@spaceflow/ci-shell?color=blue)](https://www.npmjs.com/package/@spaceflow/ci-shell)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+> Spaceflow CI Shell 扩展，在分支锁定/解锁保护下执行 Shell 命令。适用于 CI 环境中需要原子性执行命令的场景。
 
 ## 安装
 
