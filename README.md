@@ -8,8 +8,8 @@
 
 - **AI 代码审查**：基于 LLM（OpenAI、Claude、Gemini）的自动化 PR 审查，支持行级评论和增量审查
 - **自动化发布**：基于 Conventional Commits 的版本管理，支持 Monorepo 拓扑排序发布
-- **插件系统**：通过 NestJS 模块化架构，支持自定义命令和技能扩展
-- **多编辑器集成**：自动关联插件到 Claude Code、Windsurf、Cursor、OpenCode 等编辑器
+- **扩展系统**：通过 NestJS 模块化架构，支持自定义命令扩展
+- **多编辑器集成**：自动关联扩展到 Claude Code、Windsurf、Cursor、OpenCode 等编辑器
 - **多平台适配**：支持 GitHub、Gitea、GitLab 等 Git 托管平台
 - **CI 流程编排**：分支锁定保护下执行 Shell 命令或 JS 脚本
 
@@ -22,7 +22,7 @@ pnpm add -D @spaceflow/cli
 # 初始化项目配置
 pnpm spaceflow setup
 
-# 安装插件
+# 安装扩展
 pnpm spaceflow install @spaceflow/review
 pnpm spaceflow install @spaceflow/publish
 ```
@@ -32,22 +32,22 @@ pnpm spaceflow install @spaceflow/publish
 ```text
 spaceflow/
 ├── packages/
-│   ├── cli/            # CLI 入口（@spaceflow/cli）
-│   ├── core/           # 核心能力库（@spaceflow/core）
-│   │   └── src/
-│   │       ├── config/             # 配置管理
-│   │       ├── extension-system/   # 插件系统
-│   │       ├── locales/            # 国际化资源
-│   │       └── shared/             # 共享模块
-│   │           ├── git-provider/   # Git 平台适配器
-│   │           ├── git-sdk/        # Git 命令封装
-│   │           ├── llm-proxy/      # LLM 统一代理
-│   │           ├── llm-jsonput/    # JSON 结构化输出
-│   │           ├── feishu-sdk/     # 飞书 SDK
-│   │           ├── logger/         # 日志系统（TUI/Plain）
-│   │           ├── parallel/       # 并行执行工具
-│   │           └── storage/        # 通用存储服务
-├── extensions/         # 外部插件
+│   ├── cli/              # CLI 入口（@spaceflow/cli）
+│   └── core/             # 核心能力库（@spaceflow/core）
+│       └── src/
+│           ├── config/             # 配置管理
+│           ├── extension-system/   # 扩展系统
+│           ├── locales/            # 国际化资源
+│           └── shared/             # 共享模块
+│               ├── git-provider/   # Git 平台适配器
+│               ├── git-sdk/        # Git 命令封装
+│               ├── llm-proxy/      # LLM 统一代理
+│               ├── llm-jsonput/    # JSON 结构化输出
+│               ├── feishu-sdk/     # 飞书 SDK
+│               ├── logger/         # 日志系统（TUI/Plain）
+│               ├── parallel/       # 并行执行工具
+│               └── storage/        # 通用存储服务
+├── extensions/         # 扩展
 │   ├── review/         # AI 代码审查（@spaceflow/review）
 │   ├── publish/        # 自动化发布（@spaceflow/publish）
 │   ├── ci-scripts/     # CI 脚本执行（@spaceflow/ci-scripts）
@@ -55,7 +55,7 @@ spaceflow/
 │   └── period-summary/ # 周期统计（@spaceflow/period-summary）
 ├── actions/            # GitHub Actions
 ├── docs/               # 文档站点（VitePress）
-└── templates/          # 插件模板
+└── templates/          # 扩展模板
 ```
 
 ## 包一览
@@ -63,29 +63,29 @@ spaceflow/
 | 包名                        | 说明                                       |
 | --------------------------- | ------------------------------------------ |
 | `@spaceflow/cli`            | CLI 工具，提供 `spaceflow` / `space` 命令  |
-| `@spaceflow/core`           | 核心能力库，提供共享模块和插件系统基础设施 |
-| `@spaceflow/review`         | AI 代码审查插件                            |
-| `@spaceflow/publish`        | 自动化版本发布插件                         |
+| `@spaceflow/core`           | 核心能力库，提供共享模块和扩展系统基础设施 |
+| `@spaceflow/review`         | AI 代码审查扩展                            |
+| `@spaceflow/publish`        | 自动化版本发布扩展                         |
 | `@spaceflow/ci-scripts`     | CI 环境下执行 JS 脚本                      |
 | `@spaceflow/ci-shell`       | CI 环境下执行 Shell 命令                   |
 | `@spaceflow/period-summary` | PR 贡献周期统计                            |
 
 ## 内置命令
 
-| 命令         | 说明                  |
-| ------------ | --------------------- |
-| `install`    | 安装插件（命令/技能） |
-| `uninstall`  | 卸载插件              |
-| `build`      | 构建插件              |
-| `dev`        | 开发模式运行          |
-| `create`     | 创建新插件            |
-| `list`       | 列出已安装插件        |
-| `clear`      | 清理缓存              |
-| `runx` / `x` | 执行插件命令          |
-| `schema`     | 生成配置 JSON Schema  |
-| `commit`     | AI 智能提交           |
-| `setup`      | 初始化项目配置        |
-| `mcp`        | 启动 MCP Server       |
+| 命令         | 说明                 |
+| ------------ | -------------------- |
+| `install`    | 安装扩展             |
+| `uninstall`  | 卸载扩展             |
+| `build`      | 构建扩展             |
+| `dev`        | 开发模式运行         |
+| `create`     | 创建新扩展           |
+| `list`       | 列出已安装扩展       |
+| `clear`      | 清理缓存             |
+| `runx` / `x` | 执行扩展命令         |
+| `schema`     | 生成配置 JSON Schema |
+| `commit`     | AI 智能提交          |
+| `setup`      | 初始化项目配置       |
+| `mcp`        | 启动 MCP Server      |
 
 ## 配置
 
@@ -116,7 +116,7 @@ spaceflow/
 
 ## 编辑器集成
 
-通过 `support` 字段配置，`spaceflow install` 会自动将插件关联到对应编辑器目录：
+通过 `support` 字段配置，`spaceflow install` 会自动将扩展关联到对应编辑器目录：
 
 | 编辑器      | 配置目录     |
 | ----------- | ------------ |
