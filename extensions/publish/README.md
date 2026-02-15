@@ -1,6 +1,9 @@
 # @spaceflow/publish
 
-Spaceflow CI 发布插件，基于 [release-it](https://github.com/release-it/release-it) 实现自动化版本发布。
+[![npm version](https://img.shields.io/npm/v/@spaceflow/publish?color=blue)](https://www.npmjs.com/package/@spaceflow/publish)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+> Spaceflow 自动化发布扩展，基于 [release-it](https://github.com/release-it/release-it) 实现版本管理与发布。
 
 ## 功能特性
 
@@ -219,3 +222,7 @@ jobs:
 3. **解锁**：删除分支保护规则，恢复正常状态
 
 即使发布过程中发生错误，也会通过 `process.on('exit')` 确保分支被解锁。
+
+## 许可证
+
+[MIT](../../LICENSE)
