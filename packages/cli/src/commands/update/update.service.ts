@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import { execSync } from "child_process";
 import { readFile } from "fs/promises";
 import { join } from "path";
@@ -13,7 +12,6 @@ export interface UpdateOptions {
   verbose?: VerboseLevel;
 }
 
-@Injectable()
 export class UpdateService {
   protected getPackageManager(): string {
     const cwd = process.cwd();

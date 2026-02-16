@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import { execSync } from "child_process";
 import { readFile, writeFile, access, mkdir, symlink, unlink, readlink, stat } from "fs/promises";
 import { join, resolve, relative } from "path";
@@ -73,7 +72,6 @@ export type PluginConfig = Record<
   mcps: McpExportItem[];
 };
 
-@Injectable()
 export class InstallService {
   constructor(private readonly schemaGenerator: SchemaGeneratorService) {}
 

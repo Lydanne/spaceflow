@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import { ConfigReaderService } from "@spaceflow/core";
 import { execSync, spawnSync } from "child_process";
 import { existsSync, readFileSync } from "fs";
@@ -53,7 +52,6 @@ interface CommitContext {
   packageInfo?: PackageInfo;
 }
 
-@Injectable()
 export class CommitService {
   constructor(
     private readonly configReader: ConfigReaderService,

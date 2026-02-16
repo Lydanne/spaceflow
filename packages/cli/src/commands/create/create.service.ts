@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import { mkdir, writeFile, readFile, readdir, stat } from "fs/promises";
 import { join, resolve } from "path";
 import { existsSync } from "fs";
@@ -23,7 +22,6 @@ interface TemplateContext {
 /**
  * 创建插件服务
  */
-@Injectable()
 export class CreateService {
   // 缓存当前使用的远程模板目录
   private remoteTemplatesDir: string | null = null;

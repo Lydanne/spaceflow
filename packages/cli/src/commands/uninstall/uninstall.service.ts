@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import { execSync } from "child_process";
 import { readFile, rm } from "fs/promises";
 import { join } from "path";
@@ -9,7 +8,6 @@ import { detectPackageManager } from "@spaceflow/core";
 import { getSpaceflowDir } from "@spaceflow/core";
 import { getConfigPath, getSupportedEditors, removeDependency } from "@spaceflow/core";
 
-@Injectable()
 export class UninstallService {
   /**
    * 从 .spaceflow/node_modules/ 目录卸载 Extension
