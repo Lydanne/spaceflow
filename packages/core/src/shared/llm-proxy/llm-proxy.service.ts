@@ -1,4 +1,3 @@
-import { Injectable, Inject } from "@nestjs/common";
 import type { LlmAdapter } from "./adapters";
 import { ClaudeCodeAdapter } from "./adapters/claude-code.adapter";
 import { OpenAIAdapter } from "./adapters/openai.adapter";
@@ -19,16 +18,14 @@ export interface ChatOptions extends LlmRequestOptions {
   adapter?: LLMMode;
 }
 
-@Injectable()
 export class LlmProxyService {
   private adapters: Map<LLMMode, LlmAdapter> = new Map();
 
-  constructor(
-    @Inject("LLM_PROXY_CONFIG") private readonly config: LlmProxyConfig,
-    private readonly claudeCodeAdapter: ClaudeCodeAdapter,
-    private readonly openaiAdapter: OpenAIAdapter,
-    private readonly openCodeAdapter: OpenCodeAdapter,
-  ) {
+  constructor(private readonly config: LlmProxyConfig) {
+    // 适配器接收完整配置，内部自行读取所需部分
+    const claudeCodeAdapter = new ClaudeCodeAdapter(config);
+    const openaiAdapter = new OpenAIAdapter(config);
+    const openCodeAdapter = new OpenCodeAdapter(config);
     this.adapters.set("claude-code", claudeCodeAdapter);
     this.adapters.set("openai", openaiAdapter);
     this.adapters.set("open-code", openCodeAdapter);

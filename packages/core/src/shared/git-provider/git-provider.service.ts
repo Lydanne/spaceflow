@@ -1,4 +1,3 @@
-import { Inject, Injectable } from "@nestjs/common";
 import type {
   GitProvider,
   LockBranchOptions,
@@ -6,7 +5,6 @@ import type {
 } from "./git-provider.interface";
 import {
   type GitProviderModuleOptions,
-  GIT_PROVIDER_MODULE_OPTIONS,
   type BranchProtection,
   type CreateBranchProtectionOption,
   type EditBranchProtectionOption,
@@ -36,13 +34,10 @@ import { GitlabAdapter } from "./adapters/gitlab.adapter";
  * Git Provider 统一服务
  * 根据配置的 provider 类型代理到对应的适配器实现
  */
-@Injectable()
 export class GitProviderService implements GitProvider {
   protected readonly adapter: GitProvider;
 
-  constructor(
-    @Inject(GIT_PROVIDER_MODULE_OPTIONS) protected readonly options: GitProviderModuleOptions,
-  ) {
+  constructor(protected readonly options: GitProviderModuleOptions) {
     this.adapter = this.createAdapter(options);
   }
 

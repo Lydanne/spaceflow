@@ -59,15 +59,14 @@ export * from "./shared/logger";
 // ============ 配置相关 ============
 export * from "./config";
 
-// ============ NestJS 重导出 ============
-export { Command, CommandRunner, Option, SubCommand } from "nest-commander";
-export { Module, Injectable, Inject, Global } from "@nestjs/common";
-export { ConfigModule, ConfigService } from "@nestjs/config";
-
 // ============ Zod 重导出 ============
 export { z } from "zod";
 
-// ============ Swagger DTO 重导出 ============
+// ============ NestJS 重导出（已废弃，将在下个大版本移除）============
+// 保留以兼容现有代码，新代码请使用 defineExtension 接口
+export { Command, CommandRunner, Option, SubCommand } from "nest-commander";
+export { Module, Injectable, Inject, Global } from "@nestjs/common";
+export { ConfigModule, ConfigService } from "@nestjs/config";
 export { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 export {
   IsString,

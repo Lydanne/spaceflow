@@ -1,4 +1,3 @@
-import { Injectable, Inject } from "@nestjs/common";
 import OpenAI from "openai";
 import type { LlmAdapter } from "./llm-adapter.interface";
 import type {
@@ -10,13 +9,12 @@ import type {
 } from "../interfaces";
 import { shouldLog } from "../../verbose";
 
-@Injectable()
 export class OpenAIAdapter implements LlmAdapter {
   readonly name = "openai";
 
   private client: OpenAI | null = null;
 
-  constructor(@Inject("LLM_PROXY_CONFIG") private readonly config: LlmProxyConfig) {}
+  constructor(private readonly config: LlmProxyConfig) {}
 
   isConfigured(): boolean {
     return !!this.config.openai;

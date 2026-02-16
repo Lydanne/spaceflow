@@ -1,9 +1,7 @@
-import { Injectable } from "@nestjs/common";
 import { spawn, execSync } from "child_process";
 import type { GitCommit, GitChangedFile, GitDiffFile, GitRunOptions } from "./git-sdk.types";
 import { mapGitStatus, parseDiffText } from "./git-sdk-diff.utils";
 
-@Injectable()
 export class GitSdkService {
   protected readonly defaultOptions: GitRunOptions = {
     cwd: process.cwd(),

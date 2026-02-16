@@ -1,15 +1,11 @@
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { readFile, writeFile, mkdir, copyFile, unlink } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
-import { LlmConfig } from "../../config";
-
+import type { LlmConfig } from "../../config";
 import { shouldLog, type VerboseLevel } from "../verbose";
 
-@Injectable()
 export class ClaudeSetupService {
-  constructor(protected readonly configService: ConfigService) {}
+  constructor(protected readonly llmConfig?: LlmConfig) {}
 
   private getPaths() {
     const claudeDir = join(homedir(), ".claude");
@@ -69,8 +65,7 @@ export class ClaudeSetupService {
   async configure(verbose?: VerboseLevel): Promise<void> {
     const { claudeDir, settingsPath, claudeJsonPath } = this.getPaths();
 
-    const llmConf = this.configService.get<LlmConfig>("llm");
-    const claudeCode = llmConf?.claudeCode;
+    const claudeCode = this.llmConfig?.claudeCode;
 
     if (!claudeCode) {
       if (shouldLog(verbose, 1)) {

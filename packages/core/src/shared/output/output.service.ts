@@ -1,5 +1,5 @@
-import { Injectable, Scope } from "@nestjs/common";
 import { randomUUID } from "crypto";
+import type { IOutputService } from "../../extension-system/types";
 
 const OUTPUT_MARKER_START = "::spaceflow-output::";
 const OUTPUT_MARKER_END = "::end::";
@@ -16,20 +16,13 @@ const OUTPUT_MARKER_END = "::end::";
  *
  * 使用示例:
  * ```typescript
- * @Injectable()
- * export class MyService {
- *   constructor(protected readonly output: OutputService) {}
- *
- *   async execute() {
- *     // ... 执行逻辑
- *     this.output.set("version", "1.0.0");
- *     this.output.set("tag", "v1.0.0");
- *   }
- * }
+ * const output = new OutputService();
+ * output.set("version", "1.0.0");
+ * output.set("tag", "v1.0.0");
+ * output.flush();
  * ```
  */
-@Injectable({ scope: Scope.DEFAULT })
-export class OutputService {
+export class OutputService implements IOutputService {
   protected outputs: Record<string, string> = {};
   protected cacheId: string = randomUUID();
 
@@ -91,6 +84,43 @@ export class OutputService {
    */
   getCacheId(): string {
     return this.cacheId;
+  }
+
+  /**
+   * 输出信息
+   */
+  info(message: string): void {
+    console.log(message);
+  }
+
+  /**
+   * 输出成功信息
+   */
+  success(message: string): void {
+    console.log(`✅ ${message}`);
+  }
+
+  /**
+   * 输出警告
+   */
+  warn(message: string): void {
+    console.warn(`⚠️ ${message}`);
+  }
+
+  /**
+   * 输出错误
+   */
+  error(message: string): void {
+    console.error(`❌ ${message}`);
+  }
+
+  /**
+   * 输出调试信息
+   */
+  debug(message: string): void {
+    if (process.env.DEBUG) {
+      console.debug(`🔍 ${message}`);
+    }
   }
 }
 

@@ -1,6 +1,6 @@
-import { Inject, Injectable, OnModuleDestroy } from "@nestjs/common";
 import { type StorageAdapter } from "./adapters/storage-adapter.interface";
-import { STORAGE_ADAPTER, STORAGE_MODULE_OPTIONS, type StorageModuleOptions } from "./types";
+import { type StorageModuleOptions } from "./types";
+import type { IStorageService } from "../../extension-system/types";
 
 /**
  * Storage 服务
@@ -10,21 +10,18 @@ import { STORAGE_ADAPTER, STORAGE_MODULE_OPTIONS, type StorageModuleOptions } fr
  * - user:123:profile
  * - cache:api:users
  */
-@Injectable()
-export class StorageService implements OnModuleDestroy {
+export class StorageService implements IStorageService {
   protected cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
-    @Inject(STORAGE_ADAPTER)
     protected readonly adapter: StorageAdapter,
-    @Inject(STORAGE_MODULE_OPTIONS)
-    protected readonly options: StorageModuleOptions,
+    protected readonly options: StorageModuleOptions = {},
   ) {
     // 启动定期清理过期项的定时器
     this.startCleanupTimer();
   }
 
-  onModuleDestroy() {
+  destroy(): void {
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;

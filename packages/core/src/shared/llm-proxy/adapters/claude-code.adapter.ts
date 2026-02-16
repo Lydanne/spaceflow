@@ -1,4 +1,3 @@
-import { Injectable, Inject } from "@nestjs/common";
 import { query, type SpawnOptions } from "@anthropic-ai/claude-agent-sdk";
 import { spawn } from "child_process";
 import type { LlmAdapter } from "./llm-adapter.interface";
@@ -12,14 +11,14 @@ import type {
 import { ClaudeSetupService } from "../../claude-setup";
 import { shouldLog } from "../../verbose";
 
-@Injectable()
 export class ClaudeCodeAdapter implements LlmAdapter {
   readonly name = "claude-code";
+  private readonly claudeSetupService: ClaudeSetupService;
 
-  constructor(
-    @Inject("LLM_PROXY_CONFIG") private readonly config: LlmProxyConfig,
-    private readonly claudeSetupService: ClaudeSetupService,
-  ) {}
+  constructor(private readonly config: LlmProxyConfig) {
+    // 创建 ClaudeSetupService 实例，传入 LLM 配置
+    this.claudeSetupService = new ClaudeSetupService(config);
+  }
 
   isConfigured(): boolean {
     return !!this.config.claudeCode;

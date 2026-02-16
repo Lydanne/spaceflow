@@ -1,4 +1,3 @@
-import { Injectable, Inject } from "@nestjs/common";
 import { createOpencode } from "@opencode-ai/sdk";
 import type { LlmAdapter } from "./llm-adapter.interface";
 import type {
@@ -11,11 +10,10 @@ import type {
 } from "../interfaces";
 import { shouldLog } from "../../verbose";
 
-@Injectable()
 export class OpenCodeAdapter implements LlmAdapter {
   readonly name = "open-code";
 
-  constructor(@Inject("LLM_PROXY_CONFIG") private readonly config: LlmProxyConfig) {}
+  constructor(private readonly config: LlmProxyConfig) {}
 
   isConfigured(): boolean {
     return !!this.config.openCode;

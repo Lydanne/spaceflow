@@ -9,6 +9,10 @@ export * from "./config-reader.module";
 export * from "./schema-generator.service";
 export * from "./config-loader";
 
+// 新版配置系统（不依赖 NestJS）
+export { ConfigReader } from "./config-reader";
+export { loadEnvFiles } from "./load-env";
+
 import { gitProviderConfig } from "./git-provider.config";
 import { ciConfig } from "./ci.config";
 import { llmConfig } from "./llm.config";
