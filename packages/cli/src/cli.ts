@@ -34,8 +34,13 @@ async function bootstrap() {
   const program = new Command();
   program.name("spaceflow").description("Spaceflow CLI").version("1.0.0");
 
-  // 定义全局选项
-  program.option("-v, --verbose", "详细输出", false);
+  // 定义全局 verbose 选项（支持计数：-v, -vv, -vvv）
+  program.option(
+    "-v, --verbose",
+    "详细输出（可叠加：-v, -vv, -vvv）",
+    (_, prev: number) => prev + 1,
+    0,
+  );
 
   // 全局选项列表
   const globalOptions = ["-h, --help", "-V, --version", "-v, --verbose"];
@@ -54,8 +59,18 @@ async function bootstrap() {
     if (cmd.options) {
       for (const opt of cmd.options) {
         if (!globalOptions.some((go) => opt.flags.startsWith(go.split(",")[0].trim()))) {
-          const defaultValue = opt.default as string | boolean | string[] | undefined;
-          command.option(opt.flags as string, opt.description as string, defaultValue);
+          if (opt.isCount) {
+            // 计数选项：-v -v -v 或 -vvv 会累加
+            command.option(
+              opt.flags as string,
+              opt.description as string,
+              (_, prev: number) => prev + 1,
+              0,
+            );
+          } else {
+            const defaultValue = opt.default as string | boolean | string[] | undefined;
+            command.option(opt.flags as string, opt.description as string, defaultValue);
+          }
         }
       }
     }
@@ -83,9 +98,14 @@ async function bootstrap() {
     // commander 的 action 回调：有位置参数时是 (arg1, arg2, ..., options, command)
     // 无位置参数时是 (options, command)
     command.action(async (...actionArgs) => {
-      const opts = actionArgs[actionArgs.length - 2];
+      const opts = actionArgs[actionArgs.length - 2] || {};
       const positionalArgs = actionArgs.slice(0, -2);
-      await cmd.run(positionalArgs, opts || {}, container);
+      // 合并全局 verbose 选项
+      const globalOpts = program.opts();
+      if (globalOpts.verbose && !opts.verbose) {
+        opts.verbose = globalOpts.verbose;
+      }
+      await cmd.run(positionalArgs, opts, container);
     });
 
     // 将命令添加到 program

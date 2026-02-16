@@ -71,3 +71,18 @@ export function shouldLog(
 ): boolean {
   return normalizeVerbose(verbose) >= requiredLevel;
 }
+
+/**
+ * 解析命令行 verbose 参数
+ * 支持: -v, -v 2, -v 3, --verbose, --verbose 2, -vvv (计数模式)
+ * @param val 命令行参数值（字符串、布尔值、数字或 undefined）
+ * @returns 规范化后的 VerboseLevel
+ */
+export function parseVerbose(val: string | boolean | number | undefined): 0 | 1 | 2 | 3 {
+  if (val === undefined || val === 0) return 1;
+  if (val === true || val === "") return 1;
+  if (typeof val === "number") return normalizeVerbose(val as VerboseLevel);
+  const level = parseInt(val as string, 10);
+  if (isNaN(level)) return 1;
+  return normalizeVerbose(level as VerboseLevel);
+}

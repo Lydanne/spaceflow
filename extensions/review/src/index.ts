@@ -6,8 +6,8 @@ import type {
   LlmProxyService,
   GitSdkService,
   LLMMode,
-  VerboseLevel,
 } from "@spaceflow/core";
+import { parseVerbose } from "@spaceflow/core";
 import { reviewSchema, type AnalyzeDeletionsMode } from "./review.config";
 import { ReviewService } from "./review.service";
 import { ReviewSpecService } from "./review-spec";
@@ -33,7 +33,6 @@ export const extension = defineExtension({
         { flags: "-p, --pr-number <number>", description: t("review:options.prNumber") },
         { flags: "-b, --base <ref>", description: t("review:options.base") },
         { flags: "--head <ref>", description: t("review:options.head") },
-        { flags: "-v, --verbose", description: t("common.options.verboseDebug") },
         { flags: "-i, --includes <patterns...>", description: t("review:options.includes") },
         { flags: "-l, --llm-mode <mode>", description: t("review:options.llmMode") },
         { flags: "-f, --files <files...>", description: t("review:options.files") },
@@ -93,7 +92,7 @@ export const extension = defineExtension({
           prNumber: options?.prNumber ? parseInt(options.prNumber as string, 10) : undefined,
           base: options?.base as string,
           head: options?.head as string,
-          verbose: (options?.verbose ? 2 : 1) as VerboseLevel,
+          verbose: parseVerbose(options?.verbose as string | boolean | undefined),
           includes: options?.includes as string[],
           llmMode: options?.llmMode as LLMMode,
           files: options?.files as string[],

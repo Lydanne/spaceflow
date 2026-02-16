@@ -10,6 +10,8 @@ export interface OptionDefinition {
   description: string;
   /** 默认值 */
   default?: unknown;
+  /** 是否为计数选项（如 -vvv 表示 verbose 级别 3） */
+  isCount?: boolean;
 }
 
 /**
