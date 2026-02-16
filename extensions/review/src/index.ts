@@ -52,21 +52,23 @@ export const extension = defineExtension({
         { flags: "--event-action <action>", description: t("review:options.eventAction") },
       ],
       run: async (_args, options, ctx) => {
-        const gitProvider = ctx.getService<GitProviderService>("gitProvider");
-        const configReader = ctx.getService<ConfigReaderService>("config");
-        const llmProxy = ctx.getService<LlmProxyService>("llmProxy");
-        const gitSdk = ctx.getService<GitSdkService>("gitSdk");
-
-        if (!gitProvider) {
+        if (!ctx.hasService("gitProvider")) {
           ctx.output.error(
             "review 命令需要配置 Git Provider，请在 spaceflow.json 中配置 gitProvider 字段",
           );
           process.exit(1);
         }
-        if (!llmProxy) {
+        if (!ctx.hasService("llmProxy")) {
           ctx.output.error("review 命令需要配置 LLM 服务，请在 spaceflow.json 中配置 llm 字段");
           process.exit(1);
         }
+
+        const gitProvider = ctx.getService<GitProviderService>("gitProvider");
+        const configReader = ctx.getService<ConfigReaderService>("config");
+        const llmProxy = ctx.getService<LlmProxyService>("llmProxy");
+        const gitSdk = ctx.hasService("gitSdk")
+          ? ctx.getService<GitSdkService>("gitSdk")
+          : undefined;
 
         const reviewSpecService = new ReviewSpecService(gitProvider);
         const reviewReportService = new ReviewReportService();

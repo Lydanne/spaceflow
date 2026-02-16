@@ -45,6 +45,8 @@ export class StorageService implements IStorageService {
     this.cleanupTimer = setInterval(() => {
       this.cleanup().catch(console.error);
     }, 60 * 1000);
+    // 使用 unref() 让定时器不阻止进程退出
+    this.cleanupTimer.unref();
   }
 
   /**

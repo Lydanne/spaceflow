@@ -29,6 +29,11 @@ export interface SpaceflowContext {
    */
   getService<T = unknown>(key: string): T;
   /**
+   * 检查服务是否存在
+   * @param key 服务标识符
+   */
+  hasService(key: string): boolean;
+  /**
    * 注册服务实例
    * @param key 服务标识符
    * @param service 服务实例

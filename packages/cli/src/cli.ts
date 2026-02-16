@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { initI18n } from "@spaceflow/core";
-import { ServiceContainer } from "./service-container";
+import { ServiceContainer, initializeContainer } from "./di";
 import { ExtensionLoader } from "./extension-loader";
 import { internalExtensions } from "./internal-extensions";
 
@@ -12,8 +12,9 @@ initI18n();
 import "./locales";
 
 async function bootstrap() {
-  // 创建服务容器
+  // 创建并初始化服务容器
   const container = new ServiceContainer();
+  initializeContainer(container);
 
   // 创建扩展加载器
   const extensionLoader = new ExtensionLoader(container);
