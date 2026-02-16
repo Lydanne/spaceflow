@@ -4,11 +4,6 @@
     "provider": "github",
     "serverUrl": "https://api.github.com"
   },
-  "llm": {
-    "openai": {
-      "baseUrl": "https://api.openai.com/v1"
-    }
-  },
   "review": {
     "references": ["./references"],
     "includes": ["*/**/*.ts", "!*/**/*.spec.*", "!*/**/*.config.*"],

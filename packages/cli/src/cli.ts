@@ -80,8 +80,12 @@ async function bootstrap() {
     }
 
     // 添加执行函数
-    command.action(async (args, options) => {
-      await cmd.run(args || [], options || {}, container);
+    // commander 的 action 回调：有位置参数时是 (arg1, arg2, ..., options, command)
+    // 无位置参数时是 (options, command)
+    command.action(async (...actionArgs) => {
+      const opts = actionArgs[actionArgs.length - 2];
+      const positionalArgs = actionArgs.slice(0, -2);
+      await cmd.run(positionalArgs, opts || {}, container);
     });
 
     // 将命令添加到 program
