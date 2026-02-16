@@ -89,36 +89,7 @@ export function dtoToJsonSchema(dtoClass: new (...args: any[]) => any): JsonSche
     if (typeof schemaType === "function") {
       schemaType = typeMap[schemaType.name] || "string";
     }
-    // 如果 swagger 没有显式 type，从 class-validator 元数据推断
-    if (!schemaType) {
-      try {
-        const { getMetadataStorage } = require("class-validator");
-        const validationMetas = getMetadataStorage().getTargetValidationMetadatas(
-          dtoClass,
-          "",
-          false,
-          false,
-        );
-        const validatorTypeMap: Record<string, string> = {
-          isString: "string",
-          isNumber: "number",
-          isBoolean: "boolean",
-          isArray: "array",
-          isObject: "object",
-          isInt: "number",
-          isEnum: "string",
-        };
-        const propMeta = validationMetas.find(
-          (m: any) => m.propertyName === key && validatorTypeMap[m.name],
-        );
-        if (propMeta) {
-          schemaType = validatorTypeMap[propMeta.name];
-        }
-      } catch {
-        // class-validator 不可用时忽略
-      }
-    }
-    // 最后从 reflect-metadata 的 design:type 推断
+    // 从 reflect-metadata 的 design:type 推断
     if (!schemaType) {
       const reflectedType = Reflect.getMetadata("design:type", prototype, key);
       if (reflectedType) {
