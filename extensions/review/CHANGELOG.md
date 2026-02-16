@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.29.2](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.29.1...@spaceflow/review@0.29.2) (2026-02-16)
+
+### 其他修改
+
+* **ci-scripts:** released version 0.19.2 [no ci] ([aabfbf3](https://github.com/Lydanne/spaceflow/commit/aabfbf327353bdda370884f6887be92ee2e23c0c))
+* **ci-shell:** released version 0.19.2 [no ci] ([ef258b7](https://github.com/Lydanne/spaceflow/commit/ef258b7cd02305c82c5813c4056def14548261d3))
+* **cli:** released version 0.19.3 [no ci] ([30b95d5](https://github.com/Lydanne/spaceflow/commit/30b95d5bffdc617b610e6d31367c84f450050f13))
+* **core:** released version 0.1.3 [no ci] ([e02f23b](https://github.com/Lydanne/spaceflow/commit/e02f23b8d3ea3078b93bc4467de845bbd4bd1c35))
+* **period-summary:** released version 0.19.2 [no ci] ([ce5530e](https://github.com/Lydanne/spaceflow/commit/ce5530ecc75703872d00a97aa19a745be4fd2a6d))
+* **publish:** released version 0.21.2 [no ci] ([2adc708](https://github.com/Lydanne/spaceflow/commit/2adc708b51e331df60a2bb3173eb669bbc150d87))
+* 为 cli 和 core 包添加 files 字段以控制发布内容 ([5a43ee2](https://github.com/Lydanne/spaceflow/commit/5a43ee2499995dab8bdc06042269fa163fc98e31))
+
 ## [0.29.1](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.29.0...@spaceflow/review@0.29.1) (2026-02-15)
 
 ### 文档更新
