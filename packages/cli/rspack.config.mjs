@@ -10,6 +10,7 @@ export default {
   },
   entry: {
     cli: "./src/cli.ts",
+    "cli-new": "./src/cli-new.ts",
   },
   plugins: [
     new rspack.BannerPlugin({

@@ -30,35 +30,46 @@ async function bootstrap() {
   const program = new Command();
   program.name("spaceflow").description("Spaceflow CLI").version("1.0.0");
 
+  // 定义全局选项
+  program.option("-v, --verbose", "详细输出", false);
+
+  // 全局选项列表
+  const globalOptions = ["-h, --help", "-V, --version", "-v, --verbose"];
+
   // 注册所有命令
   const commands = extensionLoader.getCommands();
   for (const cmd of commands) {
-    const command = program.command(cmd.name, cmd.description);
+    const command = new Command(cmd.name).description(cmd.description);
 
     // 添加参数
     if (cmd.arguments) {
       command.arguments(cmd.arguments);
     }
 
-    // 添加选项
+    // 添加选项（排除已定义的全局选项）
     if (cmd.options) {
       for (const opt of cmd.options) {
-        command.option(opt.flags, opt.description, opt.default);
+        if (!globalOptions.some((go) => opt.flags.startsWith(go.split(",")[0].trim()))) {
+          command.option(opt.flags, opt.description, opt.default);
+        }
       }
     }
 
     // 添加子命令
     if (cmd.subcommands) {
       for (const sub of cmd.subcommands) {
-        const subCmd = command.command(sub.name, sub.description);
+        const subCmd = new Command(sub.name).description(sub.description);
         if (sub.options) {
           for (const opt of sub.options) {
-            subCmd.option(opt.flags, opt.description, opt.default);
+            if (!globalOptions.some((go) => opt.flags.startsWith(go.split(",")[0].trim()))) {
+              subCmd.option(opt.flags, opt.description, opt.default);
+            }
           }
         }
         subCmd.action(async (args, options) => {
           await sub.run([args], options, container);
         });
+        command.addCommand(subCmd);
       }
     }
 
@@ -66,6 +77,9 @@ async function bootstrap() {
     command.action(async (args, options) => {
       await cmd.run(args, options, container);
     });
+
+    // 将命令添加到 program
+    program.addCommand(command);
   }
 
   // 解析命令行参数
