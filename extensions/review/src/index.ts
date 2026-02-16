@@ -68,7 +68,7 @@ export const extension = defineExtension({
           process.exit(1);
         }
 
-        const reviewSpecService = new ReviewSpecService();
+        const reviewSpecService = new ReviewSpecService(gitProvider);
         const reviewReportService = new ReviewReportService();
         const issueVerifyService = new IssueVerifyService(llmProxy, reviewSpecService);
         const deletionImpactService = new DeletionImpactService(llmProxy, gitProvider);

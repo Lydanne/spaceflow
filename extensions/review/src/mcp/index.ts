@@ -1,4 +1,10 @@
-import { t, z, type McpServerDefinition, type SpaceflowContext } from "@spaceflow/core";
+import {
+  t,
+  z,
+  type McpServerDefinition,
+  type SpaceflowContext,
+  type GitProviderService,
+} from "@spaceflow/core";
 import { ReviewSpecService } from "../review-spec";
 import type { ReviewConfig } from "../review.config";
 import { join } from "path";
@@ -21,6 +27,17 @@ export const getRuleDetailInputSchema = z.object({
 });
 
 /**
+ * 获取 GitProviderService（可选）
+ */
+function getGitProvider(ctx: SpaceflowContext): GitProviderService | undefined {
+  try {
+    return ctx.getService<GitProviderService>("gitProvider");
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * 获取项目的规则目录
  */
 async function getSpecDirs(cwd: string, ctx: SpaceflowContext): Promise<string[]> {
@@ -28,7 +45,8 @@ async function getSpecDirs(cwd: string, ctx: SpaceflowContext): Promise<string[]
   try {
     const reviewConfig = ctx.config.get<ReviewConfig>("review");
     if (reviewConfig?.references?.length) {
-      const specService = new ReviewSpecService();
+      const gitProvider = getGitProvider(ctx);
+      const specService = new ReviewSpecService(gitProvider);
       const resolved = await specService.resolveSpecSources(reviewConfig.references);
       dirs.push(...resolved);
     }
@@ -52,7 +70,8 @@ async function getSpecDirs(cwd: string, ctx: SpaceflowContext): Promise<string[]
  * 加载所有规则
  */
 async function loadAllSpecs(cwd: string, ctx: SpaceflowContext) {
-  const specService = new ReviewSpecService();
+  const gitProvider = getGitProvider(ctx);
+  const specService = new ReviewSpecService(gitProvider);
   const specDirs = await getSpecDirs(cwd, ctx);
   const allSpecs = [];
   for (const dir of specDirs) {
@@ -99,8 +118,9 @@ export const reviewMcpServer: McpServerDefinition = {
       description: t("review:mcp.getRulesForFile"),
       inputSchema: getRulesForFileInputSchema,
       handler: async (input, ctx) => {
-        const { filePath, cwd, includeExamples } =
-          input as z.infer<typeof getRulesForFileInputSchema>;
+        const { filePath, cwd, includeExamples } = input as z.infer<
+          typeof getRulesForFileInputSchema
+        >;
         const workDir = cwd || process.cwd();
         const allSpecs = await loadAllSpecs(workDir, ctx);
         const specService = new ReviewSpecService();
