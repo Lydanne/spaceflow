@@ -170,7 +170,7 @@ export class ReviewService {
 
   async getContextFromEnv(options: ReviewOptions): Promise<ReviewContext> {
     const reviewConf = this.configReader.getPluginConfig<ReviewConfig>("review");
-    const ciConf = this.configService.get<CiConfig>("ci");
+    const ciConf = this.config.get<CiConfig>("ci");
     const repository = ciConf?.repository;
 
     if (options.ci) {
