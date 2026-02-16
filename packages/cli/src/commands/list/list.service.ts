@@ -1,8 +1,7 @@
-import { Injectable } from "@nestjs/common";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
-import { ExtensionLoaderService } from "../../extension-loader";
+import type { ExtensionLoader } from "../../extension-loader-new.js";
 import {
   shouldLog,
   type VerboseLevel,
@@ -21,9 +20,8 @@ interface ExtensionListInfo {
   installed: boolean;
 }
 
-@Injectable()
 export class ListService {
-  constructor(private readonly extensionLoader: ExtensionLoaderService) {}
+  constructor(private readonly extensionLoader: ExtensionLoader) {}
 
   /**
    * 获取支持的编辑器列表
@@ -65,24 +63,25 @@ export class ListService {
       return;
     }
 
-    // 获取已加载的 Extension 信息
-    const loadedExtensions = this.extensionLoader.getLoadedExtensions();
-    const loadedMap = new Map(loadedExtensions.map((e) => [e.name, e]));
+    // 获取已加载的命令信息
+    const commands = this.extensionLoader.getCommands();
     const editors = await this.getSupportedEditors();
     // 收集所有 Extension 信息
     const extensionInfos: ExtensionListInfo[] = [];
     for (const [name, source] of Object.entries(skills)) {
       const type = getSourceType(source);
       const installed = await this.checkInstalled(name, source, type, editors);
-      const loadedExt = loadedMap.get(name);
-      extensionInfos.push({ name, source, type, installed, commands: loadedExt?.commands ?? [] });
+      // 从命令中获取扩展名称
+      const extCommands = commands.filter((c) => c.name.startsWith(name)).map((c) => c.name);
+      extensionInfos.push({ name, source, type, installed, commands: extCommands });
     }
     if (!shouldLog(verbose, 1)) return;
     // 计算最大名称宽度用于对齐
     const maxNameLen = Math.max(...extensionInfos.map((e) => e.name.length), 10);
     const installedCount = extensionInfos.filter((e) => e.installed).length;
     console.log(
-      t("list:installedExtensions", { installed: installedCount, total: extensionInfos.length }) + "\n",
+      t("list:installedExtensions", { installed: installedCount, total: extensionInfos.length }) +
+        "\n",
     );
     for (const ext of extensionInfos) {
       const icon = ext.installed ? "\x1b[32m✔\x1b[0m" : "\x1b[33m○\x1b[0m";
