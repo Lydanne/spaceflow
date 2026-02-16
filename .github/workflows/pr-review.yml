@@ -14,7 +14,6 @@ permissions:
   packages: write # Packages：可写
   repository-projects: write # Repository Projects：可写
   security-events: write # Security Events：可写
-  workflows: write # Workflows：可写
 
 jobs:
   pr-review:
