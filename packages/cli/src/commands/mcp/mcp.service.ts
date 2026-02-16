@@ -5,6 +5,7 @@ import type { ExtensionLoader } from "../../extension-loader";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { spawn } from "child_process";
 
 export class McpService {
   constructor(private readonly extensionLoader: ExtensionLoader) {}
@@ -13,7 +14,12 @@ export class McpService {
    * 启动 MCP Server
    * 收集所有扩展的 MCP 工具并启动服务
    */
-  async startServer(verbose?: VerboseLevel): Promise<void> {
+  async startServer(verbose?: VerboseLevel, inspector?: boolean): Promise<void> {
+    // 如果启用 inspector 模式，使用 npx 启动 inspector
+    if (inspector) {
+      await this.startWithInspector();
+      return;
+    }
     if (shouldLog(verbose, 1)) {
       console.error(t("mcp:scanning"));
     }
@@ -21,18 +27,35 @@ export class McpService {
     // 加载所有扩展
     await this.extensionLoader.discoverAndLoad();
 
-    // 获取所有命令（包含扩展的 MCP 工具）
-    const commands = this.extensionLoader.getCommands();
-    const allTools: Array<{ tool: McpToolMetadata; provider: any }> = [];
+    // 获取所有扩展
+    const extensions = this.extensionLoader.getExtensions();
+    const mcpServers = this.extensionLoader.getMcpServers();
 
     if (shouldLog(verbose, 2)) {
-      console.error(t("mcp:foundExtensions", { count: commands.length }));
+      console.error(t("mcp:foundExtensions", { count: extensions.length }));
     }
 
     // 收集所有扩展的 MCP 工具
-    // 注意：新的架构中，MCP 工具通过扩展的 mcp 字段定义
-    // 这里需要重新实现以适配新架构
-    // TODO: 实现 MCP 工具收集逻辑
+    const allTools: Array<{ tool: McpToolMetadata; handler: any; ctx: any }> = [];
+    for (const { extensionName, mcp } of mcpServers) {
+      if (shouldLog(verbose, 2)) {
+        console.error(`   扩展 ${extensionName} 提供 ${mcp.tools.length} 个 MCP 工具`);
+      }
+      for (const tool of mcp.tools) {
+        allTools.push({
+          tool: {
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema
+              ? (this.zodToJsonSchema(tool.inputSchema) as any)
+              : undefined,
+            methodName: "handler",
+          },
+          handler: tool.handler,
+          ctx: this.extensionLoader["ctx"], // 获取 SpaceflowContext
+        });
+      }
+    }
 
     if (allTools.length === 0) {
       console.error(t("mcp:noToolsFound"));
@@ -52,13 +75,13 @@ export class McpService {
    * 运行 MCP Server
    */
   private async runServer(
-    allTools: Array<{ tool: McpToolMetadata; provider: any }>,
+    allTools: Array<{ tool: McpToolMetadata; handler: any; ctx: any }>,
     verbose?: VerboseLevel,
   ): Promise<void> {
     const server = new McpServer({ name: "spaceflow", version: "1.0.0" });
 
     // 注册所有工具（使用 v2 API: server.registerTool）
-    for (const { tool, provider } of allTools) {
+    for (const { tool, handler, ctx } of allTools) {
       // 将 JSON Schema 转换为 Zod schema
       const schema = this.jsonSchemaToZod(tool.inputSchema);
       server.registerTool(
@@ -69,7 +92,7 @@ export class McpService {
         },
         async (args: any) => {
           try {
-            const result = await provider[tool.methodName](args || {});
+            const result = await handler(args || {}, ctx);
             return {
               content: [
                 {
@@ -101,13 +124,74 @@ export class McpService {
       console.error(t("mcp:serverStarted", { count: allTools.length }));
     }
 
-    if (process.env.MODELCONTEXT_PROTOCOL_INSPECTOR) {
-      await new Promise<void>((resolve) => {
-        process.stdin.on("close", resolve);
-        process.on("SIGINT", resolve);
-        process.on("SIGTERM", resolve);
-      });
+    // 保持进程运行
+    await new Promise<void>((resolve) => {
+      process.stdin.on("close", resolve);
+      process.on("SIGINT", resolve);
+      process.on("SIGTERM", resolve);
+    });
+  }
+
+  /**
+   * 使用 MCP Inspector 启动
+   */
+  private async startWithInspector(): Promise<void> {
+    const args = process.argv.slice(2).filter((arg) => arg !== "--inspector");
+    const child = spawn(
+      "npx",
+      ["-y", "@modelcontextprotocol/inspector", "node", process.argv[1], ...args],
+      {
+        stdio: "inherit",
+        env: { ...process.env, FORCE_COLOR: "1" },
+      },
+    );
+    child.on("exit", (code) => {
+      process.exit(code || 0);
+    });
+  }
+
+  /**
+   * 将 Zod schema 转换为 JSON Schema
+   */
+  private zodToJsonSchema(zodSchema: any): Record<string, any> {
+    if (!zodSchema || typeof zodSchema.shape !== "object") {
+      return {};
     }
+    const properties: Record<string, any> = {};
+    const required: string[] = [];
+    for (const [key, value] of Object.entries(zodSchema.shape)) {
+      const zodType = value as any;
+      let type = "string";
+      let description = zodType._def?.description;
+      // 检查是否可选
+      const isOptional = zodType._def?.typeName === "ZodOptional";
+      const innerType = isOptional ? zodType._def?.innerType : zodType;
+      // 获取类型
+      switch (innerType?._def?.typeName) {
+        case "ZodString":
+          type = "string";
+          break;
+        case "ZodNumber":
+          type = "number";
+          break;
+        case "ZodBoolean":
+          type = "boolean";
+          break;
+        case "ZodArray":
+          type = "array";
+          break;
+        default:
+          type = "string";
+      }
+      properties[key] = { type };
+      if (description) {
+        properties[key].description = description;
+      }
+      if (!isOptional) {
+        required.push(key);
+      }
+    }
+    return { properties, required };
   }
 
   /**

@@ -54,6 +54,30 @@ export class ExtensionLoader {
   }
 
   /**
+   * 获取所有扩展
+   */
+  getExtensions(): ExtensionDefinition[] {
+    return Array.from(this.extensions.values());
+  }
+
+  /**
+   * 获取所有 MCP 服务
+   * 返回扩展中定义的 mcp 字段
+   */
+  getMcpServers(): Array<{ extensionName: string; mcp: NonNullable<ExtensionDefinition["mcp"]> }> {
+    const mcpServers: Array<{
+      extensionName: string;
+      mcp: NonNullable<ExtensionDefinition["mcp"]>;
+    }> = [];
+    for (const ext of this.extensions.values()) {
+      if (ext.mcp) {
+        mcpServers.push({ extensionName: ext.name, mcp: ext.mcp });
+      }
+    }
+    return mcpServers;
+  }
+
+  /**
    * 发现并加载外部扩展
    */
   async discoverAndLoad(): Promise<void> {
@@ -161,7 +185,7 @@ export class ExtensionLoader {
   /**
    * 加载单个扩展
    */
-  private async loadExtension(name: string, version: string): Promise<void> {
+  private async loadExtension(name: string, _version: string): Promise<void> {
     const localSpaceflowDir = path.join(process.cwd(), SPACEFLOW_DIR);
 
     if (!this.isValidExtension(name, localSpaceflowDir)) {

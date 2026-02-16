@@ -25,9 +25,10 @@ export const mcpExtension = defineExtension({
       ],
       run: async (_args, options, ctx) => {
         const verbose = (options?.verbose ? 2 : 1) as VerboseLevel;
+        const inspector = options?.inspector as boolean | undefined;
         const extensionLoader = ctx.getService<ExtensionLoader>("extensionLoader");
         const mcpService = new McpService(extensionLoader);
-        await mcpService.startServer(verbose);
+        await mcpService.startServer(verbose, inspector);
       },
     },
   ],
