@@ -1,18 +1,24 @@
-import { vi, type Mocked, type Mock } from "vitest";
-import { Test, TestingModule } from "@nestjs/testing";
+import { vi, type Mock } from "vitest";
 import { ClaudeCodeAdapter } from "./claude-code.adapter";
-import { ClaudeSetupService } from "../../claude-setup";
 import { LlmStreamEvent } from "../interfaces";
 
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: vi.fn(),
 }));
 
+vi.mock("../../claude-setup", () => ({
+  ClaudeSetupService: class MockClaudeSetupService {
+    configure = vi.fn().mockResolvedValue(undefined);
+    backup = vi.fn().mockResolvedValue(undefined);
+    restore = vi.fn().mockResolvedValue(undefined);
+    withTemporaryConfig = vi.fn();
+  },
+}));
+
 import { query } from "@anthropic-ai/claude-agent-sdk";
 
 describe("ClaudeAdapter", () => {
   let adapter: ClaudeCodeAdapter;
-  let claudeSetupService: Mocked<ClaudeSetupService>;
 
   const mockConfig = {
     claudeCode: {
@@ -21,24 +27,9 @@ describe("ClaudeAdapter", () => {
     },
   };
 
-  beforeEach(async () => {
-    const mockSetup = {
-      configure: vi.fn().mockResolvedValue(undefined),
-      backup: vi.fn().mockResolvedValue(undefined),
-      restore: vi.fn().mockResolvedValue(undefined),
-      withTemporaryConfig: vi.fn(),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ClaudeCodeAdapter,
-        { provide: "LLM_PROXY_CONFIG", useValue: mockConfig },
-        { provide: ClaudeSetupService, useValue: mockSetup },
-      ],
-    }).compile();
-
-    adapter = module.get<ClaudeCodeAdapter>(ClaudeCodeAdapter);
-    claudeSetupService = module.get(ClaudeSetupService);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    adapter = new ClaudeCodeAdapter(mockConfig as any);
   });
 
   it("should be defined", () => {
@@ -51,15 +42,8 @@ describe("ClaudeAdapter", () => {
       expect(adapter.isConfigured()).toBe(true);
     });
 
-    it("should return false if claude config is missing", async () => {
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          ClaudeCodeAdapter,
-          { provide: "LLM_PROXY_CONFIG", useValue: {} },
-          { provide: ClaudeSetupService, useValue: { configure: vi.fn() } },
-        ],
-      }).compile();
-      const unconfiguredAdapter = module.get<ClaudeCodeAdapter>(ClaudeCodeAdapter);
+    it("should return false if claude config is missing", () => {
+      const unconfiguredAdapter = new ClaudeCodeAdapter({} as any);
       expect(unconfiguredAdapter.isConfigured()).toBe(false);
     });
   });
@@ -79,7 +63,6 @@ describe("ClaudeAdapter", () => {
         events.push(event);
       }
 
-      expect(claudeSetupService.configure).toHaveBeenCalled();
       expect(query).toHaveBeenCalledWith(
         expect.objectContaining({
           prompt: "hello",

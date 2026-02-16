@@ -1,7 +1,5 @@
-import { vi, type Mocked } from "vitest";
-import { Test, TestingModule } from "@nestjs/testing";
-import { LlmProxyService } from "@spaceflow/core";
-import { ReviewIssue, FileContentsMap, ReviewSpecService } from "./review-spec";
+import { vi } from "vitest";
+import { ReviewIssue, FileContentsMap } from "./review-spec";
 import { IssueVerifyService } from "./issue-verify.service";
 
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
@@ -10,10 +8,11 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 
 describe("IssueVerifyService", () => {
   let service: IssueVerifyService;
-  let llmProxyService: Mocked<LlmProxyService>;
+  let llmProxyService: any;
 
-  beforeEach(async () => {
-    const mockLlmProxyService = {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    llmProxyService = {
       chatStream: vi.fn(),
     };
 
@@ -22,22 +21,7 @@ describe("IssueVerifyService", () => {
       buildSpecsSection: vi.fn().mockReturnValue("mock rule specs"),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        IssueVerifyService,
-        {
-          provide: LlmProxyService,
-          useValue: mockLlmProxyService,
-        },
-        {
-          provide: ReviewSpecService,
-          useValue: mockReviewSpecService,
-        },
-      ],
-    }).compile();
-
-    service = module.get<IssueVerifyService>(IssueVerifyService);
-    llmProxyService = module.get(LlmProxyService) as Mocked<LlmProxyService>;
+    service = new IssueVerifyService(llmProxyService as any, mockReviewSpecService as any);
   });
 
   it("should return empty array if no issues provided", async () => {

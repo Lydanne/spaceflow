@@ -4,7 +4,7 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { shouldLog, type VerboseLevel, t } from "@spaceflow/core";
 import { getDependencies } from "@spaceflow/core";
-import type { SkillConfig } from "../install/install.service";
+import type { ExtensionConfig } from "../install/install.service";
 
 export interface UpdateOptions {
   name?: string;
@@ -64,7 +64,7 @@ export class UpdateService {
     return "npm";
   }
 
-  parseSkillConfig(config: SkillConfig): { source: string; ref?: string } {
+  parseExtensionConfig(config: ExtensionConfig): { source: string; ref?: string } {
     if (typeof config === "string") {
       return { source: config };
     }
@@ -312,7 +312,7 @@ export class UpdateService {
       return false;
     }
 
-    const { source } = this.parseSkillConfig(dependencies[name]);
+    const { source } = this.parseExtensionConfig(dependencies[name]);
     const sourceType = this.getSourceType(source);
 
     if (shouldLog(verbose, 1)) console.log(t("update:updating", { name }));
@@ -345,7 +345,7 @@ export class UpdateService {
     let failCount = 0;
 
     for (const [name, config] of Object.entries(dependencies)) {
-      const { source } = this.parseSkillConfig(config);
+      const { source } = this.parseExtensionConfig(config);
       const sourceType = this.getSourceType(source);
 
       console.log(`\n📦 ${name}`);

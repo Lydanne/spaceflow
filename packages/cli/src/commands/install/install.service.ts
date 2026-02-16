@@ -29,11 +29,11 @@ import {
 export type { SourceType } from "@spaceflow/core";
 
 /**
- * Skills 配置项，支持字符串或对象格式
+ * 扩展配置项，支持字符串或对象格式
  * 字符串: "git@xxx.git" 或 "@scope/package@version" 或 "./path"
  * 对象: { source: "git@xxx.git", ref: "v1.0.0" }
  */
-export type SkillConfig =
+export type ExtensionConfig =
   | string
   | {
       source: string;
@@ -66,7 +66,7 @@ export interface McpExportItem {
  * 插件配置类型
  */
 export type PluginConfig = Record<
-  "flows" | "commands" | "skills",
+  "flows" | "commands" | "extensions",
   Array<{ name: string; entry: string }>
 > & {
   mcps: McpExportItem[];
@@ -95,10 +95,10 @@ export class InstallService {
 
   /**
    * 将插件关联到各个编辑器的目录
-   * pluginConfig 包含 flows/commands/skills/mcps 四种类型
+   * pluginConfig 包含 flows/commands/extensions/mcps 四种类型
    * - flows: CLI 子命令，不需要复制到编辑器目录
    * - commands: 编辑器命令，复制到 .claude/commands/ 等目录
-   * - skills: 技能包，复制到 .claude/skills/ 等目录
+   * - extensions: 扩展包，复制到 .claude/skills/ 等目录
    * - mcps: MCP Server，注册到编辑器的 mcp.json 配置
    */
   protected async linkPluginToEditors(options: {
@@ -118,19 +118,19 @@ export class InstallService {
       const editorDirName = getEditorDirName(editor);
       const editorRoot = isGlobal ? join(home, editorDirName) : join(workingDir, editorDirName);
 
-      // 处理 skills
-      if (pluginConfig.skills.length > 0) {
-        const editorSkillsDir = join(editorRoot, "skills");
-        await this.ensureSkillsDir(editorSkillsDir, verbose);
+      // 处理 extensions
+      if (pluginConfig.extensions.length > 0) {
+        const editorExtensionsDir = join(editorRoot, "skills");
+        await this.ensureDir(editorExtensionsDir, verbose);
 
-        for (const skill of pluginConfig.skills) {
-          const skillPath = skill.entry === "." ? depPath : join(depPath, skill.entry);
-          const installName = skill.name || name;
-          const targetPath = join(editorSkillsDir, installName);
+        for (const ext of pluginConfig.extensions) {
+          const extPath = ext.entry === "." ? depPath : join(depPath, ext.entry);
+          const installName = ext.name || name;
+          const targetPath = join(editorExtensionsDir, installName);
 
-          await this.copySkillToTarget(skillPath, targetPath, installName);
+          await this.copyExtensionToTarget(extPath, targetPath, installName);
 
-          // 将生成的 skill 加入编辑器目录的 .gitignore
+          // 将生成的扩展加入编辑器目录的 .gitignore
           await ensureEditorGitignore(editorRoot, "skills", installName);
         }
       }
@@ -138,7 +138,7 @@ export class InstallService {
       // 处理 commands（编辑器命令）
       if (pluginConfig.commands.length > 0) {
         const editorCommandsDir = join(editorRoot, "commands");
-        await this.ensureSkillsDir(editorCommandsDir);
+        await this.ensureDir(editorCommandsDir);
 
         for (const cmd of pluginConfig.commands) {
           const commandPath = cmd.entry === "." ? depPath : join(depPath, cmd.entry);
@@ -220,7 +220,7 @@ export class InstallService {
     config.mcpServers![name] = serverConfig;
 
     // 确保目录存在
-    await this.ensureSkillsDir(editorRoot);
+    await this.ensureDir(editorRoot);
 
     // 写入配置
     await writeFile(mcpJsonPath, JSON.stringify(config, null, 2), "utf-8");
@@ -355,10 +355,10 @@ export class InstallService {
       // 本地路径：读取 package.json 的 name 字段（先规范化）
       const normalizedSource = normalizeSource(source);
       const sourcePath = resolve(process.cwd(), normalizedSource);
-      const packageJsonPath = join(sourcePath, "package.json");
-      if (existsSync(packageJsonPath)) {
+      const pkgJsonPath = join(sourcePath, "package.json");
+      if (existsSync(pkgJsonPath)) {
         try {
-          const content = await readFile(packageJsonPath, "utf-8");
+          const content = await readFile(pkgJsonPath, "utf-8");
           const pkg = JSON.parse(content);
           if (pkg.name) {
             return pkg.name;
@@ -395,12 +395,12 @@ export class InstallService {
     }
   }
 
-  protected async ensureSkillsDir(skillsDir: string, verbose: VerboseLevel = 1): Promise<void> {
+  protected async ensureDir(dirPath: string, verbose: VerboseLevel = 1): Promise<void> {
     try {
-      await access(skillsDir);
+      await access(dirPath);
     } catch {
-      if (shouldLog(verbose, 1)) console.log(t("install:creatingDir", { dir: skillsDir }));
-      await mkdir(skillsDir, { recursive: true });
+      if (shouldLog(verbose, 1)) console.log(t("install:creatingDir", { dir: dirPath }));
+      await mkdir(dirPath, { recursive: true });
     }
   }
 
@@ -492,9 +492,9 @@ export class InstallService {
   }
 
   /**
-   * 将 skill 链接到 .claude/skills 目录
+   * 将扩展链接到 .claude/skills 目录
    */
-  protected async linkSkillToTarget(
+  protected async linkExtensionToTarget(
     sourcePath: string,
     targetPath: string,
     name: string,
@@ -507,7 +507,7 @@ export class InstallService {
         const linkTarget = await readlink(targetPath);
         const resolvedTarget = resolve(join(targetPath, ".."), linkTarget);
         if (resolvedTarget === sourcePath) {
-          console.log(t("install:skillLinkExists", { name }));
+          console.log(t("install:extensionLinkExists", { name }));
           return;
         }
         // 链接指向不同目标，删除后重建
@@ -522,14 +522,14 @@ export class InstallService {
     const targetDir = join(targetPath, "..");
     const relativeSource = relative(targetDir, sourcePath);
 
-    console.log(t("install:createSkillLink", { name, target: relativeSource }));
+    console.log(t("install:createExtensionLink", { name, target: relativeSource }));
     await symlink(relativeSource, targetPath);
   }
 
   /**
-   * 将 skill 复制到 .claude/skills 目录
+   * 将扩展复制到 .claude/skills 目录
    */
-  protected async copySkillToTarget(
+  protected async copyExtensionToTarget(
     sourcePath: string,
     targetPath: string,
     name: string,
@@ -541,14 +541,14 @@ export class InstallService {
       await rm(targetPath, { recursive: true, force: true });
     }
 
-    console.log(t("install:copySkill", { name }));
+    console.log(t("install:copyExtension", { name }));
     await cp(sourcePath, targetPath, { recursive: true });
   }
 
   /**
-   * 解析 skill 配置，支持字符串和对象格式
+   * 解析扩展配置，支持字符串和对象格式
    */
-  parseSkillConfig(config: SkillConfig): { source: string; ref?: string } {
+  parseExtensionConfig(config: ExtensionConfig): { source: string; ref?: string } {
     if (typeof config === "string") {
       return { source: config };
     }
@@ -623,7 +623,7 @@ export class InstallService {
    * 更新配置文件中的所有依赖
    * 先更新 .spaceflow/package.json，然后一次性安装所有依赖
    */
-  async updateAllSkills(options?: { verbose?: VerboseLevel }): Promise<void> {
+  async updateAllExtensions(options?: { verbose?: VerboseLevel }): Promise<void> {
     const cwd = process.cwd();
     const spaceflowDir = getSpaceflowDir(false);
     const verbose = options?.verbose ?? true;
@@ -631,7 +631,7 @@ export class InstallService {
     if (shouldLog(verbose, 1)) console.log(t("install:updatingAll"));
 
     // 读取配置文件中的 dependencies
-    const dependencies = this.parseSkillsFromConfig(cwd);
+    const dependencies = this.parseExtensionsFromConfig(cwd);
 
     if (Object.keys(dependencies).length === 0) {
       if (shouldLog(verbose, 1)) console.log(t("install:noDeps"));
@@ -653,9 +653,9 @@ export class InstallService {
       console.warn(t("install:pmInstallFailed", { pm }));
     }
 
-    // 3. 处理每个依赖的 skills/commands 关联
+    // 3. 处理每个依赖的 extensions/commands 关联
     for (const [name, config] of Object.entries(dependencies)) {
-      const { source } = this.parseSkillConfig(config);
+      const { source } = this.parseExtensionConfig(config);
       const sourceType = getSourceType(source);
 
       // 获取安装后的路径
@@ -703,7 +703,7 @@ export class InstallService {
    * 更新 .spaceflow/package.json 中的依赖
    */
   protected async updateSpaceflowPackageJson(
-    dependencies: Record<string, SkillConfig>,
+    dependencies: Record<string, ExtensionConfig>,
     spaceflowDir: string,
     verbose: VerboseLevel = 1,
   ): Promise<void> {
@@ -720,7 +720,7 @@ export class InstallService {
 
     let updated = false;
     for (const [, config] of Object.entries(dependencies)) {
-      const { source, ref } = this.parseSkillConfig(config);
+      const { source, ref } = this.parseExtensionConfig(config);
       const sourceType = getSourceType(source);
 
       let packageSpec: string;
@@ -751,22 +751,22 @@ export class InstallService {
   }
 
   /**
-   * 从配置文件解析 skills
+   * 从配置文件解析扩展
    */
-  protected parseSkillsFromConfig(cwd?: string): Record<string, SkillConfig> {
+  protected parseExtensionsFromConfig(cwd?: string): Record<string, ExtensionConfig> {
     return getDependencies(cwd);
   }
 
   /**
    * 获取 git 仓库当前的 ref (commit hash 或 tag)
    */
-  protected async getCurrentGitRef(skillPath: string): Promise<string | null> {
-    if (!existsSync(skillPath)) {
+  protected async getCurrentGitRef(extPath: string): Promise<string | null> {
+    if (!existsSync(extPath)) {
       return null;
     }
     try {
       const result = execSync("git rev-parse HEAD", {
-        cwd: skillPath,
+        cwd: extPath,
         encoding: "utf-8",
       }).trim();
       return result.substring(0, 7); // 短 hash
@@ -779,7 +779,7 @@ export class InstallService {
    * 检查 ref 是否匹配（支持 tag、branch、commit）
    */
   protected async isRefMatch(
-    skillPath: string,
+    extPath: string,
     targetRef: string,
     currentCommit: string | null,
   ): Promise<boolean> {
@@ -788,7 +788,7 @@ export class InstallService {
     try {
       // 检查 targetRef 是否是 tag 或 branch，获取其对应的 commit
       const targetCommit = execSync(`git rev-parse ${targetRef}`, {
-        cwd: skillPath,
+        cwd: extPath,
         encoding: "utf-8",
       }).trim();
 
@@ -835,14 +835,14 @@ export class InstallService {
   /**
    * 检查 ref 是否是分支
    */
-  protected async isBranchRef(skillPath: string, ref: string): Promise<boolean> {
-    if (!existsSync(skillPath)) {
+  protected async isBranchRef(extPath: string, ref: string): Promise<boolean> {
+    if (!existsSync(extPath)) {
       return false;
     }
     try {
       // 检查是否是远程分支
       const result = execSync(`git branch -r --list "origin/${ref}"`, {
-        cwd: skillPath,
+        cwd: extPath,
         encoding: "utf-8",
       }).trim();
       return result.length > 0;
@@ -854,10 +854,10 @@ export class InstallService {
   /**
    * 拉取最新代码
    */
-  protected async pullLatest(skillPath: string, verbose: VerboseLevel = 1): Promise<void> {
+  protected async pullLatest(extPath: string, verbose: VerboseLevel = 1): Promise<void> {
     try {
       execSync("git pull", {
-        cwd: skillPath,
+        cwd: extPath,
         stdio: verbose ? "inherit" : "pipe",
       });
     } catch {
@@ -869,7 +869,7 @@ export class InstallService {
    * 切换到指定的 git ref
    */
   protected async checkoutGitRef(
-    skillPath: string,
+    extPath: string,
     ref: string,
     verbose: VerboseLevel = 1,
   ): Promise<void> {
@@ -877,12 +877,12 @@ export class InstallService {
       if (shouldLog(verbose, 1)) console.log(t("install:checkoutVersion", { ref }));
       // 先 fetch 确保有最新的 refs
       execSync("git fetch --all --tags", {
-        cwd: skillPath,
+        cwd: extPath,
         stdio: "pipe",
       });
       // checkout 到指定 ref
       execSync(`git checkout ${ref}`, {
-        cwd: skillPath,
+        cwd: extPath,
         stdio: verbose ? "inherit" : "pipe",
       });
     } catch {
@@ -895,25 +895,25 @@ export class InstallService {
    * 用于版本已匹配的情况，只检查 dist 是否存在
    */
   protected async ensureDependenciesAndBuildIfNeeded(
-    skillPath: string,
-    name: string,
+    extPath: string,
+    _name: string,
   ): Promise<void> {
-    const packageJsonPath = join(skillPath, "package.json");
+    const pkgJsonPath = join(extPath, "package.json");
 
     // 检查是否有 package.json（命令型插件）
-    if (!existsSync(packageJsonPath)) {
+    if (!existsSync(pkgJsonPath)) {
       return;
     }
 
-    const distIndexPath = join(skillPath, "dist", "index.js");
-    const nodeModulesPath = join(skillPath, "node_modules");
+    const distIndexPath = join(extPath, "dist", "index.js");
+    const nodeModulesPath = join(extPath, "node_modules");
 
     // 检查 node_modules 是否存在
     if (!existsSync(nodeModulesPath)) {
       console.log(t("install:installingDepsEllipsis"));
       try {
         execSync(`${this.getPackageManager()} install`, {
-          cwd: skillPath,
+          cwd: extPath,
           stdio: "inherit",
         });
       } catch {
@@ -929,7 +929,7 @@ export class InstallService {
       console.log(t("install:buildingPlugin"));
       try {
         execSync("pnpm build", {
-          cwd: skillPath,
+          cwd: extPath,
           stdio: "inherit",
         });
       } catch {
@@ -994,19 +994,19 @@ export class InstallService {
 
   /**
    * 从 package.json 读取插件配置
-   * 返回 { flows: [], commands: [], skills: [], mcps: [] } 格式的导出映射
+   * 返回 { flows: [], commands: [], extensions: [], mcps: [] } 格式的导出映射
    */
-  protected async getPluginConfigFromPackageJson(skillPath: string): Promise<PluginConfig> {
+  protected async getPluginConfigFromPackageJson(extPath: string): Promise<PluginConfig> {
     const createEmptyConfig = (): PluginConfig => ({
       flows: [],
       commands: [],
-      skills: [],
+      extensions: [],
       mcps: [],
     });
-    const createDefaultSkill = (name = ""): PluginConfig => ({
+    const createDefaultExtension = (name = ""): PluginConfig => ({
       flows: [],
       commands: [],
-      skills: [{ name, entry: "." }],
+      extensions: [{ name, entry: "." }],
       mcps: [],
     });
 
@@ -1019,22 +1019,22 @@ export class InstallService {
     ) => {
       if (type === "flow") config.flows.push({ name, entry });
       else if (type === "command") config.commands.push({ name, entry });
-      else if (type === "skill") config.skills.push({ name, entry });
+      else if (type === "extension") config.extensions.push({ name, entry });
       else if (type === "mcp") config.mcps.push({ name, entry, mcp });
     };
 
-    const packageJsonPath = join(skillPath, "package.json");
-    if (!existsSync(packageJsonPath)) {
-      return createDefaultSkill();
+    const pkgJsonPath = join(extPath, "package.json");
+    if (!existsSync(pkgJsonPath)) {
+      return createDefaultExtension();
     }
 
     try {
-      const content = await readFile(packageJsonPath, "utf-8");
+      const content = await readFile(pkgJsonPath, "utf-8");
       const pkg = JSON.parse(content);
       const spaceflowConfig = pkg.spaceflow;
 
       if (!spaceflowConfig) {
-        return createDefaultSkill(pkg.name);
+        return createDefaultExtension(pkg.name);
       }
 
       const config = createEmptyConfig();
@@ -1064,9 +1064,9 @@ export class InstallService {
         return config;
       }
 
-      return createDefaultSkill(pkg.name);
+      return createDefaultExtension(pkg.name);
     } catch {
-      return createDefaultSkill();
+      return createDefaultExtension();
     }
   }
 
@@ -1120,15 +1120,15 @@ export class InstallService {
   }
 
   /**
-   * 生成 SKILL.md 文件
-   * 解析 README.md 和 package.json，生成标准化的 SKILL.md
+   * 生成 EXTENSION.md 文件
+   * 解析 README.md 和 package.json，生成标准化的 EXTENSION.md
    */
-  protected async generateSkillMd(skillPath: string, name: string): Promise<void> {
-    const skillMdPath = join(skillPath, "SKILL.md");
+  protected async generateExtensionMd(extPath: string, name: string): Promise<void> {
+    const extensionMdPath = join(extPath, "EXTENSION.md");
 
-    // 如果已存在 SKILL.md，跳过
-    if (existsSync(skillMdPath)) {
-      console.log(t("install:skillMdExists"));
+    // 如果已存在 EXTENSION.md，跳过
+    if (existsSync(extensionMdPath)) {
+      console.log(t("install:extensionMdExists"));
       return;
     }
 
@@ -1137,10 +1137,10 @@ export class InstallService {
     let pkgDescription = "";
 
     // 读取 package.json
-    const packageJsonPath = join(skillPath, "package.json");
-    if (existsSync(packageJsonPath)) {
+    const pkgJsonPath = join(extPath, "package.json");
+    if (existsSync(pkgJsonPath)) {
       try {
-        const pkgContent = await readFile(packageJsonPath, "utf-8");
+        const pkgContent = await readFile(pkgJsonPath, "utf-8");
         const pkg = JSON.parse(pkgContent);
         pkgName = pkg.name || name;
         pkgDescription = pkg.description || "";
@@ -1152,9 +1152,9 @@ export class InstallService {
     // 读取 README.md（支持大小写）
     let readmeContent = "";
     const readmePaths = [
-      join(skillPath, "README.md"),
-      join(skillPath, "readme.md"),
-      join(skillPath, "Readme.md"),
+      join(extPath, "README.md"),
+      join(extPath, "readme.md"),
+      join(extPath, "Readme.md"),
     ];
     for (const readmePath of readmePaths) {
       if (existsSync(readmePath)) {
@@ -1167,7 +1167,7 @@ export class InstallService {
       }
     }
 
-    // 生成 SKILL.md 内容
+    // 生成 EXTENSION.md 内容
     content = `# ${pkgName}\n\n`;
 
     if (pkgDescription) {
@@ -1187,12 +1187,12 @@ export class InstallService {
       }
     }
 
-    // 写入 SKILL.md
+    // 写入 EXTENSION.md
     try {
-      await writeFile(skillMdPath, content);
-      console.log(t("install:skillMdGenerated"));
+      await writeFile(extensionMdPath, content);
+      console.log(t("install:extensionMdGenerated"));
     } catch {
-      console.warn(t("install:skillMdFailed"));
+      console.warn(t("install:extensionMdFailed"));
     }
   }
 
@@ -1212,10 +1212,10 @@ export class InstallService {
     let pkgDescription = "";
 
     // 读取 package.json
-    const packageJsonPath = join(commandPath, "package.json");
-    if (existsSync(packageJsonPath)) {
+    const cmdPkgJsonPath = join(commandPath, "package.json");
+    if (existsSync(cmdPkgJsonPath)) {
       try {
-        const pkgContent = await readFile(packageJsonPath, "utf-8");
+        const pkgContent = await readFile(cmdPkgJsonPath, "utf-8");
         const pkg = JSON.parse(pkgContent);
         pkgName = pkg.name?.replace(/^@[^/]+\//, "") || name;
         pkgDescription = pkg.description || "";
@@ -1321,27 +1321,27 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
    * 确保依赖已安装且 dist 是最新的
    */
   protected async ensureDependenciesAndBuild(
-    skillPath: string,
+    extPath: string,
     name: string,
     verbose: VerboseLevel = 1,
   ): Promise<void> {
-    const packageJsonPath = join(skillPath, "package.json");
+    const pkgJsonPath = join(extPath, "package.json");
 
     // 检查是否有 package.json（命令型插件）
-    if (!existsSync(packageJsonPath)) {
+    if (!existsSync(pkgJsonPath)) {
       // 资源型插件，无需处理
       return;
     }
 
     // 检查依赖是否已安装
-    const nodeModulesPath = join(skillPath, "node_modules");
-    const needInstall = await this.needsInstallDependencies(skillPath, nodeModulesPath);
+    const nodeModulesPath = join(extPath, "node_modules");
+    const needInstall = await this.needsInstallDependencies(extPath, nodeModulesPath);
 
     if (needInstall) {
       if (shouldLog(verbose, 1)) console.log(t("install:installingDepsEllipsis"));
       try {
         execSync(`${getPackageManager()} install`, {
-          cwd: skillPath,
+          cwd: extPath,
           stdio: verbose ? "inherit" : "pipe",
         });
       } catch {
@@ -1353,13 +1353,13 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
     }
 
     // 检查是否需要构建
-    const needBuild = await this.needsBuild(skillPath);
+    const needBuild = await this.needsBuild(extPath);
 
     if (needBuild) {
       if (shouldLog(verbose, 1)) console.log(t("install:buildingPlugin"));
       try {
         execSync("pnpm build", {
-          cwd: skillPath,
+          cwd: extPath,
           stdio: verbose ? "inherit" : "pipe",
         });
       } catch {
@@ -1375,7 +1375,7 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
    * 比较 package.json 和 node_modules 的修改时间
    */
   protected async needsInstallDependencies(
-    skillPath: string,
+    extPath: string,
     nodeModulesPath: string,
   ): Promise<boolean> {
     // 如果 node_modules 不存在，需要安装
@@ -1384,14 +1384,14 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
     }
 
     try {
-      const packageJsonPath = join(skillPath, "package.json");
-      const lockfilePath = join(skillPath, "pnpm-lock.yaml");
+      const pkgJsonPath = join(extPath, "package.json");
+      const lockfilePath = join(extPath, "pnpm-lock.yaml");
 
       const nodeModulesStat = await stat(nodeModulesPath);
-      const packageJsonStat = await stat(packageJsonPath);
+      const pkgJsonStat = await stat(pkgJsonPath);
 
       // 如果 package.json 比 node_modules 新，需要安装
-      if (packageJsonStat.mtime > nodeModulesStat.mtime) {
+      if (pkgJsonStat.mtime > nodeModulesStat.mtime) {
         return true;
       }
 
@@ -1413,9 +1413,9 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
    * 检查是否需要构建
    * 比较 src 目录和 dist 目录的修改时间
    */
-  protected async needsBuild(skillPath: string): Promise<boolean> {
-    const srcPath = join(skillPath, "src");
-    const distPath = join(skillPath, "dist");
+  protected async needsBuild(extPath: string): Promise<boolean> {
+    const srcPath = join(extPath, "src");
+    const distPath = join(extPath, "dist");
     const distIndexPath = join(distPath, "index.js");
 
     // 如果没有 src 目录，不需要构建

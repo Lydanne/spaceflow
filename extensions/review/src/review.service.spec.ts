@@ -1,20 +1,7 @@
-import { vi, type Mocked, type Mock } from "vitest";
-import { Test, TestingModule } from "@nestjs/testing";
-import {
-  ConfigService,
-  ConfigReaderService,
-  GitProviderService,
-  ClaudeSetupService,
-  LlmProxyService,
-  GitSdkService,
-  parseChangedLinesFromPatch,
-} from "@spaceflow/core";
-import { ReviewSpecService } from "./review-spec";
-import { ReviewReportService } from "./review-report";
+import { vi, type Mock } from "vitest";
+import { parseChangedLinesFromPatch } from "@spaceflow/core";
 import { readFile } from "fs/promises";
 import { ReviewService, ReviewContext, ReviewPrompt } from "./review.service";
-import { IssueVerifyService } from "./issue-verify.service";
-import { DeletionImpactService } from "./deletion-impact.service";
 import type { ReviewOptions } from "./review.config";
 
 vi.mock("c12");
@@ -56,14 +43,17 @@ vi.mock("openai", () => {
 
 describe("ReviewService", () => {
   let service: ReviewService;
-  let gitProvider: Mocked<GitProviderService>;
-  let configService: Mocked<ConfigService>;
+  let gitProvider: any;
+  let configService: any;
   let mockReviewSpecService: any;
   let mockDeletionImpactService: any;
   let mockGitSdkService: any;
+  let mockLlmProxyService: any;
+  let mockConfigReaderService: any;
 
-  beforeEach(async () => {
-    const mockGitProvider = {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitProvider = {
       validateConfig: vi.fn(),
       getPullRequest: vi.fn(),
       getCommit: vi.fn(),
@@ -80,12 +70,8 @@ describe("ReviewService", () => {
       getIssueCommentReactions: vi.fn().mockResolvedValue([]),
     };
 
-    const mockConfigService = {
+    configService = {
       get: vi.fn(),
-    };
-
-    const mockClaudeSetupService = {
-      configure: vi.fn(),
     };
 
     mockReviewSpecService = {
@@ -139,63 +125,29 @@ describe("ReviewService", () => {
       getCommitDiff: vi.fn().mockReturnValue([]),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ReviewService,
-        {
-          provide: GitProviderService,
-          useValue: mockGitProvider,
-        },
-        {
-          provide: ConfigService,
-          useValue: mockConfigService,
-        },
-        {
-          provide: ClaudeSetupService,
-          useValue: mockClaudeSetupService,
-        },
-        {
-          provide: ReviewSpecService,
-          useValue: mockReviewSpecService,
-        },
-        {
-          provide: LlmProxyService,
-          useValue: {
-            chat: vi.fn(),
-            chatStream: vi.fn(),
-            createSession: vi.fn(),
-            getAvailableAdapters: vi.fn().mockReturnValue(["claude-code", "openai"]),
-          },
-        },
-        {
-          provide: ReviewReportService,
-          useValue: mockReviewReportService,
-        },
-        {
-          provide: IssueVerifyService,
-          useValue: mockIssueVerifyService,
-        },
-        {
-          provide: DeletionImpactService,
-          useValue: mockDeletionImpactService,
-        },
-        {
-          provide: GitSdkService,
-          useValue: mockGitSdkService,
-        },
-        {
-          provide: ConfigReaderService,
-          useValue: {
-            getPluginConfig: vi.fn().mockReturnValue({}),
-            getSystemConfig: vi.fn().mockReturnValue({}),
-          },
-        },
-      ],
-    }).compile();
+    mockLlmProxyService = {
+      chat: vi.fn(),
+      chatStream: vi.fn(),
+      createSession: vi.fn(),
+      getAvailableAdapters: vi.fn().mockReturnValue(["claude-code", "openai"]),
+    };
 
-    service = module.get<ReviewService>(ReviewService);
-    gitProvider = module.get(GitProviderService) as Mocked<GitProviderService>;
-    configService = module.get(ConfigService) as Mocked<ConfigService>;
+    mockConfigReaderService = {
+      getPluginConfig: vi.fn().mockReturnValue({}),
+      getSystemConfig: vi.fn().mockReturnValue({}),
+    };
+
+    service = new ReviewService(
+      gitProvider as any,
+      configService as any,
+      mockConfigReaderService as any,
+      mockReviewSpecService as any,
+      mockLlmProxyService as any,
+      mockReviewReportService as any,
+      mockIssueVerifyService as any,
+      mockDeletionImpactService as any,
+      mockGitSdkService as any,
+    );
   });
 
   afterEach(() => {

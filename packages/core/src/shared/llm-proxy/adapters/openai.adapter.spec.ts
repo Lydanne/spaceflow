@@ -1,5 +1,4 @@
 import { vi, type Mock } from "vitest";
-import { Test, TestingModule } from "@nestjs/testing";
 import { OpenAIAdapter } from "./openai.adapter";
 import OpenAI from "openai";
 
@@ -17,7 +16,8 @@ describe("OpenAIAdapter", () => {
     },
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
     mockOpenAIInstance = {
       chat: {
         completions: {
@@ -28,12 +28,7 @@ describe("OpenAIAdapter", () => {
     (OpenAI as unknown as Mock).mockImplementation(function () {
       return mockOpenAIInstance;
     });
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [OpenAIAdapter, { provide: "LLM_PROXY_CONFIG", useValue: mockConfig }],
-    }).compile();
-
-    adapter = module.get<OpenAIAdapter>(OpenAIAdapter);
+    adapter = new OpenAIAdapter(mockConfig as any);
   });
 
   it("should be defined", () => {
@@ -46,11 +41,8 @@ describe("OpenAIAdapter", () => {
       expect(adapter.isConfigured()).toBe(true);
     });
 
-    it("should return false if openai config is missing", async () => {
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [OpenAIAdapter, { provide: "LLM_PROXY_CONFIG", useValue: {} }],
-      }).compile();
-      const unconfiguredAdapter = module.get<OpenAIAdapter>(OpenAIAdapter);
+    it("should return false if openai config is missing", () => {
+      const unconfiguredAdapter = new OpenAIAdapter({} as any);
       expect(unconfiguredAdapter.isConfigured()).toBe(false);
     });
   });
@@ -156,10 +148,7 @@ describe("OpenAIAdapter", () => {
     });
 
     it("should yield error when openai not configured", async () => {
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [OpenAIAdapter, { provide: "LLM_PROXY_CONFIG", useValue: {} }],
-      }).compile();
-      const unconfigured = module.get<OpenAIAdapter>(OpenAIAdapter);
+      const unconfigured = new OpenAIAdapter({} as any);
       const events: any[] = [];
       for await (const event of unconfigured.chatStream([{ role: "user", content: "hi" }] as any)) {
         events.push(event);
@@ -176,10 +165,7 @@ describe("OpenAIAdapter", () => {
     });
 
     it("should throw when openai not configured for chat", async () => {
-      const module: TestingModule = await Test.createTestingModule({
-        providers: [OpenAIAdapter, { provide: "LLM_PROXY_CONFIG", useValue: {} }],
-      }).compile();
-      const unconfigured = module.get<OpenAIAdapter>(OpenAIAdapter);
+      const unconfigured = new OpenAIAdapter({} as any);
       await expect(unconfigured.chat([{ role: "user", content: "hi" }] as any)).rejects.toThrow(
         "未配置 openai",
       );

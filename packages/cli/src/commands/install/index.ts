@@ -11,9 +11,9 @@ export const installExtension = defineExtension({
   commands: [
     {
       name: "install",
-      description: "安装 Extension",
+      description: "安装 Extension（无参数时安装配置文件中的所有依赖）",
       aliases: ["i"],
-      arguments: "<source>",
+      arguments: "[source]",
       options: [
         {
           flags: "-n, --name <name>",
@@ -34,13 +34,18 @@ export const installExtension = defineExtension({
       ],
       run: async (args, options, ctx) => {
         const source = args[0];
-        if (!source) {
-          ctx.output.error("请指定要安装的包名或 Git URL");
-          process.exit(1);
-        }
         const verbose = (options?.verbose ? 2 : 1) as VerboseLevel;
         const schemaGenerator = new SchemaGeneratorService();
         const installService = new InstallService(schemaGenerator);
+        // 无参数时，安装配置文件中的所有依赖
+        if (!source) {
+          if (options?.global) {
+            ctx.output.error("全局安装需要指定 source 参数");
+            process.exit(1);
+          }
+          await installService.updateAllExtensions({ verbose });
+          return;
+        }
         const installOptions = {
           source,
           name: options?.name as string,

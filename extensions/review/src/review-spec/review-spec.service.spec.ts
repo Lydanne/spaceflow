@@ -1,7 +1,5 @@
 import { vi, type Mock } from "vitest";
-import { Test, TestingModule } from "@nestjs/testing";
 import { ReviewSpecService } from "./review-spec.service";
-import { GitProviderService } from "@spaceflow/core";
 import { readdir, readFile, mkdir, access, writeFile } from "fs/promises";
 import * as child_process from "child_process";
 
@@ -13,16 +11,13 @@ describe("ReviewSpecService", () => {
 
   let gitProvider: { listRepositoryContents: Mock; getFileContent: Mock };
 
-  beforeEach(async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
     gitProvider = {
       listRepositoryContents: vi.fn(),
       getFileContent: vi.fn(),
     };
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [ReviewSpecService, { provide: GitProviderService, useValue: gitProvider }],
-    }).compile();
-
-    service = module.get<ReviewSpecService>(ReviewSpecService);
+    service = new ReviewSpecService(gitProvider as any);
   });
 
   afterEach(() => {

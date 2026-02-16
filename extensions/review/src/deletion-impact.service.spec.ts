@@ -1,6 +1,4 @@
-import { vi, type Mocked, type Mock } from "vitest";
-import { Test, TestingModule } from "@nestjs/testing";
-import { LlmProxyService, GitProviderService } from "@spaceflow/core";
+import { vi, type Mock } from "vitest";
 import { DeletionImpactService } from "./deletion-impact.service";
 import * as child_process from "child_process";
 import { EventEmitter } from "events";
@@ -13,30 +11,21 @@ vi.mock("child_process");
 
 describe("DeletionImpactService", () => {
   let service: DeletionImpactService;
-  let llmProxyService: Mocked<LlmProxyService>;
-  let gitProvider: Mocked<GitProviderService>;
+  let llmProxyService: any;
+  let gitProvider: any;
 
-  beforeEach(async () => {
-    const mockLlmProxyService = {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    llmProxyService = {
       chatStream: vi.fn(),
     };
 
-    const mockGitProvider = {
+    gitProvider = {
       getPullRequestFiles: vi.fn(),
       getPullRequestDiff: vi.fn(),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        DeletionImpactService,
-        { provide: LlmProxyService, useValue: mockLlmProxyService },
-        { provide: GitProviderService, useValue: mockGitProvider },
-      ],
-    }).compile();
-
-    service = module.get<DeletionImpactService>(DeletionImpactService);
-    llmProxyService = module.get(LlmProxyService) as Mocked<LlmProxyService>;
-    gitProvider = module.get(GitProviderService) as Mocked<GitProviderService>;
+    service = new DeletionImpactService(llmProxyService as any, gitProvider as any);
   });
 
   describe("analyzeDeletionImpact", () => {
