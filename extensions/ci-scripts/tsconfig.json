@@ -1,5 +1,5 @@
 {
-  "extends": "../../core/tsconfig.skill.json",
+  "extends": "../../packages/core/tsconfig.skill.json",
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
