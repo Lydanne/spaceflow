@@ -1,6 +1,6 @@
 {
   "name": "@spaceflow/ci-shell",
-  "version": "0.19.2",
+  "version": "0.19.3",
   "description": "Spaceflow CI Shell 插件，用于在分支锁定/解锁之间执行 Shell 命令",
   "license": "MIT",
   "author": "Lydanne",
