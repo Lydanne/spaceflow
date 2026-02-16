@@ -1,6 +1,6 @@
 {
   "name": "@spaceflow/period-summary",
-  "version": "0.19.3",
+  "version": "0.20.0",
   "description": "Spaceflow 周期统计命令，根据时间范围统计 PR 贡献情况，按人员汇总并排序",
   "license": "MIT",
   "author": "Lydanne",
