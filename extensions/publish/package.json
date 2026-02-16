@@ -28,10 +28,7 @@
     "@types/node": "catalog:"
   },
   "peerDependencies": {
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@spaceflow/core": "workspace:*",
-    "nest-commander": "catalog:"
+    "@spaceflow/core": "workspace:*"
   },
   "spaceflow": {
     "type": "flow",

@@ -1,5 +1,3 @@
-import { Type, DynamicModule } from "@nestjs/common";
-
 /** .spaceflow 目录名 */
 export const SPACEFLOW_DIR = ".spaceflow";
 
@@ -19,67 +17,6 @@ export interface SpaceflowExtensionMetadata {
   /** 依赖的其他 Extension 配置 key 列表，读取其他 Extension 配置前必须在此声明 */
   configDependencies?: string[];
   /** 配置 schema 工厂函数，返回 zod schema，用于验证配置和生成 JSON Schema */
-  configSchema?: () => unknown;
-  /** Extension 版本 */
-  version?: string;
-  /** Extension 描述 */
-  description?: string;
-}
-
-/**
- * Extension 模块类型，支持静态模块或动态模块
- */
-export type ExtensionModuleType = Type<any> | DynamicModule;
-
-/**
- * Extension 接口
- */
-export interface SpaceflowExtension {
-  /** 获取 Extension 元数据 */
-  getMetadata(): SpaceflowExtensionMetadata;
-  /**
-   * 获取 NestJS Module
-   * 可以返回静态 Module 类或 DynamicModule
-   * 如果需要动态配置，推荐返回 DynamicModule
-   */
-  getModule(): ExtensionModuleType;
-}
-
-/**
- * Extension 类静态接口
- */
-export interface SpaceflowExtensionConstructor {
-  new (): SpaceflowExtension;
-}
-
-/**
- * Extension 入口导出格式
- */
-export type SpaceflowExtensionExport =
-  | SpaceflowExtensionConstructor
-  | {
-      default: SpaceflowExtensionConstructor;
-    };
-
-/**
- * 已加载的 Extension 信息
- */
-export interface LoadedExtension {
-  /** Extension 名称 */
-  name: string;
-  /** Extension 来源（npm 包名） */
-  source: string;
-  /** NestJS 模块（静态或动态） */
-  module: ExtensionModuleType;
-  /** 包的完整导出（用于 MCP 服务发现） */
-  exports?: Record<string, unknown>;
-  /** 提供的命令列表 */
-  commands: string[];
-  /** 配置 key */
-  configKey?: string;
-  /** 依赖的其他 Extension 配置 key 列表 */
-  configDependencies?: string[];
-  /** 配置 schema 工厂函数 */
   configSchema?: () => unknown;
   /** Extension 版本 */
   version?: string;

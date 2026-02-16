@@ -24,7 +24,6 @@
     "micromatch": "^4.0.8"
   },
   "devDependencies": {
-    "@nestjs/testing": "catalog:",
     "@spaceflow/cli": "workspace:*",
     "@swc/core": "catalog:",
     "@types/micromatch": "^4.0.9",
@@ -35,13 +34,7 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@spaceflow/core": "workspace:*",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
-    "nest-commander": "catalog:"
+    "@spaceflow/core": "workspace:*"
   },
   "spaceflow": {
     "type": "flow",

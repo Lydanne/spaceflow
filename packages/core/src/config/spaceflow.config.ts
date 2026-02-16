@@ -1,4 +1,3 @@
-import { registerAs } from "@nestjs/config";
 import { readFileSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
@@ -246,25 +245,13 @@ export function removeDependency(name: string, cwd?: string): boolean {
   return true;
 }
 
-export const spaceflowConfig = registerAs("spaceflow", (): SpaceflowConfig => {
-  const fileConfig = readConfigSync();
-
-  // 使用 zod 验证核心配置
-  const result = SpaceflowCoreConfigSchema.safeParse(fileConfig);
-
-  if (!result.success) {
-    const errors = result.error.issues
-      .map((e) => `  - ${e.path.join(".")}: ${e.message}`)
-      .join("\n");
-    throw new Error(`Spaceflow 配置验证失败:\n${errors}`);
-  }
-
-  // 返回验证后的核心配置 + 其他插件配置
-  return {
-    ...fileConfig,
-    ...result.data,
-  } as SpaceflowConfig;
-});
+/**
+ * 获取 spaceflow 配置（兼容旧 API）
+ * @deprecated 请使用 loadSpaceflowConfig()
+ */
+export function spaceflowConfig(): SpaceflowConfig {
+  return loadSpaceflowConfig();
+}
 
 /**
  * 加载 spaceflow.json 配置（用于 CLI 启动时）

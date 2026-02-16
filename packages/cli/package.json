@@ -41,18 +41,9 @@
     "zod-to-json-schema": "^3.25.1"
   },
   "peerDependencies": {
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "nest-commander": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
     "@types/node": "catalog:",
     "ts-node": "catalog:",
     "tsconfig-paths": "catalog:",
