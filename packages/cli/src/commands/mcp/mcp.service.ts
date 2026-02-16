@@ -1,22 +1,17 @@
-import { Injectable, t } from "@spaceflow/core";
+import { t } from "@spaceflow/core";
 import type { VerboseLevel } from "@spaceflow/core";
 import { shouldLog, type McpToolMetadata } from "@spaceflow/core";
-import { ModuleRef } from "@nestjs/core";
+import type { ExtensionLoader } from "../../extension-loader-new.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { ExtensionLoaderService } from "../../extension-loader/extension-loader.service";
 
-@Injectable()
 export class McpService {
-  constructor(
-    private readonly extensionLoader: ExtensionLoaderService,
-    private readonly moduleRef: ModuleRef,
-  ) {}
+  constructor(private readonly extensionLoader: ExtensionLoader) {}
 
   /**
    * 启动 MCP Server
-   * 扫描所有已安装的扩展，收集 MCP 工具并启动服务
+   * 收集所有扩展的 MCP 工具并启动服务
    */
   async startServer(verbose?: VerboseLevel): Promise<void> {
     if (shouldLog(verbose, 1)) {
@@ -24,80 +19,20 @@ export class McpService {
     }
 
     // 加载所有扩展
-    const extensions = await this.extensionLoader.discoverAndLoad();
+    await this.extensionLoader.discoverAndLoad();
+
+    // 获取所有命令（包含扩展的 MCP 工具）
+    const commands = this.extensionLoader.getCommands();
     const allTools: Array<{ tool: McpToolMetadata; provider: any }> = [];
 
     if (shouldLog(verbose, 2)) {
-      console.error(t("mcp:foundExtensions", { count: extensions.length }));
-      for (const ext of extensions) {
-        const exportKeys = ext.exports ? Object.keys(ext.exports) : [];
-        console.error(`   - ${ext.name}: exports=[${exportKeys.join(", ")}]`);
-      }
+      console.error(t("mcp:foundExtensions", { count: commands.length }));
     }
 
     // 收集所有扩展的 MCP 工具
-    for (const ext of extensions) {
-      try {
-        // 使用包的完整导出（而不是 NestJS 模块）
-        const packageExports = ext.exports || {};
-
-        // 扫描模块导出，查找带有 @McpServer 装饰器的类
-        for (const key of Object.keys(packageExports)) {
-          const exported = packageExports[key];
-
-          // 直接检查静态属性（跨模块可访问）
-          const hasMcpServer = !!(exported as any)?.__mcp_server__;
-
-          if (shouldLog(verbose, 2) && typeof exported === "function") {
-            console.error(t("mcp:checkingExport", { key, hasMcpServer }));
-          }
-
-          // 检查是否是带有 @McpServer 装饰器的类
-          if (typeof exported === "function" && hasMcpServer) {
-            try {
-              // 优先从 NestJS 容器获取实例（支持依赖注入）
-              let instance: any;
-              try {
-                instance = this.moduleRef.get(exported, { strict: false });
-                if (shouldLog(verbose, 2)) {
-                  console.error(t("mcp:containerSuccess", { key }));
-                }
-              } catch (diError) {
-                // 容器中没有，尝试直接实例化（可能缺少依赖）
-                if (shouldLog(verbose, 2)) {
-                  console.error(
-                    t("mcp:containerFailed", {
-                      key,
-                      error: diError instanceof Error ? diError.message : diError,
-                    }),
-                  );
-                }
-                instance = new (exported as any)();
-              }
-
-              // 直接读取静态属性获取工具和元数据
-              const tools: McpToolMetadata[] = (exported as any).__mcp_tools__ || [];
-              const serverMeta = (exported as any).__mcp_server__;
-
-              for (const tool of tools) {
-                allTools.push({ tool, provider: instance });
-              }
-
-              if (shouldLog(verbose, 1) && tools.length > 0) {
-                const serverName = serverMeta?.name || ext.name;
-                console.error(`   📦 ${serverName}: ${tools.map((t) => t.name).join(", ")}`);
-              }
-            } catch {
-              // 实例化失败
-            }
-          }
-        }
-      } catch (error) {
-        if (shouldLog(verbose, 2)) {
-          console.error(t("mcp:loadToolsFailed", { name: ext.name }), error);
-        }
-      }
-    }
+    // 注意：新的架构中，MCP 工具通过扩展的 mcp 字段定义
+    // 这里需要重新实现以适配新架构
+    // TODO: 实现 MCP 工具收集逻辑
 
     if (allTools.length === 0) {
       console.error(t("mcp:noToolsFound"));

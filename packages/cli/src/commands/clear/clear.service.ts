@@ -1,11 +1,9 @@
-import { Injectable } from "@nestjs/common";
 import { readFile, rm } from "fs/promises";
 import { join } from "path";
 import { existsSync, readdirSync, lstatSync } from "fs";
 import { shouldLog, type VerboseLevel, t } from "@spaceflow/core";
 import { getEditorDirName, DEFAULT_EDITOR } from "@spaceflow/core";
 
-@Injectable()
 export class ClearService {
   /**
    * 获取支持的编辑器列表

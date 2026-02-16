@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { t } from "@spaceflow/core";
 import { join } from "path";
@@ -14,14 +13,9 @@ import {
   SPACEFLOW_DIR,
   ensureSpaceflowPackageJson,
 } from "@spaceflow/core";
-import { ConfigService } from "@nestjs/config";
 
-@Injectable()
 export class SetupService {
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly schemaGenerator: SchemaGeneratorService,
-  ) {}
+  constructor(private readonly schemaGenerator: SchemaGeneratorService) {}
   /**
    * 本地初始化：创建 .spaceflow/ 目录和 package.json
    */
@@ -72,7 +66,7 @@ export class SetupService {
     const envPath = join(cwd, ".env");
     const envConfig = this.parseEnvToConfig(envPath);
 
-    const instanceConfig = this.configService.get<Partial<SpaceflowConfig>>("spaceflow") ?? {};
+    const instanceConfig = (global as any).spaceflowConfig ?? {};
 
     // 合并配置：本地配置（已含全局） < 实例配置 < 环境变量配置
     const mergedConfig = this.deepMerge(localConfig, instanceConfig, envConfig);
