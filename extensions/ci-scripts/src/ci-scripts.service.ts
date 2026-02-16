@@ -1,6 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { GitProviderService, BranchProtection, CiConfig } from "@spaceflow/core";
+import type { IConfigReader } from "@spaceflow/core";
 import { CiScriptsOptions } from "./ci-scripts.command";
 
 // 定义常量表示进程退出码
@@ -17,17 +16,16 @@ export interface CiScriptsResult {
   protection?: BranchProtection | null;
 }
 
-@Injectable()
 export class CiScriptsService {
   constructor(
     protected readonly gitProvider: GitProviderService,
-    protected readonly configService: ConfigService,
+    protected readonly config: IConfigReader,
   ) {}
 
   getContextFromEnv(options: CiScriptsOptions): CiScriptsContext {
     this.gitProvider.validateConfig();
 
-    const ciConf = this.configService.get<CiConfig>("ci");
+    const ciConf = this.config.get<CiConfig>("ci");
     const repository = ciConf?.repository;
     const branch = ciConf?.refName;
 

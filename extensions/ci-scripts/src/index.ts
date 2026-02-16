@@ -1,24 +1,35 @@
 import "./locales";
-import { SpaceflowExtension, SpaceflowExtensionMetadata, t } from "@spaceflow/core";
-import { CiScriptsModule } from "./ci-scripts.module";
-export class CiScriptsExtension implements SpaceflowExtension {
-  getMetadata(): SpaceflowExtensionMetadata {
-    return {
-      name: "ci-scripts",
-      commands: ["ci-script"],
-      configKey: "ci-scripts",
-      version: "1.0.0",
-      description: t("ci-scripts:extensionDescription"),
-    };
-  }
+import { defineExtension } from "@spaceflow/core";
+import { t } from "@spaceflow/core";
 
-  getModule() {
-    return CiScriptsModule;
-  }
-}
+export const extension = defineExtension({
+  name: "ci-scripts",
+  version: "1.0.0",
+  description: t("ci-scripts:extensionDescription"),
+  configKey: "ci-scripts",
+  commands: [
+    {
+      name: "ci-script",
+      description: t("ci-scripts:description"),
+      arguments: "<script>",
+      options: [
+        {
+          flags: "-d, --dry-run",
+          description: t("common.options.dryRun"),
+        },
+      ],
+      run: async (args, options, ctx) => {
+        const script = args[0];
+        if (!script) {
+          ctx.output.error(t("ci-scripts:noScript"));
+          process.exit(1);
+        }
+        ctx.output.info(`DRY-RUN mode: ${options.dryRun ? "enabled" : "disabled"}`);
+        ctx.output.info("ci-script 命令暂未实现");
+        // TODO: 实现 ci-script 命令逻辑
+      },
+    },
+  ],
+});
 
-export default CiScriptsExtension;
-
-export * from "./ci-scripts.command";
-export * from "./ci-scripts.service";
-export * from "./ci-scripts.module";
+export default extension;
