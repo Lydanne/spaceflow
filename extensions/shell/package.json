@@ -1,0 +1,32 @@
+{
+  "name": "@spaceflow/shell",
+  "version": "0.20.0",
+  "description": "Spaceflow Shell 插件，用于在分支锁定/解锁之间执行 Shell 命令",
+  "license": "MIT",
+  "author": "Lydanne",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lydanne/spaceflow.git",
+    "directory": "extensions/shell"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "spaceflow build",
+    "dev": "spaceflow dev"
+  },
+  "devDependencies": {
+    "@spaceflow/cli": "workspace:*",
+    "@types/node": "catalog:"
+  },
+  "peerDependencies": {
+    "@spaceflow/core": "workspace:*"
+  },
+  "spaceflow": {
+    "type": "flow",
+    "entry": "."
+  }
+}

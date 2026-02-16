@@ -24,9 +24,9 @@
   "i18n-ally-next.localesPaths": [
     "packages/cli/src/locales",
     "packages/core/src/locales",
-    "extensions/ci-scripts/src/locales",
-    "extensions/ci-shell/src/locales",
-    "extensions/period-summary/src/locales",
+    "extensions/scripts/src/locales",
+    "extensions/shell/src/locales",
+    "extensions/review-summary/src/locales",
     "extensions/publish/src/locales",
     "extensions/review/src/locales"
   ]

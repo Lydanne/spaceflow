@@ -2,8 +2,8 @@
   "name": "spaceflow-local",
   "private": true,
   "dependencies": {
-    "@spaceflow/ci-scripts": "link:../extensions/ci-scripts",
-    "@spaceflow/ci-shell": "link:../extensions/ci-shell",
+    "@spaceflow/scripts": "link:../extensions/scripts",
+    "@spaceflow/shell": "link:../extensions/shell",
     "@spaceflow/core": "link:../packages/core",
     "@spaceflow/publish": "link:../extensions/publish",
     "@spaceflow/review": "link:../extensions/review"

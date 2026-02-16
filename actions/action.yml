@@ -4,7 +4,7 @@ author: "spaceflow"
 
 inputs:
   command:
-    description: "The spaceflow command to run (e.g. review, publish, ci-scripts, ci-shell, or get-output for extracting cached values)"
+    description: "The spaceflow command to run (e.g. review, publish, scripts, shell, or get-output for extracting cached values)"
     required: true
   args:
     description: "Additional arguments to pass to the command"

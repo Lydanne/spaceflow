@@ -50,9 +50,9 @@ spaceflow/
 ├── extensions/         # 扩展
 │   ├── review/         # AI 代码审查（@spaceflow/review）
 │   ├── publish/        # 自动化发布（@spaceflow/publish）
-│   ├── ci-scripts/     # CI 脚本执行（@spaceflow/ci-scripts）
-│   ├── ci-shell/       # CI Shell 执行（@spaceflow/ci-shell）
-│   └── period-summary/ # 周期统计（@spaceflow/period-summary）
+│   ├── scripts/        # 脚本执行（@spaceflow/scripts）
+│   ├── shell/          # Shell 执行（@spaceflow/shell）
+│   └── review-summary/ # 审查统计（@spaceflow/review-summary）
 ├── actions/            # GitHub Actions
 ├── docs/               # 文档站点（VitePress）
 └── templates/          # 扩展模板
@@ -66,9 +66,9 @@ spaceflow/
 | `@spaceflow/core`           | 核心能力库，提供共享模块和扩展系统基础设施 |
 | `@spaceflow/review`         | AI 代码审查扩展                            |
 | `@spaceflow/publish`        | 自动化版本发布扩展                         |
-| `@spaceflow/ci-scripts`     | CI 环境下执行 JS 脚本                      |
-| `@spaceflow/ci-shell`       | CI 环境下执行 Shell 命令                   |
-| `@spaceflow/period-summary` | PR 贡献周期统计                            |
+| `@spaceflow/scripts`        | CI 环境下执行 JS 脚本                      |
+| `@spaceflow/shell`          | CI 环境下执行 Shell 命令                   |
+| `@spaceflow/review-summary` | PR 贡献审查统计                            |
 
 ## 内置命令
 
