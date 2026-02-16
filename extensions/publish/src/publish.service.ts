@@ -3,7 +3,7 @@ import {
   type ConfigReaderService,
   type IConfigReader,
   type BranchProtection,
-  type CiConfig,
+  ciConfig,
 } from "@spaceflow/core";
 import { type PublishConfig } from "./publish.config";
 import { MonorepoService, type PackageInfo } from "./monorepo.service";
@@ -68,9 +68,9 @@ export class PublishService {
   getContextFromEnv(options: PublishOptions): PublishContext {
     this.gitProvider.validateConfig();
 
-    const ciConf = this.config.get<CiConfig>("ci");
-    const repository = ciConf?.repository;
-    const branch = ciConf?.refName;
+    const ciConf = ciConfig();
+    const repository = ciConf.repository;
+    const branch = ciConf.refName;
 
     if (!repository) {
       throw new Error("缺少配置 ci.repository (环境变量 GITHUB_REPOSITORY)");
