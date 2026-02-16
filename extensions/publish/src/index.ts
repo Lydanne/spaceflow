@@ -1,30 +1,30 @@
 import "./locales";
-import { SpaceflowExtension, SpaceflowExtensionMetadata, t } from "@spaceflow/core";
-import { PublishModule } from "./publish.module";
+import { defineExtension } from "@spaceflow/core";
+import { t } from "@spaceflow/core";
 import { publishSchema } from "./publish.config";
-/** publish Extension 元数据 */
-export const publishMetadata: SpaceflowExtensionMetadata = {
+
+export const extension = defineExtension({
   name: "publish",
-  commands: ["publish"],
-  configKey: "publish",
-  configSchema: () => publishSchema,
   version: "1.0.0",
   description: t("publish:extensionDescription"),
-};
+  configKey: "publish",
+  configSchema: () => publishSchema,
+  commands: [
+    {
+      name: "publish",
+      description: t("publish:description"),
+      options: [
+        {
+          flags: "-d, --dry-run",
+          description: t("common.options.dryRun"),
+        },
+      ],
+      run: async (args, options, ctx) => {
+        ctx.output.info("publish 命令暂未实现");
+        // TODO: 实现 publish 命令逻辑
+      },
+    },
+  ],
+});
 
-export class PublishExtension implements SpaceflowExtension {
-  getMetadata(): SpaceflowExtensionMetadata {
-    return publishMetadata;
-  }
-
-  getModule() {
-    return PublishModule;
-  }
-}
-
-export default PublishExtension;
-
-export * from "./publish.command";
-export * from "./publish.service";
-export * from "./publish.module";
-export * from "./monorepo.service";
+export default extension;
