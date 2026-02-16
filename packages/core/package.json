@@ -12,6 +12,12 @@
   "publishConfig": {
     "access": "public"
   },
+  "files": [
+    "dist",
+    "src",
+    "package.json",
+    "README.md"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./src/index.ts",

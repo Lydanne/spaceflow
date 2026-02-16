@@ -12,6 +12,11 @@
   "publishConfig": {
     "access": "public"
   },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
   "bin": {
     "space": "dist/cli.js",
     "spaceflow": "dist/cli.js"
