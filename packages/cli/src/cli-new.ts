@@ -50,7 +50,8 @@ async function bootstrap() {
     if (cmd.options) {
       for (const opt of cmd.options) {
         if (!globalOptions.some((go) => opt.flags.startsWith(go.split(",")[0].trim()))) {
-          command.option(opt.flags, opt.description, opt.default);
+          const defaultValue = opt.default as string | boolean | string[] | undefined;
+          command.option(opt.flags as string, opt.description as string, defaultValue);
         }
       }
     }
@@ -62,7 +63,8 @@ async function bootstrap() {
         if (sub.options) {
           for (const opt of sub.options) {
             if (!globalOptions.some((go) => opt.flags.startsWith(go.split(",")[0].trim()))) {
-              subCmd.option(opt.flags, opt.description, opt.default);
+              const defaultValue = opt.default as string | boolean | string[] | undefined;
+              subCmd.option(opt.flags as string, opt.description as string, defaultValue);
             }
           }
         }
@@ -75,7 +77,7 @@ async function bootstrap() {
 
     // 添加执行函数
     command.action(async (args, options) => {
-      await cmd.run(args, options, container);
+      await cmd.run(args || [], options || {}, container);
     });
 
     // 将命令添加到 program

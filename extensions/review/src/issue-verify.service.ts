@@ -1,5 +1,4 @@
 import {
-  Injectable,
   LlmProxyService,
   type LLMMode,
   type VerboseLevel,
@@ -46,7 +45,6 @@ const VERIFY_SCHEMA: LlmJsonPutSchema = {
   additionalProperties: false,
 };
 
-@Injectable()
 export class IssueVerifyService {
   constructor(
     protected readonly llmProxyService: LlmProxyService,

@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import { rspack, type Compiler, type Configuration, type Stats } from "@rspack/core";
 import { readdir, stat } from "fs/promises";
 import { join, dirname, resolve } from "path";
@@ -21,7 +20,6 @@ export interface BuildResult {
   warnings?: string[];
 }
 
-@Injectable()
 export class BuildService {
   private readonly projectRoot = this.findProjectRoot();
   private readonly extensionDirs = this.discoverExtensionDirs();
@@ -199,7 +197,10 @@ export class BuildService {
   /**
    * 构建单个 Extension
    */
-  private async buildExtension(ext: ExtensionInfo, verbose: VerboseLevel = 1): Promise<BuildResult> {
+  private async buildExtension(
+    ext: ExtensionInfo,
+    verbose: VerboseLevel = 1,
+  ): Promise<BuildResult> {
     const startTime = Date.now();
     if (shouldLog(verbose, 1)) console.log(t("build:building", { name: ext.name }));
 
@@ -276,8 +277,7 @@ export class BuildService {
               t("build:watchBuildWarnings", { name: ext.name, count: info.warnings?.length }),
             );
         } else {
-          if (shouldLog(verbose, 1))
-            console.log(t("build:watchBuildSuccess", { name: ext.name }));
+          if (shouldLog(verbose, 1)) console.log(t("build:watchBuildSuccess", { name: ext.name }));
         }
       });
     } catch (error) {

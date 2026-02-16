@@ -1,9 +1,8 @@
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import { GitProviderService, shouldLog, normalizeVerbose } from "@spaceflow/core";
+import type { IConfigReader } from "@spaceflow/core";
+import type { PullRequest, Issue, CiConfig } from "@spaceflow/core";
 import { writeFileSync } from "fs";
 import { join } from "path";
-import { GitProviderService, shouldLog, normalizeVerbose } from "@spaceflow/core";
-import type { PullRequest, Issue, CiConfig } from "@spaceflow/core";
 import type {
   PeriodSummaryOptions,
   PeriodSummaryContext,
@@ -33,17 +32,16 @@ const SCORE_WEIGHTS = {
 /**
  * 周期统计服务
  */
-@Injectable()
 export class PeriodSummaryService {
   constructor(
     protected readonly gitProvider: GitProviderService,
-    protected readonly configService: ConfigService,
+    protected readonly config: IConfigReader,
   ) {}
 
   /**
    * 从配置和选项获取执行上下文
    */
-  getContextFromOptions(options: PeriodSummaryOptions): PeriodSummaryContext {
+  private getContextFromOptions(options: PeriodSummaryOptions): PeriodSummaryContext {
     let owner: string;
     let repo: string;
     if (options.repository) {
@@ -54,7 +52,7 @@ export class PeriodSummaryService {
       owner = parts[0];
       repo = parts[1];
     } else {
-      const ciConf = this.configService.get<CiConfig>("ci");
+      const ciConf = this.config.get<CiConfig>("ci");
       const repository = ciConf?.repository;
       if (!repository) {
         throw new Error("缺少仓库配置，请通过 --repository 参数或环境变量 GITHUB_REPOSITORY 指定");

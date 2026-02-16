@@ -1,5 +1,4 @@
 import {
-  Injectable,
   type ChangedFile,
   type VerboseLevel,
   shouldLog,
@@ -8,7 +7,6 @@ import {
   type RemoteRepoRef,
   type RepositoryContent,
 } from "@spaceflow/core";
-import { Optional } from "@nestjs/common";
 import { readdir, readFile, mkdir, access, writeFile } from "fs/promises";
 import { join, basename, extname } from "path";
 import { homedir } from "os";
@@ -19,9 +17,8 @@ import { ReviewSpec, ReviewRule, RuleExample, Severity } from "./types";
 /** 远程规则缓存 TTL（毫秒），默认 5 分钟 */
 const REMOTE_SPEC_CACHE_TTL = 5 * 60 * 1000;
 
-@Injectable()
 export class ReviewSpecService {
-  constructor(@Optional() protected readonly gitProvider?: GitProviderService) {}
+  constructor(protected readonly gitProvider?: GitProviderService) {}
   /**
    * 检查规则 ID 是否匹配（精确匹配或前缀匹配）
    * 例如: "JsTs.FileName" 匹配 "JsTs.FileName" 和 "JsTs.FileName.UpperCamel"

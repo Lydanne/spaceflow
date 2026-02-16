@@ -18,8 +18,8 @@
     "README.md"
   ],
   "bin": {
-    "space": "dist/cli.js",
-    "spaceflow": "dist/cli.js"
+    "space": "dist/cli-new.js",
+    "spaceflow": "dist/cli-new.js"
   },
   "type": "module",
   "scripts": {

@@ -1,5 +1,4 @@
 import {
-  Injectable,
   LlmProxyService,
   logStreamEvent,
   createStreamLoggerState,
@@ -73,7 +72,6 @@ export interface DeletionAnalysisContext {
   includes?: string[];
 }
 
-@Injectable()
 export class DeletionImpactService {
   constructor(
     protected readonly llmProxyService: LlmProxyService,

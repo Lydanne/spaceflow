@@ -1,9 +1,7 @@
-import { Injectable } from "@nestjs/common";
 import { ReviewResult, ReviewStats } from "../review-spec/types";
 import { JsonFormatter, MarkdownFormatter, TerminalFormatter } from "./formatters";
 import { ParsedReport, ReportFormat, ReportOptions, ReviewReportFormatter } from "./types";
 
-@Injectable()
 export class ReviewReportService {
   private readonly markdownFormatter = new MarkdownFormatter();
   private readonly terminalFormatter = new TerminalFormatter();

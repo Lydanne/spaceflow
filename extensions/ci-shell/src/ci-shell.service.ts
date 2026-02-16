@@ -1,7 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { execSync } from "child_process";
 import { GitProviderService, BranchProtection, CiConfig } from "@spaceflow/core";
+import type { IConfigReader } from "@spaceflow/core";
+import { execSync } from "child_process";
 import { CiShellOptions } from "./ci-shell.command";
 
 export interface CiShellContext extends CiShellOptions {
@@ -16,17 +15,16 @@ export interface CiShellResult {
   protection?: BranchProtection | null;
 }
 
-@Injectable()
 export class CiShellService {
   constructor(
     protected readonly gitProvider: GitProviderService,
-    protected readonly configService: ConfigService,
+    protected readonly config: IConfigReader,
   ) {}
 
   getContextFromEnv(options: CiShellOptions): CiShellContext {
     this.gitProvider.validateConfig();
 
-    const ciConf = this.configService.get<CiConfig>("ci");
+    const ciConf = this.config.get<CiConfig>("ci");
     const repository = ciConf?.repository;
     const branch = ciConf?.refName;
 

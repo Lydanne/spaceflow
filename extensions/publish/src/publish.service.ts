@@ -1,8 +1,7 @@
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import {
   GitProviderService,
-  ConfigReaderService,
+  type ConfigReaderService,
+  type IConfigReader,
   type BranchProtection,
   type CiConfig,
 } from "@spaceflow/core";
@@ -48,7 +47,6 @@ interface ReleaseItConfigOptions {
   publishConf: PublishConfig;
 }
 
-@Injectable()
 export class PublishService {
   private cleanupOnExit: (() => void) | null = null;
   private uncaughtExceptionHandler: ((err: Error) => void) | null = null;
@@ -56,7 +54,7 @@ export class PublishService {
 
   constructor(
     protected readonly gitProvider: GitProviderService,
-    protected readonly configService: ConfigService,
+    protected readonly config: IConfigReader,
     protected readonly configReader: ConfigReaderService,
     protected readonly monorepoService: MonorepoService,
   ) {}
@@ -64,7 +62,7 @@ export class PublishService {
   getContextFromEnv(options: PublishOptions): PublishContext {
     this.gitProvider.validateConfig();
 
-    const ciConf = this.configService.get<CiConfig>("ci");
+    const ciConf = this.config.get<CiConfig>("ci");
     const repository = ciConf?.repository;
     const branch = ciConf?.refName;
 

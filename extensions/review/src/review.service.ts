@@ -1,6 +1,4 @@
 import {
-  Injectable,
-  ConfigService,
   ConfigReaderService,
   GitProviderService,
   PullRequest,
@@ -24,6 +22,7 @@ import {
   parseHunksFromPatch,
   calculateNewLineNumber,
 } from "@spaceflow/core";
+import type { IConfigReader } from "@spaceflow/core";
 import { type AnalyzeDeletionsMode, type ReviewConfig } from "./review.config";
 import {
   ReviewSpecService,
@@ -138,13 +137,12 @@ const REVIEW_SCHEMA: LlmJsonPutSchema = {
   additionalProperties: false,
 };
 
-@Injectable()
 export class ReviewService {
   protected readonly llmJsonPut: LlmJsonPut<ReviewResult>;
 
   constructor(
     protected readonly gitProvider: GitProviderService,
-    protected readonly configService: ConfigService,
+    protected readonly config: IConfigReader,
     protected readonly configReader: ConfigReaderService,
     protected readonly reviewSpecService: ReviewSpecService,
     protected readonly llmProxyService: LlmProxyService,
