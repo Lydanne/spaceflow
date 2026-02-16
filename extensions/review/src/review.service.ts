@@ -40,7 +40,7 @@ import { execSync } from "child_process";
 import { readFile, readdir } from "fs/promises";
 import { join, dirname, extname, relative, isAbsolute } from "path";
 import micromatch from "micromatch";
-import { ReviewOptions } from "./review.command";
+import { ReviewOptions } from "./review.config";
 import { IssueVerifyService } from "./issue-verify.service";
 import { DeletionImpactService } from "./deletion-impact.service";
 import { parseTitleOptions } from "./parse-title-options";

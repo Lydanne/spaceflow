@@ -1,6 +1,7 @@
 import "./locales";
-import { defineExtension } from "@spaceflow/core";
-import { t } from "@spaceflow/core";
+import { defineExtension, t } from "@spaceflow/core";
+import type { GitProviderService } from "@spaceflow/core";
+import { CiShellService } from "./ci-shell.service";
 
 export const extension = defineExtension({
   name: "ci-shell",
@@ -24,9 +25,18 @@ export const extension = defineExtension({
           ctx.output.error(t("ci-shell:noCommand"));
           process.exit(1);
         }
-        ctx.output.info(`DRY-RUN mode: ${options.dryRun ? "enabled" : "disabled"}`);
-        ctx.output.info("ci-shell 命令暂未实现");
-        // TODO: 实现 ci-shell 命令逻辑
+
+        const gitProvider = ctx.getService<GitProviderService>("gitProvider");
+        if (!gitProvider) {
+          ctx.output.error("ci-shell 命令需要配置 Git Provider");
+          process.exit(1);
+        }
+
+        const ciShellService = new CiShellService(gitProvider, ctx.config);
+        const context = ciShellService.getContextFromEnv({
+          dryRun: !!options?.dryRun,
+        });
+        await ciShellService.execute(context, command);
       },
     },
   ],

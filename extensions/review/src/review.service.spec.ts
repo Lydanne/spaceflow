@@ -15,7 +15,7 @@ import { readFile } from "fs/promises";
 import { ReviewService, ReviewContext, ReviewPrompt } from "./review.service";
 import { IssueVerifyService } from "./issue-verify.service";
 import { DeletionImpactService } from "./deletion-impact.service";
-import type { ReviewOptions } from "./review.command";
+import type { ReviewOptions } from "./review.config";
 
 vi.mock("c12");
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({

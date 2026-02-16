@@ -1,6 +1,9 @@
 import { GitProviderService, BranchProtection, CiConfig } from "@spaceflow/core";
 import type { IConfigReader } from "@spaceflow/core";
-import { CiScriptsOptions } from "./ci-scripts.command";
+
+export interface CiScriptsOptions {
+  dryRun: boolean;
+}
 
 // 定义常量表示进程退出码
 const PROCESS_EXIT_CODE_ERROR = 1;

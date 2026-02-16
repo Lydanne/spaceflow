@@ -1,7 +1,10 @@
 import { GitProviderService, BranchProtection, CiConfig } from "@spaceflow/core";
 import type { IConfigReader } from "@spaceflow/core";
 import { execSync } from "child_process";
-import { CiShellOptions } from "./ci-shell.command";
+
+export interface CiShellOptions {
+  dryRun: boolean;
+}
 
 export interface CiShellContext extends CiShellOptions {
   owner: string;

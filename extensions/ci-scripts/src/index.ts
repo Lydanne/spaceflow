@@ -1,6 +1,7 @@
 import "./locales";
-import { defineExtension } from "@spaceflow/core";
-import { t } from "@spaceflow/core";
+import { defineExtension, t } from "@spaceflow/core";
+import type { GitProviderService } from "@spaceflow/core";
+import { CiScriptsService } from "./ci-scripts.service";
 
 export const extension = defineExtension({
   name: "ci-scripts",
@@ -24,9 +25,18 @@ export const extension = defineExtension({
           ctx.output.error(t("ci-scripts:noScript"));
           process.exit(1);
         }
-        ctx.output.info(`DRY-RUN mode: ${options.dryRun ? "enabled" : "disabled"}`);
-        ctx.output.info("ci-script 命令暂未实现");
-        // TODO: 实现 ci-script 命令逻辑
+
+        const gitProvider = ctx.getService<GitProviderService>("gitProvider");
+        if (!gitProvider) {
+          ctx.output.error("ci-script 命令需要配置 Git Provider");
+          process.exit(1);
+        }
+
+        const ciScriptsService = new CiScriptsService(gitProvider, ctx.config);
+        const context = ciScriptsService.getContextFromEnv({
+          dryRun: !!options?.dryRun,
+        });
+        await ciScriptsService.execute(context, script);
       },
     },
   ],

@@ -18,7 +18,13 @@ const releaseItModule = require("release-it") as
 
 const releaseIt = typeof releaseItModule === "function" ? releaseItModule : releaseItModule.default;
 
-import type { PublishOptions } from "./publish.command";
+export interface PublishOptions {
+  dryRun: boolean;
+  ci: boolean;
+  prerelease?: string;
+  /** 预演模式：执行 hooks 但不修改文件/git */
+  rehearsal: boolean;
+}
 
 export interface PublishContext extends PublishOptions {
   owner: string;

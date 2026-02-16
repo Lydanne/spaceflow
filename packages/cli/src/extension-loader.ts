@@ -2,10 +2,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { createRequire } from "module";
 import { homedir } from "os";
-import type {
-  ExtensionDefinition,
-  CommandDefinition,
-} from "@spaceflow/core";
+import type { ExtensionDefinition, CommandDefinition } from "@spaceflow/core";
 import { SPACEFLOW_DIR, PACKAGE_JSON, t } from "@spaceflow/core";
 import type { SpaceflowContext } from "@spaceflow/core";
 
@@ -128,6 +125,9 @@ export class ExtensionLoader {
 
   /**
    * 检查是否是有效的扩展
+   * 支持两种方式：
+   * 1. package.json 中有 spaceflow.extension 配置
+   * 2. 模块导出了 defineExtension 定义
    */
   private isValidExtension(name: string, spaceflowDir: string): boolean {
     const nodeModulesPath = path.join(spaceflowDir, "node_modules", name);
@@ -140,14 +140,19 @@ export class ExtensionLoader {
     try {
       const content = fs.readFileSync(packageJsonPath, "utf-8");
       const pkg = JSON.parse(content);
-      const spaceflowConfig = pkg.spaceflow;
 
-      if (!spaceflowConfig) {
-        return false;
+      // 方式1：检查 spaceflow.extension 配置
+      if (pkg.spaceflow?.extension) {
+        return true;
       }
 
-      // 检查是否有 extension 导出
-      return !!spaceflowConfig.extension;
+      // 方式2：检查是否有 main 入口（可能是 defineExtension 格式）
+      // 对于 @spaceflow/* 包，默认认为是有效扩展
+      if (name.startsWith("@spaceflow/") && pkg.main) {
+        return true;
+      }
+
+      return false;
     } catch {
       return false;
     }
