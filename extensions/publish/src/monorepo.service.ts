@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import { execSync } from "child_process";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
@@ -21,7 +20,6 @@ export interface MonorepoAnalysisResult {
   packagesToPublish: PackageInfo[];
 }
 
-@Injectable()
 export class MonorepoService {
   private readonly cwd: string;
 
