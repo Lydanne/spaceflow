@@ -2192,25 +2192,51 @@ ${fileChanges || "无"}`;
 
   /**
    * 删除已有的 AI review（通过 marker 识别）
+   * 注意：GitHub API 的 DELETE /pulls/{pull_number}/reviews/{review_id} 只能删除 PENDING 状态的 review
+   * 已提交的 review 需要通过 listIssueComments + deleteIssueComment 来删除
    */
   protected async deleteExistingAiReviews(
     owner: string,
     repo: string,
     prNumber: number,
   ): Promise<void> {
+    let deletedCount = 0;
+    // 方式1：尝试删除 PENDING 状态的 review（通过 review API）
     try {
       const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
       const aiReviews = reviews.filter((r) => r.body?.includes(REVIEW_COMMENT_MARKER));
       for (const review of aiReviews) {
         if (review.id) {
-          await this.gitProvider.deletePullReview(owner, repo, prNumber, review.id);
+          try {
+            await this.gitProvider.deletePullReview(owner, repo, prNumber, review.id);
+            deletedCount++;
+          } catch {
+            // PENDING 状态的 review 删除失败，忽略（可能已提交）
+          }
         }
       }
-      if (aiReviews.length > 0) {
-        console.log(`🗑️ 已删除 ${aiReviews.length} 个旧的 AI review`);
+    } catch (error) {
+      console.warn("⚠️ 列出 PR reviews 失败:", error);
+    }
+    // 方式2：删除已提交的 AI 评论（通过 issue comment API）
+    try {
+      const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
+      const aiComments = comments.filter((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
+      for (const comment of aiComments) {
+        if (comment.id) {
+          try {
+            await this.gitProvider.deleteIssueComment(owner, repo, comment.id);
+            deletedCount++;
+          } catch (error) {
+            console.warn(`⚠️ 删除评论 ${comment.id} 失败:`, error);
+          }
+        }
       }
     } catch (error) {
-      console.warn("⚠️ 删除旧 AI review 失败:", error);
+      console.warn("⚠️ 列出 issue comments 失败:", error);
+    }
+    if (deletedCount > 0) {
+      console.log(`🗑️ 已删除 ${deletedCount} 个旧的 AI review`);
     }
   }
 

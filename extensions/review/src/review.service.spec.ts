@@ -68,6 +68,8 @@ describe("ReviewService", () => {
       listPullReviewComments: vi.fn(),
       searchUsers: vi.fn().mockResolvedValue([]),
       getIssueCommentReactions: vi.fn().mockResolvedValue([]),
+      listIssueComments: vi.fn().mockResolvedValue([]),
+      deleteIssueComment: vi.fn().mockResolvedValue(undefined),
     };
 
     configService = {
@@ -1481,19 +1483,42 @@ describe("ReviewService", () => {
   });
 
   describe("ReviewService.deleteExistingAiReviews", () => {
-    it("should delete AI reviews", async () => {
+    it("should delete AI reviews via review API", async () => {
       gitProvider.listPullReviews.mockResolvedValue([
         { id: 1, body: "<!-- spaceflow-review --> old review" },
         { id: 2, body: "normal review" },
       ] as any);
+      gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.deletePullReview.mockResolvedValue(undefined as any);
       await (service as any).deleteExistingAiReviews("o", "r", 1);
       expect(gitProvider.deletePullReview).toHaveBeenCalledWith("o", "r", 1, 1);
       expect(gitProvider.deletePullReview).toHaveBeenCalledTimes(1);
     });
 
-    it("should handle error gracefully", async () => {
+    it("should delete AI reviews via issue comment API", async () => {
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listIssueComments.mockResolvedValue([
+        { id: 10, body: "<!-- spaceflow-review --> old comment" },
+        { id: 11, body: "normal comment" },
+      ] as any);
+      gitProvider.deleteIssueComment.mockResolvedValue(undefined as any);
+      await (service as any).deleteExistingAiReviews("o", "r", 1);
+      expect(gitProvider.deleteIssueComment).toHaveBeenCalledWith("o", "r", 10);
+      expect(gitProvider.deleteIssueComment).toHaveBeenCalledTimes(1);
+    });
+
+    it("should handle review API error gracefully", async () => {
       gitProvider.listPullReviews.mockRejectedValue(new Error("fail"));
+      gitProvider.listIssueComments.mockResolvedValue([] as any);
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      await (service as any).deleteExistingAiReviews("o", "r", 1);
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle issue comment API error gracefully", async () => {
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listIssueComments.mockRejectedValue(new Error("fail"));
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       await (service as any).deleteExistingAiReviews("o", "r", 1);
       expect(consoleSpy).toHaveBeenCalled();
