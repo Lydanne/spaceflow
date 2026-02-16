@@ -1,28 +1,36 @@
-import type {
-  SpaceflowExtension,
-  SpaceflowExtensionMetadata,
-  ExtensionModuleType,
-} from "@spaceflow/core";
-import { t } from "@spaceflow/core";
-import { McpModule } from "./mcp.module";
+import { defineExtension, type VerboseLevel } from "@spaceflow/core";
+import { McpService } from "./mcp.service";
+import type { ExtensionLoader } from "../../extension-loader";
 
-export const mcpMetadata: SpaceflowExtensionMetadata = {
+/**
+ * MCP 命令扩展
+ */
+export const mcpExtension = defineExtension({
   name: "mcp",
-  commands: ["mcp"],
   version: "1.0.0",
-  description: t("mcp:extensionDescription"),
-};
+  description: "MCP 工具",
+  commands: [
+    {
+      name: "mcp",
+      description: "启动 MCP Server",
+      options: [
+        {
+          flags: "-v, --verbose",
+          description: "详细输出",
+        },
+        {
+          flags: "--inspector",
+          description: "启动 MCP Inspector",
+        },
+      ],
+      run: async (_args, options, ctx) => {
+        const verbose = (options?.verbose ? 2 : 1) as VerboseLevel;
+        const extensionLoader = ctx.getService<ExtensionLoader>("extensionLoader");
+        const mcpService = new McpService(extensionLoader);
+        await mcpService.startServer(verbose);
+      },
+    },
+  ],
+});
 
-export class McpExtension implements SpaceflowExtension {
-  getMetadata(): SpaceflowExtensionMetadata {
-    return mcpMetadata;
-  }
-
-  getModule(): ExtensionModuleType {
-    return McpModule;
-  }
-}
-
-export * from "./mcp.command";
 export * from "./mcp.service";
-export * from "./mcp.module";

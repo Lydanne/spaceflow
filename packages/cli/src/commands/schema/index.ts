@@ -1,27 +1,30 @@
-import type {
-  SpaceflowExtension,
-  SpaceflowExtensionMetadata,
-  ExtensionModuleType,
-} from "@spaceflow/core";
-import { t } from "@spaceflow/core";
-import { SchemaModule } from "./schema.module";
+import { defineExtension, SchemaGeneratorService } from "@spaceflow/core";
 
-export const schemaMetadata: SpaceflowExtensionMetadata = {
+/**
+ * Schema 命令扩展
+ */
+export const schemaExtension = defineExtension({
   name: "schema",
-  commands: ["schema"],
   version: "1.0.0",
-  description: t("schema:extensionDescription"),
-};
-
-export class SchemaExtension implements SpaceflowExtension {
-  getMetadata(): SpaceflowExtensionMetadata {
-    return schemaMetadata;
-  }
-
-  getModule(): ExtensionModuleType {
-    return SchemaModule;
-  }
-}
-
-export * from "./schema.command";
-export * from "./schema.module";
+  description: "生成 schema",
+  commands: [
+    {
+      name: "schema",
+      description: "生成 JSON Schema 配置文件",
+      options: [
+        {
+          flags: "-o, --output <path>",
+          description: "输出路径",
+        },
+      ],
+      run: async (_args, options, _ctx) => {
+        const schemaGenerator = new SchemaGeneratorService();
+        if (options?.output) {
+          schemaGenerator.generateJsonSchema(options.output as string);
+        } else {
+          schemaGenerator.generate();
+        }
+      },
+    },
+  ],
+});

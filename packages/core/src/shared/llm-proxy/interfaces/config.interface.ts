@@ -2,6 +2,7 @@ export interface ClaudeAdapterConfig {
   model?: string;
   baseUrl?: string;
   authToken?: string;
+  hasCompletedOnboarding?: boolean;
 }
 
 export interface OpenAIAdapterConfig {
@@ -22,11 +23,18 @@ export interface OpenCodeAdapterConfig {
 
 export type LLMMode = "claude-code" | "openai" | "gemini" | "open-code";
 
+export interface GeminiAdapterConfig {
+  model?: string;
+  baseUrl?: string;
+  apiKey?: string;
+}
+
 export interface LlmProxyConfig {
   defaultAdapter?: LLMMode;
   claudeCode?: ClaudeAdapterConfig;
   openai?: OpenAIAdapterConfig;
   openCode?: OpenCodeAdapterConfig;
+  gemini?: GeminiAdapterConfig;
 }
 
 export const LLM_PROXY_CONFIG = Symbol("LLM_PROXY_CONFIG");

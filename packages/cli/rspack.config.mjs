@@ -9,7 +9,7 @@ export default {
     minimize: false,
   },
   entry: {
-    "cli-new": "./src/cli-new.ts",
+    cli: "./src/cli.ts",
   },
   plugins: [
     new rspack.BannerPlugin({

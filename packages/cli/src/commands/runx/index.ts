@@ -1,29 +1,47 @@
-import type {
-  SpaceflowExtension,
-  SpaceflowExtensionMetadata,
-  ExtensionModuleType,
-} from "@spaceflow/core";
-import { t } from "@spaceflow/core";
-import { RunxModule } from "./runx.module";
+import { defineExtension, SchemaGeneratorService, type VerboseLevel } from "@spaceflow/core";
+import { RunxService } from "./runx.service";
+import { InstallService } from "../install/install.service";
 
-export const runxMetadata: SpaceflowExtensionMetadata = {
+/**
+ * Runx 命令扩展
+ */
+export const runxExtension = defineExtension({
   name: "runx",
-  commands: ["runx", "x"],
   version: "1.0.0",
-  description: t("runx:extensionDescription"),
-};
+  description: "运行 x 命令",
+  commands: [
+    {
+      name: "runx",
+      description: "全局安装并运行扩展命令",
+      aliases: ["x"],
+      arguments: "<source> [args...]",
+      options: [
+        {
+          flags: "-n, --name <name>",
+          description: "指定安装名称",
+        },
+        {
+          flags: "-v, --verbose",
+          description: "详细输出",
+        },
+      ],
+      run: async (args, options, _ctx) => {
+        const source = args[0];
+        const cmdArgs = args.slice(1);
+        const verbose = (options?.verbose ? 2 : 1) as VerboseLevel;
+        const schemaGenerator = new SchemaGeneratorService();
+        const installService = new InstallService(schemaGenerator);
+        const runxService = new RunxService(installService);
+        await runxService.execute({
+          source,
+          name: options?.name as string,
+          args: cmdArgs,
+          verbose,
+        });
+      },
+    },
+  ],
+});
 
-export class RunxExtension implements SpaceflowExtension {
-  getMetadata(): SpaceflowExtensionMetadata {
-    return runxMetadata;
-  }
-
-  getModule(): ExtensionModuleType {
-    return RunxModule;
-  }
-}
-
-export { RunxModule } from "./runx.module";
-export { RunxCommand } from "./runx.command";
-export { RunxService } from "./runx.service";
+export * from "./runx.service";
 export * from "./runx.utils";

@@ -1,11 +1,11 @@
 import { readFile, writeFile, mkdir, copyFile, unlink } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
-import type { LlmConfig } from "../../config";
+import type { LlmProxyConfig } from "../llm-proxy/interfaces";
 import { shouldLog, type VerboseLevel } from "../verbose";
 
 export class ClaudeSetupService {
-  constructor(protected readonly llmConfig?: LlmConfig) {}
+  constructor(protected readonly llmConfig?: LlmProxyConfig) {}
 
   private getPaths() {
     const claudeDir = join(homedir(), ".claude");

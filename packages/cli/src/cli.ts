@@ -2,8 +2,8 @@
 import { Command } from "commander";
 import { initI18n } from "@spaceflow/core";
 import { ServiceContainer } from "./service-container";
-import { ExtensionLoader } from "./extension-loader-new";
-import { internalExtensions } from "./internal-extensions-new";
+import { ExtensionLoader } from "./extension-loader";
+import { internalExtensions } from "./internal-extensions";
 
 // 初始化 i18n
 initI18n();
@@ -17,6 +17,9 @@ async function bootstrap() {
 
   // 创建扩展加载器
   const extensionLoader = new ExtensionLoader(container);
+
+  // 注册 extensionLoader 到服务容器
+  container.registerService("extensionLoader", extensionLoader);
 
   // 注册内部扩展
   for (const ext of internalExtensions) {

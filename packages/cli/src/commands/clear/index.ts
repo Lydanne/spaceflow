@@ -1,28 +1,35 @@
-import type {
-  SpaceflowExtension,
-  SpaceflowExtensionMetadata,
-  ExtensionModuleType,
-} from "@spaceflow/core";
-import { t } from "@spaceflow/core";
-import { ClearModule } from "./clear.module";
+import { defineExtension, type VerboseLevel } from "@spaceflow/core";
+import { ClearService } from "./clear.service";
 
-export const clearMetadata: SpaceflowExtensionMetadata = {
+/**
+ * Clear 命令扩展
+ */
+export const clearExtension = defineExtension({
   name: "clear",
-  commands: ["clear"],
   version: "1.0.0",
-  description: t("clear:extensionDescription"),
-};
+  description: "清除缓存",
+  commands: [
+    {
+      name: "clear",
+      description: "清除缓存",
+      options: [
+        {
+          flags: "-g, --global",
+          description: "清除全局缓存",
+        },
+        {
+          flags: "-v, --verbose",
+          description: "详细输出",
+        },
+      ],
+      run: async (args, options, _ctx) => {
+        const isGlobal = !!options?.global;
+        const verbose = (options?.verbose ? 2 : 1) as VerboseLevel;
+        const clearService = new ClearService();
+        await clearService.execute(isGlobal, verbose);
+      },
+    },
+  ],
+});
 
-export class ClearExtension implements SpaceflowExtension {
-  getMetadata(): SpaceflowExtensionMetadata {
-    return clearMetadata;
-  }
-
-  getModule(): ExtensionModuleType {
-    return ClearModule;
-  }
-}
-
-export * from "./clear.command";
 export * from "./clear.service";
-export * from "./clear.module";

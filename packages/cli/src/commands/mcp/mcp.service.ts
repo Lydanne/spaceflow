@@ -1,7 +1,7 @@
 import { t } from "@spaceflow/core";
 import type { VerboseLevel } from "@spaceflow/core";
 import { shouldLog, type McpToolMetadata } from "@spaceflow/core";
-import type { ExtensionLoader } from "../../extension-loader-new.js";
+import type { ExtensionLoader } from "../../extension-loader";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";

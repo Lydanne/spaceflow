@@ -1,28 +1,34 @@
-import type {
-  SpaceflowExtension,
-  SpaceflowExtensionMetadata,
-  ExtensionModuleType,
-} from "@spaceflow/core";
-import { t } from "@spaceflow/core";
-import { SetupModule } from "./setup.module";
+import { defineExtension, SchemaGeneratorService } from "@spaceflow/core";
+import { SetupService } from "./setup.service";
 
-export const setupMetadata: SpaceflowExtensionMetadata = {
+/**
+ * Setup 命令扩展
+ */
+export const setupExtension = defineExtension({
   name: "setup",
-  commands: ["setup"],
   version: "1.0.0",
-  description: t("setup:extensionDescription"),
-};
+  description: "设置配置",
+  commands: [
+    {
+      name: "setup",
+      description: "设置配置",
+      options: [
+        {
+          flags: "-g, --global",
+          description: "全局设置",
+        },
+      ],
+      run: async (_args, options, _ctx) => {
+        const schemaGenerator = new SchemaGeneratorService();
+        const setupService = new SetupService(schemaGenerator);
+        if (options?.global) {
+          await setupService.setupGlobal();
+        } else {
+          await setupService.setupLocal();
+        }
+      },
+    },
+  ],
+});
 
-export class SetupExtension implements SpaceflowExtension {
-  getMetadata(): SpaceflowExtensionMetadata {
-    return setupMetadata;
-  }
-
-  getModule(): ExtensionModuleType {
-    return SetupModule;
-  }
-}
-
-export * from "./setup.command";
 export * from "./setup.service";
-export * from "./setup.module";

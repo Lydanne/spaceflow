@@ -1,7 +1,7 @@
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
-import type { ExtensionLoader } from "../../extension-loader-new.js";
+import type { ExtensionLoader } from "../../extension-loader";
 import {
   shouldLog,
   type VerboseLevel,
@@ -49,10 +49,11 @@ export class ListService {
       configPath = join(cwd, "spaceflow.json");
     }
 
-    // 读取配置文件中的 skills
-    const skills = await this.parseSkillsFromConfig(configPath);
+    // 读取配置文件中的 dependencies（只读取外部扩展）
+    const config = await this.parseConfig(configPath);
+    const dependencies = config.dependencies || {};
 
-    if (Object.keys(skills).length === 0) {
+    if (Object.keys(dependencies).length === 0) {
       if (shouldLog(verbose, 1)) {
         console.log(t("list:noSkills"));
         console.log("");
@@ -63,17 +64,13 @@ export class ListService {
       return;
     }
 
-    // 获取已加载的命令信息
-    const commands = this.extensionLoader.getCommands();
     const editors = await this.getSupportedEditors();
-    // 收集所有 Extension 信息
+    // 收集所有外部扩展信息
     const extensionInfos: ExtensionListInfo[] = [];
-    for (const [name, source] of Object.entries(skills)) {
+    for (const [name, source] of Object.entries(dependencies)) {
       const type = getSourceType(source);
       const installed = await this.checkInstalled(name, source, type, editors);
-      // 从命令中获取扩展名称
-      const extCommands = commands.filter((c) => c.name.startsWith(name)).map((c) => c.name);
-      extensionInfos.push({ name, source, type, installed, commands: extCommands });
+      extensionInfos.push({ name, source, type, installed, commands: [] });
     }
     if (!shouldLog(verbose, 1)) return;
     // 计算最大名称宽度用于对齐
@@ -151,6 +148,18 @@ export class ListService {
 
   /**
    * 从配置文件解析 dependencies
+   */
+  private async parseConfig(configPath: string): Promise<Record<string, unknown>> {
+    try {
+      const content = await readFile(configPath, "utf-8");
+      return JSON.parse(content);
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * 从配置文件解析 skills
    */
   private async parseSkillsFromConfig(configPath: string): Promise<Record<string, string>> {
     try {

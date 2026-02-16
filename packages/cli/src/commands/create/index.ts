@@ -1,28 +1,42 @@
-import type {
-  SpaceflowExtension,
-  SpaceflowExtensionMetadata,
-  ExtensionModuleType,
-} from "@spaceflow/core";
-import { t } from "@spaceflow/core";
-import { CreateModule } from "./create.module";
+import { defineExtension, type VerboseLevel } from "@spaceflow/core";
+import { CreateService } from "./create.service";
 
-export const createMetadata: SpaceflowExtensionMetadata = {
+/**
+ * Create 命令扩展
+ */
+export const createExtension = defineExtension({
   name: "create",
-  commands: ["create"],
   version: "1.0.0",
-  description: t("create:extensionDescription"),
-};
+  description: "创建 Extension",
+  commands: [
+    {
+      name: "create",
+      description: "创建 Extension",
+      arguments: "<name>",
+      options: [
+        {
+          flags: "-t, --template <template>",
+          description: "模板类型 (command, mcp, skills)",
+          default: "command",
+        },
+        {
+          flags: "-v, --verbose",
+          description: "详细输出",
+        },
+      ],
+      run: async (args, options, ctx) => {
+        const name = args[0];
+        if (!name) {
+          ctx.output.error("请指定扩展名称");
+          process.exit(1);
+        }
+        const verbose = (options?.verbose ? 2 : 1) as VerboseLevel;
+        const createService = new CreateService();
+        const template = (options?.template as string) || "command";
+        await createService.createFromTemplate(template, name, {}, verbose);
+      },
+    },
+  ],
+});
 
-export class CreateExtension implements SpaceflowExtension {
-  getMetadata(): SpaceflowExtensionMetadata {
-    return createMetadata;
-  }
-
-  getModule(): ExtensionModuleType {
-    return CreateModule;
-  }
-}
-
-export * from "./create.module";
-export { CreateCommand } from "./create.command";
-export { CreateService } from "./create.service";
+export * from "./create.service";

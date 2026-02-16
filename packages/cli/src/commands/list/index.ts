@@ -1,28 +1,33 @@
-import type {
-  SpaceflowExtension,
-  SpaceflowExtensionMetadata,
-  ExtensionModuleType,
-} from "@spaceflow/core";
-import { t } from "@spaceflow/core";
-import { ListModule } from "./list.module";
+import { defineExtension, type VerboseLevel } from "@spaceflow/core";
+import { ListService } from "./list.service";
+import type { ExtensionLoader } from "../../extension-loader";
 
-export const listMetadata: SpaceflowExtensionMetadata = {
+/**
+ * List 命令扩展
+ */
+export const listExtension = defineExtension({
   name: "list",
-  commands: ["list", "ls"],
   version: "1.0.0",
-  description: t("list:extensionDescription"),
-};
+  description: "列出已安装的 Extension",
+  commands: [
+    {
+      name: "list",
+      description: "列出已安装的 Extension",
+      aliases: ["ls"],
+      options: [
+        {
+          flags: "-v, --verbose",
+          description: "详细输出",
+        },
+      ],
+      run: async (args, options, ctx) => {
+        const verbose = (options?.verbose ? 2 : 1) as VerboseLevel;
+        const extensionLoader = ctx.getService<ExtensionLoader>("extensionLoader");
+        const listService = new ListService(extensionLoader);
+        await listService.execute(verbose);
+      },
+    },
+  ],
+});
 
-export class ListExtension implements SpaceflowExtension {
-  getMetadata(): SpaceflowExtensionMetadata {
-    return listMetadata;
-  }
-
-  getModule(): ExtensionModuleType {
-    return ListModule;
-  }
-}
-
-export * from "./list.module";
-export * from "./list.command";
 export * from "./list.service";

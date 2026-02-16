@@ -1,20 +1,9 @@
-import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
 import { join } from "path";
 import { existsSync, realpathSync } from "fs";
 import { spawn } from "child_process";
 import { InstallService } from "../install/install.service";
-import { CommandFactory } from "nest-commander";
-import type { SpaceflowExtension, VerboseLevel } from "@spaceflow/core";
-import {
-  configLoaders,
-  getEnvFilePaths,
-  StorageModule,
-  OutputModule,
-  extractName,
-  getSourceType,
-  t,
-} from "@spaceflow/core";
+import type { VerboseLevel } from "@spaceflow/core";
+import { extractName, getSourceType, t } from "@spaceflow/core";
 
 export interface RunxOptions {
   source: string;
@@ -27,7 +16,6 @@ export interface RunxOptions {
  * Runx 服务
  * 全局安装依赖后运行命令
  */
-@Injectable()
 export class RunxService {
   constructor(private readonly installService: InstallService) {}
 
@@ -87,7 +75,7 @@ export class RunxService {
 
   /**
    * 运行已安装的命令
-   * 创建包含共享模块的新实例并运行
+   * TODO: 迁移到新架构后实现
    */
   protected async runCommand(name: string, args: string[]): Promise<void> {
     const home = process.env.HOME || process.env.USERPROFILE || "~";
@@ -107,39 +95,26 @@ export class RunxService {
     const importUrl = `file://${distPath}`;
     const dynamicImport = new Function("url", "return import(url)");
     const pluginModule = await dynamicImport(importUrl);
-    const PluginClass = pluginModule.default;
-    if (!PluginClass) {
+    const extensionDef = pluginModule.default;
+    if (!extensionDef) {
       throw new Error(t("runx:pluginNoExport", { name }));
     }
-    const extension: SpaceflowExtension = new PluginClass();
-    const metadata = extension.getMetadata();
-    const commandModule = extension.getModule();
-    // 如果插件只有一个命令，且用户没有指定子命令，自动补充
-    const finalArgs = this.autoCompleteCommand(args, metadata.commands);
-    // 创建动态模块并运行（包含配置和共享模块）
-    @Module({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          load: configLoaders,
-          envFilePath: getEnvFilePaths(),
-        }),
-        StorageModule.forFeature(),
-        OutputModule,
-        commandModule,
-      ],
-    })
-    class DynamicRunxModule {}
-    // 修改 process.argv 以传递参数
-    const originalArgv = process.argv;
-    process.argv = ["node", "runx", ...finalArgs];
-    try {
-      await CommandFactory.run(DynamicRunxModule, {
-        logger: false,
-      });
-    } finally {
-      process.argv = originalArgv;
+    // 新架构：extensionDef 是 ExtensionDefinition 对象
+    // 查找匹配的命令并执行
+    const commands = extensionDef.commands || [];
+    const finalArgs = this.autoCompleteCommand(
+      args,
+      commands.map((c: { name: string }) => c.name),
+    );
+    // 查找要执行的命令
+    const cmdName = finalArgs[0];
+    const cmdDef = commands.find((c: { name: string }) => c.name === cmdName);
+    if (!cmdDef) {
+      throw new Error(t("runx:commandNotFound", { name: cmdName }));
     }
+    // TODO: 需要创建 SpaceflowContext 来执行命令
+    // 暂时抛出未实现错误
+    throw new Error(`runx 命令正在迁移到新架构，暂不可用。请直接使用 space ${cmdName} 命令。`);
   }
 
   /**
