@@ -60,7 +60,9 @@ async function bootstrap() {
   class DynamicCliModule {}
 
   // 4. 创建并运行 CLI
-  const app = await CommandFactory.createWithoutRunning(DynamicCliModule);
+  const app = await CommandFactory.createWithoutRunning(DynamicCliModule, {
+    abortOnError: false,
+  });
   const output = app.get(OutputService);
 
   await CommandFactory.runApplication(app);
