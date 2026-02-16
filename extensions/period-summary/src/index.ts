@@ -1,25 +1,28 @@
 import "./locales";
-import { SpaceflowExtension, SpaceflowExtensionMetadata, t } from "@spaceflow/core";
-import { PeriodSummaryModule } from "./period-summary.module";
-export class PeriodSummaryExtension implements SpaceflowExtension {
-  getMetadata(): SpaceflowExtensionMetadata {
-    return {
+import { defineExtension } from "@spaceflow/core";
+import { t } from "@spaceflow/core";
+
+export const extension = defineExtension({
+  name: "period-summary",
+  version: "1.0.0",
+  description: t("period-summary:extensionDescription"),
+  configKey: "period-summary",
+  commands: [
+    {
       name: "period-summary",
-      commands: ["period-summary"],
-      configKey: "period-summary",
-      version: "1.0.0",
-      description: t("period-summary:extensionDescription"),
-    };
-  }
+      description: t("period-summary:description"),
+      options: [
+        {
+          flags: "-d, --days",
+          description: "天数",
+        },
+      ],
+      run: async (args, options, ctx) => {
+        ctx.output.info("period-summary 命令暂未实现");
+        // TODO: 实现 period-summary 命令逻辑
+      },
+    },
+  ],
+});
 
-  getModule() {
-    return PeriodSummaryModule;
-  }
-}
-
-export default PeriodSummaryExtension;
-
-export * from "./period-summary.command";
-export * from "./period-summary.service";
-export * from "./period-summary.module";
-export * from "./types";
+export default extension;
