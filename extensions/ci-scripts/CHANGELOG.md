@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.19.3](https://github.com/Lydanne/spaceflow/compare/@spaceflow/ci-scripts@0.19.2...@spaceflow/ci-scripts@0.19.3) (2026-02-16)
+
+### 修复BUG
+
+* **cli:** 配置 CommandFactory 在错误时不中止执行 ([e55eaa9](https://github.com/Lydanne/spaceflow/commit/e55eaa9a8f0c3f90564657df2a9cb5cd3314956c))
+
+### 其他修改
+
+* **ci-shell:** released version 0.19.2 [no ci] ([ef258b7](https://github.com/Lydanne/spaceflow/commit/ef258b7cd02305c82c5813c4056def14548261d3))
+* **cli:** released version 0.19.4 [no ci] ([caddff1](https://github.com/Lydanne/spaceflow/commit/caddff1553a3d2d2a9f3aaba225d1dfb6eb2318f))
+* **period-summary:** released version 0.19.2 [no ci] ([ce5530e](https://github.com/Lydanne/spaceflow/commit/ce5530ecc75703872d00a97aa19a745be4fd2a6d))
+* **publish:** released version 0.21.2 [no ci] ([2adc708](https://github.com/Lydanne/spaceflow/commit/2adc708b51e331df60a2bb3173eb669bbc150d87))
+* **review:** released version 0.29.2 [no ci] ([ec0f499](https://github.com/Lydanne/spaceflow/commit/ec0f499c802d57a64cc01580dbccf991a6855331))
+
 ## [0.19.2](https://github.com/Lydanne/spaceflow/compare/@spaceflow/ci-scripts@0.19.1...@spaceflow/ci-scripts@0.19.2) (2026-02-16)
 
 ### 其他修改
