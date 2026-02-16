@@ -42,6 +42,9 @@ export class McpService {
         console.error(`   扩展 ${extensionName} 提供 ${mcp.tools.length} 个 MCP 工具`);
       }
       for (const tool of mcp.tools) {
+        if (shouldLog(verbose, 3)) {
+          console.error(`      - ${tool.name}: ${tool.description}`);
+        }
         allTools.push({
           tool: {
             name: tool.name,
@@ -65,6 +68,9 @@ export class McpService {
 
     if (shouldLog(verbose, 1)) {
       console.error(t("mcp:toolsFound", { count: allTools.length }));
+      for (const { tool } of allTools) {
+        console.error(`   - ${tool.name}`);
+      }
     }
 
     // 启动 MCP Server
