@@ -27,7 +27,6 @@
  */
 
 import "reflect-metadata";
-import { Injectable } from "@nestjs/common";
 
 /** MCP 服务元数据 key（使用 Symbol 确保唯一性） */
 export const MCP_SERVER_METADATA = Symbol.for("spaceflow:mcp:server");
@@ -180,8 +179,6 @@ export interface McpToolMetadata extends McpToolDefinition {
  */
 export function McpServer(definition: McpServerDefinition): ClassDecorator {
   return (target: Function) => {
-    // 应用 @Injectable() 装饰器
-    Injectable()(target);
     // 使用静态属性存储元数据（跨模块可访问）
     (target as any).__mcp_server__ = definition;
   };

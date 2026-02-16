@@ -37,12 +37,6 @@ export interface CorePathOptions {
 export const DEFAULT_EXTERNALS: Configuration["externals"] = [
   // Spaceflow 核心 - 运行时从 core 加载
   { "@spaceflow/core": "module @spaceflow/core" },
-  // NestJS 相关 - 这些由 core 提供
-  { "@nestjs/common": "module @nestjs/common" },
-  { "@nestjs/config": "module @nestjs/config" },
-  { "@nestjs/core": "module @nestjs/core" },
-  { "nest-commander": "module nest-commander" },
-  { "reflect-metadata": "module reflect-metadata" },
   // 排除所有 node_modules（除了相对路径和 src/ 别名）
   /^(?!\.\/|\.\.\/|src\/)[^./]/,
 ];

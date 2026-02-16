@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
@@ -34,7 +33,6 @@ export function getRegisteredSchemas(): Map<string, SchemaRegistry> {
  * Schema 生成服务
  * 用于生成 JSON Schema 文件
  */
-@Injectable()
 export class SchemaGeneratorService {
   /**
    * 生成完整的 spaceflow.json 的 JSON Schema

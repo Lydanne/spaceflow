@@ -1,4 +1,3 @@
-import { registerAs } from "@nestjs/config";
 import { z } from "zod";
 import { readConfigSync } from "./spaceflow.config";
 import { registerPluginSchema } from "./schema-generator.service";
@@ -7,7 +6,7 @@ import { registerPluginSchema } from "./schema-generator.service";
  * 配置加载器选项
  */
 export interface ConfigLoaderOptions<T extends z.ZodObject<z.ZodRawShape>> {
-  /** 配置 key（用于 registerAs 和从 spaceflow.json 读取） */
+  /** 配置 key（用于从 spaceflow.json 读取） */
   configKey: string;
   /** zod schema（应包含 .default() 设置默认值） */
   schemaFactory: () => T;
@@ -41,7 +40,7 @@ export function createConfigLoader<T extends z.ZodObject<z.ZodRawShape>>(
   const { configKey, schemaFactory, description } = options;
 
   // 创建配置加载器
-  return registerAs(configKey, (): z.infer<T> => {
+  return (): z.infer<T> => {
     const schema = schemaFactory();
     // 注册 schema 用于 JSON Schema 生成
     registerPluginSchema({
@@ -64,7 +63,7 @@ export function createConfigLoader<T extends z.ZodObject<z.ZodRawShape>>(
     }
 
     return result.data;
-  });
+  };
 }
 
 /**
@@ -76,7 +75,7 @@ export function createEnvConfigLoader<T extends z.ZodObject<z.ZodRawShape>>(
 ) {
   const { configKey, schemaFactory, description } = options;
 
-  return registerAs(configKey, (): z.infer<T> => {
+  return (): z.infer<T> => {
     const schema = schemaFactory();
     // 注册 schema（如果有描述）
     if (description) {
@@ -97,5 +96,5 @@ export function createEnvConfigLoader<T extends z.ZodObject<z.ZodRawShape>>(
     }
 
     return result.data;
-  });
+  };
 }
