@@ -28,6 +28,12 @@ export interface SpaceflowContext {
    * @param key 服务标识符（字符串 key，非 class 引用）
    */
   getService<T = unknown>(key: string): T;
+  /**
+   * 注册服务实例
+   * @param key 服务标识符
+   * @param service 服务实例
+   */
+  registerService(key: string, service: unknown): void;
 }
 
 /**
