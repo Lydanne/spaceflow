@@ -1,6 +1,15 @@
 import { type StorageAdapter } from "./adapters/storage-adapter.interface";
-import { type StorageModuleOptions } from "./types";
 import type { IStorageService } from "../../extension-system/types";
+
+/**
+ * Storage 服务配置选项
+ */
+export interface StorageServiceOptions {
+  /** 默认过期时间（毫秒），0 表示永不过期 */
+  defaultTtl?: number;
+  /** 最大 key 数量，超过时会淘汰最早过期的 key，0 或 undefined 表示不限制 */
+  maxKeys?: number;
+}
 
 /**
  * Storage 服务
@@ -15,7 +24,7 @@ export class StorageService implements IStorageService {
 
   constructor(
     protected readonly adapter: StorageAdapter,
-    protected readonly options: StorageModuleOptions = {},
+    protected readonly options: StorageServiceOptions = {},
   ) {
     // 启动定期清理过期项的定时器
     this.startCleanupTimer();
