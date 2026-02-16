@@ -5,7 +5,6 @@ export * from "./feishu.config";
 export * from "./storage.config";
 export * from "./spaceflow.config";
 export * from "./config-reader.service";
-export * from "./config-reader.module";
 export * from "./schema-generator.service";
 export * from "./config-loader";
 

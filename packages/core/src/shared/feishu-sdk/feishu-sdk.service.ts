@@ -1,9 +1,7 @@
-import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
-import { EventEmitter2 } from "@nestjs/event-emitter";
+import { EventEmitter } from "events";
 import * as lark from "@larksuiteoapi/node-sdk";
 import {
   FeishuModuleOptions,
-  FEISHU_MODULE_OPTIONS,
   FeishuUser,
   GetUserParams,
   FEISHU_CARD_ACTION_TRIGGER,
@@ -15,12 +13,39 @@ import {
 /**
  * 飞书 API 服务
  */
-@Injectable()
-export class FeishuSdkService implements OnModuleInit, OnModuleDestroy {
+export class FeishuSdkService {
   protected readonly client: lark.Client;
+  protected readonly eventEmitter: EventEmitter;
+  private eventDispatcher: lark.EventDispatcher | null = null;
 
-  onModuleInit(): void {
-    const eventDispatcher = new lark.EventDispatcher({
+  constructor(protected readonly options: FeishuModuleOptions) {
+    this.eventEmitter = new EventEmitter();
+    this.client = new lark.Client({
+      appId: options.appId,
+      appSecret: options.appSecret,
+      appType: options.appType === "store" ? lark.AppType.ISV : lark.AppType.SelfBuild,
+      domain: options.domain === "lark" ? lark.Domain.Lark : lark.Domain.Feishu,
+    });
+
+    this.initEventDispatcher();
+  }
+
+  /**
+   * 注册事件监听器
+   */
+  on(eventName: string, listener: (...args: any[]) => void): void {
+    this.eventEmitter.on(eventName, listener);
+  }
+
+  /**
+   * 移除事件监听器
+   */
+  off(eventName: string, listener: (...args: any[]) => void): void {
+    this.eventEmitter.off(eventName, listener);
+  }
+
+  private initEventDispatcher(): void {
+    this.eventDispatcher = new lark.EventDispatcher({
       encryptKey: "encrypt key",
     }).register<CardEvents>({
       [FEISHU_CARD_ACTION_TRIGGER]: async (data) => {
@@ -41,21 +66,8 @@ export class FeishuSdkService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  onModuleDestroy(): void {
+  destroy(): void {
     this.eventEmitter.removeAllListeners();
-  }
-
-  constructor(
-    @Inject(FEISHU_MODULE_OPTIONS)
-    protected readonly options: FeishuModuleOptions,
-    protected readonly eventEmitter: EventEmitter2,
-  ) {
-    this.client = new lark.Client({
-      appId: options.appId,
-      appSecret: options.appSecret,
-      appType: options.appType === "store" ? lark.AppType.ISV : lark.AppType.SelfBuild,
-      domain: options.domain === "lark" ? lark.Domain.Lark : lark.Domain.Feishu,
-    });
   }
 
   /**

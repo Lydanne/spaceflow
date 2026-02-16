@@ -1,7 +1,3 @@
-import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import type { SpaceflowConfig } from "./spaceflow.config";
-
 /**
  * 系统配置（不包含插件配置）
  */
@@ -57,9 +53,8 @@ export function getRegisteredPluginConfig(configKey: string): PluginConfigRegist
  * 2. getOtherPluginConfig - 读取其他插件的配置（需要在 metadata 中声明依赖）
  * 3. getSystemConfig - 读取系统配置
  */
-@Injectable()
 export class ConfigReaderService {
-  constructor(protected readonly configService: ConfigService) {}
+  constructor() {}
 
   /**
    * 读取插件的配置
@@ -68,8 +63,8 @@ export class ConfigReaderService {
    * @returns 验证后的插件配置
    */
   getPluginConfig<T>(configKey: string): T {
-    const rawConfig = this.configService.get<Record<string, unknown>>("spaceflow");
-    const userConfig = rawConfig?.[configKey] ?? {};
+    const rawConfig = (global as any).spaceflowConfig || {};
+    const userConfig = rawConfig[configKey] ?? {};
 
     // 从注册表获取 schema 工厂函数
     const registry = pluginRegistry.get(configKey);
@@ -124,10 +119,10 @@ export class ConfigReaderService {
    * @returns 系统配置
    */
   getSystemConfig(): SystemConfig {
-    const rawConfig = this.configService.get<SpaceflowConfig>("spaceflow");
+    const rawConfig = (global as any).spaceflowConfig || {};
     return {
-      dependencies: rawConfig?.dependencies,
-      support: rawConfig?.support,
+      dependencies: rawConfig.dependencies,
+      support: rawConfig.support,
     };
   }
 }

@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import { FeishuSdkService } from "./feishu-sdk.service";
 import {
   SendCardParams,
@@ -8,25 +7,24 @@ import {
   CardContent,
   type CardActionTriggerCallback,
 } from "./types";
-import { OnEvent, type EventEmitter2 } from "@nestjs/event-emitter";
 import { FEISHU_CARD_ACTION_TRIGGER } from "./types";
 
 /**
  * 飞书卡片消息服务
  * 提供卡片消息的发送、回复、更新功能
  */
-@Injectable()
 export class FeishuCardService {
-  constructor(
-    protected readonly feishuSdkService: FeishuSdkService,
-    protected readonly eventEmitter: EventEmitter2,
-  ) {}
+  constructor(protected readonly feishuSdkService: FeishuSdkService) {
+    // 监听卡片动作触发事件
+    feishuSdkService.on(FEISHU_CARD_ACTION_TRIGGER, (event) => {
+      this.handleCardActionTrigger(event);
+    });
+  }
 
-  @OnEvent(FEISHU_CARD_ACTION_TRIGGER)
-  async handleCardActionTrigger(event: CardActionTriggerCallback) {
-    const event_hook = event.header.event_type ?? event.event.action.tag;
+  async handleCardActionTrigger(event: CardActionTriggerCallback): Promise<void> {
+    const _eventHook = event.header.event_type ?? event.event.action.tag;
 
-    // console.log(event_hook);
+    // console.log(_eventHook);
   }
 
   /**

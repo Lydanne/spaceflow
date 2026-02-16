@@ -9,7 +9,6 @@ export default {
     minimize: false,
   },
   entry: {
-    cli: "./src/cli.ts",
     "cli-new": "./src/cli-new.ts",
   },
   plugins: [
