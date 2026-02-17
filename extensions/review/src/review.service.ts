@@ -1932,8 +1932,28 @@ ${fileChanges || "无"}`;
           commit_id: commitId,
         });
         console.log(`✅ 已发布 ${comments.length} 条行级评论`);
-      } catch (error) {
-        console.warn("⚠️ 发布行级评论失败:", error);
+      } catch {
+        // 批量失败时逐条发布，跳过无法定位的评论
+        console.warn("⚠️ 批量发布行级评论失败，尝试逐条发布...");
+        let successCount = 0;
+        for (const comment of comments) {
+          try {
+            await this.gitProvider.createPullReview(owner, repo, prNumber, {
+              event: "COMMENT",
+              body: successCount === 0 ? REVIEW_LINE_COMMENTS_MARKER : undefined,
+              comments: [comment],
+              commit_id: commitId,
+            });
+            successCount++;
+          } catch {
+            console.warn(`⚠️ 跳过无法定位的评论: ${comment.path}:${comment.new_position}`);
+          }
+        }
+        if (successCount > 0) {
+          console.log(`✅ 逐条发布成功 ${successCount}/${comments.length} 条行级评论`);
+        } else {
+          console.warn("⚠️ 所有行级评论均无法定位，已跳过");
+        }
       }
     }
   }

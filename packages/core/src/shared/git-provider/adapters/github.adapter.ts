@@ -468,7 +468,8 @@ export class GithubAdapter implements GitProvider {
       body.comments = options.comments.map((c) => ({
         path: c.path,
         body: c.body,
-        position: c.new_position,
+        line: c.new_position,
+        side: "RIGHT",
       }));
     }
     const result = await this.request<Record<string, unknown>>(
