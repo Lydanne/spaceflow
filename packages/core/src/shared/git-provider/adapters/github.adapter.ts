@@ -533,6 +533,10 @@ export class GithubAdapter implements GitProvider {
     return results.map((c) => this.mapPullReviewComment(c));
   }
 
+  async deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void> {
+    await this.request<void>("DELETE", `/repos/${owner}/${repo}/pulls/comments/${commentId}`);
+  }
+
   // ============ Reaction 操作 ============
 
   async getIssueCommentReactions(

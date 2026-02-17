@@ -1915,23 +1915,48 @@ ${fileChanges || "无"}`;
       console.warn("⚠️ 发布/更新 AI Review 评论失败:", error);
     }
 
-    // 2. 发布行级评论（使用 PR Review API）
-    // 检查是否已存在行级 PR Review，避免重复（GitHub 已提交的 review 无法删除）
-    let hasExistingLineReview = false;
+    // 2. 删除旧的行级评论（逐条删除 PR Review Comment）
     try {
       const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
-      hasExistingLineReview = reviews.some((r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER));
-    } catch {
-      // 查询失败时默认允许创建
+      const oldLineReviews = reviews.filter((r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER));
+      for (const review of oldLineReviews) {
+        if (review.id) {
+          const reviewComments = await this.gitProvider.listPullReviewComments(
+            owner,
+            repo,
+            prNumber,
+            review.id,
+          );
+          for (const comment of reviewComments) {
+            if (comment.id) {
+              try {
+                await this.gitProvider.deletePullReviewComment(owner, repo, comment.id);
+              } catch {
+                // 删除失败忽略
+              }
+            }
+          }
+          // 评论删除后尝试删除 review 本身
+          try {
+            await this.gitProvider.deletePullReview(owner, repo, prNumber, review.id);
+          } catch {
+            // 已提交的 review 无法删除，忽略
+          }
+        }
+      }
+      if (oldLineReviews.length > 0) {
+        console.log(`🗑️ 已清理 ${oldLineReviews.length} 个旧的行级评论 review`);
+      }
+    } catch (error) {
+      console.warn("⚠️ 清理旧行级评论失败:", error);
     }
+    // 3. 发布新的行级评论（使用 PR Review API）
     let comments: CreatePullReviewComment[] = [];
-    if (reviewConf.lineComments && !hasExistingLineReview) {
+    if (reviewConf.lineComments) {
       comments = result.issues
         .filter((issue) => !issue.fixed && issue.valid !== "false")
         .map((issue) => this.issueToReviewComment(issue))
         .filter((comment): comment is CreatePullReviewComment => comment !== null);
-    } else if (hasExistingLineReview) {
-      console.log(`ℹ️ 已存在行级评论，跳过重复创建`);
     }
     if (comments.length > 0) {
       try {

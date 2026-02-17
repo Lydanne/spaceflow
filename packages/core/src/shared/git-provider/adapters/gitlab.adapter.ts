@@ -671,6 +671,17 @@ export class GitlabAdapter implements GitProvider {
       });
   }
 
+  async deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void> {
+    // GitLab: 删除 MR note
+    const project = this.encodeProject(owner, repo);
+    // GitLab 删除 note 需要 merge_request_iid，但此处只有 commentId（note_id）
+    // 使用全局 note 删除不可行，需要通过其他方式获取 MR iid
+    // 暂时忽略，GitLab 场景下行级评论删除不常用
+    console.warn(
+      `⚠️ GitLab 暂不支持删除单条 review comment (id: ${commentId}, project: ${project})`,
+    );
+  }
+
   // ============ Reaction 操作 ============
 
   async getIssueCommentReactions(

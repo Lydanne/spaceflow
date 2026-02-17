@@ -478,6 +478,10 @@ export class GiteaAdapter implements GitProvider {
     );
   }
 
+  async deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void> {
+    await this.request<void>("DELETE", `/repos/${owner}/${repo}/pulls/comments/${commentId}`);
+  }
+
   // ============ Reaction 操作 ============
 
   async getIssueCommentReactions(

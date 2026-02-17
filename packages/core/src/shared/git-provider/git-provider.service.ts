@@ -288,6 +288,10 @@ export class GitProviderService implements GitProvider {
     return this.adapter.listPullReviewComments(owner, repo, index, reviewId);
   }
 
+  async deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void> {
+    return this.adapter.deletePullReviewComment(owner, repo, commentId);
+  }
+
   // ============ Reaction 操作 ============
 
   async getIssueCommentReactions(

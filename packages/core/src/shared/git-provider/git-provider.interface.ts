@@ -181,6 +181,8 @@ export interface GitProvider {
     index: number,
     reviewId: number,
   ): Promise<PullReviewComment[]>;
+  /** 删除 PR Review 的单条行级评论 */
+  deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void>;
 
   // ============ Reaction 操作 ============
   /** 获取 Issue/PR 评论的 reactions */
