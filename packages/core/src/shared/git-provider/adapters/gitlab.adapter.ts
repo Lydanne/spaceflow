@@ -4,28 +4,29 @@ import type {
   LockBranchOptions,
   ListPullRequestsOptions,
 } from "../git-provider.interface";
-import type {
-  GitProviderModuleOptions,
-  BranchProtection,
-  CreateBranchProtectionOption,
-  EditBranchProtectionOption,
-  Branch,
-  Repository,
-  PullRequest,
-  PullRequestCommit,
-  ChangedFile,
-  CommitInfo,
-  IssueComment,
-  CreateIssueCommentOption,
-  CreateIssueOption,
-  Issue,
-  CreatePullReviewOption,
-  PullReview,
-  PullReviewComment,
-  Reaction,
-  EditPullRequestOption,
-  User,
-  RepositoryContent,
+import {
+  REVIEW_STATE,
+  type GitProviderModuleOptions,
+  type BranchProtection,
+  type CreateBranchProtectionOption,
+  type EditBranchProtectionOption,
+  type Branch,
+  type Repository,
+  type PullRequest,
+  type PullRequestCommit,
+  type ChangedFile,
+  type CommitInfo,
+  type IssueComment,
+  type CreateIssueCommentOption,
+  type CreateIssueOption,
+  type Issue,
+  type CreatePullReviewOption,
+  type PullReview,
+  type PullReviewComment,
+  type Reaction,
+  type EditPullRequestOption,
+  type User,
+  type RepositoryContent,
 } from "../types";
 
 /**
@@ -553,7 +554,7 @@ export class GitlabAdapter implements GitProvider {
       return {
         id: note.id,
         body: note.body,
-        state: options.event || "COMMENT",
+        state: options.event || REVIEW_STATE.COMMENT,
         user: note.user,
         created_at: note.created_at,
         updated_at: note.updated_at,
@@ -570,13 +571,13 @@ export class GitlabAdapter implements GitProvider {
       }
     }
     // 如果是 APPROVE 事件，调用 approve API
-    if (options.event === "APPROVE") {
+    if (options.event === REVIEW_STATE.APPROVE) {
       await this.request<void>("POST", `/projects/${project}/merge_requests/${index}/approve`);
     }
     return {
       id: 0,
       body: options.body || "",
-      state: options.event || "COMMENT",
+      state: options.event || REVIEW_STATE.COMMENT,
     };
   }
 
@@ -594,7 +595,7 @@ export class GitlabAdapter implements GitProvider {
         return {
           id: note.id,
           body: note.body,
-          state: "COMMENT",
+          state: REVIEW_STATE.COMMENT,
           user: note.user,
           created_at: note.created_at,
           updated_at: note.updated_at,
@@ -618,7 +619,7 @@ export class GitlabAdapter implements GitProvider {
     return {
       id: result.id as number,
       body: result.body as string,
-      state: "COMMENT",
+      state: REVIEW_STATE.COMMENT,
       user: result.author
         ? {
             id: (result.author as Record<string, unknown>).id as number,

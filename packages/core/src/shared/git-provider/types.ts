@@ -318,6 +318,20 @@ export interface Issue {
 /** PR Review 事件类型 */
 export type ReviewStateType = "APPROVE" | "REQUEST_CHANGES" | "COMMENT" | "PENDING";
 
+/** PR Review 事件常量 */
+export const REVIEW_STATE = {
+  APPROVE: "APPROVE",
+  REQUEST_CHANGES: "REQUEST_CHANGES",
+  COMMENT: "COMMENT",
+  PENDING: "PENDING",
+} as const;
+
+/** PR Review 行级评论 Diff 方向 */
+export const DIFF_SIDE = {
+  RIGHT: "RIGHT",
+  LEFT: "LEFT",
+} as const;
+
 /** PR Review 行级评论 */
 export interface CreatePullReviewComment {
   /** 文件路径 */

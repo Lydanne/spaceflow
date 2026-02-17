@@ -5,6 +5,7 @@ import {
   PullRequestCommit,
   ChangedFile,
   CreatePullReviewComment,
+  REVIEW_STATE,
   CiConfig,
   type LLMMode,
   LlmProxyService,
@@ -1961,7 +1962,7 @@ ${fileChanges || "无"}`;
     if (comments.length > 0) {
       try {
         await this.gitProvider.createPullReview(owner, repo, prNumber, {
-          event: "COMMENT",
+          event: REVIEW_STATE.COMMENT,
           body: REVIEW_LINE_COMMENTS_MARKER,
           comments,
           commit_id: commitId,
@@ -1974,7 +1975,7 @@ ${fileChanges || "无"}`;
         for (const comment of comments) {
           try {
             await this.gitProvider.createPullReview(owner, repo, prNumber, {
-              event: "COMMENT",
+              event: REVIEW_STATE.COMMENT,
               body: successCount === 0 ? REVIEW_LINE_COMMENTS_MARKER : undefined,
               comments: [comment],
               commit_id: commitId,

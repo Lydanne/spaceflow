@@ -5,28 +5,29 @@ import type {
   LockBranchOptions,
   ListPullRequestsOptions,
 } from "../git-provider.interface";
-import type {
-  GitProviderModuleOptions,
-  BranchProtection,
-  CreateBranchProtectionOption,
-  EditBranchProtectionOption,
-  Branch,
-  Repository,
-  PullRequest,
-  PullRequestCommit,
-  ChangedFile,
-  CommitInfo,
-  IssueComment,
-  CreateIssueCommentOption,
-  CreateIssueOption,
-  Issue,
-  CreatePullReviewOption,
-  PullReview,
-  PullReviewComment,
-  Reaction,
-  EditPullRequestOption,
-  User,
-  RepositoryContent,
+import {
+  REVIEW_STATE,
+  type GitProviderModuleOptions,
+  type BranchProtection,
+  type CreateBranchProtectionOption,
+  type EditBranchProtectionOption,
+  type Branch,
+  type Repository,
+  type PullRequest,
+  type PullRequestCommit,
+  type ChangedFile,
+  type CommitInfo,
+  type IssueComment,
+  type CreateIssueCommentOption,
+  type CreateIssueOption,
+  type Issue,
+  type CreatePullReviewOption,
+  type PullReview,
+  type PullReviewComment,
+  type Reaction,
+  type EditPullRequestOption,
+  type User,
+  type RepositoryContent,
 } from "../types";
 
 /**
@@ -449,7 +450,7 @@ export class GiteaAdapter implements GitProvider {
     // Gitea 不支持更新 review，使用删除+创建的方式模拟
     await this.deletePullReview(owner, repo, index, reviewId);
     return this.createPullReview(owner, repo, index, {
-      event: "COMMENT",
+      event: REVIEW_STATE.COMMENT,
       body,
     });
   }

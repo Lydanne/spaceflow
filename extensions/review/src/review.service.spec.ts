@@ -60,9 +60,10 @@ describe("ReviewService", () => {
       getPullRequestCommits: vi.fn(),
       getPullRequestFiles: vi.fn(),
       getFileContent: vi.fn(),
-      listPullReviews: vi.fn(),
-      createPullReview: vi.fn(),
-      deletePullReview: vi.fn(),
+      listPullReviews: vi.fn().mockResolvedValue([]),
+      createPullReview: vi.fn().mockResolvedValue({}),
+      deletePullReview: vi.fn().mockResolvedValue(undefined),
+      deletePullReviewComment: vi.fn().mockResolvedValue(undefined),
       editPullRequest: vi.fn(),
       getCommitDiff: vi.fn(),
       listPullReviewComments: vi.fn(),
@@ -1816,6 +1817,7 @@ describe("ReviewService", () => {
         round: 1,
       };
       await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
+      expect(gitProvider.createPullReview.mock.calls.length).toBeGreaterThan(0);
       const callArgs = gitProvider.createPullReview.mock.calls[0];
       expect(callArgs[3].comments.length).toBeGreaterThan(0);
     });

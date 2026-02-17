@@ -4,28 +4,30 @@ import type {
   LockBranchOptions,
   ListPullRequestsOptions,
 } from "../git-provider.interface";
-import type {
-  GitProviderModuleOptions,
-  BranchProtection,
-  CreateBranchProtectionOption,
-  EditBranchProtectionOption,
-  Branch,
-  Repository,
-  PullRequest,
-  PullRequestCommit,
-  ChangedFile,
-  CommitInfo,
-  IssueComment,
-  CreateIssueCommentOption,
-  CreateIssueOption,
-  Issue,
-  CreatePullReviewOption,
-  PullReview,
-  PullReviewComment,
-  Reaction,
-  EditPullRequestOption,
-  User,
-  RepositoryContent,
+import {
+  REVIEW_STATE,
+  DIFF_SIDE,
+  type GitProviderModuleOptions,
+  type BranchProtection,
+  type CreateBranchProtectionOption,
+  type EditBranchProtectionOption,
+  type Branch,
+  type Repository,
+  type PullRequest,
+  type PullRequestCommit,
+  type ChangedFile,
+  type CommitInfo,
+  type IssueComment,
+  type CreateIssueCommentOption,
+  type CreateIssueOption,
+  type Issue,
+  type CreatePullReviewOption,
+  type PullReview,
+  type PullReviewComment,
+  type Reaction,
+  type EditPullRequestOption,
+  type User,
+  type RepositoryContent,
 } from "../types";
 
 /**
@@ -494,7 +496,7 @@ export class GithubAdapter implements GitProvider {
         path: c.path,
         body: c.body,
         line: c.new_position,
-        side: "RIGHT",
+        side: DIFF_SIDE.RIGHT,
       }));
     }
     const result = await this.request<Record<string, unknown>>(
@@ -528,7 +530,7 @@ export class GithubAdapter implements GitProvider {
       // 已提交的 review 无法删除，忽略错误
     }
     return this.createPullReview(owner, repo, index, {
-      event: "COMMENT",
+      event: REVIEW_STATE.COMMENT,
       body,
     });
   }
@@ -943,12 +945,12 @@ export class GithubAdapter implements GitProvider {
 
   protected mapReviewEvent(event?: string): string {
     const eventMap: Record<string, string> = {
-      APPROVE: "APPROVE",
-      REQUEST_CHANGES: "REQUEST_CHANGES",
-      COMMENT: "COMMENT",
-      PENDING: "PENDING",
+      [REVIEW_STATE.APPROVE]: REVIEW_STATE.APPROVE,
+      [REVIEW_STATE.REQUEST_CHANGES]: REVIEW_STATE.REQUEST_CHANGES,
+      [REVIEW_STATE.COMMENT]: REVIEW_STATE.COMMENT,
+      [REVIEW_STATE.PENDING]: REVIEW_STATE.PENDING,
     };
-    return event ? eventMap[event] || event : "COMMENT";
+    return event ? eventMap[event] || event : REVIEW_STATE.COMMENT;
   }
 
   protected mapSortParam(sort: string): string {
