@@ -187,6 +187,12 @@ export interface GitProvider {
   // ============ Reaction 操作 ============
   /** 获取 Issue/PR 评论的 reactions */
   getIssueCommentReactions(owner: string, repo: string, commentId: number): Promise<Reaction[]>;
+  /** 获取 PR Review 行级评论的 reactions */
+  getPullReviewCommentReactions(
+    owner: string,
+    repo: string,
+    commentId: number,
+  ): Promise<Reaction[]>;
   /** 获取 Issue/PR 的 reactions */
   getIssueReactions(owner: string, repo: string, index: number): Promise<Reaction[]>;
 

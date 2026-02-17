@@ -2173,7 +2173,7 @@ ${fileChanges || "无"}`;
           commentIdToIssue.set(comment.id, matchedIssue);
         }
         try {
-          const reactions = await this.gitProvider.getIssueCommentReactions(
+          const reactions = await this.gitProvider.getPullReviewCommentReactions(
             owner,
             repo,
             comment.id,

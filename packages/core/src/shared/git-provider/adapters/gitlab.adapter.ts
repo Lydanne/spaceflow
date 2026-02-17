@@ -693,6 +693,15 @@ export class GitlabAdapter implements GitProvider {
     return [];
   }
 
+  async getPullReviewCommentReactions(
+    _owner: string,
+    _repo: string,
+    _commentId: number,
+  ): Promise<Reaction[]> {
+    // GitLab: award emoji on notes（需要 noteable_iid，此处简化返回空）
+    return [];
+  }
+
   async getIssueReactions(owner: string, repo: string, index: number): Promise<Reaction[]> {
     const project = this.encodeProject(owner, repo);
     try {

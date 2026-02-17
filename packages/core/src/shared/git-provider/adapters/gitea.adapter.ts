@@ -495,6 +495,18 @@ export class GiteaAdapter implements GitProvider {
     );
   }
 
+  async getPullReviewCommentReactions(
+    owner: string,
+    repo: string,
+    commentId: number,
+  ): Promise<Reaction[]> {
+    // Gitea: PR review comment reactions 使用与 issue comment 相同的路径
+    return this.request<Reaction[]>(
+      "GET",
+      `/repos/${owner}/${repo}/issues/comments/${commentId}/reactions`,
+    );
+  }
+
   async getIssueReactions(owner: string, repo: string, index: number): Promise<Reaction[]> {
     return this.request<Reaction[]>("GET", `/repos/${owner}/${repo}/issues/${index}/reactions`);
   }

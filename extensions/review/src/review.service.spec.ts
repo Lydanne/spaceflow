@@ -68,6 +68,7 @@ describe("ReviewService", () => {
       listPullReviewComments: vi.fn(),
       searchUsers: vi.fn().mockResolvedValue([]),
       getIssueCommentReactions: vi.fn().mockResolvedValue([]),
+      getPullReviewCommentReactions: vi.fn().mockResolvedValue([]),
       listIssueComments: vi.fn().mockResolvedValue([]),
       createIssueComment: vi.fn().mockResolvedValue({}),
       updateIssueComment: vi.fn().mockResolvedValue({}),
@@ -2189,7 +2190,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([
         { id: 100, path: "test.ts", position: 10 },
       ] as any);
-      gitProvider.getIssueCommentReactions.mockResolvedValue([
+      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
         { content: "-1", user: { login: "reviewer1" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", valid: "true" }] };
@@ -2209,7 +2210,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([
         { id: 100, path: "test.ts", position: 10 },
       ] as any);
-      gitProvider.getIssueCommentReactions.mockResolvedValue([
+      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
         { content: "-1", user: { login: "req-reviewer" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", valid: "true" }] };
@@ -2246,7 +2247,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([
         { id: 100, path: "test.ts", position: 10 },
       ] as any);
-      gitProvider.getIssueCommentReactions.mockResolvedValue([] as any);
+      gitProvider.getPullReviewCommentReactions.mockResolvedValue([] as any);
       const result = { issues: [{ file: "test.ts", line: "10", reactions: [] }] };
       await (service as any).syncReactionsToIssues("o", "r", 1, result);
       expect(result.issues[0].reactions).toHaveLength(0);
@@ -2264,7 +2265,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([
         { id: 100, path: "test.ts", position: 10 },
       ] as any);
-      gitProvider.getIssueCommentReactions.mockResolvedValue([
+      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
         { content: "+1", user: { login: "user1" } },
         { content: "+1", user: { login: "user2" } },
         { content: "heart", user: { login: "user1" } },
@@ -2286,7 +2287,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([
         { id: 100, path: "test.ts", position: 10 },
       ] as any);
-      gitProvider.getIssueCommentReactions.mockResolvedValue([
+      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
         { content: "-1", user: { login: "random-user" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", valid: "true", reactions: [] }] };

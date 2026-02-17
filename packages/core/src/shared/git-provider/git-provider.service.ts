@@ -302,6 +302,14 @@ export class GitProviderService implements GitProvider {
     return this.adapter.getIssueCommentReactions(owner, repo, commentId);
   }
 
+  async getPullReviewCommentReactions(
+    owner: string,
+    repo: string,
+    commentId: number,
+  ): Promise<Reaction[]> {
+    return this.adapter.getPullReviewCommentReactions(owner, repo, commentId);
+  }
+
   async getIssueReactions(owner: string, repo: string, index: number): Promise<Reaction[]> {
     return this.adapter.getIssueReactions(owner, repo, index);
   }

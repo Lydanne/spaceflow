@@ -551,6 +551,18 @@ export class GithubAdapter implements GitProvider {
     return results.map((r) => this.mapReaction(r));
   }
 
+  async getPullReviewCommentReactions(
+    owner: string,
+    repo: string,
+    commentId: number,
+  ): Promise<Reaction[]> {
+    const results = await this.request<Array<Record<string, unknown>>>(
+      "GET",
+      `/repos/${owner}/${repo}/pulls/comments/${commentId}/reactions`,
+    );
+    return results.map((r) => this.mapReaction(r));
+  }
+
   async getIssueReactions(owner: string, repo: string, index: number): Promise<Reaction[]> {
     const results = await this.request<Array<Record<string, unknown>>>(
       "GET",
