@@ -260,6 +260,16 @@ export class GitProviderService implements GitProvider {
     return this.adapter.listPullReviews(owner, repo, index);
   }
 
+  async updatePullReview(
+    owner: string,
+    repo: string,
+    index: number,
+    reviewId: number,
+    body: string,
+  ): Promise<PullReview> {
+    return this.adapter.updatePullReview(owner, repo, index, reviewId, body);
+  }
+
   async deletePullReview(
     owner: string,
     repo: string,

@@ -70,6 +70,7 @@ describe("ReviewService", () => {
       getIssueCommentReactions: vi.fn().mockResolvedValue([]),
       listIssueComments: vi.fn().mockResolvedValue([]),
       deleteIssueComment: vi.fn().mockResolvedValue(undefined),
+      updatePullReview: vi.fn().mockResolvedValue({}),
     };
 
     configService = {
@@ -2748,13 +2749,13 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequestCommits.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc" } } as any);
-      gitProvider.createPullReview.mockResolvedValue({} as any);
+      gitProvider.updatePullReview.mockResolvedValue({} as any);
       const configReader = (service as any).configReader;
       configReader.getPluginConfig.mockReturnValue({});
       const context = { owner: "o", repo: "r", prNumber: 1, ci: true, dryRun: false, verbose: 1 };
       const result = await (service as any).executeCollectOnly(context);
       expect(result.issues).toHaveLength(1);
-      expect(gitProvider.createPullReview).toHaveBeenCalled();
+      expect(gitProvider.updatePullReview).toHaveBeenCalled();
     });
   });
 

@@ -602,6 +602,32 @@ export class GitlabAdapter implements GitProvider {
       });
   }
 
+  async updatePullReview(
+    owner: string,
+    repo: string,
+    index: number,
+    reviewId: number,
+    body: string,
+  ): Promise<PullReview> {
+    const project = this.encodeProject(owner, repo);
+    const result = await this.request<Record<string, unknown>>(
+      "PUT",
+      `/projects/${project}/merge_requests/${index}/notes/${reviewId}`,
+      { body },
+    );
+    return {
+      id: result.id as number,
+      body: result.body as string,
+      state: "COMMENT",
+      user: result.author
+        ? {
+            id: (result.author as Record<string, unknown>).id as number,
+            login: (result.author as Record<string, unknown>).username as string,
+          }
+        : undefined,
+    };
+  }
+
   async deletePullReview(
     owner: string,
     repo: string,

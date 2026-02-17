@@ -164,7 +164,15 @@ export interface GitProvider {
   ): Promise<PullReview>;
   /** 列出 PR 的所有 Reviews */
   listPullReviews(owner: string, repo: string, index: number): Promise<PullReview[]>;
-  /** 删除 PR Review */
+  /** 更新 PR Review 的内容 */
+  updatePullReview(
+    owner: string,
+    repo: string,
+    index: number,
+    reviewId: number,
+    body: string,
+  ): Promise<PullReview>;
+  /** 删除 PR Review（仅支持 PENDING 状态） */
   deletePullReview(owner: string, repo: string, index: number, reviewId: number): Promise<void>;
   /** 获取 PR Review 的行级评论列表 */
   listPullReviewComments(

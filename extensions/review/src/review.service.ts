@@ -1873,14 +1873,14 @@ ${fileChanges || "无"}`;
       }
     }
 
-    // 获取已解决的评论，同步 fixed 状态（在删除旧 review 之前）
+    // 获取已解决的评论，同步 fixed 状态（在更新 review 之前）
     await this.syncResolvedComments(owner, repo, prNumber, result);
 
     // 获取评论的 reactions，同步 valid 状态（👎 标记为无效）
     await this.syncReactionsToIssues(owner, repo, prNumber, result, verbose);
 
-    // 删除已有的 AI review（避免重复评论）
-    await this.deleteExistingAiReviews(owner, repo, prNumber);
+    // 查找已有的 AI review
+    const existingAiReview = await this.findExistingAiReview(owner, repo, prNumber);
 
     // 调试：检查 issues 是否有 author
     if (shouldLog(verbose, 3)) {
@@ -1911,17 +1911,46 @@ ${fileChanges || "无"}`;
     }
 
     try {
-      // 使用 PR Review 发布主评论 + 行级评论（合并为一个消息块）
-      await this.gitProvider.createPullReview(owner, repo, prNumber, {
-        event: "COMMENT",
-        body: reviewBody,
-        comments,
-        commit_id: commitId,
-      });
-      const lineMsg = comments.length > 0 ? `，包含 ${comments.length} 条行级评论` : "";
-      console.log(`✅ 已发布 AI Review${lineMsg}`);
+      if (existingAiReview?.id) {
+        // 更新已有的 AI review（避免重复评论）
+        await this.gitProvider.updatePullReview(
+          owner,
+          repo,
+          prNumber,
+          existingAiReview.id,
+          reviewBody,
+        );
+        console.log(`✅ 已更新 AI Review`);
+      } else {
+        // 创建新的 AI review
+        await this.gitProvider.createPullReview(owner, repo, prNumber, {
+          event: "COMMENT",
+          body: reviewBody,
+          comments,
+          commit_id: commitId,
+        });
+        const lineMsg = comments.length > 0 ? `，包含 ${comments.length} 条行级评论` : "";
+        console.log(`✅ 已发布 AI Review${lineMsg}`);
+      }
     } catch (error) {
-      console.warn("⚠️ 发布 AI Review 失败:", error);
+      console.warn("⚠️ 发布/更新 AI Review 失败:", error);
+    }
+  }
+
+  /**
+   * 查找已有的 AI review
+   */
+  protected async findExistingAiReview(
+    owner: string,
+    repo: string,
+    prNumber: number,
+  ): Promise<{ id: number } | null> {
+    try {
+      const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
+      const aiReview = reviews.find((r) => r.body?.includes(REVIEW_COMMENT_MARKER));
+      return aiReview?.id ? { id: aiReview.id } : null;
+    } catch {
+      return null;
     }
   }
 

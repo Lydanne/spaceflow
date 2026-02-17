@@ -487,6 +487,21 @@ export class GithubAdapter implements GitProvider {
     return results.map((r) => this.mapPullReview(r));
   }
 
+  async updatePullReview(
+    owner: string,
+    repo: string,
+    index: number,
+    reviewId: number,
+    body: string,
+  ): Promise<PullReview> {
+    const result = await this.request<Record<string, unknown>>(
+      "PUT",
+      `/repos/${owner}/${repo}/pulls/${index}/reviews/${reviewId}`,
+      { body },
+    );
+    return this.mapPullReview(result);
+  }
+
   async deletePullReview(
     owner: string,
     repo: string,
