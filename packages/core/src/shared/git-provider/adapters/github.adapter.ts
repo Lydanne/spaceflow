@@ -72,6 +72,31 @@ export class GithubAdapter implements GitProvider {
     return response.json() as Promise<T>;
   }
 
+  protected async requestGraphQL<T>(
+    query: string,
+    variables?: Record<string, unknown>,
+  ): Promise<T> {
+    const graphqlUrl =
+      this.baseUrl.replace(/\/v3\/?$/, "").replace(/\/api\/v3\/?$/, "") + "/graphql";
+    const response = await fetch(graphqlUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`GitHub GraphQL error: ${response.status} - ${errorText}`);
+    }
+    const json = (await response.json()) as { data: T; errors?: unknown[] };
+    if (json.errors) {
+      throw new Error(`GitHub GraphQL errors: ${JSON.stringify(json.errors)}`);
+    }
+    return json.data;
+  }
+
   protected async fetchText(url: string): Promise<string> {
     const response = await fetch(url, {
       headers: {
@@ -530,7 +555,19 @@ export class GithubAdapter implements GitProvider {
       "GET",
       `/repos/${owner}/${repo}/pulls/${index}/reviews/${reviewId}/comments`,
     );
-    return results.map((c) => this.mapPullReviewComment(c));
+    const comments = results.map((c) => this.mapPullReviewComment(c));
+    // 通过 GraphQL 补充 resolved 状态
+    try {
+      const resolvedMap = await this.fetchResolvedThreads(owner, repo, index);
+      for (const comment of comments) {
+        if (comment.id && resolvedMap.has(comment.id)) {
+          comment.resolver = resolvedMap.get(comment.id) ?? null;
+        }
+      }
+    } catch {
+      // GraphQL 查询失败不影响主流程
+    }
+    return comments;
   }
 
   async deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void> {
@@ -757,6 +794,66 @@ export class GithubAdapter implements GitProvider {
       updated_at: data.submitted_at as string,
       commit_id: data.commit_id as string,
     };
+  }
+
+  /**
+   * 通过 GraphQL 查询 PR 的 review threads resolved 状态
+   * 返回 Map<commentId, resolver>
+   */
+  protected async fetchResolvedThreads(
+    owner: string,
+    repo: string,
+    prNumber: number,
+  ): Promise<Map<number, { id?: number; login?: string } | null>> {
+    const QUERY = `
+      query($owner: String!, $repo: String!, $prNumber: Int!) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $prNumber) {
+            reviewThreads(first: 100) {
+              nodes {
+                isResolved
+                resolvedBy { login databaseId }
+                comments(first: 1) {
+                  nodes { databaseId }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+    interface GraphQLResult {
+      repository: {
+        pullRequest: {
+          reviewThreads: {
+            nodes: Array<{
+              isResolved: boolean;
+              resolvedBy?: { login: string; databaseId: number } | null;
+              comments: { nodes: Array<{ databaseId: number }> };
+            }>;
+          };
+        };
+      };
+    }
+    const data = await this.requestGraphQL<GraphQLResult>(QUERY, {
+      owner,
+      repo,
+      prNumber,
+    });
+    const resolvedMap = new Map<number, { id?: number; login?: string } | null>();
+    const threads = data.repository.pullRequest.reviewThreads.nodes;
+    for (const thread of threads) {
+      if (!thread.isResolved) continue;
+      const firstComment = thread.comments.nodes[0];
+      if (!firstComment?.databaseId) continue;
+      resolvedMap.set(
+        firstComment.databaseId,
+        thread.resolvedBy
+          ? { id: thread.resolvedBy.databaseId, login: thread.resolvedBy.login }
+          : null,
+      );
+    }
+    return resolvedMap;
   }
 
   protected mapPullReviewComment(data: Record<string, unknown>): PullReviewComment {
