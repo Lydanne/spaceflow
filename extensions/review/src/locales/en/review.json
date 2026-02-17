@@ -17,6 +17,7 @@
   "options.outputFormat": "Output format: markdown, terminal, json. Auto-selected if not specified (markdown for PR, terminal for CLI)",
   "options.generateDescription": "Generate PR description using AI",
   "options.showAll": "Show all issues found, including those on unchanged lines",
+  "options.flush": "Only sync status (reactions, resolved conversations, replies), skip LLM review",
   "options.eventAction": "PR event type (opened, synchronize, closed, etc.), closed only collects stats without AI review",
   "extensionDescription": "Code review command using LLM for automated PR review",
   "mcp.serverDescription": "Code review rules query service",

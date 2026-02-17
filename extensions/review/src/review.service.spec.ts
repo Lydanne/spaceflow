@@ -1939,6 +1939,34 @@ describe("ReviewService", () => {
     });
   });
 
+  describe("ReviewService.execute - flush mode", () => {
+    it("should route to executeCollectOnly when flush is true", async () => {
+      const mockResult = { issues: [{ file: "a.ts", line: "1", ruleId: "R1" }], summary: [] };
+      const mockReviewReportService = (service as any).reviewReportService;
+      mockReviewReportService.parseMarkdown.mockReturnValue({ result: mockResult });
+      mockReviewReportService.formatStatsTerminal = vi.fn().mockReturnValue("stats");
+      gitProvider.listIssueComments.mockResolvedValue([
+        { id: 10, body: "<!-- spaceflow-review --> content" },
+      ] as any);
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
+      gitProvider.getPullRequestCommits.mockResolvedValue([] as any);
+      gitProvider.getPullRequest.mockResolvedValue({} as any);
+      const context = {
+        owner: "o",
+        repo: "r",
+        prNumber: 1,
+        ci: false,
+        dryRun: false,
+        flush: true,
+        specSources: [],
+      };
+      const result = await service.execute(context as any);
+      expect(result.issues).toHaveLength(1);
+      expect(result.stats).toBeDefined();
+    });
+  });
+
   describe("ReviewService.executeDeletionOnly", () => {
     it("should throw when no llmMode", async () => {
       const context = { owner: "o", repo: "r", prNumber: 1, ci: false, dryRun: false };

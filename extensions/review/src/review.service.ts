@@ -291,6 +291,7 @@ export class ReviewService {
       retryDelay: options.retryDelay ?? reviewConf.retryDelay ?? 1000,
       generateDescription: options.generateDescription ?? reviewConf.generateDescription ?? false,
       showAll: options.showAll ?? false,
+      flush: options.flush ?? false,
       eventAction: options.eventAction,
     };
   }
@@ -405,8 +406,8 @@ export class ReviewService {
       return this.executeDeletionOnly(context);
     }
 
-    // 如果是 closed 事件，仅收集 review 状态
-    if (context.eventAction === "closed") {
+    // 如果是 closed 事件或 flush 模式，仅收集 review 状态
+    if (context.eventAction === "closed" || context.flush) {
       return this.executeCollectOnly(context);
     }
 
@@ -827,7 +828,7 @@ export class ReviewService {
   }
 
   /**
-   * 仅收集 review 状态模式（用于 PR 关闭时）
+   * 仅收集 review 状态模式（用于 PR 关闭或 --flush 指令）
    * 从现有的 AI review 评论中读取问题状态，同步已解决/无效状态，输出统计信息
    */
   protected async executeCollectOnly(context: ReviewContext): Promise<ReviewResult> {
