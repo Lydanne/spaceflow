@@ -440,14 +440,18 @@ export class GiteaAdapter implements GitProvider {
   }
 
   async updatePullReview(
-    _owner: string,
-    _repo: string,
-    _index: number,
-    _reviewId: number,
-    _body: string,
+    owner: string,
+    repo: string,
+    index: number,
+    reviewId: number,
+    body: string,
   ): Promise<PullReview> {
-    // Gitea 不支持更新 review，抛出错误
-    throw new Error("Gitea 适配器暂不支持更新 PR Review");
+    // Gitea 不支持更新 review，使用删除+创建的方式模拟
+    await this.deletePullReview(owner, repo, index, reviewId);
+    return this.createPullReview(owner, repo, index, {
+      event: "COMMENT",
+      body,
+    });
   }
 
   async deletePullReview(
