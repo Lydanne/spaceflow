@@ -494,12 +494,17 @@ export class GithubAdapter implements GitProvider {
     reviewId: number,
     body: string,
   ): Promise<PullReview> {
-    const result = await this.request<Record<string, unknown>>(
-      "PUT",
-      `/repos/${owner}/${repo}/pulls/${index}/reviews/${reviewId}`,
-      { body },
-    );
-    return this.mapPullReview(result);
+    // GitHub 的 updatePullReview 只能更新 PENDING 状态的 review
+    // 已提交的 review 无法更新，所以使用删除+创建的方式
+    try {
+      await this.deletePullReview(owner, repo, index, reviewId);
+    } catch {
+      // 已提交的 review 无法删除，忽略错误
+    }
+    return this.createPullReview(owner, repo, index, {
+      event: "COMMENT",
+      body,
+    });
   }
 
   async deletePullReview(
