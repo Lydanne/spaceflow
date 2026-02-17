@@ -1424,12 +1424,12 @@ describe("ReviewService", () => {
       expect(result.skippedCount).toBe(1);
     });
 
-    it("should not filter if existing issue is not valid", () => {
+    it("should also filter invalid existing issues to prevent repeated reporting", () => {
       const newIssues = [{ file: "a.ts", line: "1", ruleId: "R1" }];
       const existingIssues = [{ file: "a.ts", line: "1", ruleId: "R1", valid: "false" }];
       const result = (service as any).filterDuplicateIssues(newIssues, existingIssues);
-      expect(result.filteredIssues).toHaveLength(1);
-      expect(result.skippedCount).toBe(0);
+      expect(result.filteredIssues).toHaveLength(0);
+      expect(result.skippedCount).toBe(1);
     });
   });
 

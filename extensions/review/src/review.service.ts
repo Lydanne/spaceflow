@@ -2614,12 +2614,11 @@ ${fileChanges || "无"}`;
     newIssues: ReviewIssue[],
     existingIssues: ReviewIssue[],
   ): { filteredIssues: ReviewIssue[]; skippedCount: number } {
-    // 只有 valid === 'true' 的历史问题才阻止新问题，其他情况允许覆盖
-    const existingKeys = new Set(
-      existingIssues
-        .filter((issue) => issue.valid === "true")
-        .map((issue) => this.generateIssueKey(issue)),
-    );
+    // 所有历史问题（无论 valid 状态）都阻止新问题重复添加
+    // valid='false' 的问题已被评审人标记为无效，不应再次报告
+    // valid='true' 的问题已存在，无需重复
+    // fixed 的问题已解决，无需重复
+    const existingKeys = new Set(existingIssues.map((issue) => this.generateIssueKey(issue)));
     const filteredIssues = newIssues.filter(
       (issue) => !existingKeys.has(this.generateIssueKey(issue)),
     );
