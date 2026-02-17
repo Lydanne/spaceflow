@@ -99,7 +99,7 @@ AI 代码审查相关配置。
   "dependencies": {
     "@spaceflow/review": "link:./extensions/review",
     "@spaceflow/publish": "link:./extensions/publish",
-    "@spaceflow/ci-shell": "link:./extensions/ci-shell"
+    "@spaceflow/shell": "link:./extensions/shell"
   }
 }
 ```

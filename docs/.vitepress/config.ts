@@ -72,9 +72,9 @@ export default defineConfig({
           items: [
             { text: "review — 代码审查", link: "/guide/commands/review" },
             { text: "publish — 版本发布", link: "/guide/commands/publish" },
-            { text: "ci-scripts — 脚本执行", link: "/guide/commands/ci-scripts" },
-            { text: "ci-shell — Shell 执行", link: "/guide/commands/ci-shell" },
-            { text: "period-summary — 周期总结", link: "/guide/commands/period-summary" },
+            { text: "scripts — 脚本执行", link: "/guide/commands/scripts" },
+            { text: "shell — Shell 执行", link: "/guide/commands/shell" },
+            { text: "review-summary — 审查总结", link: "/guide/commands/review-summary" },
           ],
         },
       ],

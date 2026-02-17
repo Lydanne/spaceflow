@@ -4,28 +4,30 @@ import type {
   LockBranchOptions,
   ListPullRequestsOptions,
 } from "../git-provider.interface";
-import type {
-  GitProviderModuleOptions,
-  BranchProtection,
-  CreateBranchProtectionOption,
-  EditBranchProtectionOption,
-  Branch,
-  Repository,
-  PullRequest,
-  PullRequestCommit,
-  ChangedFile,
-  CommitInfo,
-  IssueComment,
-  CreateIssueCommentOption,
-  CreateIssueOption,
-  Issue,
-  CreatePullReviewOption,
-  PullReview,
-  PullReviewComment,
-  Reaction,
-  EditPullRequestOption,
-  User,
-  RepositoryContent,
+import {
+  REVIEW_STATE,
+  type GitProviderModuleOptions,
+  type BranchProtection,
+  type CreateBranchProtectionOption,
+  type EditBranchProtectionOption,
+  type Branch,
+  type Repository,
+  type PullRequest,
+  type PullRequestCommit,
+  type ChangedFile,
+  type CommitInfo,
+  type IssueComment,
+  type CreateIssueCommentOption,
+  type CreateIssueOption,
+  type Issue,
+  type CreatePullReviewOption,
+  type PullReview,
+  type PullReviewComment,
+  type Reaction,
+  type EditPullRequestOption,
+  type User,
+  type RepositoryContent,
+  type ResolvedThread,
 } from "../types";
 
 /**
@@ -553,7 +555,7 @@ export class GitlabAdapter implements GitProvider {
       return {
         id: note.id,
         body: note.body,
-        state: options.event || "COMMENT",
+        state: options.event || REVIEW_STATE.COMMENT,
         user: note.user,
         created_at: note.created_at,
         updated_at: note.updated_at,
@@ -570,13 +572,13 @@ export class GitlabAdapter implements GitProvider {
       }
     }
     // 如果是 APPROVE 事件，调用 approve API
-    if (options.event === "APPROVE") {
+    if (options.event === REVIEW_STATE.APPROVE) {
       await this.request<void>("POST", `/projects/${project}/merge_requests/${index}/approve`);
     }
     return {
       id: 0,
       body: options.body || "",
-      state: options.event || "COMMENT",
+      state: options.event || REVIEW_STATE.COMMENT,
     };
   }
 
@@ -594,12 +596,38 @@ export class GitlabAdapter implements GitProvider {
         return {
           id: note.id,
           body: note.body,
-          state: "COMMENT",
+          state: REVIEW_STATE.COMMENT,
           user: note.user,
           created_at: note.created_at,
           updated_at: note.updated_at,
         };
       });
+  }
+
+  async updatePullReview(
+    owner: string,
+    repo: string,
+    index: number,
+    reviewId: number,
+    body: string,
+  ): Promise<PullReview> {
+    const project = this.encodeProject(owner, repo);
+    const result = await this.request<Record<string, unknown>>(
+      "PUT",
+      `/projects/${project}/merge_requests/${index}/notes/${reviewId}`,
+      { body },
+    );
+    return {
+      id: result.id as number,
+      body: result.body as string,
+      state: REVIEW_STATE.COMMENT,
+      user: result.author
+        ? {
+            id: (result.author as Record<string, unknown>).id as number,
+            login: (result.author as Record<string, unknown>).username as string,
+          }
+        : undefined,
+    };
   }
 
   async deletePullReview(
@@ -645,9 +673,33 @@ export class GitlabAdapter implements GitProvider {
       });
   }
 
+  async deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void> {
+    // GitLab: 删除 MR note
+    const project = this.encodeProject(owner, repo);
+    // GitLab 删除 note 需要 merge_request_iid，但此处只有 commentId（note_id）
+    // 使用全局 note 删除不可行，需要通过其他方式获取 MR iid
+    // 暂时忽略，GitLab 场景下行级评论删除不常用
+    console.warn(
+      `⚠️ GitLab 暂不支持删除单条 review comment (id: ${commentId}, project: ${project})`,
+    );
+  }
+
+  async listResolvedThreads(): Promise<ResolvedThread[]> {
+    return [];
+  }
+
   // ============ Reaction 操作 ============
 
   async getIssueCommentReactions(
+    _owner: string,
+    _repo: string,
+    _commentId: number,
+  ): Promise<Reaction[]> {
+    // GitLab: award emoji on notes（需要 noteable_iid，此处简化返回空）
+    return [];
+  }
+
+  async getPullReviewCommentReactions(
     _owner: string,
     _repo: string,
     _commentId: number,

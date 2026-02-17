@@ -4,13 +4,13 @@
 
 ## 全局选项
 
-| 选项 | 简写 | 说明 |
-|------|------|------|
-| `--help` | `-h` | 显示帮助信息 |
-| `--version` | `-V` | 显示版本号 |
+| 选项        | 简写 | 说明                                      |
+| ----------- | ---- | ----------------------------------------- |
+| `--help`    | `-h` | 显示帮助信息                              |
+| `--version` | `-V` | 显示版本号                                |
 | `--verbose` | `-v` | 详细日志（`-v` 基本日志，`-vv` 详细日志） |
-| `--dry-run` | | 试运行，不实际执行 |
-| `--ci` | | CI 模式 |
+| `--dry-run` |      | 试运行，不实际执行                        |
+| `--ci`      |      | CI 模式                                   |
 
 ## 内置命令
 
@@ -160,26 +160,26 @@ spaceflow review -b <base> --head <head> [-l <llm-mode>]
 spaceflow publish [--dry-run]
 ```
 
-### `ci-scripts`
+### `scripts`
 
-脚本执行。详见 [ci-scripts 命令](/guide/commands/ci-scripts)。
+脚本执行。详见 [scripts 命令](/guide/commands/scripts)。
 
 ```bash
-spaceflow ci-scripts --script <path>
+spaceflow scripts --script <path>
 ```
 
-### `ci-shell`
+### `shell`
 
-Shell 执行。详见 [ci-shell 命令](/guide/commands/ci-shell)。
+Shell 执行。详见 [shell 命令](/guide/commands/shell)。
 
 ```bash
-spaceflow ci-shell --command <cmd>
+spaceflow shell --command <cmd>
 ```
 
-### `period-summary`
+### `review-summary`
 
-周期总结。详见 [period-summary 命令](/guide/commands/period-summary)。
+审查总结。详见 [review-summary 命令](/guide/commands/review-summary)。
 
 ```bash
-spaceflow period-summary --period <week|month>
+spaceflow review-summary --period <week|month>
 ```

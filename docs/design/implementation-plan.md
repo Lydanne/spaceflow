@@ -4,12 +4,12 @@
 
 ## 概览
 
-| 阶段 | 内容 | 预计时间 | 依赖 |
-|------|------|----------|------|
-| 1 | CLI 内联构建（快速止血） | 1-2 天 | 无 |
-| 2 | core 去 NestJS + 定义新接口 | 3-4 天 | 阶段 1 |
-| 3 | CLI 去 NestJS | 3-5 天 | 阶段 2 |
-| 4 | 迁移扩展 | 2.5-5 天 | 阶段 3 |
+| 阶段 | 内容                        | 预计时间 | 依赖   |
+| ---- | --------------------------- | -------- | ------ |
+| 1    | CLI 内联构建（快速止血）    | 1-2 天   | 无     |
+| 2    | core 去 NestJS + 定义新接口 | 3-4 天   | 阶段 1 |
+| 3    | CLI 去 NestJS               | 3-5 天   | 阶段 2 |
+| 4    | 迁移扩展                    | 2.5-5 天 | 阶段 3 |
 
 **总计**：10-16 天
 
@@ -29,12 +29,10 @@ externals: [
   { "@spaceflow/core": "module @spaceflow/core" },
   { "@nestjs/common": "module @nestjs/common" },
   // ...
-]
+];
 
 // 改为：只排除 Node.js 内置模块
-externals: [
-  /^node:/,
-]
+externals: [/^node:/];
 ```
 
 ### 1.2 验证步骤
@@ -72,7 +70,7 @@ space mcp --verbose
 **新建文件**：`packages/core/src/extension-system/types.ts`
 
 ```typescript
-// SpaceflowContext, CommandDefinition, ExtensionDefinition, 
+// SpaceflowContext, CommandDefinition, ExtensionDefinition,
 // ServiceDefinition, McpToolDefinition, McpServerDefinition
 // 详见 architecture-v2.md 2.3.1 节
 ```
@@ -108,9 +106,15 @@ export class ConfigReader {
     this.config = readConfigSync();
   }
 
-  get<T>(key: string): T | undefined { /* ... */ }
-  getPluginConfig<T>(key: string): T | undefined { /* ... */ }
-  registerSchema(key: string, schema: ZodSchema): void { /* ... */ }
+  get<T>(key: string): T | undefined {
+    /* ... */
+  }
+  getPluginConfig<T>(key: string): T | undefined {
+    /* ... */
+  }
+  registerSchema(key: string, schema: ZodSchema): void {
+    /* ... */
+  }
 }
 ```
 
@@ -130,17 +134,17 @@ export function loadEnvFiles(paths: string[]): void {
 
 需要修改的服务文件（按依赖顺序）：
 
-| 文件 | 改动 |
-|------|------|
-| `shared/output/output.service.ts` | 移除 `@Injectable()` |
-| `shared/storage/storage.service.ts` | 移除 `@Injectable()`、`@Inject()`，构造函数改为接收 config |
-| `shared/git-sdk/git-sdk.service.ts` | 移除 `@Injectable()` |
+| 文件                                          | 改动                                                       |
+| --------------------------------------------- | ---------------------------------------------------------- |
+| `shared/output/output.service.ts`             | 移除 `@Injectable()`                                       |
+| `shared/storage/storage.service.ts`           | 移除 `@Injectable()`、`@Inject()`，构造函数改为接收 config |
+| `shared/git-sdk/git-sdk.service.ts`           | 移除 `@Injectable()`                                       |
 | `shared/git-provider/git-provider.service.ts` | 移除 `@Injectable()`、`@Inject()`，构造函数改为接收 config |
-| `shared/llm-proxy/llm-proxy.service.ts` | 移除 `@Injectable()`、`@Inject()`，构造函数改为接收 config |
-| `shared/llm-proxy/adapters/*.adapter.ts` | 移除 `@Injectable()` |
-| `shared/feishu-sdk/feishu-sdk.service.ts` | 移除 `@Injectable()`、`@Inject()` |
-| `shared/claude-setup/claude-setup.service.ts` | 移除 `@Injectable()` |
-| `config/schema-generator.service.ts` | 移除 `@Injectable()` |
+| `shared/llm-proxy/llm-proxy.service.ts`       | 移除 `@Injectable()`、`@Inject()`，构造函数改为接收 config |
+| `shared/llm-proxy/adapters/*.adapter.ts`      | 移除 `@Injectable()`                                       |
+| `shared/feishu-sdk/feishu-sdk.service.ts`     | 移除 `@Injectable()`、`@Inject()`                          |
+| `shared/claude-setup/claude-setup.service.ts` | 移除 `@Injectable()`                                       |
+| `config/schema-generator.service.ts`          | 移除 `@Injectable()`                                       |
 
 ### 2.4 移除 NestJS 模块
 
@@ -186,7 +190,7 @@ export { loadEnvFiles } from "./config/load-env";
     // "@nestjs/core": "catalog:",
     // "nest-commander": "catalog:",
     // "reflect-metadata": "catalog:",
-    
+
     // 新增
     "dotenv": "^16.4.5"
   }
@@ -254,22 +258,22 @@ import { Command } from "commander";
 
 需要迁移的内置命令（按复杂度排序）：
 
-| 命令 | 文件 | 复杂度 |
-|------|------|--------|
-| version | `commands/version/` | 低 |
-| list | `commands/list/` | 低 |
-| schema | `commands/schema/` | 低 |
-| clear | `commands/clear/` | 低 |
-| install | `commands/install/` | 中 |
-| uninstall | `commands/uninstall/` | 中 |
-| update | `commands/update/` | 中 |
-| create | `commands/create/` | 中 |
-| build | `commands/build/` | 中 |
-| dev | `commands/dev/` | 中 |
-| commit | `commands/commit/` | 中 |
-| setup | `commands/setup/` | 中 |
-| runx | `commands/runx/` | 中 |
-| mcp | `commands/mcp/` | 高 |
+| 命令      | 文件                  | 复杂度 |
+| --------- | --------------------- | ------ |
+| version   | `commands/version/`   | 低     |
+| list      | `commands/list/`      | 低     |
+| schema    | `commands/schema/`    | 低     |
+| clear     | `commands/clear/`     | 低     |
+| install   | `commands/install/`   | 中     |
+| uninstall | `commands/uninstall/` | 中     |
+| update    | `commands/update/`    | 中     |
+| create    | `commands/create/`    | 中     |
+| build     | `commands/build/`     | 中     |
+| dev       | `commands/dev/`       | 中     |
+| commit    | `commands/commit/`    | 中     |
+| setup     | `commands/setup/`     | 中     |
+| runx      | `commands/runx/`      | 中     |
+| mcp       | `commands/mcp/`       | 高     |
 
 **迁移模板**：
 
@@ -277,8 +281,12 @@ import { Command } from "commander";
 // 旧版 (NestJS)
 @Command({ name: "list", description: "..." })
 export class ListCommand extends CommandRunner {
-  constructor(private readonly service: ListService) { super(); }
-  async run() { /* ... */ }
+  constructor(private readonly service: ListService) {
+    super();
+  }
+  async run() {
+    /* ... */
+  }
 }
 
 // 新版 (defineExtension)
@@ -299,8 +307,8 @@ export const listCommand: CommandDefinition = {
 {
   "dependencies": {
     // 新增
-    "commander": "^12.1.0",
-    
+    "commander": "^12.1.0"
+
     // 移除 peerDependencies
   },
   "peerDependencies": {
@@ -351,24 +359,24 @@ space -h
 
 ### 4.1 迁移顺序
 
-| 扩展 | 复杂度 | service 数量 | MCP |
-|------|--------|--------------|-----|
-| ci-scripts | 低 | 1 | 无 |
-| ci-shell | 低 | 1 | 无 |
-| publish | 中 | 2 | 无 |
-| period-summary | 中 | 1 | 无 |
-| review | 高 | 6 | 有 |
+| 扩展           | 复杂度 | service 数量 | MCP |
+| -------------- | ------ | ------------ | --- |
+| scripts        | 低     | 1            | 无  |
+| shell          | 低     | 1            | 无  |
+| publish        | 中     | 2            | 无  |
+| review-summary | 中     | 1            | 无  |
+| review         | 高     | 6            | 有  |
 
 ### 4.2 迁移模板
 
 **旧版结构**：
 
 ```
-extensions/ci-scripts/
+extensions/scripts/
   ├── src/
-  │   ├── ci-scripts.module.ts      # 删除
-  │   ├── ci-scripts.command.ts     # 合并到 index.ts
-  │   ├── ci-scripts.service.ts     # 保留，去装饰器
+  │   ├── scripts.module.ts         # 删除
+  │   ├── scripts.command.ts        # 合并到 index.ts
+  │   ├── scripts.service.ts        # 保留，去装饰器
   │   └── index.ts                  # 重写
   └── package.json                  # 更新
 ```
@@ -376,9 +384,9 @@ extensions/ci-scripts/
 **新版结构**：
 
 ```
-extensions/ci-scripts/
+extensions/scripts/
   ├── src/
-  │   ├── ci-scripts.service.ts     # 纯 class
+  │   ├── scripts.service.ts        # 纯 class
   │   ├── i18n.ts                   # 扩展自己的 i18n
   │   ├── locales/
   │   │   ├── zh-cn.json
@@ -398,15 +406,15 @@ extensions/ci-scripts/
 }
 ```
 
-### 4.4 ci-scripts 迁移示例
+### 4.4 scripts 迁移示例
 
-**`extensions/ci-scripts/src/index.ts`**：
+**`extensions/scripts/src/index.ts`**：
 
 ```typescript
 import { defineExtension } from "@spaceflow/core";
 import { z } from "zod";
 import { t } from "./i18n";
-import { CiScriptsService } from "./ci-scripts.service";
+import { ScriptsService } from "./scripts.service";
 import type { GitProviderService } from "@spaceflow/core";
 
 const CiConfigSchema = z.object({
@@ -415,7 +423,7 @@ const CiConfigSchema = z.object({
 });
 
 export default defineExtension({
-  name: "@spaceflow/ci-scripts",
+  name: "@spaceflow/scripts",
   version: "0.19.3",
   configKey: "ci",
   configSchema: () => CiConfigSchema,
@@ -423,23 +431,22 @@ export default defineExtension({
   services: [
     {
       key: "ci.service",
-      factory: (ctx) => new CiScriptsService(
-        ctx.getService<GitProviderService>("gitProvider"),
-        ctx.config,
-      ),
+      factory: (ctx) =>
+        new ScriptsService(
+          ctx.getService<GitProviderService>("gitProvider"),
+          ctx.config,
+        ),
     },
   ],
 
   commands: [
     {
-      name: "ci-script",
+      name: "script",
       description: t("description"),
       arguments: "<script>",
-      options: [
-        { flags: "-d, --dry-run", description: t("options.dryRun") },
-      ],
+      options: [{ flags: "-d, --dry-run", description: t("options.dryRun") }],
       async run(args, options, ctx) {
-        const service = ctx.getService<CiScriptsService>("ci.service");
+        const service = ctx.getService<ScriptsService>("ci.service");
         await service.execute(args.join(" "), options);
       },
     },
@@ -503,14 +510,14 @@ mcp: defineMcpServer({
 
 ```bash
 # 1. 构建扩展
-cd extensions/ci-scripts && pnpm build
+cd extensions/scripts && pnpm build
 
 # 2. 在 .spaceflow 中安装
 cd /path/to/test/project
-pnpm add @spaceflow/ci-scripts --filter .spaceflow
+pnpm add @spaceflow/scripts --filter .spaceflow
 
 # 3. 测试命令
-space ci-script "console.log('test')" --dry-run
+space script "console.log('test')" --dry-run
 
 # 4. 测试 MCP（如果有）
 space mcp --verbose
@@ -577,9 +584,9 @@ space mcp --verbose
 
 ### 阶段 4 完成
 
-- [ ] ci-scripts 迁移
-- [ ] ci-shell 迁移
+- [ ] scripts 迁移
+- [ ] shell 迁移
 - [ ] publish 迁移
-- [ ] period-summary 迁移
+- [ ] review-summary 迁移
 - [ ] review 迁移
 - [ ] 全局安装集成测试通过

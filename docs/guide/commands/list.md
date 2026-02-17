@@ -19,8 +19,8 @@ spaceflow list
   publish       @spaceflow/publish         [link]
     命令: publish
 
-  ci-shell      @spaceflow/ci-shell        [npm]
-    命令: ci-shell
+  shell         @spaceflow/shell           [npm]
+    命令: shell
 ```
 
 输出包含：
@@ -32,6 +32,6 @@ spaceflow list
 
 ## 命令行选项
 
-| 选项 | 简写 | 说明 |
-|------|------|------|
+| 选项        | 简写 | 说明             |
+| ----------- | ---- | ---------------- |
 | `--verbose` | `-v` | 显示更多详细信息 |

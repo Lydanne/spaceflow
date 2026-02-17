@@ -335,29 +335,29 @@ class ConfigReader {
 #### 旧版（NestJS）
 
 ```typescript
-// ci-scripts.module.ts
+// scripts.module.ts
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { GitProviderModule, ciConfig } from "@spaceflow/core";
-import { CiScriptsCommand } from "./ci-scripts.command";
-import { CiScriptsService } from "./ci-scripts.service";
+import { ScriptsCommand } from "./scripts.command";
+import { ScriptsService } from "./scripts.service";
 
 @Module({
   imports: [ConfigModule.forFeature(ciConfig), GitProviderModule.forFeature()],
-  providers: [CiScriptsCommand, CiScriptsService],
+  providers: [ScriptsCommand, ScriptsService],
 })
-export class CiScriptsModule {}
+export class ScriptsModule {}
 
-// ci-scripts.command.ts
+// scripts.command.ts
 import { Command, CommandRunner, Option } from "nest-commander";
 
 @Command({
-  name: "ci-script",
-  description: "执行 CI 脚本",
+  name: "script",
+  description: "执行脚本",
   arguments: "<script>",
 })
-export class CiScriptsCommand extends CommandRunner {
-  constructor(private readonly ciScriptsService: CiScriptsService) {
+export class ScriptsCommand extends CommandRunner {
+  constructor(private readonly scriptsService: ScriptsService) {
     super();
   }
 
@@ -373,21 +373,21 @@ export class CiScriptsCommand extends CommandRunner {
 
 // index.ts
 import type { SpaceflowExtension } from "@spaceflow/core";
-import { CiScriptsModule } from "./ci-scripts.module";
+import { ScriptsModule } from "./scripts.module";
 
-export class CiScriptsExtension implements SpaceflowExtension {
+export class ScriptsExtension implements SpaceflowExtension {
   getMetadata() {
     return {
-      name: "@spaceflow/ci-scripts",
-      commands: ["ci-script"],
+      name: "@spaceflow/scripts",
+      commands: ["script"],
       configKey: "ci",
     };
   }
   getModule() {
-    return CiScriptsModule;
+    return ScriptsModule;
   }
 }
-export default CiScriptsExtension;
+export default ScriptsExtension;
 ```
 
 #### 新版（无 NestJS）
@@ -407,15 +407,15 @@ const CiConfigSchema = z.object({
 type CiConfig = z.infer<typeof CiConfigSchema>;
 
 export default defineExtension({
-  name: "@spaceflow/ci-scripts",
+  name: "@spaceflow/scripts",
   version: "0.19.3",
-  description: "CI 脚本执行插件",
+  description: "脚本执行插件",
   configKey: "ci",
   configSchema: () => CiConfigSchema,
 
   commands: [
     {
-      name: "ci-script",
+      name: "script",
       description: t("description"),
       arguments: "<script>",
       argsDescription: { script: t("argsDescription.script") },
@@ -1200,7 +1200,7 @@ export const mcpCommand: CommandDefinition = {
 
 **目标**：将现有扩展迁移到 `defineExtension` 接口
 
-1. 按复杂度排序：ci-scripts → ci-shell → publish → period-summary → review
+1. 按复杂度排序：ci-scripts → ci-shell → publish → review-summary → period-summary
 2. 每个扩展：去除 NestJS 装饰器 → 改用 `defineExtension` → 声明 `services` 工厂 → 各自管理 i18n
 3. 每个扩展迁移后单独测试
 

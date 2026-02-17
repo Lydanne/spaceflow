@@ -9,7 +9,7 @@
 spaceflow x @spaceflow/review --help
 
 # 运行本地路径的 Extension
-spaceflow x ./extensions/ci-scripts -- --script ./deploy.sh
+spaceflow x ./extensions/scripts -- --script ./deploy.sh
 
 # 使用完整命令名
 spaceflow runx @spaceflow/review -- -p 123
@@ -38,7 +38,7 @@ spaceflow x @spaceflow/review -- --help
 spaceflow x @spaceflow/review -- -p 123
 
 # 指定名称并传递参数
-spaceflow x ./extensions/ci-scripts -n ci-scripts -- --script ./test.sh
+spaceflow x ./extensions/scripts -n scripts -- --script ./test.sh
 ```
 
 ## 与 install 的区别

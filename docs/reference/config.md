@@ -63,8 +63,8 @@
   "dependencies": {
     "@spaceflow/review": "link:./extensions/review",
     "@spaceflow/publish": "link:./extensions/publish",
-    "@spaceflow/ci-shell": "link:./extensions/ci-shell",
-    "@spaceflow/ci-scripts": "link:./extensions/ci-scripts"
+    "@spaceflow/shell": "link:./extensions/shell",
+    "@spaceflow/scripts": "link:./extensions/scripts"
   }
 }
 ```

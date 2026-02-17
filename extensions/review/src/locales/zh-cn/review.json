@@ -17,6 +17,7 @@
   "options.outputFormat": "输出格式: markdown, terminal, json。不指定则智能选择（PR 用 markdown，终端用 terminal）",
   "options.generateDescription": "使用 AI 生成 PR 功能描述",
   "options.showAll": "显示所有发现的问题，不过滤非变更行的问题",
+  "options.flush": "仅刷新状态（同步 reactions、resolved conversations、replies），不执行 LLM 审查",
   "options.eventAction": "PR 事件类型（opened, synchronize, closed 等），closed 时仅收集统计不进行 AI 审查",
   "extensionDescription": "代码审查命令，使用 LLM 对 PR 代码进行自动审查",
   "mcp.serverDescription": "代码审查规则查询服务",

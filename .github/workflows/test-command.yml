@@ -4,14 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       command:
-        description: "Command to run (publish, review, ci-scripts, ci-shell, claude-config)"
+        description: "Command to run (publish, review, scripts, shell, claude-config)"
         required: true
         type: choice
         options:
           - publish
           - review
-          - ci-scripts
-          - ci-shell
+          - scripts
+          - shell
           - claude-config
       args:
         description: "Additional arguments for the command"

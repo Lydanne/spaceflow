@@ -300,7 +300,8 @@ describe("GithubAdapter", () => {
       });
       const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
       expect(body.event).toBe("COMMENT");
-      expect(body.comments[0].position).toBe(10);
+      expect(body.comments[0].line).toBe(10);
+      expect(body.comments[0].side).toBe("RIGHT");
       expect(body.comments[0].path).toBe("a.ts");
     });
   });

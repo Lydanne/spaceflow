@@ -14,28 +14,28 @@ Spaceflow 是一个**可扩展的 AI 工作流引擎**，为团队提供统一�
 
 ## 技术栈
 
-| 技术 | 用途 |
-|------|------|
-| [NestJS](https://nestjs.com/) | 核心框架，依赖注入和模块化 |
-| [nest-commander](https://docs.nestjs.com/recipes/nest-commander) | CLI 命令系统 |
-| [Rspack](https://rspack.dev/) | 构建打包 |
-| [i18next](https://www.i18next.com/) | 国际化 |
-| [Zod](https://zod.dev/) | 配置校验 |
-| [pnpm](https://pnpm.io/) | 包管理（Monorepo） |
+| 技术                                                             | 用途                       |
+| ---------------------------------------------------------------- | -------------------------- |
+| [NestJS](https://nestjs.com/)                                    | 核心框架，依赖注入和模块化 |
+| [nest-commander](https://docs.nestjs.com/recipes/nest-commander) | CLI 命令系统               |
+| [Rspack](https://rspack.dev/)                                    | 构建打包                   |
+| [i18next](https://www.i18next.com/)                              | 国际化                     |
+| [Zod](https://zod.dev/)                                          | 配置校验                   |
+| [pnpm](https://pnpm.io/)                                         | 包管理（Monorepo）         |
 
 ## 包结构
 
 Spaceflow 采用 Monorepo 结构，主要包含以下包：
 
-| 包名 | 说明 |
-|------|------|
-| `@spaceflow/core` | 核心能力库，提供 Git Provider、LLM Proxy、Logger 等基础模块 |
-| `@spaceflow/cli` | CLI 入口，包含所有内置命令 |
-| `@spaceflow/review` | AI 代码审查 Extension |
-| `@spaceflow/publish` | 版本发布 Extension |
-| `@spaceflow/ci-scripts` | 自定义脚本执行 Extension |
-| `@spaceflow/ci-shell` | Shell 命令执行 Extension |
-| `@spaceflow/period-summary` | 周期总结 Extension |
+| 包名                        | 说明                                                        |
+| --------------------------- | ----------------------------------------------------------- |
+| `@spaceflow/core`           | 核心能力库，提供 Git Provider、LLM Proxy、Logger 等基础模块 |
+| `@spaceflow/cli`            | CLI 入口，包含所有内置命令                                  |
+| `@spaceflow/review`         | AI 代码审查 Extension                                       |
+| `@spaceflow/publish`        | 版本发布 Extension                                          |
+| `@spaceflow/scripts`        | 自定义脚本执行 Extension                                    |
+| `@spaceflow/shell`          | Shell 命令执行 Extension                                    |
+| `@spaceflow/review-summary` | 审查总结 Extension                                          |
 
 ## 适用场景
 

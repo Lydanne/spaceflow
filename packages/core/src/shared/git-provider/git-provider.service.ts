@@ -25,6 +25,7 @@ import {
   type EditPullRequestOption,
   type User,
   type RepositoryContent,
+  type ResolvedThread,
 } from "./types";
 import { GiteaAdapter } from "./adapters/gitea.adapter";
 import { GithubAdapter } from "./adapters/github.adapter";
@@ -260,6 +261,16 @@ export class GitProviderService implements GitProvider {
     return this.adapter.listPullReviews(owner, repo, index);
   }
 
+  async updatePullReview(
+    owner: string,
+    repo: string,
+    index: number,
+    reviewId: number,
+    body: string,
+  ): Promise<PullReview> {
+    return this.adapter.updatePullReview(owner, repo, index, reviewId, body);
+  }
+
   async deletePullReview(
     owner: string,
     repo: string,
@@ -278,6 +289,14 @@ export class GitProviderService implements GitProvider {
     return this.adapter.listPullReviewComments(owner, repo, index, reviewId);
   }
 
+  async deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void> {
+    return this.adapter.deletePullReviewComment(owner, repo, commentId);
+  }
+
+  async listResolvedThreads(owner: string, repo: string, index: number): Promise<ResolvedThread[]> {
+    return this.adapter.listResolvedThreads(owner, repo, index);
+  }
+
   // ============ Reaction 操作 ============
 
   async getIssueCommentReactions(
@@ -286,6 +305,14 @@ export class GitProviderService implements GitProvider {
     commentId: number,
   ): Promise<Reaction[]> {
     return this.adapter.getIssueCommentReactions(owner, repo, commentId);
+  }
+
+  async getPullReviewCommentReactions(
+    owner: string,
+    repo: string,
+    commentId: number,
+  ): Promise<Reaction[]> {
+    return this.adapter.getPullReviewCommentReactions(owner, repo, commentId);
   }
 
   async getIssueReactions(owner: string, repo: string, index: number): Promise<Reaction[]> {

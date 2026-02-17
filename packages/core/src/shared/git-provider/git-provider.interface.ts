@@ -19,6 +19,7 @@ import type {
   EditPullRequestOption,
   User,
   RepositoryContent,
+  ResolvedThread,
 } from "./types";
 
 /** PR 列表查询选项 */
@@ -164,7 +165,15 @@ export interface GitProvider {
   ): Promise<PullReview>;
   /** 列出 PR 的所有 Reviews */
   listPullReviews(owner: string, repo: string, index: number): Promise<PullReview[]>;
-  /** 删除 PR Review */
+  /** 更新 PR Review 的内容 */
+  updatePullReview(
+    owner: string,
+    repo: string,
+    index: number,
+    reviewId: number,
+    body: string,
+  ): Promise<PullReview>;
+  /** 删除 PR Review（仅支持 PENDING 状态） */
   deletePullReview(owner: string, repo: string, index: number, reviewId: number): Promise<void>;
   /** 获取 PR Review 的行级评论列表 */
   listPullReviewComments(
@@ -173,10 +182,20 @@ export interface GitProvider {
     index: number,
     reviewId: number,
   ): Promise<PullReviewComment[]>;
+  /** 删除 PR Review 的单条行级评论 */
+  deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void>;
+  /** 获取 PR 中所有已解决的 review threads（含文件路径和行号） */
+  listResolvedThreads(owner: string, repo: string, index: number): Promise<ResolvedThread[]>;
 
   // ============ Reaction 操作 ============
   /** 获取 Issue/PR 评论的 reactions */
   getIssueCommentReactions(owner: string, repo: string, commentId: number): Promise<Reaction[]>;
+  /** 获取 PR Review 行级评论的 reactions */
+  getPullReviewCommentReactions(
+    owner: string,
+    repo: string,
+    commentId: number,
+  ): Promise<Reaction[]>;
   /** 获取 Issue/PR 的 reactions */
   getIssueReactions(owner: string, repo: string, index: number): Promise<Reaction[]>;
 
