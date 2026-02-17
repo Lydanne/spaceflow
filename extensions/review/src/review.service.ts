@@ -1915,13 +1915,23 @@ ${fileChanges || "无"}`;
       console.warn("⚠️ 发布/更新 AI Review 评论失败:", error);
     }
 
-    // 2. 发布行级评论（使用 PR Review API，不带 body）
+    // 2. 发布行级评论（使用 PR Review API）
+    // 检查是否已存在行级 PR Review，避免重复（GitHub 已提交的 review 无法删除）
+    let hasExistingLineReview = false;
+    try {
+      const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
+      hasExistingLineReview = reviews.some((r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER));
+    } catch {
+      // 查询失败时默认允许创建
+    }
     let comments: CreatePullReviewComment[] = [];
-    if (reviewConf.lineComments) {
+    if (reviewConf.lineComments && !hasExistingLineReview) {
       comments = result.issues
         .filter((issue) => !issue.fixed && issue.valid !== "false")
         .map((issue) => this.issueToReviewComment(issue))
         .filter((comment): comment is CreatePullReviewComment => comment !== null);
+    } else if (hasExistingLineReview) {
+      console.log(`ℹ️ 已存在行级评论，跳过重复创建`);
     }
     if (comments.length > 0) {
       try {
