@@ -64,6 +64,7 @@ describe("ReviewService", () => {
       createPullReview: vi.fn().mockResolvedValue({}),
       deletePullReview: vi.fn().mockResolvedValue(undefined),
       deletePullReviewComment: vi.fn().mockResolvedValue(undefined),
+      listResolvedThreads: vi.fn().mockResolvedValue([]),
       editPullRequest: vi.fn(),
       getCommitDiff: vi.fn(),
       listPullReviewComments: vi.fn(),
@@ -1826,39 +1827,32 @@ describe("ReviewService", () => {
   describe("ReviewService.syncResolvedComments", () => {
     it("should mark matched issues as fixed", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review-lines --> content" },
-      ] as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([
-        { path: "test.ts", position: 10, resolver: { login: "user1" } },
+      gitProvider.listResolvedThreads.mockResolvedValue([
+        { path: "test.ts", line: 10, resolvedBy: { login: "user1" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10" }] };
       await (service as any).syncResolvedComments("o", "r", 1, result);
       expect((result.issues[0] as any).fixed).toBeDefined();
     });
 
-    it("should skip resolved comments with no resolver", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review-lines --> content" },
-      ] as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([
-        { path: "test.ts", position: 10, resolver: null },
+    it("should skip when no resolved threads", async () => {
+      gitProvider.listResolvedThreads.mockResolvedValue([] as any);
+      const result = { issues: [{ file: "test.ts", line: "10" }] };
+      await (service as any).syncResolvedComments("o", "r", 1, result);
+      expect((result.issues[0] as any).fixed).toBeUndefined();
+    });
+
+    it("should skip threads without path", async () => {
+      gitProvider.listResolvedThreads.mockResolvedValue([
+        { path: undefined, line: 10, resolvedBy: { login: "user1" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10" }] };
       await (service as any).syncResolvedComments("o", "r", 1, result);
       expect((result.issues[0] as any).fixed).toBeUndefined();
     });
 
-    it("should skip when no AI review found", async () => {
-      gitProvider.listPullReviews.mockResolvedValue([{ id: 1, body: "normal review" }] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", fixed: false }] };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect(result.issues[0].fixed).toBe(false);
-    });
-
     it("should handle error gracefully", async () => {
-      gitProvider.listPullReviews.mockRejectedValue(new Error("fail"));
+      gitProvider.listResolvedThreads.mockRejectedValue(new Error("fail"));
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const result = { issues: [] };
       await (service as any).syncResolvedComments("o", "r", 1, result);

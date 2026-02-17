@@ -2013,7 +2013,8 @@ ${fileChanges || "无"}`;
   }
 
   /**
-   * 从旧的 AI review 中获取已解决的评论，同步 fixed 状态到 result.issues
+   * 从 PR 的所有 resolved review threads 中同步 fixed 状态到 result.issues
+   * 直接通过 GraphQL 查询所有 resolved threads 的 path+line，匹配 issues
    */
   protected async syncResolvedComments(
     owner: string,
@@ -2022,31 +2023,16 @@ ${fileChanges || "无"}`;
     result: ReviewResult,
   ): Promise<void> {
     try {
-      const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
-      const aiReview = reviews.find((r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER));
-      if (!aiReview?.id) {
+      const resolvedThreads = await this.gitProvider.listResolvedThreads(owner, repo, prNumber);
+      if (resolvedThreads.length === 0) {
         return;
       }
-      // 获取该 review 的所有行级评论
-      const reviewComments = await this.gitProvider.listPullReviewComments(
-        owner,
-        repo,
-        prNumber,
-        aiReview.id,
-      );
-      // 找出已解决的评论（resolver 不为 null）
-      const resolvedComments = reviewComments.filter(
-        (c) => c.resolver !== null && c.resolver !== undefined,
-      );
-      if (resolvedComments.length === 0) {
-        return;
-      }
-      // 根据文件路径和行号匹配 issues，标记为已解决
       const now = new Date().toISOString();
-      for (const comment of resolvedComments) {
+      for (const thread of resolvedThreads) {
+        if (!thread.path) continue;
         const matchedIssue = result.issues.find(
           (issue) =>
-            issue.file === comment.path && this.lineMatchesPosition(issue.line, comment.position),
+            issue.file === thread.path && this.lineMatchesPosition(issue.line, thread.line),
         );
         if (matchedIssue && !matchedIssue.fixed) {
           matchedIssue.fixed = now;

@@ -28,7 +28,17 @@ import {
   type EditPullRequestOption,
   type User,
   type RepositoryContent,
+  type ResolvedThread,
 } from "../types";
+
+/** GraphQL review thread 节点类型 */
+interface GraphQLReviewThread {
+  isResolved: boolean;
+  resolvedBy?: { login: string; databaseId: number } | null;
+  path?: string | null;
+  line?: number | null;
+  comments: { nodes: Array<{ databaseId: number }> };
+}
 
 /**
  * GitHub 平台适配器
@@ -800,13 +810,53 @@ export class GithubAdapter implements GitProvider {
 
   /**
    * 通过 GraphQL 查询 PR 的 review threads resolved 状态
-   * 返回 Map<commentId, resolver>
+   * 返回 Map<commentId, resolver>（用于 listPullReviewComments 内部补充 resolver）
    */
   protected async fetchResolvedThreads(
     owner: string,
     repo: string,
     prNumber: number,
   ): Promise<Map<number, { id?: number; login?: string } | null>> {
+    const threads = await this.queryReviewThreads(owner, repo, prNumber);
+    const resolvedMap = new Map<number, { id?: number; login?: string } | null>();
+    for (const thread of threads) {
+      if (!thread.isResolved) continue;
+      const firstComment = thread.comments.nodes[0];
+      if (!firstComment?.databaseId) continue;
+      resolvedMap.set(
+        firstComment.databaseId,
+        thread.resolvedBy
+          ? { id: thread.resolvedBy.databaseId, login: thread.resolvedBy.login }
+          : null,
+      );
+    }
+    return resolvedMap;
+  }
+
+  async listResolvedThreads(owner: string, repo: string, index: number): Promise<ResolvedThread[]> {
+    const threads = await this.queryReviewThreads(owner, repo, index);
+    const result: ResolvedThread[] = [];
+    for (const thread of threads) {
+      if (!thread.isResolved) continue;
+      result.push({
+        path: thread.path ?? undefined,
+        line: thread.line ?? undefined,
+        resolvedBy: thread.resolvedBy
+          ? { id: thread.resolvedBy.databaseId, login: thread.resolvedBy.login }
+          : null,
+      });
+    }
+    return result;
+  }
+
+  /**
+   * GraphQL 查询 PR 的所有 review threads
+   */
+  protected async queryReviewThreads(
+    owner: string,
+    repo: string,
+    prNumber: number,
+  ): Promise<GraphQLReviewThread[]> {
     const QUERY = `
       query($owner: String!, $repo: String!, $prNumber: Int!) {
         repository(owner: $owner, name: $repo) {
@@ -815,6 +865,8 @@ export class GithubAdapter implements GitProvider {
               nodes {
                 isResolved
                 resolvedBy { login databaseId }
+                path
+                line
                 comments(first: 1) {
                   nodes { databaseId }
                 }
@@ -828,11 +880,7 @@ export class GithubAdapter implements GitProvider {
       repository: {
         pullRequest: {
           reviewThreads: {
-            nodes: Array<{
-              isResolved: boolean;
-              resolvedBy?: { login: string; databaseId: number } | null;
-              comments: { nodes: Array<{ databaseId: number }> };
-            }>;
+            nodes: GraphQLReviewThread[];
           };
         };
       };
@@ -842,20 +890,7 @@ export class GithubAdapter implements GitProvider {
       repo,
       prNumber,
     });
-    const resolvedMap = new Map<number, { id?: number; login?: string } | null>();
-    const threads = data.repository.pullRequest.reviewThreads.nodes;
-    for (const thread of threads) {
-      if (!thread.isResolved) continue;
-      const firstComment = thread.comments.nodes[0];
-      if (!firstComment?.databaseId) continue;
-      resolvedMap.set(
-        firstComment.databaseId,
-        thread.resolvedBy
-          ? { id: thread.resolvedBy.databaseId, login: thread.resolvedBy.login }
-          : null,
-      );
-    }
-    return resolvedMap;
+    return data.repository.pullRequest.reviewThreads.nodes;
   }
 
   protected mapPullReviewComment(data: Record<string, unknown>): PullReviewComment {

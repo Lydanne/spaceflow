@@ -27,6 +27,7 @@ import {
   type EditPullRequestOption,
   type User,
   type RepositoryContent,
+  type ResolvedThread,
 } from "../types";
 
 /**
@@ -681,6 +682,10 @@ export class GitlabAdapter implements GitProvider {
     console.warn(
       `⚠️ GitLab 暂不支持删除单条 review comment (id: ${commentId}, project: ${project})`,
     );
+  }
+
+  async listResolvedThreads(): Promise<ResolvedThread[]> {
+    return [];
   }
 
   // ============ Reaction 操作 ============

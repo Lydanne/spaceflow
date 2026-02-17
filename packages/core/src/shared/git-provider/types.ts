@@ -395,6 +395,19 @@ export interface PullReviewComment {
   html_url?: string;
 }
 
+/** PR Review Thread 已解决信息 */
+export interface ResolvedThread {
+  /** 文件路径 */
+  path?: string;
+  /** 行号（新文件中的行号） */
+  line?: number;
+  /** 解决者 */
+  resolvedBy?: {
+    id?: number;
+    login?: string;
+  } | null;
+}
+
 /** 用户信息 */
 export interface User {
   id?: number;

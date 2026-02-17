@@ -28,6 +28,7 @@ import {
   type EditPullRequestOption,
   type User,
   type RepositoryContent,
+  type ResolvedThread,
 } from "../types";
 
 /**
@@ -481,6 +482,10 @@ export class GiteaAdapter implements GitProvider {
 
   async deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void> {
     await this.request<void>("DELETE", `/repos/${owner}/${repo}/pulls/comments/${commentId}`);
+  }
+
+  async listResolvedThreads(): Promise<ResolvedThread[]> {
+    return [];
   }
 
   // ============ Reaction 操作 ============

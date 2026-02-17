@@ -19,6 +19,7 @@ import type {
   EditPullRequestOption,
   User,
   RepositoryContent,
+  ResolvedThread,
 } from "./types";
 
 /** PR 列表查询选项 */
@@ -183,6 +184,8 @@ export interface GitProvider {
   ): Promise<PullReviewComment[]>;
   /** 删除 PR Review 的单条行级评论 */
   deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void>;
+  /** 获取 PR 中所有已解决的 review threads（含文件路径和行号） */
+  listResolvedThreads(owner: string, repo: string, index: number): Promise<ResolvedThread[]>;
 
   // ============ Reaction 操作 ============
   /** 获取 Issue/PR 评论的 reactions */
