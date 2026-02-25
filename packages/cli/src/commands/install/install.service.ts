@@ -289,7 +289,7 @@ export class InstallService {
     const spaceflowDir = getSpaceflowDir(isGlobal);
 
     // 确保 .spaceflow 目录和 package.json 存在
-    ensureSpaceflowPackageJson(spaceflowDir, isGlobal);
+    ensureSpaceflowPackageJson(spaceflowDir);
 
     // 根据类型构建 pnpm add 的参数
     let packageSpec: string;
@@ -708,7 +708,7 @@ export class InstallService {
     verbose: VerboseLevel = 1,
   ): Promise<void> {
     // 确保目录和 package.json 存在
-    ensureSpaceflowPackageJson(spaceflowDir, false);
+    ensureSpaceflowPackageJson(spaceflowDir);
 
     const packageJsonPath = join(spaceflowDir, "package.json");
     const content = await readFile(packageJsonPath, "utf-8");

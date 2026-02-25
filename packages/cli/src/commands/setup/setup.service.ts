@@ -24,7 +24,7 @@ export class SetupService {
 
     // 1. 创建 .spaceflow/ 目录和 package.json
     const spaceflowDir = join(cwd, SPACEFLOW_DIR);
-    ensureSpaceflowPackageJson(spaceflowDir, false, cwd);
+    ensureSpaceflowPackageJson(spaceflowDir);
     console.log(t("setup:dirCreated", { dir: spaceflowDir }));
 
     // 2. 创建 spaceflow.json 配置文件（运行时配置）
@@ -53,7 +53,7 @@ export class SetupService {
     const globalConfigPath = join(globalDir, CONFIG_FILE_NAME);
 
     // 1. 创建 ~/.spaceflow/ 目录和 package.json
-    ensureSpaceflowPackageJson(globalDir, true, cwd);
+    ensureSpaceflowPackageJson(globalDir);
     console.log(t("setup:dirCreated", { dir: globalDir }));
 
     // 读取本地配置（支持 .spaceflow/spaceflow.json 和 .spaceflowrc）
