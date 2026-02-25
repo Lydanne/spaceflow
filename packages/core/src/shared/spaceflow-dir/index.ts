@@ -35,11 +35,6 @@ config-schema.json
     writeFileSync(gitignorePath, gitignoreContent);
   }
 
-  // 创建空的 pnpm-workspace.yaml，防止被父级 workspace 接管
-  const workspaceYamlPath = join(spaceflowDir, "pnpm-workspace.yaml");
-  if (!existsSync(workspaceYamlPath)) {
-    writeFileSync(workspaceYamlPath, "packages: []\n");
-  }
 }
 
 /**
@@ -58,7 +53,7 @@ export function getSpaceflowCoreVersion(): string {
         const cliPkg = JSON.parse(readFileSync(cliPkgPath, "utf-8"));
         if (cliPkg.name === "@spaceflow/cli") {
           const coreVersion = cliPkg.dependencies?.["@spaceflow/core"];
-          if (coreVersion && !coreVersion.startsWith("workspace:")) {
+          if (coreVersion) {
             return coreVersion;
           }
         }
