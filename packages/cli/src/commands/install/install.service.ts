@@ -1314,13 +1314,33 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
     }
   }
 
-  protected updateConfigFile(context: InstallContext, verbose: VerboseLevel = 1): void {
-    const { source, type } = context;
+  protected async updateConfigFile(context: InstallContext, verbose: VerboseLevel = 1): Promise<void> {
+    const { source, type, depPath } = context;
     // dependencies key 使用完整包名（npm 类型保留 @scope/ 前缀）
     const name = context.name || (type === "npm" ? extractNpmPackageName(source) : extractName(source));
     const cwd = process.cwd();
 
-    const updated = updateDependency(name, source, cwd);
+    // 根据类型生成正确的 value（和 package.json 格式一致）
+    let depValue: string;
+    if (type === "npm") {
+      // npm 类型：从已安装包的 package.json 读取实际版本号
+      const pkgJsonPath = join(depPath, "package.json");
+      try {
+        const content = await readFile(pkgJsonPath, "utf-8");
+        const pkg = JSON.parse(content);
+        depValue = pkg.version ? `^${pkg.version}` : source;
+      } catch {
+        depValue = source;
+      }
+    } else if (type === "local") {
+      // local 类型：写入 link: 格式
+      depValue = source.startsWith("link:") ? source : `link:${normalizeSource(source)}`;
+    } else {
+      // git 类型：写入 git URL
+      depValue = source.startsWith("git+") ? source : buildGitPackageSpec(source, context.ref);
+    }
+
+    const updated = updateDependency(name, depValue, cwd);
 
     if (updated) {
       if (shouldLog(verbose, 1))

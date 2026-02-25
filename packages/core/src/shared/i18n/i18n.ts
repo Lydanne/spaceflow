@@ -37,6 +37,8 @@ export function initI18n(lang?: string): void {
     },
     returnNull: false,
     returnEmptyString: false,
+    // 确保 init 同步完成（默认 initImmediate: true 会将加载推到 setTimeout）
+    initImmediate: false,
     // i18next v25.8+ 会在 init 时输出 locize.com 推广日志
     showSupportNotice: false,
   });
