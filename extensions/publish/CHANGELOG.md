@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.26.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/publish@0.25.0...@spaceflow/publish@0.26.0) (2026-02-25)
+
+### 代码重构
+
+* **cli:** 统一使用 core 层配置读取函数，移除重复的配置解析逻辑 ([5783e5f](https://github.com/Lydanne/spaceflow/commit/5783e5f693b0aafd8346ee3a250692265aad55c5))
+
+### 其他修改
+
+* **cli:** released version 0.24.0 [no ci] ([418daf8](https://github.com/Lydanne/spaceflow/commit/418daf8a8571e9dec2ef5c13e8fb103b876fb483))
+* **review-summary:** released version 0.3.0 [no ci] ([9a881e9](https://github.com/Lydanne/spaceflow/commit/9a881e94b6141592aefc835861bf2bf7cca9eefe))
+* **review:** released version 0.33.0 [no ci] ([467cf91](https://github.com/Lydanne/spaceflow/commit/467cf91c60c0693e22c172a9358d0981dc8a9d64))
+* **scripts:** released version 0.3.0 [no ci] ([7b62b7b](https://github.com/Lydanne/spaceflow/commit/7b62b7bc7a4c4795472d729df321acbde808ec4d))
+* **shell:** released version 0.3.0 [no ci] ([baa26b3](https://github.com/Lydanne/spaceflow/commit/baa26b3d6bc63de2c252101d915badf4461dfbd1))
+
 ## [0.25.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/publish@0.24.0...@spaceflow/publish@0.25.0) (2026-02-25)
 
 ### 代码重构
