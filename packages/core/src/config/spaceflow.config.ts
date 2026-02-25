@@ -196,14 +196,52 @@ export function getDependencies(cwd?: string): Record<string, string> {
 }
 
 /**
+ * 找到包含指定字段的最高优先级配置文件路径
+ * 如果没有找到，返回项目级 .spaceflowrc 路径（默认写入位置）
+ * @param field 要查找的字段名
+ * @param cwd 工作目录
+ */
+export function findConfigFileWithField(field: string, cwd?: string): string {
+  const workDir = cwd || process.cwd();
+  // 按优先级从高到低查找，找到第一个包含该字段的文件
+  const candidates = [
+    join(workDir, RC_FILE_NAME),
+    join(workDir, ".spaceflow", CONFIG_FILE_NAME),
+    join(homedir(), RC_FILE_NAME),
+    join(homedir(), ".spaceflow", CONFIG_FILE_NAME),
+  ];
+
+  for (const filePath of candidates) {
+    if (existsSync(filePath)) {
+      try {
+        const content = readFileSync(filePath, "utf-8");
+        const config = JSON.parse(content);
+        if (config[field] !== undefined) {
+          return filePath;
+        }
+      } catch {
+        // 解析失败，跳过
+      }
+    }
+  }
+
+  // 默认写入项目级 .spaceflowrc
+  return join(workDir, RC_FILE_NAME);
+}
+
+/**
  * 更新单个 dependency
+ * 找到 dependencies 所在的配置文件并原地更新，默认写入 .spaceflowrc
  * @param name 依赖名称
  * @param source 依赖来源
  * @param cwd 工作目录，默认为 process.cwd()
  * @returns 是否有更新（false 表示已存在相同配置）
  */
 export function updateDependency(name: string, source: string, cwd?: string): boolean {
-  const config = readConfigSync(cwd) as Record<string, unknown>;
+  const targetFile = findConfigFileWithField("dependencies", cwd);
+  const config = existsSync(targetFile)
+    ? (JSON.parse(readFileSync(targetFile, "utf-8")) as Record<string, unknown>)
+    : ({} as Record<string, unknown>);
 
   if (!config.dependencies) {
     config.dependencies = {};
@@ -217,18 +255,29 @@ export function updateDependency(name: string, source: string, cwd?: string): bo
   }
 
   dependencies[name] = source;
-  writeConfigSync(config, cwd);
+  writeFileSync(targetFile, stringify(config, { indent: 2 }) + "\n");
   return true;
 }
 
 /**
  * 删除单个 dependency
+ * 找到 dependencies 所在的配置文件并原地更新
  * @param name 依赖名称
  * @param cwd 工作目录，默认为 process.cwd()
  * @returns 是否有删除（false 表示不存在）
  */
 export function removeDependency(name: string, cwd?: string): boolean {
-  const config = readConfigSync(cwd) as Record<string, unknown>;
+  const targetFile = findConfigFileWithField("dependencies", cwd);
+  if (!existsSync(targetFile)) {
+    return false;
+  }
+
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(readFileSync(targetFile, "utf-8"));
+  } catch {
+    return false;
+  }
 
   if (!config.dependencies) {
     return false;
@@ -241,7 +290,7 @@ export function removeDependency(name: string, cwd?: string): boolean {
   }
 
   delete dependencies[name];
-  writeConfigSync(config, cwd);
+  writeFileSync(targetFile, stringify(config, { indent: 2 }) + "\n");
   return true;
 }
 
