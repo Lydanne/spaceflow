@@ -19,7 +19,7 @@ import {
   ensureSpaceflowPackageJson,
   ensureEditorGitignore,
   SchemaGeneratorService,
-  getConfigPath,
+  findConfigFileWithField,
   getSupportedEditors,
   getDependencies,
   updateDependency,
@@ -81,8 +81,10 @@ export class InstallService {
     const name = options.name || extractName(options.source);
     const spaceflowDir = join(cwd, SPACEFLOW_DIR);
     // Extension 安装到 .spaceflow/node_modules/ 中
-    const depPath = join(spaceflowDir, "node_modules", name);
-    const configPath = getConfigPath(cwd);
+    // 对 npm 包使用完整包名（含 @scope/ 前缀）作为 node_modules 路径
+    const depName = type === "npm" ? extractNpmPackageName(options.source) : name;
+    const depPath = join(spaceflowDir, "node_modules", depName);
+    const configPath = findConfigFileWithField("dependencies", cwd);
 
     return {
       ...options,
@@ -585,7 +587,9 @@ export class InstallService {
     await this.installExtension(source, sourceType, ref, true, verbose);
 
     // Extension 安装后的路径
-    const depPath = join(spaceflowDir, "node_modules", depName);
+    // 对 npm 包使用完整包名（含 @scope/ 前缀）作为 node_modules 路径
+    const depModuleName = sourceType === "npm" ? (name || extractNpmPackageName(source)) : depName;
+    const depPath = join(spaceflowDir, "node_modules", depModuleName);
 
     // 读取插件配置
     const pluginConfig = await this.getPluginConfigFromPackageJson(depPath);
@@ -1319,7 +1323,7 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
 
     if (updated) {
       if (shouldLog(verbose, 1))
-        console.log(t("install:configUpdated", { path: getConfigPath(cwd) }));
+        console.log(t("install:configUpdated", { path: findConfigFileWithField("dependencies", cwd) }));
     } else {
       if (shouldLog(verbose, 1)) console.log(t("install:configAlreadyExists"));
     }
