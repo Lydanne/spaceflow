@@ -2,7 +2,6 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { SPACEFLOW_DIR, PACKAGE_JSON } from "../../extension-system/extension.interface";
-import { isPnpmWorkspace } from "../package-manager";
 
 /**
  * 获取 .spaceflow 目录路径
@@ -70,11 +69,6 @@ export function getSpaceflowCliPath(isGlobal: boolean = false, cwd?: string): st
     return "latest";
   }
 
-  // 本地安装：检查是否在 monorepo 中
-  if (isPnpmWorkspace(workDir)) {
-    return "workspace:*";
-  }
-
   // 尝试从项目 package.json 获取版本
   const projectPkgPath = join(workDir, PACKAGE_JSON);
   if (existsSync(projectPkgPath)) {
@@ -83,7 +77,27 @@ export function getSpaceflowCliPath(isGlobal: boolean = false, cwd?: string): st
       const pkg = JSON.parse(content);
       const version =
         pkg.dependencies?.["@spaceflow/core"] || pkg.devDependencies?.["@spaceflow/core"];
-      if (version) return version;
+      if (version) {
+        // workspace:* 不能直接用于 .spaceflow（它有独立的 pnpm-workspace.yaml）
+        // 需要转换为 link: 指向实际的 core 包路径
+        if (version.startsWith("workspace:")) {
+          const corePath = join(workDir, "packages", "core");
+          if (existsSync(join(corePath, PACKAGE_JSON))) {
+            try {
+              const coreContent = readFileSync(join(corePath, PACKAGE_JSON), "utf-8");
+              const corePkg = JSON.parse(coreContent);
+              if (corePkg.name === "@spaceflow/core") {
+                return `link:${corePath}`;
+              }
+            } catch {
+              // ignore
+            }
+          }
+          // workspace 引用但找不到本地 core 包，回退到 latest
+          return "latest";
+        }
+        return version;
+      }
     } catch {
       // ignore
     }
