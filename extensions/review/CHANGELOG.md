@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.32.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.31.0...@spaceflow/review@0.32.0) (2026-02-25)
+
+### 修复BUG
+
+* **core:** 移除 isPnpmWorkspace 检查，改为在读取项目 package.json 版本时处理 workspace 协议 ([ed04f56](https://github.com/Lydanne/spaceflow/commit/ed04f568cebdc71a9c9ad08eebe343bf82250d5d))
+
+### 代码重构
+
+* **cli:** 移除 ensureSpaceflowPackageJson 调用中的 isGlobal 和 cwd 参数 ([731758f](https://github.com/Lydanne/spaceflow/commit/731758fabb54236c0002be6815070af804c1801e))
+* **core:** 移除 .spaceflow 目录的 pnpm-workspace.yaml 创建逻辑 ([538f7b0](https://github.com/Lydanne/spaceflow/commit/538f7b0e1b71515f3cdfa7273747f0fa728f737a))
+* **core:** 简化 ensureSpaceflowPackageJson，移除 isGlobal 参数，改为从 cli 入口读取 core 版本 ([eb4df3e](https://github.com/Lydanne/spaceflow/commit/eb4df3e3af261e3017ad26a308afe760667acba5))
+* 将 .spaceflow 配置迁移到根目录 .spaceflowrc，统一使用 workspace: 协议管理依赖 ([0aff2af](https://github.com/Lydanne/spaceflow/commit/0aff2afa6176e97c1f131b37cec51e32051a346a))
+
+### 其他修改
+
+* **cli:** released version 0.22.0 [no ci] ([e90581b](https://github.com/Lydanne/spaceflow/commit/e90581bfd7e1f388aeec35077753971939fbf25f))
+* **core:** released version 0.4.0 [no ci] ([144a5d8](https://github.com/Lydanne/spaceflow/commit/144a5d8afdc9681b548406f83491359a2accfa3c))
+* **publish:** released version 0.24.0 [no ci] ([260e96e](https://github.com/Lydanne/spaceflow/commit/260e96e2c6dfb4201c40a0c55f78428a9f6c502c))
+* **review-summary:** released version 0.1.0 [no ci] ([eb52706](https://github.com/Lydanne/spaceflow/commit/eb527063cc6e99530436d5a370827596baae44a3))
+* **scripts:** released version 0.1.0 [no ci] ([98abf0e](https://github.com/Lydanne/spaceflow/commit/98abf0e6e17985320a4d96e1350cea05e8f81b15))
+* **shell:** released version 0.1.0 [no ci] ([e03b69e](https://github.com/Lydanne/spaceflow/commit/e03b69e7ad7d3db6e96c699ec715c2313b236196))
+
 ## [0.31.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.30.0...@spaceflow/review@0.31.0) (2026-02-25)
 
 ### 新特性
