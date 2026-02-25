@@ -1,4 +1,3 @@
-import { readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 import type { ExtensionLoader } from "../../extension-loader";
@@ -6,9 +5,10 @@ import {
   shouldLog,
   type VerboseLevel,
   getEditorDirName,
-  DEFAULT_EDITOR,
   getSourceType,
   normalizeSource,
+  getDependencies,
+  getSupportedEditors,
   t,
 } from "@spaceflow/core";
 
@@ -24,34 +24,13 @@ export class ListService {
   constructor(private readonly extensionLoader: ExtensionLoader) {}
 
   /**
-   * 获取支持的编辑器列表
-   */
-  protected async getSupportedEditors(): Promise<string[]> {
-    const configPath = join(process.cwd(), "spaceflow.json");
-    try {
-      if (!existsSync(configPath)) return [DEFAULT_EDITOR];
-      const content = await readFile(configPath, "utf-8");
-      const config = JSON.parse(content);
-      return config.support || [DEFAULT_EDITOR];
-    } catch {
-      return [DEFAULT_EDITOR];
-    }
-  }
-
-  /**
    * 执行列表展示
    */
   async execute(verbose: VerboseLevel = 1): Promise<void> {
     const cwd = process.cwd();
-    // 优先检查 .spaceflow/spaceflow.json，回退到 spaceflow.json
-    let configPath = join(cwd, ".spaceflow", "spaceflow.json");
-    if (!existsSync(configPath)) {
-      configPath = join(cwd, "spaceflow.json");
-    }
 
-    // 读取配置文件中的 dependencies（只读取外部扩展）
-    const config = await this.parseConfig(configPath);
-    const dependencies = config.dependencies || {};
+    // 读取合并后的 dependencies（支持 .spaceflowrc、.spaceflow/spaceflow.json 等所有配置源）
+    const dependencies = getDependencies(cwd);
 
     if (Object.keys(dependencies).length === 0) {
       if (shouldLog(verbose, 1)) {
@@ -64,7 +43,7 @@ export class ListService {
       return;
     }
 
-    const editors = await this.getSupportedEditors();
+    const editors = getSupportedEditors(cwd);
     // 收集所有外部扩展信息
     const extensionInfos: ExtensionListInfo[] = [];
     for (const [name, source] of Object.entries(dependencies)) {
@@ -146,28 +125,4 @@ export class ListService {
     }
   }
 
-  /**
-   * 从配置文件解析 dependencies
-   */
-  private async parseConfig(configPath: string): Promise<Record<string, unknown>> {
-    try {
-      const content = await readFile(configPath, "utf-8");
-      return JSON.parse(content);
-    } catch {
-      return {};
-    }
-  }
-
-  /**
-   * 从配置文件解析 skills
-   */
-  private async parseSkillsFromConfig(configPath: string): Promise<Record<string, string>> {
-    try {
-      const content = await readFile(configPath, "utf-8");
-      const config = JSON.parse(content);
-      return config.dependencies || {};
-    } catch {
-      return {};
-    }
-  }
 }

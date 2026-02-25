@@ -1315,8 +1315,9 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
   }
 
   protected updateConfigFile(context: InstallContext, verbose: VerboseLevel = 1): void {
-    const { source } = context;
-    const name = context.name || extractName(source);
+    const { source, type } = context;
+    // dependencies key 使用完整包名（npm 类型保留 @scope/ 前缀）
+    const name = context.name || (type === "npm" ? extractNpmPackageName(source) : extractName(source));
     const cwd = process.cwd();
 
     const updated = updateDependency(name, source, cwd);
