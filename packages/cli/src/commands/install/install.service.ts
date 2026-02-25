@@ -659,7 +659,9 @@ export class InstallService {
       const sourceType = getSourceType(source);
 
       // 获取安装后的路径
-      const packageName = await this.getPackageNameFromSource(source, sourceType, spaceflowDir);
+      const packageName = source.startsWith("workspace:")
+        ? name
+        : await this.getPackageNameFromSource(source, sourceType, spaceflowDir);
       const depPath = join(spaceflowDir, "node_modules", packageName);
 
       if (!existsSync(depPath)) {
@@ -685,8 +687,8 @@ export class InstallService {
         });
       }
 
-      // 对于本地路径的 Extension，需要构建
-      if (sourceType === "local") {
+      // 对于本地路径的 Extension，需要构建（workspace: 类型不需要，已在 workspace 中构建）
+      if (sourceType === "local" && !source.startsWith("workspace:")) {
         const normalizedSource = normalizeSource(source);
         const sourcePath = resolve(cwd, normalizedSource);
         await this.ensureDependenciesAndBuild(sourcePath, name, verbose);
@@ -719,23 +721,29 @@ export class InstallService {
     }
 
     let updated = false;
-    for (const [, config] of Object.entries(dependencies)) {
+    for (const [name, config] of Object.entries(dependencies)) {
       const { source, ref } = this.parseExtensionConfig(config);
       const sourceType = getSourceType(source);
 
       let packageSpec: string;
-      if (sourceType === "local") {
+      let packageName: string;
+
+      if (source.startsWith("workspace:")) {
+        // workspace 协议：直接透传
+        packageName = name;
+        packageSpec = source;
+      } else if (sourceType === "local") {
         const normalizedSource = normalizeSource(source);
         const relativePath = join("..", normalizedSource);
         packageSpec = `link:${relativePath}`;
+        packageName = await this.getPackageNameFromSource(source, sourceType, spaceflowDir);
       } else if (sourceType === "git") {
         packageSpec = source.startsWith("git+") ? source : buildGitPackageSpec(source, ref);
+        packageName = await this.getPackageNameFromSource(source, sourceType, spaceflowDir);
       } else {
         packageSpec = source;
+        packageName = await this.getPackageNameFromSource(source, sourceType, spaceflowDir);
       }
-
-      // 获取包名
-      const packageName = await this.getPackageNameFromSource(source, sourceType, spaceflowDir);
 
       if (pkg.dependencies[packageName] !== packageSpec) {
         pkg.dependencies[packageName] = packageSpec;

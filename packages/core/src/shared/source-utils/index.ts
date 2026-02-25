@@ -22,6 +22,7 @@ export function isGitUrl(source: string): boolean {
  */
 export function isLocalPath(source: string): boolean {
   return (
+    source.startsWith("workspace:") ||
     source.startsWith("link:") ||
     source.startsWith("./") ||
     source.startsWith("../") ||

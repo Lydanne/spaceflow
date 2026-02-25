@@ -3,6 +3,7 @@ packages:
   - extensions/*
   - actions
   - docs
+  - .spaceflow
 
 catalogs:
   default:
