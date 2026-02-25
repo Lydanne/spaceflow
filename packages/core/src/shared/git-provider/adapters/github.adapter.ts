@@ -4,29 +4,41 @@ import type {
   LockBranchOptions,
   ListPullRequestsOptions,
 } from "../git-provider.interface";
-import type {
-  GitProviderModuleOptions,
-  BranchProtection,
-  CreateBranchProtectionOption,
-  EditBranchProtectionOption,
-  Branch,
-  Repository,
-  PullRequest,
-  PullRequestCommit,
-  ChangedFile,
-  CommitInfo,
-  IssueComment,
-  CreateIssueCommentOption,
-  CreateIssueOption,
-  Issue,
-  CreatePullReviewOption,
-  PullReview,
-  PullReviewComment,
-  Reaction,
-  EditPullRequestOption,
-  User,
-  RepositoryContent,
+import {
+  REVIEW_STATE,
+  DIFF_SIDE,
+  type GitProviderModuleOptions,
+  type BranchProtection,
+  type CreateBranchProtectionOption,
+  type EditBranchProtectionOption,
+  type Branch,
+  type Repository,
+  type PullRequest,
+  type PullRequestCommit,
+  type ChangedFile,
+  type CommitInfo,
+  type IssueComment,
+  type CreateIssueCommentOption,
+  type CreateIssueOption,
+  type Issue,
+  type CreatePullReviewOption,
+  type PullReview,
+  type PullReviewComment,
+  type Reaction,
+  type EditPullRequestOption,
+  type User,
+  type RepositoryContent,
+  type ResolvedThread,
 } from "../types";
+
+/** GraphQL review thread 节点类型 */
+interface GraphQLReviewThread {
+  isResolved: boolean;
+  resolvedBy?: { login: string; databaseId: number } | null;
+  path?: string | null;
+  line?: number | null;
+  comments: { nodes: Array<{ databaseId: number }> };
+}
 
 /**
  * GitHub 平台适配器
@@ -70,6 +82,31 @@ export class GithubAdapter implements GitProvider {
       return {} as T;
     }
     return response.json() as Promise<T>;
+  }
+
+  protected async requestGraphQL<T>(
+    query: string,
+    variables?: Record<string, unknown>,
+  ): Promise<T> {
+    const graphqlUrl =
+      this.baseUrl.replace(/\/v3\/?$/, "").replace(/\/api\/v3\/?$/, "") + "/graphql";
+    const response = await fetch(graphqlUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`GitHub GraphQL error: ${response.status} - ${errorText}`);
+    }
+    const json = (await response.json()) as { data: T; errors?: unknown[] };
+    if (json.errors) {
+      throw new Error(`GitHub GraphQL errors: ${JSON.stringify(json.errors)}`);
+    }
+    return json.data;
   }
 
   protected async fetchText(url: string): Promise<string> {
@@ -468,7 +505,8 @@ export class GithubAdapter implements GitProvider {
       body.comments = options.comments.map((c) => ({
         path: c.path,
         body: c.body,
-        position: c.new_position,
+        line: c.new_position,
+        side: DIFF_SIDE.RIGHT,
       }));
     }
     const result = await this.request<Record<string, unknown>>(
@@ -485,6 +523,26 @@ export class GithubAdapter implements GitProvider {
       `/repos/${owner}/${repo}/pulls/${index}/reviews`,
     );
     return results.map((r) => this.mapPullReview(r));
+  }
+
+  async updatePullReview(
+    owner: string,
+    repo: string,
+    index: number,
+    reviewId: number,
+    body: string,
+  ): Promise<PullReview> {
+    // GitHub 的 updatePullReview 只能更新 PENDING 状态的 review
+    // 已提交的 review 无法更新，所以使用删除+创建的方式
+    try {
+      await this.deletePullReview(owner, repo, index, reviewId);
+    } catch {
+      // 已提交的 review 无法删除，忽略错误
+    }
+    return this.createPullReview(owner, repo, index, {
+      event: REVIEW_STATE.COMMENT,
+      body,
+    });
   }
 
   async deletePullReview(
@@ -509,7 +567,23 @@ export class GithubAdapter implements GitProvider {
       "GET",
       `/repos/${owner}/${repo}/pulls/${index}/reviews/${reviewId}/comments`,
     );
-    return results.map((c) => this.mapPullReviewComment(c));
+    const comments = results.map((c) => this.mapPullReviewComment(c));
+    // 通过 GraphQL 补充 resolved 状态
+    try {
+      const resolvedMap = await this.fetchResolvedThreads(owner, repo, index);
+      for (const comment of comments) {
+        if (comment.id && resolvedMap.has(comment.id)) {
+          comment.resolver = resolvedMap.get(comment.id) ?? null;
+        }
+      }
+    } catch {
+      // GraphQL 查询失败不影响主流程
+    }
+    return comments;
+  }
+
+  async deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void> {
+    await this.request<void>("DELETE", `/repos/${owner}/${repo}/pulls/comments/${commentId}`);
   }
 
   // ============ Reaction 操作 ============
@@ -522,6 +596,18 @@ export class GithubAdapter implements GitProvider {
     const results = await this.request<Array<Record<string, unknown>>>(
       "GET",
       `/repos/${owner}/${repo}/issues/comments/${commentId}/reactions`,
+    );
+    return results.map((r) => this.mapReaction(r));
+  }
+
+  async getPullReviewCommentReactions(
+    owner: string,
+    repo: string,
+    commentId: number,
+  ): Promise<Reaction[]> {
+    const results = await this.request<Array<Record<string, unknown>>>(
+      "GET",
+      `/repos/${owner}/${repo}/pulls/comments/${commentId}/reactions`,
     );
     return results.map((r) => this.mapReaction(r));
   }
@@ -722,6 +808,91 @@ export class GithubAdapter implements GitProvider {
     };
   }
 
+  /**
+   * 通过 GraphQL 查询 PR 的 review threads resolved 状态
+   * 返回 Map<commentId, resolver>（用于 listPullReviewComments 内部补充 resolver）
+   */
+  protected async fetchResolvedThreads(
+    owner: string,
+    repo: string,
+    prNumber: number,
+  ): Promise<Map<number, { id?: number; login?: string } | null>> {
+    const threads = await this.queryReviewThreads(owner, repo, prNumber);
+    const resolvedMap = new Map<number, { id?: number; login?: string } | null>();
+    for (const thread of threads) {
+      if (!thread.isResolved) continue;
+      const firstComment = thread.comments.nodes[0];
+      if (!firstComment?.databaseId) continue;
+      resolvedMap.set(
+        firstComment.databaseId,
+        thread.resolvedBy
+          ? { id: thread.resolvedBy.databaseId, login: thread.resolvedBy.login }
+          : null,
+      );
+    }
+    return resolvedMap;
+  }
+
+  async listResolvedThreads(owner: string, repo: string, index: number): Promise<ResolvedThread[]> {
+    const threads = await this.queryReviewThreads(owner, repo, index);
+    const result: ResolvedThread[] = [];
+    for (const thread of threads) {
+      if (!thread.isResolved) continue;
+      result.push({
+        path: thread.path ?? undefined,
+        line: thread.line ?? undefined,
+        resolvedBy: thread.resolvedBy
+          ? { id: thread.resolvedBy.databaseId, login: thread.resolvedBy.login }
+          : null,
+      });
+    }
+    return result;
+  }
+
+  /**
+   * GraphQL 查询 PR 的所有 review threads
+   */
+  protected async queryReviewThreads(
+    owner: string,
+    repo: string,
+    prNumber: number,
+  ): Promise<GraphQLReviewThread[]> {
+    const QUERY = `
+      query($owner: String!, $repo: String!, $prNumber: Int!) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $prNumber) {
+            reviewThreads(first: 100) {
+              nodes {
+                isResolved
+                resolvedBy { login databaseId }
+                path
+                line
+                comments(first: 1) {
+                  nodes { databaseId }
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+    interface GraphQLResult {
+      repository: {
+        pullRequest: {
+          reviewThreads: {
+            nodes: GraphQLReviewThread[];
+          };
+        };
+      };
+    }
+    const data = await this.requestGraphQL<GraphQLResult>(QUERY, {
+      owner,
+      repo,
+      prNumber,
+    });
+    return data.repository.pullRequest.reviewThreads.nodes;
+  }
+
   protected mapPullReviewComment(data: Record<string, unknown>): PullReviewComment {
     const user = data.user as Record<string, unknown> | undefined;
     return {
@@ -809,12 +980,12 @@ export class GithubAdapter implements GitProvider {
 
   protected mapReviewEvent(event?: string): string {
     const eventMap: Record<string, string> = {
-      APPROVE: "APPROVE",
-      REQUEST_CHANGES: "REQUEST_CHANGES",
-      COMMENT: "COMMENT",
-      PENDING: "PENDING",
+      [REVIEW_STATE.APPROVE]: REVIEW_STATE.APPROVE,
+      [REVIEW_STATE.REQUEST_CHANGES]: REVIEW_STATE.REQUEST_CHANGES,
+      [REVIEW_STATE.COMMENT]: REVIEW_STATE.COMMENT,
+      [REVIEW_STATE.PENDING]: REVIEW_STATE.PENDING,
     };
-    return event ? eventMap[event] || event : "COMMENT";
+    return event ? eventMap[event] || event : REVIEW_STATE.COMMENT;
   }
 
   protected mapSortParam(sort: string): string {

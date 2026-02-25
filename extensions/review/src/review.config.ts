@@ -63,6 +63,8 @@ export interface ReviewOptions {
   generateDescription?: boolean;
   /** 显示所有问题，不过滤非变更行的问题 */
   showAll?: boolean;
+  /** 仅刷新状态（同步 reactions、resolved 等），不执行 LLM 审查 */
+  flush?: boolean;
   /** PR 事件类型（opened, synchronize, closed 等） */
   eventAction?: string;
   concurrency?: number;

@@ -5,6 +5,7 @@ import {
   PullRequestCommit,
   ChangedFile,
   CreatePullReviewComment,
+  REVIEW_STATE,
   CiConfig,
   type LLMMode,
   LlmProxyService,
@@ -94,6 +95,7 @@ export interface LLMReviewOptions {
 }
 
 const REVIEW_COMMENT_MARKER = "<!-- spaceflow-review -->";
+const REVIEW_LINE_COMMENTS_MARKER = "<!-- spaceflow-review-lines -->";
 
 const REVIEW_SCHEMA: LlmJsonPutSchema = {
   type: "object",
@@ -289,6 +291,7 @@ export class ReviewService {
       retryDelay: options.retryDelay ?? reviewConf.retryDelay ?? 1000,
       generateDescription: options.generateDescription ?? reviewConf.generateDescription ?? false,
       showAll: options.showAll ?? false,
+      flush: options.flush ?? false,
       eventAction: options.eventAction,
     };
   }
@@ -403,8 +406,8 @@ export class ReviewService {
       return this.executeDeletionOnly(context);
     }
 
-    // 如果是 closed 事件，仅收集 review 状态
-    if (context.eventAction === "closed") {
+    // 如果是 closed 事件或 flush 模式，仅收集 review 状态
+    if (context.eventAction === "closed" || context.flush) {
       return this.executeCollectOnly(context);
     }
 
@@ -825,7 +828,7 @@ export class ReviewService {
   }
 
   /**
-   * 仅收集 review 状态模式（用于 PR 关闭时）
+   * 仅收集 review 状态模式（用于 PR 关闭或 --flush 指令）
    * 从现有的 AI review 评论中读取问题状态，同步已解决/无效状态，输出统计信息
    */
   protected async executeCollectOnly(context: ReviewContext): Promise<ReviewResult> {
@@ -1873,14 +1876,14 @@ ${fileChanges || "无"}`;
       }
     }
 
-    // 获取已解决的评论，同步 fixed 状态（在删除旧 review 之前）
+    // 获取已解决的评论，同步 fixed 状态（在更新 review 之前）
     await this.syncResolvedComments(owner, repo, prNumber, result);
 
     // 获取评论的 reactions，同步 valid 状态（👎 标记为无效）
     await this.syncReactionsToIssues(owner, repo, prNumber, result, verbose);
 
-    // 删除已有的 AI review（避免重复评论）
-    await this.deleteExistingAiReviews(owner, repo, prNumber);
+    // 查找已有的 AI 评论（Issue Comment）
+    const existingComment = await this.findExistingAiComment(owner, repo, prNumber);
 
     // 调试：检查 issues 是否有 author
     if (shouldLog(verbose, 3)) {
@@ -1901,7 +1904,55 @@ ${fileChanges || "无"}`;
     const pr = await this.gitProvider.getPullRequest(owner, repo, prNumber);
     const commitId = pr.head?.sha;
 
-    // 构建行级评论（根据配置决定是否启用）
+    // 1. 发布或更新主评论（使用 Issue Comment API，支持删除和更新）
+    try {
+      if (existingComment?.id) {
+        await this.gitProvider.updateIssueComment(owner, repo, existingComment.id, reviewBody);
+        console.log(`✅ 已更新 AI Review 评论`);
+      } else {
+        await this.gitProvider.createIssueComment(owner, repo, prNumber, { body: reviewBody });
+        console.log(`✅ 已发布 AI Review 评论`);
+      }
+    } catch (error) {
+      console.warn("⚠️ 发布/更新 AI Review 评论失败:", error);
+    }
+
+    // 2. 删除旧的行级评论（逐条删除 PR Review Comment）
+    try {
+      const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
+      const oldLineReviews = reviews.filter((r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER));
+      for (const review of oldLineReviews) {
+        if (review.id) {
+          const reviewComments = await this.gitProvider.listPullReviewComments(
+            owner,
+            repo,
+            prNumber,
+            review.id,
+          );
+          for (const comment of reviewComments) {
+            if (comment.id) {
+              try {
+                await this.gitProvider.deletePullReviewComment(owner, repo, comment.id);
+              } catch {
+                // 删除失败忽略
+              }
+            }
+          }
+          // 评论删除后尝试删除 review 本身
+          try {
+            await this.gitProvider.deletePullReview(owner, repo, prNumber, review.id);
+          } catch {
+            // 已提交的 review 无法删除，忽略
+          }
+        }
+      }
+      if (oldLineReviews.length > 0) {
+        console.log(`🗑️ 已清理 ${oldLineReviews.length} 个旧的行级评论 review`);
+      }
+    } catch (error) {
+      console.warn("⚠️ 清理旧行级评论失败:", error);
+    }
+    // 3. 发布新的行级评论（使用 PR Review API）
     let comments: CreatePullReviewComment[] = [];
     if (reviewConf.lineComments) {
       comments = result.issues
@@ -1909,24 +1960,61 @@ ${fileChanges || "无"}`;
         .map((issue) => this.issueToReviewComment(issue))
         .filter((comment): comment is CreatePullReviewComment => comment !== null);
     }
-
-    try {
-      // 使用 PR Review 发布主评论 + 行级评论（合并为一个消息块）
-      await this.gitProvider.createPullReview(owner, repo, prNumber, {
-        event: "COMMENT",
-        body: reviewBody,
-        comments,
-        commit_id: commitId,
-      });
-      const lineMsg = comments.length > 0 ? `，包含 ${comments.length} 条行级评论` : "";
-      console.log(`✅ 已发布 AI Review${lineMsg}`);
-    } catch (error) {
-      console.warn("⚠️ 发布 AI Review 失败:", error);
+    if (comments.length > 0) {
+      try {
+        await this.gitProvider.createPullReview(owner, repo, prNumber, {
+          event: REVIEW_STATE.COMMENT,
+          body: REVIEW_LINE_COMMENTS_MARKER,
+          comments,
+          commit_id: commitId,
+        });
+        console.log(`✅ 已发布 ${comments.length} 条行级评论`);
+      } catch {
+        // 批量失败时逐条发布，跳过无法定位的评论
+        console.warn("⚠️ 批量发布行级评论失败，尝试逐条发布...");
+        let successCount = 0;
+        for (const comment of comments) {
+          try {
+            await this.gitProvider.createPullReview(owner, repo, prNumber, {
+              event: REVIEW_STATE.COMMENT,
+              body: successCount === 0 ? REVIEW_LINE_COMMENTS_MARKER : undefined,
+              comments: [comment],
+              commit_id: commitId,
+            });
+            successCount++;
+          } catch {
+            console.warn(`⚠️ 跳过无法定位的评论: ${comment.path}:${comment.new_position}`);
+          }
+        }
+        if (successCount > 0) {
+          console.log(`✅ 逐条发布成功 ${successCount}/${comments.length} 条行级评论`);
+        } else {
+          console.warn("⚠️ 所有行级评论均无法定位，已跳过");
+        }
+      }
     }
   }
 
   /**
-   * 从旧的 AI review 中获取已解决的评论，同步 fixed 状态到 result.issues
+   * 查找已有的 AI 评论（Issue Comment）
+   */
+  protected async findExistingAiComment(
+    owner: string,
+    repo: string,
+    prNumber: number,
+  ): Promise<{ id: number } | null> {
+    try {
+      const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
+      const aiComment = comments.find((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
+      return aiComment?.id ? { id: aiComment.id } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 从 PR 的所有 resolved review threads 中同步 fixed 状态到 result.issues
+   * 直接通过 GraphQL 查询所有 resolved threads 的 path+line，匹配 issues
    */
   protected async syncResolvedComments(
     owner: string,
@@ -1935,31 +2023,16 @@ ${fileChanges || "无"}`;
     result: ReviewResult,
   ): Promise<void> {
     try {
-      const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
-      const aiReview = reviews.find((r) => r.body?.includes(REVIEW_COMMENT_MARKER));
-      if (!aiReview?.id) {
+      const resolvedThreads = await this.gitProvider.listResolvedThreads(owner, repo, prNumber);
+      if (resolvedThreads.length === 0) {
         return;
       }
-      // 获取该 review 的所有行级评论
-      const reviewComments = await this.gitProvider.listPullReviewComments(
-        owner,
-        repo,
-        prNumber,
-        aiReview.id,
-      );
-      // 找出已解决的评论（resolver 不为 null）
-      const resolvedComments = reviewComments.filter(
-        (c) => c.resolver !== null && c.resolver !== undefined,
-      );
-      if (resolvedComments.length === 0) {
-        return;
-      }
-      // 根据文件路径和行号匹配 issues，标记为已解决
       const now = new Date().toISOString();
-      for (const comment of resolvedComments) {
+      for (const thread of resolvedThreads) {
+        if (!thread.path) continue;
         const matchedIssue = result.issues.find(
           (issue) =>
-            issue.file === comment.path && this.lineMatchesPosition(issue.line, comment.position),
+            issue.file === thread.path && this.lineMatchesPosition(issue.line, thread.line),
         );
         if (matchedIssue && !matchedIssue.fixed) {
           matchedIssue.fixed = now;
@@ -1998,7 +2071,7 @@ ${fileChanges || "无"}`;
   ): Promise<void> {
     try {
       const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
-      const aiReview = reviews.find((r) => r.body?.includes(REVIEW_COMMENT_MARKER));
+      const aiReview = reviews.find((r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER));
       if (!aiReview?.id) {
         if (shouldLog(verbose, 2)) {
           console.log(`[syncReactionsToIssues] No AI review found`);
@@ -2011,7 +2084,7 @@ ${fileChanges || "无"}`;
 
       // 1. 从已提交的 review 中获取评审人（排除 AI bot）
       for (const review of reviews) {
-        if (review.user?.login && !review.body?.includes(REVIEW_COMMENT_MARKER)) {
+        if (review.user?.login && !review.body?.includes(REVIEW_LINE_COMMENTS_MARKER)) {
           reviewers.add(review.user.login);
         }
       }
@@ -2088,7 +2161,7 @@ ${fileChanges || "无"}`;
           commentIdToIssue.set(comment.id, matchedIssue);
         }
         try {
-          const reactions = await this.gitProvider.getIssueCommentReactions(
+          const reactions = await this.gitProvider.getPullReviewCommentReactions(
             owner,
             repo,
             comment.id,
@@ -2192,25 +2265,54 @@ ${fileChanges || "无"}`;
 
   /**
    * 删除已有的 AI review（通过 marker 识别）
+   * - 删除行级评论的 PR Review（带 REVIEW_LINE_COMMENTS_MARKER）
+   * - 删除主评论的 Issue Comment（带 REVIEW_COMMENT_MARKER）
    */
   protected async deleteExistingAiReviews(
     owner: string,
     repo: string,
     prNumber: number,
   ): Promise<void> {
+    let deletedCount = 0;
+    // 删除行级评论的 PR Review
     try {
       const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
-      const aiReviews = reviews.filter((r) => r.body?.includes(REVIEW_COMMENT_MARKER));
+      const aiReviews = reviews.filter(
+        (r) =>
+          r.body?.includes(REVIEW_LINE_COMMENTS_MARKER) || r.body?.includes(REVIEW_COMMENT_MARKER),
+      );
       for (const review of aiReviews) {
         if (review.id) {
-          await this.gitProvider.deletePullReview(owner, repo, prNumber, review.id);
+          try {
+            await this.gitProvider.deletePullReview(owner, repo, prNumber, review.id);
+            deletedCount++;
+          } catch {
+            // 已提交的 review 无法删除，忽略
+          }
         }
       }
-      if (aiReviews.length > 0) {
-        console.log(`🗑️ 已删除 ${aiReviews.length} 个旧的 AI review`);
+    } catch (error) {
+      console.warn("⚠️ 列出 PR reviews 失败:", error);
+    }
+    // 删除主评论的 Issue Comment
+    try {
+      const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
+      const aiComments = comments.filter((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
+      for (const comment of aiComments) {
+        if (comment.id) {
+          try {
+            await this.gitProvider.deleteIssueComment(owner, repo, comment.id);
+            deletedCount++;
+          } catch (error) {
+            console.warn(`⚠️ 删除评论 ${comment.id} 失败:`, error);
+          }
+        }
       }
     } catch (error) {
-      console.warn("⚠️ 删除旧 AI review 失败:", error);
+      console.warn("⚠️ 列出 issue comments 失败:", error);
+    }
+    if (deletedCount > 0) {
+      console.log(`🗑️ 已删除 ${deletedCount} 个旧的 AI review`);
     }
   }
 
@@ -2499,12 +2601,11 @@ ${fileChanges || "无"}`;
     newIssues: ReviewIssue[],
     existingIssues: ReviewIssue[],
   ): { filteredIssues: ReviewIssue[]; skippedCount: number } {
-    // 只有 valid === 'true' 的历史问题才阻止新问题，其他情况允许覆盖
-    const existingKeys = new Set(
-      existingIssues
-        .filter((issue) => issue.valid === "true")
-        .map((issue) => this.generateIssueKey(issue)),
-    );
+    // 所有历史问题（无论 valid 状态）都阻止新问题重复添加
+    // valid='false' 的问题已被评审人标记为无效，不应再次报告
+    // valid='true' 的问题已存在，无需重复
+    // fixed 的问题已解决，无需重复
+    const existingKeys = new Set(existingIssues.map((issue) => this.generateIssueKey(issue)));
     const filteredIssues = newIssues.filter(
       (issue) => !existingKeys.has(this.generateIssueKey(issue)),
     );
@@ -2518,11 +2619,11 @@ ${fileChanges || "无"}`;
     prNumber: number,
   ): Promise<ReviewResult | null> {
     try {
-      // 从 PR Review 获取已有的审查结果
-      const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
-      const existingReview = reviews.find((r) => r.body?.includes(REVIEW_COMMENT_MARKER));
-      if (existingReview?.body) {
-        return this.parseExistingReviewResult(existingReview.body);
+      // 从 Issue Comment 获取已有的审查结果
+      const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
+      const existingComment = comments.find((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
+      if (existingComment?.body) {
+        return this.parseExistingReviewResult(existingComment.body);
       }
     } catch (error) {
       console.warn("⚠️ 获取已有评论失败:", error);

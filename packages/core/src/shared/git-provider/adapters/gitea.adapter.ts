@@ -5,28 +5,30 @@ import type {
   LockBranchOptions,
   ListPullRequestsOptions,
 } from "../git-provider.interface";
-import type {
-  GitProviderModuleOptions,
-  BranchProtection,
-  CreateBranchProtectionOption,
-  EditBranchProtectionOption,
-  Branch,
-  Repository,
-  PullRequest,
-  PullRequestCommit,
-  ChangedFile,
-  CommitInfo,
-  IssueComment,
-  CreateIssueCommentOption,
-  CreateIssueOption,
-  Issue,
-  CreatePullReviewOption,
-  PullReview,
-  PullReviewComment,
-  Reaction,
-  EditPullRequestOption,
-  User,
-  RepositoryContent,
+import {
+  REVIEW_STATE,
+  type GitProviderModuleOptions,
+  type BranchProtection,
+  type CreateBranchProtectionOption,
+  type EditBranchProtectionOption,
+  type Branch,
+  type Repository,
+  type PullRequest,
+  type PullRequestCommit,
+  type ChangedFile,
+  type CommitInfo,
+  type IssueComment,
+  type CreateIssueCommentOption,
+  type CreateIssueOption,
+  type Issue,
+  type CreatePullReviewOption,
+  type PullReview,
+  type PullReviewComment,
+  type Reaction,
+  type EditPullRequestOption,
+  type User,
+  type RepositoryContent,
+  type ResolvedThread,
 } from "../types";
 
 /**
@@ -439,6 +441,21 @@ export class GiteaAdapter implements GitProvider {
     return this.request<PullReview[]>("GET", `/repos/${owner}/${repo}/pulls/${index}/reviews`);
   }
 
+  async updatePullReview(
+    owner: string,
+    repo: string,
+    index: number,
+    reviewId: number,
+    body: string,
+  ): Promise<PullReview> {
+    // Gitea 不支持更新 review，使用删除+创建的方式模拟
+    await this.deletePullReview(owner, repo, index, reviewId);
+    return this.createPullReview(owner, repo, index, {
+      event: REVIEW_STATE.COMMENT,
+      body,
+    });
+  }
+
   async deletePullReview(
     owner: string,
     repo: string,
@@ -463,6 +480,14 @@ export class GiteaAdapter implements GitProvider {
     );
   }
 
+  async deletePullReviewComment(owner: string, repo: string, commentId: number): Promise<void> {
+    await this.request<void>("DELETE", `/repos/${owner}/${repo}/pulls/comments/${commentId}`);
+  }
+
+  async listResolvedThreads(): Promise<ResolvedThread[]> {
+    return [];
+  }
+
   // ============ Reaction 操作 ============
 
   async getIssueCommentReactions(
@@ -470,6 +495,18 @@ export class GiteaAdapter implements GitProvider {
     repo: string,
     commentId: number,
   ): Promise<Reaction[]> {
+    return this.request<Reaction[]>(
+      "GET",
+      `/repos/${owner}/${repo}/issues/comments/${commentId}/reactions`,
+    );
+  }
+
+  async getPullReviewCommentReactions(
+    owner: string,
+    repo: string,
+    commentId: number,
+  ): Promise<Reaction[]> {
+    // Gitea: PR review comment reactions 使用与 issue comment 相同的路径
     return this.request<Reaction[]>(
       "GET",
       `/repos/${owner}/${repo}/issues/comments/${commentId}/reactions`,

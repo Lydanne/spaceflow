@@ -60,14 +60,22 @@ describe("ReviewService", () => {
       getPullRequestCommits: vi.fn(),
       getPullRequestFiles: vi.fn(),
       getFileContent: vi.fn(),
-      listPullReviews: vi.fn(),
-      createPullReview: vi.fn(),
-      deletePullReview: vi.fn(),
+      listPullReviews: vi.fn().mockResolvedValue([]),
+      createPullReview: vi.fn().mockResolvedValue({}),
+      deletePullReview: vi.fn().mockResolvedValue(undefined),
+      deletePullReviewComment: vi.fn().mockResolvedValue(undefined),
+      listResolvedThreads: vi.fn().mockResolvedValue([]),
       editPullRequest: vi.fn(),
       getCommitDiff: vi.fn(),
       listPullReviewComments: vi.fn(),
       searchUsers: vi.fn().mockResolvedValue([]),
       getIssueCommentReactions: vi.fn().mockResolvedValue([]),
+      getPullReviewCommentReactions: vi.fn().mockResolvedValue([]),
+      listIssueComments: vi.fn().mockResolvedValue([]),
+      createIssueComment: vi.fn().mockResolvedValue({}),
+      updateIssueComment: vi.fn().mockResolvedValue({}),
+      deleteIssueComment: vi.fn().mockResolvedValue(undefined),
+      updatePullReview: vi.fn().mockResolvedValue({}),
     };
 
     configService = {
@@ -316,12 +324,13 @@ describe("ReviewService", () => {
       gitProvider.getPullRequestCommits.mockResolvedValue(mockCommits);
       gitProvider.getPullRequestFiles.mockResolvedValue(mockFiles);
       gitProvider.getFileContent.mockResolvedValue("const test = 1;");
+      gitProvider.listIssueComments.mockResolvedValue([]);
       gitProvider.listPullReviews.mockResolvedValue([]);
-      gitProvider.createPullReview.mockResolvedValue({});
+      gitProvider.createIssueComment.mockResolvedValue({});
 
       await service.execute(context);
 
-      expect(gitProvider.createPullReview).toHaveBeenCalledWith(
+      expect(gitProvider.createIssueComment).toHaveBeenCalledWith(
         "owner",
         "repo",
         123,
@@ -501,14 +510,15 @@ describe("ReviewService", () => {
       gitProvider.getPullRequest.mockResolvedValue(mockPR as any);
       gitProvider.getPullRequestCommits.mockResolvedValue([]);
       gitProvider.getPullRequestFiles.mockResolvedValue([]);
+      gitProvider.listIssueComments.mockResolvedValue([]);
       gitProvider.listPullReviews.mockResolvedValue([]);
-      gitProvider.createPullReview.mockResolvedValue({});
+      gitProvider.createIssueComment.mockResolvedValue({});
 
       const result = await service.execute(context);
 
       expect(result.success).toBe(true);
       expect(mockDeletionImpactService.analyzeDeletionImpact).toHaveBeenCalled();
-      expect(gitProvider.createPullReview).toHaveBeenCalled();
+      expect(gitProvider.createIssueComment).toHaveBeenCalled();
     });
   });
 
@@ -1415,12 +1425,12 @@ describe("ReviewService", () => {
       expect(result.skippedCount).toBe(1);
     });
 
-    it("should not filter if existing issue is not valid", () => {
+    it("should also filter invalid existing issues to prevent repeated reporting", () => {
       const newIssues = [{ file: "a.ts", line: "1", ruleId: "R1" }];
       const existingIssues = [{ file: "a.ts", line: "1", ruleId: "R1", valid: "false" }];
       const result = (service as any).filterDuplicateIssues(newIssues, existingIssues);
-      expect(result.filteredIssues).toHaveLength(1);
-      expect(result.skippedCount).toBe(0);
+      expect(result.filteredIssues).toHaveLength(0);
+      expect(result.skippedCount).toBe(1);
     });
   });
 
@@ -1457,7 +1467,7 @@ describe("ReviewService", () => {
 
   describe("ReviewService.getExistingReviewResult", () => {
     it("should return null when no AI review exists", async () => {
-      gitProvider.listPullReviews.mockResolvedValue([{ body: "normal review" }] as any);
+      gitProvider.listIssueComments.mockResolvedValue([{ body: "normal comment" }] as any);
       const result = await (service as any).getExistingReviewResult("o", "r", 1);
       expect(result).toBeNull();
     });
@@ -1466,7 +1476,7 @@ describe("ReviewService", () => {
       const mockResult = { issues: [], summary: [] };
       const mockReviewReportService = (service as any).reviewReportService;
       mockReviewReportService.parseMarkdown.mockReturnValue({ result: mockResult });
-      gitProvider.listPullReviews.mockResolvedValue([
+      gitProvider.listIssueComments.mockResolvedValue([
         { body: "<!-- spaceflow-review --> review content" },
       ] as any);
       const result = await (service as any).getExistingReviewResult("o", "r", 1);
@@ -1474,26 +1484,49 @@ describe("ReviewService", () => {
     });
 
     it("should return null on error", async () => {
-      gitProvider.listPullReviews.mockRejectedValue(new Error("API error"));
+      gitProvider.listIssueComments.mockRejectedValue(new Error("API error"));
       const result = await (service as any).getExistingReviewResult("o", "r", 1);
       expect(result).toBeNull();
     });
   });
 
   describe("ReviewService.deleteExistingAiReviews", () => {
-    it("should delete AI reviews", async () => {
+    it("should delete AI reviews via review API", async () => {
       gitProvider.listPullReviews.mockResolvedValue([
         { id: 1, body: "<!-- spaceflow-review --> old review" },
         { id: 2, body: "normal review" },
       ] as any);
+      gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.deletePullReview.mockResolvedValue(undefined as any);
       await (service as any).deleteExistingAiReviews("o", "r", 1);
       expect(gitProvider.deletePullReview).toHaveBeenCalledWith("o", "r", 1, 1);
       expect(gitProvider.deletePullReview).toHaveBeenCalledTimes(1);
     });
 
-    it("should handle error gracefully", async () => {
+    it("should delete AI reviews via issue comment API", async () => {
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listIssueComments.mockResolvedValue([
+        { id: 10, body: "<!-- spaceflow-review --> old comment" },
+        { id: 11, body: "normal comment" },
+      ] as any);
+      gitProvider.deleteIssueComment.mockResolvedValue(undefined as any);
+      await (service as any).deleteExistingAiReviews("o", "r", 1);
+      expect(gitProvider.deleteIssueComment).toHaveBeenCalledWith("o", "r", 10);
+      expect(gitProvider.deleteIssueComment).toHaveBeenCalledTimes(1);
+    });
+
+    it("should handle review API error gracefully", async () => {
       gitProvider.listPullReviews.mockRejectedValue(new Error("fail"));
+      gitProvider.listIssueComments.mockResolvedValue([] as any);
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      await (service as any).deleteExistingAiReviews("o", "r", 1);
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle issue comment API error gracefully", async () => {
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listIssueComments.mockRejectedValue(new Error("fail"));
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       await (service as any).deleteExistingAiReviews("o", "r", 1);
       expect(consoleSpy).toHaveBeenCalled();
@@ -1725,35 +1758,35 @@ describe("ReviewService", () => {
     it("should post review comment", async () => {
       const configReader = (service as any).configReader;
       configReader.getPluginConfig.mockReturnValue({});
-      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc123" } } as any);
-      gitProvider.createPullReview.mockResolvedValue({} as any);
+      gitProvider.createIssueComment.mockResolvedValue({} as any);
       const result = { issues: [], summary: [], round: 1 };
       await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
-      expect(gitProvider.createPullReview).toHaveBeenCalled();
+      expect(gitProvider.createIssueComment).toHaveBeenCalled();
     });
 
     it("should update PR title when autoUpdatePrTitle enabled", async () => {
       const configReader = (service as any).configReader;
       configReader.getPluginConfig.mockReturnValue({ autoUpdatePrTitle: true });
-      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.editPullRequest.mockResolvedValue({} as any);
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc123" } } as any);
-      gitProvider.createPullReview.mockResolvedValue({} as any);
+      gitProvider.createIssueComment.mockResolvedValue({} as any);
       const result = { issues: [], summary: [], round: 1, title: "New Title" };
       await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
       expect(gitProvider.editPullRequest).toHaveBeenCalledWith("o", "r", 1, { title: "New Title" });
     });
 
-    it("should handle createPullReview error gracefully", async () => {
+    it("should handle createIssueComment error gracefully", async () => {
       const configReader = (service as any).configReader;
       configReader.getPluginConfig.mockReturnValue({});
-      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc123" } } as any);
-      gitProvider.createPullReview.mockRejectedValue(new Error("fail") as any);
+      gitProvider.createIssueComment.mockRejectedValue(new Error("fail") as any);
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const result = { issues: [], summary: [], round: 1 };
       await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
@@ -1765,9 +1798,10 @@ describe("ReviewService", () => {
       const configReader = (service as any).configReader;
       configReader.getPluginConfig.mockReturnValue({ lineComments: true });
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc123" } } as any);
+      gitProvider.createIssueComment.mockResolvedValue({} as any);
       gitProvider.createPullReview.mockResolvedValue({} as any);
       const result = {
         issues: [
@@ -1784,6 +1818,7 @@ describe("ReviewService", () => {
         round: 1,
       };
       await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
+      expect(gitProvider.createPullReview.mock.calls.length).toBeGreaterThan(0);
       const callArgs = gitProvider.createPullReview.mock.calls[0];
       expect(callArgs[3].comments.length).toBeGreaterThan(0);
     });
@@ -1792,39 +1827,32 @@ describe("ReviewService", () => {
   describe("ReviewService.syncResolvedComments", () => {
     it("should mark matched issues as fixed", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review --> content" },
-      ] as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([
-        { path: "test.ts", position: 10, resolver: { login: "user1" } },
+      gitProvider.listResolvedThreads.mockResolvedValue([
+        { path: "test.ts", line: 10, resolvedBy: { login: "user1" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10" }] };
       await (service as any).syncResolvedComments("o", "r", 1, result);
       expect((result.issues[0] as any).fixed).toBeDefined();
     });
 
-    it("should skip resolved comments with no resolver", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review --> content" },
-      ] as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([
-        { path: "test.ts", position: 10, resolver: null },
+    it("should skip when no resolved threads", async () => {
+      gitProvider.listResolvedThreads.mockResolvedValue([] as any);
+      const result = { issues: [{ file: "test.ts", line: "10" }] };
+      await (service as any).syncResolvedComments("o", "r", 1, result);
+      expect((result.issues[0] as any).fixed).toBeUndefined();
+    });
+
+    it("should skip threads without path", async () => {
+      gitProvider.listResolvedThreads.mockResolvedValue([
+        { path: undefined, line: 10, resolvedBy: { login: "user1" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10" }] };
       await (service as any).syncResolvedComments("o", "r", 1, result);
       expect((result.issues[0] as any).fixed).toBeUndefined();
     });
 
-    it("should skip when no AI review found", async () => {
-      gitProvider.listPullReviews.mockResolvedValue([{ id: 1, body: "normal review" }] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", fixed: false }] };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect(result.issues[0].fixed).toBe(false);
-    });
-
     it("should handle error gracefully", async () => {
-      gitProvider.listPullReviews.mockRejectedValue(new Error("fail"));
+      gitProvider.listResolvedThreads.mockRejectedValue(new Error("fail"));
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const result = { issues: [] };
       await (service as any).syncResolvedComments("o", "r", 1, result);
@@ -1891,14 +1919,43 @@ describe("ReviewService", () => {
       const mockReviewReportService = (service as any).reviewReportService;
       mockReviewReportService.parseMarkdown.mockReturnValue({ result: mockResult });
       mockReviewReportService.formatStatsTerminal = vi.fn().mockReturnValue("stats");
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review --> content" },
+      gitProvider.listIssueComments.mockResolvedValue([
+        { id: 10, body: "<!-- spaceflow-review --> content" },
       ] as any);
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequestCommits.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({} as any);
       const context = { owner: "o", repo: "r", prNumber: 1, ci: false, dryRun: false };
       const result = await (service as any).executeCollectOnly(context);
+      expect(result.issues).toHaveLength(1);
+      expect(result.stats).toBeDefined();
+    });
+  });
+
+  describe("ReviewService.execute - flush mode", () => {
+    it("should route to executeCollectOnly when flush is true", async () => {
+      const mockResult = { issues: [{ file: "a.ts", line: "1", ruleId: "R1" }], summary: [] };
+      const mockReviewReportService = (service as any).reviewReportService;
+      mockReviewReportService.parseMarkdown.mockReturnValue({ result: mockResult });
+      mockReviewReportService.formatStatsTerminal = vi.fn().mockReturnValue("stats");
+      gitProvider.listIssueComments.mockResolvedValue([
+        { id: 10, body: "<!-- spaceflow-review --> content" },
+      ] as any);
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
+      gitProvider.getPullRequestCommits.mockResolvedValue([] as any);
+      gitProvider.getPullRequest.mockResolvedValue({} as any);
+      const context = {
+        owner: "o",
+        repo: "r",
+        prNumber: 1,
+        ci: false,
+        dryRun: false,
+        flush: true,
+        specSources: [],
+      };
+      const result = await service.execute(context as any);
       expect(result.issues).toHaveLength(1);
       expect(result.stats).toBeDefined();
     });
@@ -1925,10 +1982,11 @@ describe("ReviewService", () => {
       gitProvider.getPullRequestFiles.mockResolvedValue([
         { filename: "a.ts", status: "modified" },
       ] as any);
+      gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.listPullReviews.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc" } } as any);
-      gitProvider.createPullReview.mockResolvedValue({} as any);
+      gitProvider.createIssueComment.mockResolvedValue({} as any);
       const configReader = (service as any).configReader;
       configReader.getPluginConfig.mockReturnValue({});
       const context = {
@@ -1959,10 +2017,11 @@ describe("ReviewService", () => {
       gitProvider.getPullRequestFiles.mockResolvedValue([
         { filename: "a.ts", status: "modified" },
       ] as any);
+      gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.listPullReviews.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc" } } as any);
-      gitProvider.createPullReview.mockResolvedValue({} as any);
+      gitProvider.createIssueComment.mockResolvedValue({} as any);
       const configReader = (service as any).configReader;
       configReader.getPluginConfig.mockReturnValue({});
       const context = {
@@ -1977,7 +2036,7 @@ describe("ReviewService", () => {
       };
       const result = await (service as any).executeDeletionOnly(context);
       expect(result.success).toBe(true);
-      expect(gitProvider.createPullReview).toHaveBeenCalled();
+      expect(gitProvider.createIssueComment).toHaveBeenCalled();
     });
   });
 
@@ -2141,21 +2200,21 @@ describe("ReviewService", () => {
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
-
     it("should mark issue as invalid on thumbs down from reviewer", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review --> content", user: { login: "bot" } },
+        { id: 1, body: "<!-- spaceflow-review-lines --> content", user: { login: "bot" } },
         { id: 2, body: "LGTM", user: { login: "reviewer1" } },
       ] as any);
       gitProvider.getPullRequest.mockResolvedValue({
+        head: { sha: "abc" },
         requested_reviewers: [],
         requested_reviewers_teams: [],
       } as any);
       gitProvider.listPullReviewComments.mockResolvedValue([
         { id: 100, path: "test.ts", position: 10 },
       ] as any);
-      gitProvider.getIssueCommentReactions.mockResolvedValue([
+      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
         { content: "-1", user: { login: "reviewer1" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", valid: "true" }] };
@@ -2166,7 +2225,7 @@ describe("ReviewService", () => {
     it("should add requested_reviewers to reviewers set", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review --> content", user: { login: "bot" } },
+        { id: 1, body: "<!-- spaceflow-review-lines --> content", user: { login: "bot" } },
       ] as any);
       gitProvider.getPullRequest.mockResolvedValue({
         requested_reviewers: [{ login: "req-reviewer" }],
@@ -2175,7 +2234,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([
         { id: 100, path: "test.ts", position: 10 },
       ] as any);
-      gitProvider.getIssueCommentReactions.mockResolvedValue([
+      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
         { content: "-1", user: { login: "req-reviewer" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", valid: "true" }] };
@@ -2186,7 +2245,7 @@ describe("ReviewService", () => {
     it("should skip comments without id", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review --> content" },
+        { id: 1, body: "<!-- spaceflow-review-lines --> content" },
       ] as any);
       gitProvider.getPullRequest.mockResolvedValue({
         requested_reviewers: [],
@@ -2203,7 +2262,7 @@ describe("ReviewService", () => {
     it("should skip when reactions are empty", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review --> content" },
+        { id: 1, body: "<!-- spaceflow-review-lines --> content" },
       ] as any);
       gitProvider.getPullRequest.mockResolvedValue({
         requested_reviewers: [],
@@ -2212,7 +2271,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([
         { id: 100, path: "test.ts", position: 10 },
       ] as any);
-      gitProvider.getIssueCommentReactions.mockResolvedValue([] as any);
+      gitProvider.getPullReviewCommentReactions.mockResolvedValue([] as any);
       const result = { issues: [{ file: "test.ts", line: "10", reactions: [] }] };
       await (service as any).syncReactionsToIssues("o", "r", 1, result);
       expect(result.issues[0].reactions).toHaveLength(0);
@@ -2221,7 +2280,7 @@ describe("ReviewService", () => {
     it("should store multiple reaction types", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review --> content" },
+        { id: 1, body: "<!-- spaceflow-review-lines --> content" },
       ] as any);
       gitProvider.getPullRequest.mockResolvedValue({
         requested_reviewers: [],
@@ -2230,7 +2289,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([
         { id: 100, path: "test.ts", position: 10 },
       ] as any);
-      gitProvider.getIssueCommentReactions.mockResolvedValue([
+      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
         { content: "+1", user: { login: "user1" } },
         { content: "+1", user: { login: "user2" } },
         { content: "heart", user: { login: "user1" } },
@@ -2243,7 +2302,7 @@ describe("ReviewService", () => {
     it("should not mark as invalid when thumbs down from non-reviewer", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review --> content" },
+        { id: 1, body: "<!-- spaceflow-review-lines --> content" },
       ] as any);
       gitProvider.getPullRequest.mockResolvedValue({
         requested_reviewers: [],
@@ -2252,7 +2311,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([
         { id: 100, path: "test.ts", position: 10 },
       ] as any);
-      gitProvider.getIssueCommentReactions.mockResolvedValue([
+      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
         { content: "-1", user: { login: "random-user" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", valid: "true", reactions: [] }] };
@@ -2717,19 +2776,20 @@ describe("ReviewService", () => {
       mockReviewReportService.parseMarkdown.mockReturnValue({ result: mockResult });
       mockReviewReportService.formatStatsTerminal = vi.fn().mockReturnValue("stats");
       mockReviewReportService.formatMarkdown.mockReturnValue("report");
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review --> content" },
+      gitProvider.listIssueComments.mockResolvedValue([
+        { id: 10, body: "<!-- spaceflow-review --> content" },
       ] as any);
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequestCommits.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc" } } as any);
-      gitProvider.createPullReview.mockResolvedValue({} as any);
+      gitProvider.updateIssueComment.mockResolvedValue({} as any);
       const configReader = (service as any).configReader;
       configReader.getPluginConfig.mockReturnValue({});
       const context = { owner: "o", repo: "r", prNumber: 1, ci: true, dryRun: false, verbose: 1 };
       const result = await (service as any).executeCollectOnly(context);
       expect(result.issues).toHaveLength(1);
-      expect(gitProvider.createPullReview).toHaveBeenCalled();
+      expect(gitProvider.updateIssueComment).toHaveBeenCalled();
     });
   });
 

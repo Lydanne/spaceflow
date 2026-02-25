@@ -44,9 +44,9 @@ spaceflow/
 ├── extensions/            # 外部 Extension（独立 npm 包）
 │   ├── review/            # @spaceflow/review — AI 代码审查
 │   ├── publish/           # @spaceflow/publish — 版本发布
-│   ├── ci-scripts/        # @spaceflow/ci-scripts — 脚本执行
-│   ├── ci-shell/          # @spaceflow/ci-shell — Shell 执行
-│   └── period-summary/    # @spaceflow/period-summary — 周期总结
+│   ├── scripts/           # @spaceflow/scripts — 脚本执行
+│   ├── shell/             # @spaceflow/shell — Shell 执行
+│   └── review-summary/    # @spaceflow/review-summary — 审查总结
 │
 ├── actions/               # GitHub Actions
 │   ├── src/

@@ -15,11 +15,11 @@ Spaceflow 提供预配置的 GitHub Actions，可以在 CI 中自动执行各种
 
 ### 输入参数
 
-| 参数 | 必填 | 说明 |
-|------|------|------|
-| `github-token` | ✅ | GitHub Token |
-| `github-server-url` | ❌ | GitHub Server URL（默认自动检测） |
-| `command` | ✅ | 要执行的 spaceflow 命令 |
+| 参数                | 必填 | 说明                              |
+| ------------------- | ---- | --------------------------------- |
+| `github-token`      | ✅   | GitHub Token                      |
+| `github-server-url` | ❌   | GitHub Server URL（默认自动检测） |
+| `command`           | ✅   | 要执行的 spaceflow 命令           |
 
 ## 预配置工作流
 
@@ -155,13 +155,13 @@ jobs:
 
 在 GitHub 仓库的 Settings → Secrets and variables → Actions 中配置：
 
-| Secret | 说明 |
-|--------|------|
-| `OPENAI_API_KEY` | OpenAI API Key（review 命令需要） |
-| `ANTHROPIC_API_KEY` | Anthropic API Key（可选） |
-| `NPM_TOKEN` | npm 发布 Token（publish 命令需要） |
-| `FEISHU_APP_ID` | 飞书 App ID（通知需要） |
-| `FEISHU_APP_SECRET` | 飞书 App Secret（通知需要） |
+| Secret              | 说明                               |
+| ------------------- | ---------------------------------- |
+| `OPENAI_API_KEY`    | OpenAI API Key（review 命令需要）  |
+| `ANTHROPIC_API_KEY` | Anthropic API Key（可选）          |
+| `NPM_TOKEN`         | npm 发布 Token（publish 命令需要） |
+| `FEISHU_APP_ID`     | 飞书 App ID（通知需要）            |
+| `FEISHU_APP_SECRET` | 飞书 App Secret（通知需要）        |
 
 ::: tip
 `GITHUB_TOKEN` 由 GitHub Actions 自动注入，无需手动配置。
@@ -171,9 +171,9 @@ jobs:
 
 根据使用的命令，需要配置不同的权限：
 
-| 命令 | 需要的权限 |
-|------|-----------|
-| `review` | `contents: read`, `pull-requests: write` |
-| `publish` | `contents: write`, `packages: write` |
-| `ci-scripts` | `contents: read` |
-| `ci-shell` | `contents: read` |
+| 命令      | 需要的权限                               |
+| --------- | ---------------------------------------- |
+| `review`  | `contents: read`, `pull-requests: write` |
+| `publish` | `contents: write`, `packages: write`     |
+| `scripts` | `contents: read`                         |
+| `shell`   | `contents: read`                         |

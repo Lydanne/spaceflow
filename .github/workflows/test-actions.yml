@@ -10,8 +10,8 @@ on:
         options:
           - publish
           - review
-          - ci-scripts
-          - ci-shell
+          - scripts
+          - shell
       args:
         description: "Additional arguments for the command"
         required: false

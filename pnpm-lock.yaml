@@ -106,45 +106,6 @@ importers:
         specifier: ^3.5.13
         version: 3.5.28(typescript@5.9.3)
 
-  extensions/ci-scripts:
-    dependencies:
-      '@spaceflow/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-    devDependencies:
-      '@spaceflow/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.19.1
-
-  extensions/ci-shell:
-    dependencies:
-      '@spaceflow/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-    devDependencies:
-      '@spaceflow/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.19.1
-
-  extensions/period-summary:
-    dependencies:
-      '@spaceflow/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-    devDependencies:
-      '@spaceflow/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.19.1
-
   extensions/publish:
     dependencies:
       '@release-it/conventional-changelog':
@@ -200,6 +161,45 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.0.18(@types/node@22.19.1)(jiti@2.6.1)(terser@5.44.1)
+
+  extensions/review-summary:
+    dependencies:
+      '@spaceflow/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      '@spaceflow/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.1
+
+  extensions/scripts:
+    dependencies:
+      '@spaceflow/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      '@spaceflow/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.1
+
+  extensions/shell:
+    dependencies:
+      '@spaceflow/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      '@spaceflow/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.1
 
   packages/cli:
     dependencies:

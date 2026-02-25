@@ -48,23 +48,27 @@ export const extension = defineExtension({
         { flags: "-o, --output-format <format>", description: t("review:options.outputFormat") },
         { flags: "--generate-description", description: t("review:options.generateDescription") },
         { flags: "--show-all", description: t("review:options.showAll") },
+        { flags: "--flush", description: t("review:options.flush") },
         { flags: "--event-action <action>", description: t("review:options.eventAction") },
       ],
       run: async (_args, options, ctx) => {
+        const isFlush = !!options?.flush;
         if (!ctx.hasService("gitProvider")) {
           ctx.output.error(
             "review 命令需要配置 Git Provider，请在 spaceflow.json 中配置 gitProvider 字段",
           );
           process.exit(1);
         }
-        if (!ctx.hasService("llmProxy")) {
+        if (!isFlush && !ctx.hasService("llmProxy")) {
           ctx.output.error("review 命令需要配置 LLM 服务，请在 spaceflow.json 中配置 llm 字段");
           process.exit(1);
         }
 
         const gitProvider = ctx.getService<GitProviderService>("gitProvider");
         const configReader = ctx.getService<ConfigReaderService>("config");
-        const llmProxy = ctx.getService<LlmProxyService>("llmProxy");
+        const llmProxy = ctx.hasService("llmProxy")
+          ? ctx.getService<LlmProxyService>("llmProxy")
+          : (undefined as unknown as LlmProxyService);
         const gitSdk = ctx.hasService("gitSdk")
           ? ctx.getService<GitSdkService>("gitSdk")
           : undefined;
@@ -104,6 +108,7 @@ export const extension = defineExtension({
           outputFormat: options?.outputFormat as ReportFormat,
           generateDescription: !!options?.generateDescription,
           showAll: !!options?.showAll,
+          flush: isFlush,
           eventAction: options?.eventAction as string,
         };
 
