@@ -1,11 +1,11 @@
 {
-  "name": "spaceflow-local",
+  "name": "spaceflow",
   "private": true,
   "dependencies": {
-    "@spaceflow/scripts": "link:../extensions/scripts",
-    "@spaceflow/shell": "link:../extensions/shell",
-    "@spaceflow/core": "link:../packages/core",
-    "@spaceflow/publish": "link:../extensions/publish",
-    "@spaceflow/review": "link:../extensions/review"
+    "@spaceflow/core": "workspace:*",
+    "@spaceflow/scripts": "workspace:*",
+    "@spaceflow/shell": "workspace:*",
+    "@spaceflow/publish": "workspace:*",
+    "@spaceflow/review": "workspace:*"
   }
 }
