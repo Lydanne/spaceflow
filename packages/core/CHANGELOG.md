@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.6.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@0.5.0...@spaceflow/core@0.6.0) (2026-02-25)
+
+### 代码重构
+
+* **cli:** 统一使用 core 层配置读取函数，移除重复的配置解析逻辑 ([5783e5f](https://github.com/Lydanne/spaceflow/commit/5783e5f693b0aafd8346ee3a250692265aad55c5))
+* **core:** 修复 dependencies 写入格式，确保与 package.json 规范一致 ([b3d4ada](https://github.com/Lydanne/spaceflow/commit/b3d4ada9ece7d191bdbf035550553c9919d9d90f))
+
+### 其他修改
+
+* **cli:** released version 0.23.0 [no ci] ([7a71e2c](https://github.com/Lydanne/spaceflow/commit/7a71e2c21a409999fde86a7fca9e6b26fa8bef14))
+* **cli:** released version 0.24.0 [no ci] ([418daf8](https://github.com/Lydanne/spaceflow/commit/418daf8a8571e9dec2ef5c13e8fb103b876fb483))
+* **publish:** released version 0.25.0 [no ci] ([3bae586](https://github.com/Lydanne/spaceflow/commit/3bae586e34df1978a010a33bba20611082b3c3e2))
+* **publish:** released version 0.26.0 [no ci] ([2f196b1](https://github.com/Lydanne/spaceflow/commit/2f196b196a0cdb6da94881c27d5d55202c5fa8c0))
+* **review-summary:** released version 0.3.0 [no ci] ([9a881e9](https://github.com/Lydanne/spaceflow/commit/9a881e94b6141592aefc835861bf2bf7cca9eefe))
+* **review-summary:** released version 0.4.0 [no ci] ([6a9e7d5](https://github.com/Lydanne/spaceflow/commit/6a9e7d58f796a72fb381e18bfb0d0a1799fd2d5d))
+* **review:** released version 0.33.0 [no ci] ([467cf91](https://github.com/Lydanne/spaceflow/commit/467cf91c60c0693e22c172a9358d0981dc8a9d64))
+* **review:** released version 0.34.0 [no ci] ([fb1ae4a](https://github.com/Lydanne/spaceflow/commit/fb1ae4a48a6ff6f68b43ea45ac8950283605bad6))
+* **scripts:** released version 0.3.0 [no ci] ([7b62b7b](https://github.com/Lydanne/spaceflow/commit/7b62b7bc7a4c4795472d729df321acbde808ec4d))
+* **scripts:** released version 0.4.0 [no ci] ([b30f118](https://github.com/Lydanne/spaceflow/commit/b30f118e07506485ceaafaa850d13b3167facea9))
+* **shell:** released version 0.3.0 [no ci] ([baa26b3](https://github.com/Lydanne/spaceflow/commit/baa26b3d6bc63de2c252101d915badf4461dfbd1))
+* **shell:** released version 0.4.0 [no ci] ([dca978f](https://github.com/Lydanne/spaceflow/commit/dca978fd7c620a78ecc9f23e96f29775a1276f0d))
+
 ## [0.5.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@0.4.0...@spaceflow/core@0.5.0) (2026-02-25)
 
 ### 代码重构
