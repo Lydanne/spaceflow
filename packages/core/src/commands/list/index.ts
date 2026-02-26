@@ -1,6 +1,6 @@
 import { defineExtension, type VerboseLevel } from "@spaceflow/core";
 import { ListService } from "./list.service";
-import type { ExtensionLoader } from "../../extension-loader";
+import type { ExtensionLoader } from "../../cli-runtime/extension-loader";
 
 /**
  * List 命令扩展

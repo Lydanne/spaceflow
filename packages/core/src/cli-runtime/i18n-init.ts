@@ -13,32 +13,32 @@ const i18next: i18n =
   (i18nextModule as unknown as { default: i18n }).default || (i18nextModule as unknown as i18n);
 
 // ---- CLI 命令翻译 ----
-import buildZhCN from "./zh-cn/build.json";
-import buildEn from "./en/build.json";
-import clearZhCN from "./zh-cn/clear.json";
-import clearEn from "./en/clear.json";
-import commitZhCN from "./zh-cn/commit.json";
-import commitEn from "./en/commit.json";
-import createZhCN from "./zh-cn/create.json";
-import createEn from "./en/create.json";
-import devZhCN from "./zh-cn/dev.json";
-import devEn from "./en/dev.json";
-import installZhCN from "./zh-cn/install.json";
-import installEn from "./en/install.json";
-import listZhCN from "./zh-cn/list.json";
-import listEn from "./en/list.json";
-import mcpZhCN from "./zh-cn/mcp.json";
-import mcpEn from "./en/mcp.json";
-import runxZhCN from "./zh-cn/runx.json";
-import runxEn from "./en/runx.json";
-import schemaZhCN from "./zh-cn/schema.json";
-import schemaEn from "./en/schema.json";
-import setupZhCN from "./zh-cn/setup.json";
-import setupEn from "./en/setup.json";
-import uninstallZhCN from "./zh-cn/uninstall.json";
-import uninstallEn from "./en/uninstall.json";
-import updateZhCN from "./zh-cn/update.json";
-import updateEn from "./en/update.json";
+import buildZhCN from "../locales/zh-cn/build.json";
+import buildEn from "../locales/en/build.json";
+import clearZhCN from "../locales/zh-cn/clear.json";
+import clearEn from "../locales/en/clear.json";
+import commitZhCN from "../locales/zh-cn/commit.json";
+import commitEn from "../locales/en/commit.json";
+import createZhCN from "../locales/zh-cn/create.json";
+import createEn from "../locales/en/create.json";
+import devZhCN from "../locales/zh-cn/dev.json";
+import devEn from "../locales/en/dev.json";
+import installZhCN from "../locales/zh-cn/install.json";
+import installEn from "../locales/en/install.json";
+import listZhCN from "../locales/zh-cn/list.json";
+import listEn from "../locales/en/list.json";
+import mcpZhCN from "../locales/zh-cn/mcp.json";
+import mcpEn from "../locales/en/mcp.json";
+import runxZhCN from "../locales/zh-cn/runx.json";
+import runxEn from "../locales/en/runx.json";
+import schemaZhCN from "../locales/zh-cn/schema.json";
+import schemaEn from "../locales/en/schema.json";
+import setupZhCN from "../locales/zh-cn/setup.json";
+import setupEn from "../locales/en/setup.json";
+import uninstallZhCN from "../locales/zh-cn/uninstall.json";
+import uninstallEn from "../locales/en/uninstall.json";
+import updateZhCN from "../locales/zh-cn/update.json";
+import updateEn from "../locales/en/update.json";
 
 type LocaleResource = Record<string, Record<string, string>>;
 

@@ -1,6 +1,6 @@
 import { join } from "path";
 import { existsSync } from "fs";
-import type { ExtensionLoader } from "../../extension-loader";
+import type { ExtensionLoader } from "../../cli-runtime/extension-loader";
 import {
   shouldLog,
   type VerboseLevel,
@@ -124,5 +124,4 @@ export class ListService {
       return possiblePaths.some((p) => existsSync(p));
     }
   }
-
 }

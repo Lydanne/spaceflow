@@ -73,5 +73,15 @@ export * from "./shared/logger";
 // ============ 配置相关 ============
 export * from "./config";
 
+// ============ CLI Runtime ============
+// exec 入口、DI 容器、扩展加载器、i18n 初始化
+export {
+  exec,
+  ServiceContainer,
+  ExtensionLoader,
+  initCliI18n,
+  internalExtensions,
+} from "./cli-runtime";
+
 // ============ Zod 重导出 ============
 export { z } from "zod";

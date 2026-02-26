@@ -11,7 +11,7 @@ import {
   SchemaGeneratorService,
 } from "@spaceflow/core";
 import type { SpaceflowContext } from "@spaceflow/core";
-import { InstallService } from "./commands/install/install.service";
+import { InstallService } from "../commands/install/install.service";
 
 /**
  * 扩展加载器

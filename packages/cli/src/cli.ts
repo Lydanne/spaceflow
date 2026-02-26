@@ -1,125 +1,128 @@
 #!/usr/bin/env node
-import { Command } from "commander";
-import { ServiceContainer, initializeContainer } from "./di";
-import { ExtensionLoader } from "./extension-loader";
-import { internalExtensions } from "./internal-extensions";
-import { initCliI18n } from "./locales";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { join } from "path";
+import { execSync } from "child_process";
+import { homedir } from "os";
 
-// 初始化 CLI i18n（i18next 仅在 CLI 中管理）
-initCliI18n();
+/**
+ * Spaceflow CLI — 壳子入口
+ *
+ * 职责：
+ * 1. 读取 .spaceflow/package.json 的 dependencies（外部扩展列表）
+ * 2. 生成 .spaceflow/bin/index.js（静态导入所有扩展 + 调用 Core.exec()）
+ * 3. 执行 node .spaceflow/bin/index.js，将所有参数透传
+ */
+
+const SPACEFLOW_DIR = ".spaceflow";
+const BIN_DIR = "bin";
+const INDEX_FILE = "index.js";
+const CORE_PACKAGES = ["@spaceflow/core", "@spaceflow/cli"];
+
+/**
+ * 获取 .spaceflow 目录路径（优先本地，回退全局）
+ */
+function getSpaceflowDir(): string {
+  const localDir = join(process.cwd(), SPACEFLOW_DIR);
+  if (existsSync(localDir)) {
+    return localDir;
+  }
+  const globalDir = join(homedir(), SPACEFLOW_DIR);
+  if (existsSync(globalDir)) {
+    return globalDir;
+  }
+  // 默认使用本地目录
+  return localDir;
+}
+
+/**
+ * 从 .spaceflow/package.json 读取外部扩展列表
+ */
+function readExternalExtensions(spaceflowDir: string): string[] {
+  const pkgJsonPath = join(spaceflowDir, "package.json");
+  if (!existsSync(pkgJsonPath)) {
+    return [];
+  }
+
+  try {
+    const content = readFileSync(pkgJsonPath, "utf-8");
+    const pkg = JSON.parse(content);
+    const deps = pkg.dependencies || {};
+    return Object.keys(deps).filter((name) => !CORE_PACKAGES.includes(name));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 生成 .spaceflow/bin/index.js 内容
+ * 静态导入所有扩展，调用 Core.exec()
+ */
+function generateIndexContent(extensions: string[]): string {
+  const imports = extensions.map((name, i) => `import ext${i} from '${name}';`).join("\n");
+
+  const extArray = extensions.length > 0 ? extensions.map((_, i) => `  ext${i},`).join("\n") : "";
+
+  return `import { exec } from '@spaceflow/core';
+${imports}
 
 async function bootstrap() {
-  // 创建并初始化服务容器
-  const container = new ServiceContainer();
-  initializeContainer(container);
-
-  // 创建扩展加载器
-  const extensionLoader = new ExtensionLoader(container);
-
-  // 注册 extensionLoader 到服务容器
-  container.registerService("extensionLoader", extensionLoader);
-
-  // 注册内部扩展
-  for (const ext of internalExtensions) {
-    extensionLoader.registerExtension(ext);
-  }
-
-  // 发现并加载外部扩展
-  // install/setup 命令本身会处理安装，跳过自动安装
-  const subCommand = process.argv[2];
-  const skipAutoInstall = ["install", "i", "setup", "uninstall"].includes(subCommand);
-  await extensionLoader.discoverAndLoad({ skipAutoInstall });
-
-  // 创建 CLI 程序
-  const program = new Command();
-  program.name("spaceflow").description("Spaceflow CLI").version("1.0.0");
-
-  // 定义全局 verbose 选项（支持计数：-v, -vv, -vvv）
-  program.option(
-    "-v, --verbose",
-    "详细输出（可叠加：-v, -vv, -vvv）",
-    (_, prev: number) => prev + 1,
-    0,
-  );
-
-  // 全局选项列表
-  const globalOptions = ["-h, --help", "-V, --version", "-v, --verbose"];
-
-  // 注册所有命令
-  const commands = extensionLoader.getCommands();
-  for (const cmd of commands) {
-    const command = new Command(cmd.name).description(cmd.description);
-
-    // 添加参数
-    if (cmd.arguments) {
-      command.arguments(cmd.arguments);
-    }
-
-    // 添加选项（排除已定义的全局选项）
-    if (cmd.options) {
-      for (const opt of cmd.options) {
-        if (!globalOptions.some((go) => opt.flags.startsWith(go.split(",")[0].trim()))) {
-          if (opt.isCount) {
-            // 计数选项：-v -v -v 或 -vvv 会累加
-            command.option(
-              opt.flags as string,
-              opt.description as string,
-              (_, prev: number) => prev + 1,
-              0,
-            );
-          } else {
-            const defaultValue = opt.default as string | boolean | string[] | undefined;
-            command.option(opt.flags as string, opt.description as string, defaultValue);
-          }
-        }
-      }
-    }
-
-    // 添加子命令
-    if (cmd.subcommands) {
-      for (const sub of cmd.subcommands) {
-        const subCmd = new Command(sub.name).description(sub.description);
-        if (sub.options) {
-          for (const opt of sub.options) {
-            if (!globalOptions.some((go) => opt.flags.startsWith(go.split(",")[0].trim()))) {
-              const defaultValue = opt.default as string | boolean | string[] | undefined;
-              subCmd.option(opt.flags as string, opt.description as string, defaultValue);
-            }
-          }
-        }
-        subCmd.action(async (args, options) => {
-          await sub.run([args], options, container);
-        });
-        command.addCommand(subCmd);
-      }
-    }
-
-    // 添加执行函数
-    // commander 的 action 回调：有位置参数时是 (arg1, arg2, ..., options, command)
-    // 无位置参数时是 (options, command)
-    command.action(async (...actionArgs) => {
-      const opts = actionArgs[actionArgs.length - 2] || {};
-      const positionalArgs = actionArgs.slice(0, -2);
-      // 合并全局 verbose 选项
-      const globalOpts = program.opts();
-      if (globalOpts.verbose && !opts.verbose) {
-        opts.verbose = globalOpts.verbose;
-      }
-      await cmd.run(positionalArgs, opts, container);
-    });
-
-    // 将命令添加到 program
-    program.addCommand(command);
-  }
-
-  // 解析命令行参数
-  await program.parseAsync(process.argv);
-
-  // 清理
-  await container.destroy();
+  await exec([
+${extArray}
+  ]);
 }
 
 bootstrap().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+`;
+}
+
+/**
+ * 生成并写入 .spaceflow/bin/index.js
+ */
+function generateBinFile(spaceflowDir: string, extensions: string[]): string {
+  const binDir = join(spaceflowDir, BIN_DIR);
+  const indexPath = join(binDir, INDEX_FILE);
+
+  // 确保 bin 目录存在
+  if (!existsSync(binDir)) {
+    mkdirSync(binDir, { recursive: true });
+  }
+
+  const content = generateIndexContent(extensions);
+
+  // 仅在内容变化时写入，避免不必要的文件系统操作
+  if (existsSync(indexPath)) {
+    const existing = readFileSync(indexPath, "utf-8");
+    if (existing === content) {
+      return indexPath;
+    }
+  }
+
+  writeFileSync(indexPath, content, "utf-8");
+  return indexPath;
+}
+
+/**
+ * 执行生成的 index.js
+ */
+function executeIndexFile(indexPath: string): void {
+  try {
+    execSync(`node "${indexPath}" ${process.argv.slice(2).join(" ")}`, {
+      cwd: process.cwd(),
+      stdio: "inherit",
+      env: process.env,
+    });
+  } catch (error: any) {
+    // execSync 在子进程非零退出时抛出错误
+    // 子进程的 stdout/stderr 已通过 stdio: "inherit" 输出
+    process.exit(error.status || 1);
+  }
+}
+
+// ---- 主流程 ----
+const spaceflowDir = getSpaceflowDir();
+const extensions = readExternalExtensions(spaceflowDir);
+const indexPath = generateBinFile(spaceflowDir, extensions);
+executeIndexFile(indexPath);

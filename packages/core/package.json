@@ -69,6 +69,10 @@
     "./parallel": {
       "types": "./src/shared/parallel/index.ts",
       "import": "./dist/index.js"
+    },
+    "./cli-runtime": {
+      "types": "./src/cli-runtime/index.ts",
+      "import": "./dist/index.js"
     }
   },
   "scripts": {
@@ -100,7 +104,9 @@
     "release-it-gitea": "^1.8.0",
     "rxjs": "catalog:",
     "zod": "catalog:",
-    "zod-to-json-schema": "^3.25.1"
+    "zod-to-json-schema": "^3.25.1",
+    "commander": "^12.1.0",
+    "i18next": "^25.8.4"
   },
   "devDependencies": {
     "@swc/core": "catalog:",
@@ -116,7 +122,6 @@
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "i18next": "^25.8.4",
     "unplugin-swc": "catalog:",
     "vitest": "catalog:"
   }

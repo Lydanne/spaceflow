@@ -26,12 +26,15 @@ export default {
   externalsType: "module-import",
   externals: [
     { micromatch: "node-commonjs micromatch" },
-    /^(?!src\/)[^./]/, // node_modules 包（排除 src/ 别名）
+    /^(?!src\/|@spaceflow\/core)[^./]/, // node_modules 包（排除 src/ 别名和 @spaceflow/core 自引用）
   ],
   resolve: {
     extensions: [".ts", ".js"],
     extensionAlias: {
       ".js": [".ts", ".js"],
+    },
+    alias: {
+      "@spaceflow/core": resolve(__dirname, "src/index.ts"),
     },
     tsConfig: {
       configFile: resolve(__dirname, "tsconfig.json"),

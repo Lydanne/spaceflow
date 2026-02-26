@@ -1,6 +1,6 @@
 import { defineExtension, type VerboseLevel } from "@spaceflow/core";
 import { McpService } from "./mcp.service";
-import type { ExtensionLoader } from "../../extension-loader";
+import type { ExtensionLoader } from "../../cli-runtime/extension-loader";
 
 /**
  * MCP 命令扩展
