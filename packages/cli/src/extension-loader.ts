@@ -102,7 +102,11 @@ export class ExtensionLoader {
     if (!options?.skipAutoInstall && requiredExtensions.length > 0) {
       const installService = new InstallService(new SchemaGeneratorService());
       if (installService.hasMissingExtensions()) {
-        await installService.updateAllExtensions({ verbose: 0 });
+        // 检测命令行是否带 -v/--verbose，有则传入 verbose 以便排查安装问题
+        const hasVerbose = process.argv.some(
+          (arg) => arg === "-v" || arg === "--verbose" || /^-[a-uw-zA-Z]*v/.test(arg),
+        );
+        await installService.updateAllExtensions({ verbose: hasVerbose ? 1 : 0 });
       }
     }
 
