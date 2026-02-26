@@ -16,16 +16,13 @@
 
 ## 安装
 
-`@spaceflow/publish` 是 `@spaceflow/cli` 的内置命令，安装 CLI 后即可使用：
+`@spaceflow/publish` 是独立的扩展包，需要先安装：
 
 ```bash
-# 使用 pnpm
-pnpm add -D @spaceflow/cli
-
 pnpm spaceflow install @spaceflow/publish
 ```
 
-然后在项目根目录创建 `spaceflow.json` 配置文件：
+然后在配置文件中添加 `publish` 字段：
 
 ```json
 {
