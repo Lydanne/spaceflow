@@ -17,7 +17,7 @@ export { internalExtensions } from "./internal-extensions";
  * @param extensions 外部扩展定义列表（来自 .spaceflow/bin/index.js 的静态导入）
  */
 export async function exec(extensions: ExtensionDefinition[] = []): Promise<void> {
-  // 1. 初始化 i18n
+  // 1. 初始化 i18n（如果尚未初始化，由生成的 bin/index.js 提前调用）
   initCliI18n();
 
   // 2. 创建并初始化服务容器

@@ -46,18 +46,26 @@ function readExternalExtensions(): string[] {
 
 /**
  * 生成 .spaceflow/bin/index.js 内容
+ *
+ * 使用 dynamic import 加载扩展，确保 i18n 在扩展模块执行前已初始化
+ * （扩展在 import 阶段就会调用 t() 获取 description，必须先初始化 i18n）
  */
 function generateIndexContent(extensions: string[]): string {
-  const imports = extensions.map((name, i) => `import ext${i} from '${name}';`).join("\n");
-  const extArray = extensions.length > 0 ? extensions.map((_, i) => `  ext${i},`).join("\n") : "";
+  const dynamicImports = extensions
+    .map((name) => `    import('${name}').then(m => m.default || m.extension || m),`)
+    .join("\n");
 
-  return `import { exec } from '@spaceflow/core';
-${imports}
+  return `import { exec, initCliI18n } from '@spaceflow/core';
 
 async function bootstrap() {
-  await exec([
-${extArray}
+  // 先初始化 i18n，再加载扩展（扩展 import 时会调用 t() 获取翻译）
+  initCliI18n();
+
+  const extensions = await Promise.all([
+${dynamicImports}
   ]);
+
+  await exec(extensions);
 }
 
 bootstrap().catch((err) => {
