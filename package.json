@@ -14,8 +14,8 @@
     "url": "https://github.com/Lydanne/spaceflow/issues"
   },
   "scripts": {
-    "setup": "pnpm --filter @spaceflow/core build && pnpm --filter @spaceflow/cli build && pnpm install && pnpm --filter \"!@spaceflow/core\" --filter \"!@spaceflow/cli\" build",
-    "build": "pnpm --filter @spaceflow/core build && pnpm --filter @spaceflow/cli build && pnpm --filter \"!@spaceflow/core\" --filter \"!@spaceflow/cli\" build",
+    "setup": "pnpm --filter @spaceflow/shared build && pnpm --filter @spaceflow/core build && pnpm --filter @spaceflow/cli build && pnpm install && pnpm --filter \"!@spaceflow/shared\" --filter \"!@spaceflow/core\" --filter \"!@spaceflow/cli\" build",
+    "build": "pnpm --filter @spaceflow/shared build && pnpm --filter @spaceflow/core build && pnpm --filter @spaceflow/cli build && pnpm --filter \"!@spaceflow/shared\" --filter \"!@spaceflow/core\" --filter \"!@spaceflow/cli\" build",
     "lint": "oxlint .",
     "format": "oxfmt . --write",
     "test": "pnpm --filter \"*\" test",
