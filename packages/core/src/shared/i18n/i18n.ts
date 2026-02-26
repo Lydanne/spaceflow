@@ -1,95 +1,70 @@
-import * as i18nextModule from "i18next";
-import type { TOptions, i18n } from "i18next";
+/** globalThis 上的 key */
+const GLOBAL_T_KEY = "__spaceflow_t__";
+const GLOBAL_ADD_LOCALE_KEY = "__spaceflow_add_locale__";
 
-// 兼容 CJS/ESM 混合环境
-const i18next: i18n =
-  (i18nextModule as unknown as { default: i18n }).default || (i18nextModule as unknown as i18n);
-import { detectLocale } from "./locale-detect";
-import zhCN from "../../locales/zh-cn/translation.json";
-import en from "../../locales/en/translation.json";
+/** 翻译函数类型 */
+export type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
 
-/** 默认命名空间 */
-const DEFAULT_NS = "translation";
+/** 注册翻译资源函数类型 */
+export type AddLocaleResourcesFn = (
+  ns: string,
+  resources: Record<string, Record<string, unknown>>,
+) => void;
 
-/** globalThis 上的 key，确保多份 core 实例共享同一个 i18n 状态 */
-const GLOBAL_I18N_KEY = "__spaceflow_i18n__";
-
-interface GlobalI18nState {
-  instance: i18n;
-  initialized: boolean;
+/**
+ * 设置全局翻译函数
+ * 由 CLI 在启动时调用，将 i18next 的 t 函数挂载到 globalThis
+ */
+export function setGlobalT(fn: TranslateFn): void {
+  (globalThis as Record<string, unknown>)[GLOBAL_T_KEY] = fn;
 }
 
 /**
- * 获取全局 i18n 状态（单例）
- * 无论有几份 @spaceflow/core 实例，都共享同一个 i18next 实例
+ * 设置全局翻译资源注册函数
+ * 由 CLI 在启动时调用
  */
-function getGlobalState(): GlobalI18nState {
-  const g = globalThis as Record<string, unknown>;
-  if (!g[GLOBAL_I18N_KEY]) {
-    g[GLOBAL_I18N_KEY] = {
-      instance: i18next,
-      initialized: false,
-    } satisfies GlobalI18nState;
-  }
-  return g[GLOBAL_I18N_KEY] as GlobalI18nState;
+export function setGlobalAddLocaleResources(fn: AddLocaleResourcesFn): void {
+  (globalThis as Record<string, unknown>)[GLOBAL_ADD_LOCALE_KEY] = fn;
 }
 
 /**
- * 初始化 i18n
- * 当提供 resources 且无后端加载器时，i18next.init() 同步完成
- * @param lang 指定语言，不传则自动检测
+ * 获取全局翻译函数
  */
-export function initI18n(lang?: string): void {
-  const state = getGlobalState();
-  if (state.initialized) return;
-  const lng = lang || detectLocale();
-  // i18next v25+ 移除了 initSync，但提供内联 resources 时 init() 同步完成
-  void state.instance.init({
-    lng,
-    fallbackLng: "zh-CN",
-    defaultNS: DEFAULT_NS,
-    ns: [DEFAULT_NS],
-    resources: {
-      "zh-CN": { [DEFAULT_NS]: zhCN },
-      en: { [DEFAULT_NS]: en },
-    },
-    interpolation: {
-      escapeValue: false,
-    },
-    returnNull: false,
-    returnEmptyString: false,
-    // 确保 init 同步完成（默认 initImmediate: true 会将加载推到 setTimeout）
-    initImmediate: false,
-    // i18next v25.8+ 会在 init 时输出 locize.com 推广日志
-    showSupportNotice: false,
+function getGlobalT(): TranslateFn | undefined {
+  return (globalThis as Record<string, unknown>)[GLOBAL_T_KEY] as TranslateFn | undefined;
+}
+
+/**
+ * 简单的模板插值（fallback 用）
+ * 支持 {{key}} 格式
+ */
+function interpolate(template: string, options?: Record<string, unknown>): string {
+  if (!options) return template;
+  return template.replace(/\{\{(\w+)\}\}/g, (_, k: string) => {
+    const val = options[k];
+    return val !== undefined ? String(val) : `{{${k}}}`;
   });
-  state.initialized = true;
-}
-
-/**
- * 重置 i18n 状态（仅用于测试）
- */
-export function resetI18n(): void {
-  const state = getGlobalState();
-  state.initialized = false;
 }
 
 /**
  * 翻译函数
- * 通过 globalThis 共享 i18next 实例，确保多份 core 实例下翻译一致
+ * 优先使用 CLI 通过 setGlobalT 挂载的翻译函数
+ * 未挂载时回退到返回 key（带插值）
  * @param key 翻译 key
  * @param options 插值参数
  */
-export function t(key: string, options?: TOptions): string {
-  const state = getGlobalState();
-  if (!state.initialized) {
-    initI18n();
+export function t(key: string, options?: Record<string, unknown>): string {
+  const globalT = getGlobalT();
+  if (globalT) {
+    return globalT(key, options);
   }
-  return state.instance.t(key, options) as string;
+  // fallback: 直接返回 key（带插值）
+  return interpolate(key, options);
 }
 
 /**
  * 为外部 Extension 注册语言资源
+ * 委托给 CLI 通过 setGlobalAddLocaleResources 挂载的实际实现
  * @param ns 命名空间（通常为 Extension name）
  * @param resources 语言资源，key 为语言代码，值为翻译对象
  */
@@ -97,16 +72,18 @@ export function addLocaleResources(
   ns: string,
   resources: Record<string, Record<string, unknown>>,
 ): void {
-  const state = getGlobalState();
-  if (!state.initialized) {
-    initI18n();
+  const fn = (globalThis as Record<string, unknown>)[GLOBAL_ADD_LOCALE_KEY] as
+    | AddLocaleResourcesFn
+    | undefined;
+  if (fn) {
+    fn(ns, resources);
   }
-  for (const [lng, translations] of Object.entries(resources)) {
-    state.instance.addResourceBundle(lng, ns, translations, true, true);
-  }
-  if (!state.instance.options.ns) {
-    state.instance.options.ns = [DEFAULT_NS, ns];
-  } else if (Array.isArray(state.instance.options.ns) && !state.instance.options.ns.includes(ns)) {
-    state.instance.options.ns.push(ns);
-  }
+}
+
+/**
+ * 重置全局翻译函数（仅用于测试）
+ */
+export function resetI18n(): void {
+  (globalThis as Record<string, unknown>)[GLOBAL_T_KEY] = undefined;
+  (globalThis as Record<string, unknown>)[GLOBAL_ADD_LOCALE_KEY] = undefined;
 }

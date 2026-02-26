@@ -1,15 +1,12 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { initI18n } from "@spaceflow/core";
 import { ServiceContainer, initializeContainer } from "./di";
 import { ExtensionLoader } from "./extension-loader";
 import { internalExtensions } from "./internal-extensions";
+import { initCliI18n } from "./locales";
 
-// 初始化 i18n
-initI18n();
-
-// 注册内部命令的 i18n 资源
-import "./locales";
+// 初始化 CLI i18n（i18next 仅在 CLI 中管理）
+initCliI18n();
 
 async function bootstrap() {
   // 创建并初始化服务容器

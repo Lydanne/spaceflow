@@ -89,7 +89,6 @@
     "@rspack/core": "^1.7.4",
     "chalk": "^5.6.2",
     "dotenv": "^16.4.5",
-    "i18next": "^25.8.4",
     "json-stringify-pretty-compact": "^4.0.0",
     "jsonrepair": "^3.13.1",
     "log-update": "^7.1.0",
@@ -117,6 +116,7 @@
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "i18next": "^25.8.4",
     "unplugin-swc": "catalog:",
     "vitest": "catalog:"
   }

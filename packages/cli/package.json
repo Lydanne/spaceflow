@@ -36,6 +36,7 @@
     "@rspack/core": "^1.7.4",
     "@spaceflow/core": "workspace:*",
     "commander": "^12.1.0",
+    "i18next": "^25.8.4",
     "json-stringify-pretty-compact": "^4.0.0",
     "micromatch": "^4.0.8",
     "zod-to-json-schema": "^3.25.1"
@@ -45,11 +46,11 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "ts-node": "catalog:",
     "tsconfig-paths": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
-    "@vitest/coverage-v8": "catalog:",
     "vitest": "catalog:"
   }
 }

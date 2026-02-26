@@ -1,4 +1,18 @@
-import { addLocaleResources } from "@spaceflow/core";
+import * as i18nextModule from "i18next";
+import type { i18n } from "i18next";
+import {
+  setGlobalT,
+  setGlobalAddLocaleResources,
+  detectLocale,
+  coreZhCN,
+  coreEn,
+} from "@spaceflow/core";
+
+// 兼容 CJS/ESM 混合环境
+const i18next: i18n =
+  (i18nextModule as unknown as { default: i18n }).default || (i18nextModule as unknown as i18n);
+
+// ---- CLI 命令翻译 ----
 import buildZhCN from "./zh-cn/build.json";
 import buildEn from "./en/build.json";
 import clearZhCN from "./zh-cn/clear.json";
@@ -28,105 +42,77 @@ import updateEn from "./en/update.json";
 
 type LocaleResource = Record<string, Record<string, string>>;
 
-/** build 命令 i18n 资源 */
-export const buildLocales: LocaleResource = {
-  "zh-CN": buildZhCN,
-  en: buildEn,
-};
-
-/** clear 命令 i18n 资源 */
-export const clearLocales: LocaleResource = {
-  "zh-CN": clearZhCN,
-  en: clearEn,
-};
-
-/** commit 命令 i18n 资源 */
-export const commitLocales: LocaleResource = {
-  "zh-CN": commitZhCN,
-  en: commitEn,
-};
-
-/** create 命令 i18n 资源 */
-export const createLocales: LocaleResource = {
-  "zh-CN": createZhCN,
-  en: createEn,
-};
-
-/** dev 命令 i18n 资源 */
-export const devLocales: LocaleResource = {
-  "zh-CN": devZhCN,
-  en: devEn,
-};
-
-/** install 命令 i18n 资源 */
-export const installLocales: LocaleResource = {
-  "zh-CN": installZhCN,
-  en: installEn,
-};
-
-/** list 命令 i18n 资源 */
-export const listLocales: LocaleResource = {
-  "zh-CN": listZhCN,
-  en: listEn,
-};
-
-/** mcp 命令 i18n 资源 */
-export const mcpLocales: LocaleResource = {
-  "zh-CN": mcpZhCN,
-  en: mcpEn,
-};
-
-/** runx 命令 i18n 资源 */
-export const runxLocales: LocaleResource = {
-  "zh-CN": runxZhCN,
-  en: runxEn,
-};
-
-/** schema 命令 i18n 资源 */
-export const schemaLocales: LocaleResource = {
-  "zh-CN": schemaZhCN,
-  en: schemaEn,
-};
-
-/** setup 命令 i18n 资源 */
-export const setupLocales: LocaleResource = {
-  "zh-CN": setupZhCN,
-  en: setupEn,
-};
-
-/** uninstall 命令 i18n 资源 */
-export const uninstallLocales: LocaleResource = {
-  "zh-CN": uninstallZhCN,
-  en: uninstallEn,
-};
-
-/** update 命令 i18n 资源 */
-export const updateLocales: LocaleResource = {
-  "zh-CN": updateZhCN,
-  en: updateEn,
-};
-
-/** 所有内部命令 i18n 资源映射 */
+/** 所有内部命令 i18n 资源映射（命名空间 → 语言 → 翻译） */
 const allLocales: Record<string, LocaleResource> = {
-  build: buildLocales,
-  clear: clearLocales,
-  commit: commitLocales,
-  create: createLocales,
-  dev: devLocales,
-  install: installLocales,
-  list: listLocales,
-  mcp: mcpLocales,
-  runx: runxLocales,
-  schema: schemaLocales,
-  setup: setupLocales,
-  uninstall: uninstallLocales,
-  update: updateLocales,
+  build: { "zh-CN": buildZhCN, en: buildEn },
+  clear: { "zh-CN": clearZhCN, en: clearEn },
+  commit: { "zh-CN": commitZhCN, en: commitEn },
+  create: { "zh-CN": createZhCN, en: createEn },
+  dev: { "zh-CN": devZhCN, en: devEn },
+  install: { "zh-CN": installZhCN, en: installEn },
+  list: { "zh-CN": listZhCN, en: listEn },
+  mcp: { "zh-CN": mcpZhCN, en: mcpEn },
+  runx: { "zh-CN": runxZhCN, en: runxEn },
+  schema: { "zh-CN": schemaZhCN, en: schemaEn },
+  setup: { "zh-CN": setupZhCN, en: setupEn },
+  uninstall: { "zh-CN": uninstallZhCN, en: uninstallEn },
+  update: { "zh-CN": updateZhCN, en: updateEn },
 };
+
+/** 默认命名空间 */
+const DEFAULT_NS = "translation";
 
 /**
- * 立即注册所有内部命令的 i18n 资源
- * 确保 @Command 装饰器中的 t() 在模块 import 时即可获取翻译
+ * 初始化 CLI 的 i18n 系统
+ * 1. 初始化 i18next（core 基础翻译 + CLI 命令翻译）
+ * 2. 通过 setGlobalT 挂载翻译函数到 globalThis
  */
-for (const [ns, resources] of Object.entries(allLocales)) {
-  addLocaleResources(ns, resources);
+export function initCliI18n(lang?: string): void {
+  const lng = lang || detectLocale();
+
+  void i18next.init({
+    lng,
+    fallbackLng: "zh-CN",
+    defaultNS: DEFAULT_NS,
+    ns: [DEFAULT_NS, ...Object.keys(allLocales)],
+    resources: {
+      "zh-CN": { [DEFAULT_NS]: coreZhCN },
+      en: { [DEFAULT_NS]: coreEn },
+    },
+    interpolation: { escapeValue: false },
+    returnNull: false,
+    returnEmptyString: false,
+    initImmediate: false,
+    showSupportNotice: false,
+  });
+
+  // 注册 CLI 命令翻译到各自命名空间
+  for (const [ns, resources] of Object.entries(allLocales)) {
+    for (const [lngKey, translations] of Object.entries(resources)) {
+      i18next.addResourceBundle(lngKey, ns, translations, true, true);
+    }
+  }
+
+  // 挂载到 globalThis，让 core 和扩展的 t() / addLocaleResources() 调用都能生效
+  setGlobalT((key, options) => i18next.t(key, options) as string);
+  setGlobalAddLocaleResources(addLocaleResources);
+}
+
+/**
+ * 为外部 Extension 注册语言资源
+ * @param ns 命名空间（通常为 Extension name）
+ * @param resources 语言资源，key 为语言代码，值为翻译对象
+ */
+export function addLocaleResources(
+  ns: string,
+  resources: Record<string, Record<string, unknown>>,
+): void {
+  for (const [lng, translations] of Object.entries(resources)) {
+    i18next.addResourceBundle(lng, ns, translations, true, true);
+  }
+  if (!i18next.options.ns) {
+    i18next.options.ns = [DEFAULT_NS, ns];
+  } else if (Array.isArray(i18next.options.ns) && !i18next.options.ns.includes(ns)) {
+    i18next.options.ns.push(ns);
+  }
 }
