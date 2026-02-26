@@ -1,14 +1,12 @@
-# Review 模块
+# Review 扩展
 
-Review 是 spaceflow 的核心模块，提供基于 LLM 的自动化代码审查功能。支持在 GitHub Actions CI 环境中运行，也可在本地命令行使用。
+Review 是 Spaceflow 的核心扩展，提供基于 LLM 的自动化代码审查功能。支持在 GitHub Actions CI 环境中运行，也可在本地命令行使用。
 
 ## 目录结构
 
 ```text
-review/
-├── index.ts                      # 模块导出入口
-├── review.module.ts              # NestJS 模块定义
-├── review.command.ts             # CLI 命令定义
+review/src/
+├── index.ts                      # Extension 入口（defineExtension）
 ├── review.service.ts             # 核心审查服务
 ├── review.service.spec.ts        # 审查服务单元测试
 ├── issue-verify.service.ts       # 历史问题验证服务
@@ -19,17 +17,16 @@ review/
 ├── parse-title-options.spec.ts   # 标题解析单元测试
 ```
 
-## 模块依赖
+## 依赖的共享模块
 
 ```text
-ReviewModule
-├── ConfigModule          # 配置管理
-├── GitProviderModule      # Git Provider 适配器
-├── ClaudeSetupModule     # Claude CLI 配置
-├── ReviewSpecModule      # 审查规范加载
-├── ReviewReportModule    # 审查报告格式化
-├── GitSdkModule          # Git 命令封装
-└── LlmProxyModule        # LLM 统一代理（支持 OpenAI/Claude/Gemini）
+review extension
+├── GitProviderService     # Git 平台适配器
+├── GitSdkService          # Git 命令封装
+├── LlmProxyService        # LLM 统一代理（OpenAI / Claude）
+├── LoggerService          # 日志系统
+├── StorageService         # 缓存存储
+└── ParallelService        # 并行执行
 ```
 
 ## 核心功能
@@ -234,50 +231,24 @@ feat: 添加新功能 [/ai-review -l openai -v 2]
 
 ## 配置项
 
-在 `spaceflow.json` 中配置：
+在 `.spaceflowrc` 或 `.spaceflow/spaceflow.json` 中配置 `review` 字段：
 
-```javascript
-module.exports = {
-  review: {
-    // LLM 模式：claude-code, openai, gemini
-    llmMode: "openai",
-
-    // 文件过滤模式
-    includes: ["**/*.ts", "**/*.js"],
-
-    // 是否验证历史问题
-    verifyFixes: true,
-    verifyFixesConcurrency: 10,
-
-    // 删除代码分析
-    analyzeDeletions: false,
-    deletionAnalysisMode: "openai",
-
-    // 并发和超时配置
-    concurrency: 5,
-    timeout: 60000,
-    retries: 0,
-    retryDelay: 1000,
-
-    // 是否生成 PR 描述
-    generateDescription: false,
-
-    // 是否启用行级评论
-    lineComments: false,
-
-    // OpenAI 配置
-    openai: {
-      apiKey: "sk-xxx",
-      baseUrl: "https://api.openai.com/v1",
-      model: "gpt-4o",
-    },
-
-    // Claude Code 配置
-    claudeCode: {
-      // Claude CLI 配置
-    },
-  },
-};
+```json
+{
+  "review": {
+    "includes": ["*/**/*.ts", "!*/**/*.spec.*", "!*/**/*.config.*"],
+    "references": ["./references"],
+    "generateDescription": true,
+    "autoUpdatePrTitle": false,
+    "lineComments": true,
+    "verifyFixes": true,
+    "analyzeDeletions": false,
+    "deletionAnalysisMode": "open-code",
+    "concurrency": 10,
+    "retries": 3,
+    "retryDelay": 1000
+  }
+}
 ```
 
 ## 使用示例
@@ -297,7 +268,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Review
-        run: npx spaceflow review --ci -l openai
+        run: pnpm spaceflow review --ci -l openai
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -306,26 +277,26 @@ jobs:
 
 ```bash
 # 审查 PR
-npx spaceflow review -p 123 -l openai
+spaceflow review -p 123 -l openai
 
 # 审查两个分支之间的差异
-npx spaceflow review -b main --head feature/xxx -l openai
+spaceflow review -b main --head feature/xxx -l openai
 
 # 仅审查指定文件
-npx spaceflow review -f src/app.ts -l openai
+spaceflow review -f src/app.ts -l openai
 
 # 详细输出
-npx spaceflow review -p 123 -l openai -v 2
+spaceflow review -p 123 -l openai -vv
 
 # 仅分析删除代码
-npx spaceflow review -p 123 --deletion-only -l openai
+spaceflow review -p 123 --deletion-only -l openai
 ```
 
 ## 审查规范
 
-审查规范文件位于 `.spaceflow/review-spec/` 目录，使用 Markdown 格式定义规则。
+审查规范文件通过配置文件的 `review.references` 字段指定，支持本地目录和远程 Git 仓库 URL。
 
-详见 [ReviewSpec 模块文档](../../shared/review-spec/README.md)。
+详见 [Review Spec 规范](/reference/review-spec)。
 
 ## 输出格式
 
