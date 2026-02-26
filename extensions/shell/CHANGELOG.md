@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.5.0...@spaceflow/shell@0.6.0) (2026-02-26)
+
+### 代码重构
+
+* **core:** 使用 globalThis 确保多份 core 实例共享同一个 i18n 状态 ([c46e713](https://github.com/Lydanne/spaceflow/commit/c46e713d3e6e4d84447ebecad6ea719fc861854f))
+* **core:** 实现扩展自动安装机制，确保 .spaceflowrc 声明的依赖自动同步 ([89af2ae](https://github.com/Lydanne/spaceflow/commit/89af2ae864decd6f2acb917d59afd657ee8e4562))
+
+### 其他修改
+
+* **cli:** released version 0.26.0 [no ci] ([55f6cf7](https://github.com/Lydanne/spaceflow/commit/55f6cf7f76c49a8a871e0a1516520db78d841752))
+* **core:** released version 0.7.0 [no ci] ([1e37534](https://github.com/Lydanne/spaceflow/commit/1e37534d5e25ce8e08bb90a073c402d0cae80c9d))
+* **publish:** released version 0.28.0 [no ci] ([c226199](https://github.com/Lydanne/spaceflow/commit/c22619956276d6c4464ae94f6e47f798d66eba2b))
+* **review-summary:** released version 0.6.0 [no ci] ([185e4ff](https://github.com/Lydanne/spaceflow/commit/185e4ff5488a13cd32e54a442bf41728abdadb4e))
+* **review:** released version 0.36.0 [no ci] ([32df799](https://github.com/Lydanne/spaceflow/commit/32df799cf56a1bd7ca987fe79c6392dfc829f841))
+* **scripts:** released version 0.6.0 [no ci] ([91ea44e](https://github.com/Lydanne/spaceflow/commit/91ea44ec943c2de318b32c0cd29d8c6ce1e89012))
+
 ## [0.5.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.4.0...@spaceflow/shell@0.5.0) (2026-02-25)
 
 ### 代码重构
