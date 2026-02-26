@@ -65,7 +65,7 @@ export {
 } from "./shared/mcp";
 
 // I18n - 国际化
-export * from "./shared/i18n";
+export * from "./cli-runtime/i18n";
 
 // Logger - 全局日志工具
 export * from "./shared/logger";

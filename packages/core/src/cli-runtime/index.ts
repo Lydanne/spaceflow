@@ -3,11 +3,11 @@ import type { ExtensionDefinition } from "@spaceflow/core";
 import { ServiceContainer, initializeContainer } from "./di";
 import { ExtensionLoader } from "./extension-loader";
 import { internalExtensions } from "./internal-extensions";
-import { initCliI18n } from "./i18n-init";
+import { initCliI18n } from "./i18n";
 
 export { ServiceContainer } from "./di";
 export { ExtensionLoader } from "./extension-loader";
-export { initCliI18n } from "./i18n-init";
+export { initCliI18n } from "./i18n";
 export { internalExtensions } from "./internal-extensions";
 
 /**
