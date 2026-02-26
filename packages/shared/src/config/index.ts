@@ -1,5 +1,5 @@
 import { readFileSync, existsSync, writeFileSync } from "fs";
-import { join } from "path";
+import { join, dirname, resolve } from "path";
 import { homedir } from "os";
 import stringify from "json-stringify-pretty-compact";
 import { config as dotenvConfig } from "dotenv";
@@ -69,39 +69,89 @@ export function getConfigPath(cwd?: string): string {
 
 /**
  * 获取所有配置文件路径（按优先级从低到高排列）
- * 优先级: ~/.spaceflow/spaceflow.json < ~/.spaceflowrc < ./.spaceflow/spaceflow.json < ./.spaceflowrc
+ * 从 cwd 逐级向上遍历查找 .spaceflowrc 和 .spaceflow/spaceflow.json，
+ * 越靠近 cwd 的优先级越高。全局配置优先级最低。
+ *
+ * 优先级示例（从低到高）:
+ *   ~/.spaceflow/spaceflow.json < ~/.spaceflowrc
+ *   < /project/.spaceflow/spaceflow.json < /project/.spaceflowrc
+ *   < /project/extensions/publish/.spaceflow/spaceflow.json < /project/extensions/publish/.spaceflowrc
+ *
  * @param cwd 工作目录，默认为 process.cwd()
  */
-export function getConfigPaths(cwd?: string): string[] {
-  const workDir = cwd || process.cwd();
-  return [
-    join(homedir(), ".spaceflow", CONFIG_FILE_NAME),
-    join(homedir(), RC_FILE_NAME),
-    join(workDir, ".spaceflow", CONFIG_FILE_NAME),
-    join(workDir, RC_FILE_NAME),
-  ];
+export function getConfigPaths(cwd?: string, options?: { local?: boolean }): string[] {
+  const workDir = resolve(cwd || process.cwd());
+  const home = homedir();
+
+  // local 模式：只读当前目录和全局目录，不向上遍历
+  if (options?.local) {
+    return [
+      join(home, ".spaceflow", CONFIG_FILE_NAME),
+      join(home, RC_FILE_NAME),
+      join(workDir, ".spaceflow", CONFIG_FILE_NAME),
+      join(workDir, RC_FILE_NAME),
+    ];
+  }
+
+  // 从 cwd 向上收集所有祖先目录（不含 home，home 单独处理）
+  const ancestors: string[] = [];
+  let current = workDir;
+  while (true) {
+    ancestors.push(current);
+    const parent = dirname(current);
+    if (parent === current) break; // 到达文件系统根
+    current = parent;
+  }
+
+  // 全局配置（最低优先级）
+  const paths: string[] = [join(home, ".spaceflow", CONFIG_FILE_NAME), join(home, RC_FILE_NAME)];
+
+  // 从最远祖先到 cwd（优先级递增）
+  for (let i = ancestors.length - 1; i >= 0; i--) {
+    const dir = ancestors[i];
+    // 跳过 home 目录（已在全局配置中处理）
+    if (dir === home) continue;
+    paths.push(join(dir, ".spaceflow", CONFIG_FILE_NAME));
+    paths.push(join(dir, RC_FILE_NAME));
+  }
+
+  return paths;
 }
 
 /**
- * 获取所有 .env 文件路径（按优先级从高到低排列，供 ConfigModule.envFilePath 使用）
- *
- * NestJS ConfigModule 中 envFilePath 数组靠前的优先级更高（先读到的变量不会被后面覆盖）
- * 因此返回顺序为从高到低：
- * 1. ./.env (程序启动目录，最高优先级)
- * 2. ./.spaceflow/.env (项目配置目录)
- * 3. ~/.env (全局 home 目录)
- * 4. ~/.spaceflow/.env (全局配置目录，最低优先级)
+ * 获取所有 .env 文件路径（按优先级从高到低排列）
+ * 从 cwd 逐级向上遍历查找 .env 和 .spaceflow/.env，
+ * 越靠近 cwd 的优先级越高（先加载的变量不会被后加载的覆盖）。
  *
  * @param cwd 工作目录，默认为 process.cwd()
  */
 export function getEnvFilePaths(cwd?: string): string[] {
-  const workDir = cwd || process.cwd();
-  return [
-    join(workDir, ENV_FILE_NAME),
-    join(workDir, ".spaceflow", ENV_FILE_NAME),
-    join(homedir(), ENV_FILE_NAME),
-    join(homedir(), ".spaceflow", ENV_FILE_NAME),
-  ];
+  const workDir = resolve(cwd || process.cwd());
+  const home = homedir();
+
+  // 从 cwd 向上收集所有祖先目录
+  const ancestors: string[] = [];
+  let current = workDir;
+  while (true) {
+    ancestors.push(current);
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  // 从 cwd 到最远祖先（优先级递减）
+  const paths: string[] = [];
+  for (const dir of ancestors) {
+    if (dir === home) continue;
+    paths.push(join(dir, ENV_FILE_NAME));
+    paths.push(join(dir, ".spaceflow", ENV_FILE_NAME));
+  }
+
+  // 全局配置（最低优先级）
+  paths.push(join(home, ENV_FILE_NAME));
+  paths.push(join(home, ".spaceflow", ENV_FILE_NAME));
+
+  return paths;
 }
 
 /**
@@ -144,8 +194,11 @@ function readSingleConfigSync(configPath: string): Record<string, unknown> {
  * 4. ./.spaceflowrc (项目根目录 RC 配置，最高优先级)
  * @param cwd 工作目录，默认为 process.cwd()
  */
-export function readConfigSync(cwd?: string): Record<string, unknown> {
-  const configPaths = getConfigPaths(cwd);
+export function readConfigSync(
+  cwd?: string,
+  options?: { local?: boolean },
+): Record<string, unknown> {
+  const configPaths = getConfigPaths(cwd, options);
   const configs = configPaths.map((p) => readSingleConfigSync(p));
   return deepMerge(...configs);
 }
@@ -173,8 +226,11 @@ export function getSupportedEditors(cwd?: string): string[] {
  * 获取 dependencies
  * @param cwd 工作目录，默认为 process.cwd()
  */
-export function getDependencies(cwd?: string): Record<string, string> {
-  const config = readConfigSync(cwd);
+export function getDependencies(
+  cwd?: string,
+  options?: { local?: boolean },
+): Record<string, string> {
+  const config = readConfigSync(cwd, options);
   return (config.dependencies as Record<string, string>) || {};
 }
 

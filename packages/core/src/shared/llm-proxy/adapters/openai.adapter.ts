@@ -108,7 +108,9 @@ export class OpenAIAdapter implements LlmAdapter {
     const model = options?.model || openaiConf.model;
 
     if (shouldLog(options?.verbose, 1)) {
-      console.log(`[LLMProxy.OpenAIAdapter.chatStream] 配置: Model=${model}`);
+      console.log(
+        `[LLMProxy.OpenAIAdapter.chatStream] 配置: Model=${model}, BaseURL=${openaiConf.baseUrl || "默认"}`,
+      );
     }
     try {
       const stream = await client.chat.completions.create({

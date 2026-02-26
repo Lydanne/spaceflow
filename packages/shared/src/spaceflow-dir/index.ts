@@ -102,13 +102,13 @@ export function ensureSpaceflowPackageJson(spaceflowDir: string): void {
   const packageJsonPath = join(spaceflowDir, PACKAGE_JSON);
   const coreVersion = getSpaceflowCoreVersion();
 
-  // 从 spaceflow.json/.spaceflowrc 读取扩展依赖
-  const extDeps = getDependencies();
+  // 只从当前目录级别读取扩展依赖（不向上遍历祖先目录）
+  const projectDir = join(spaceflowDir, "..");
+  const extDeps = getDependencies(projectDir, { local: true });
 
-  // 构建期望的 dependencies：@spaceflow/core + @spaceflow/shared + 所有扩展包
+  // 构建期望的 dependencies：@spaceflow/core + 所有扩展包
   const expectedDeps: Record<string, string> = {
     "@spaceflow/core": coreVersion,
-    "@spaceflow/shared": coreVersion,
     ...extDeps,
   };
 

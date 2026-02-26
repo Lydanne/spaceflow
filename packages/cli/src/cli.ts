@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
+import { join, dirname, resolve } from "path";
 import { execSync } from "child_process";
 import { homedir } from "os";
 import {
@@ -22,25 +22,39 @@ import {
  */
 
 /**
- * 获取 .spaceflow 目录路径（优先本地，回退全局）
+ * 获取 .spaceflow 目录路径
+ * 从 cwd 向上遍历查找已存在的 .spaceflow 目录，
+ * 如果整个目录树中都没有，则回退到 cwd/.spaceflow
  */
 function getSpaceflowDir(): string {
-  const localDir = join(process.cwd(), SPACEFLOW_DIR);
-  if (existsSync(localDir)) {
-    return localDir;
+  let current = resolve(process.cwd());
+  const home = homedir();
+
+  while (true) {
+    const candidate = join(current, SPACEFLOW_DIR);
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+    const parent = dirname(current);
+    if (parent === current) break; // 文件系统根
+    current = parent;
   }
-  const globalDir = join(homedir(), SPACEFLOW_DIR);
+
+  // 检查全局目录
+  const globalDir = join(home, SPACEFLOW_DIR);
   if (existsSync(globalDir)) {
     return globalDir;
   }
-  return localDir;
+
+  // 都没有，回退到 cwd（后续 ensureSpaceflowPackageJson 会创建）
+  return join(process.cwd(), SPACEFLOW_DIR);
 }
 
 /**
  * 从 spaceflow.json / .spaceflowrc 读取外部扩展包名列表
  */
 function readExternalExtensions(): string[] {
-  const deps = getDependencies();
+  const deps = getDependencies(undefined, { local: true });
   return Object.keys(deps);
 }
 
@@ -55,8 +69,7 @@ function generateIndexContent(extensions: string[]): string {
     .map((name) => `    import('${name}').then(m => m.default || m.extension || m),`)
     .join("\n");
 
-  return `import { exec, initCliI18n } from '@spaceflow/core';
-import { loadEnvFiles, getEnvFilePaths } from '@spaceflow/shared';
+  return `import { exec, initCliI18n, loadEnvFiles, getEnvFilePaths } from '@spaceflow/core';
 
 async function bootstrap() {
   // 1. 先加载 .env 文件，确保 process.env 在 schema 求值前已就绪

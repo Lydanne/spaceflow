@@ -95,9 +95,6 @@ importers:
       '@spaceflow/scripts':
         specifier: workspace:*
         version: link:../extensions/scripts
-      '@spaceflow/shared':
-        specifier: workspace:*
-        version: link:../packages/shared
       '@spaceflow/shell':
         specifier: workspace:*
         version: link:../extensions/shell

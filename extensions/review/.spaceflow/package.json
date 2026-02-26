@@ -1,8 +1,0 @@
-{
-  "name": "spaceflow",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@spaceflow/core": "latest"
-  }
-}
