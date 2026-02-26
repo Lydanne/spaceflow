@@ -11,8 +11,28 @@ import en from "../../locales/en/translation.json";
 /** 默认命名空间 */
 const DEFAULT_NS = "translation";
 
-/** 是否已初始化 */
-let initialized = false;
+/** globalThis 上的 key，确保多份 core 实例共享同一个 i18n 状态 */
+const GLOBAL_I18N_KEY = "__spaceflow_i18n__";
+
+interface GlobalI18nState {
+  instance: i18n;
+  initialized: boolean;
+}
+
+/**
+ * 获取全局 i18n 状态（单例）
+ * 无论有几份 @spaceflow/core 实例，都共享同一个 i18next 实例
+ */
+function getGlobalState(): GlobalI18nState {
+  const g = globalThis as Record<string, unknown>;
+  if (!g[GLOBAL_I18N_KEY]) {
+    g[GLOBAL_I18N_KEY] = {
+      instance: i18next,
+      initialized: false,
+    } satisfies GlobalI18nState;
+  }
+  return g[GLOBAL_I18N_KEY] as GlobalI18nState;
+}
 
 /**
  * 初始化 i18n
@@ -20,10 +40,11 @@ let initialized = false;
  * @param lang 指定语言，不传则自动检测
  */
 export function initI18n(lang?: string): void {
-  if (initialized) return;
+  const state = getGlobalState();
+  if (state.initialized) return;
   const lng = lang || detectLocale();
   // i18next v25+ 移除了 initSync，但提供内联 resources 时 init() 同步完成
-  void i18next.init({
+  void state.instance.init({
     lng,
     fallbackLng: "zh-CN",
     defaultNS: DEFAULT_NS,
@@ -42,27 +63,29 @@ export function initI18n(lang?: string): void {
     // i18next v25.8+ 会在 init 时输出 locize.com 推广日志
     showSupportNotice: false,
   });
-  initialized = true;
+  state.initialized = true;
 }
 
 /**
  * 重置 i18n 状态（仅用于测试）
  */
 export function resetI18n(): void {
-  initialized = false;
+  const state = getGlobalState();
+  state.initialized = false;
 }
 
 /**
  * 翻译函数
- * 装饰器和运行时均可使用
+ * 通过 globalThis 共享 i18next 实例，确保多份 core 实例下翻译一致
  * @param key 翻译 key
  * @param options 插值参数
  */
 export function t(key: string, options?: TOptions): string {
-  if (!initialized) {
+  const state = getGlobalState();
+  if (!state.initialized) {
     initI18n();
   }
-  return i18next.t(key, options) as string;
+  return state.instance.t(key, options) as string;
 }
 
 /**
@@ -74,15 +97,16 @@ export function addLocaleResources(
   ns: string,
   resources: Record<string, Record<string, unknown>>,
 ): void {
-  if (!initialized) {
+  const state = getGlobalState();
+  if (!state.initialized) {
     initI18n();
   }
   for (const [lng, translations] of Object.entries(resources)) {
-    i18next.addResourceBundle(lng, ns, translations, true, true);
+    state.instance.addResourceBundle(lng, ns, translations, true, true);
   }
-  if (!i18next.options.ns) {
-    i18next.options.ns = [DEFAULT_NS, ns];
-  } else if (Array.isArray(i18next.options.ns) && !i18next.options.ns.includes(ns)) {
-    i18next.options.ns.push(ns);
+  if (!state.instance.options.ns) {
+    state.instance.options.ns = [DEFAULT_NS, ns];
+  } else if (Array.isArray(state.instance.options.ns) && !state.instance.options.ns.includes(ns)) {
+    state.instance.options.ns.push(ns);
   }
 }
