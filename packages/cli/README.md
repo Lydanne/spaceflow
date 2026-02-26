@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@spaceflow/cli?color=blue)](https://www.npmjs.com/package/@spaceflow/cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-> Spaceflow CLI 工具，提供 `spaceflow` / `space` 命令，是所有 Spaceflow 功能的统一入口。
+> Spaceflow CLI 壳子入口，提供 `spaceflow` / `space` 命令。负责引导 `.spaceflow/` 工作目录并启动 `@spaceflow/core` 运行时。
 
 ## 安装
 
@@ -19,6 +19,16 @@ spaceflow <command> [options]
 space <command> [options]
 ```
 
+## 工作原理
+
+CLI 本身不包含任何命令实现，职责仅限于：
+
+1. 读取 `.spaceflow/package.json` 确定依赖
+2. 生成 `.spaceflow/bin/index.js` 入口文件
+3. 通过 `execSync` 启动子进程执行 `@spaceflow/core` 的 `exec()` 函数
+
+所有命令（内置 13 个 + 外部扩展）均由 `@spaceflow/core` 提供。
+
 ## 内置命令
 
 | 命令         | 说明                 |
@@ -28,6 +38,7 @@ space <command> [options]
 | `build`      | 构建扩展             |
 | `dev`        | 开发模式运行         |
 | `create`     | 创建新扩展           |
+| `update`     | 更新扩展             |
 | `list`       | 列出已安装扩展       |
 | `clear`      | 清理缓存             |
 | `runx` / `x` | 执行扩展命令         |
@@ -39,29 +50,35 @@ space <command> [options]
 ## 扩展开发
 
 ```bash
-# 创建扩展
-spaceflow create my-extension
+# 创建命令型扩展
+spaceflow create command my-extension
+
+# 创建 MCP 服务扩展
+spaceflow create mcp my-mcp
 ```
 
 ### 扩展结构
 
 ```typescript
-import { Command, CommandRunner, Module } from "@spaceflow/core";
+import { defineExtension } from "@spaceflow/core";
 
-@Command({ name: "my-command", description: "My command description" })
-class MyCommand extends CommandRunner {
-  async run(): Promise<void> {
-    console.log("Hello from my command!");
-  }
-}
-
-@Module({ providers: [MyCommand] })
-export class MyModule {}
+export default defineExtension({
+  name: "my-extension",
+  commands: [
+    {
+      name: "my-command",
+      description: "My command description",
+      run: async (args, options, ctx) => {
+        ctx.output.info("Hello from my command!");
+      },
+    },
+  ],
+});
 ```
 
 ## 编辑器集成
 
-通过 `spaceflow.json` 中的 `support` 字段，`spaceflow install` 会自动将扩展关联到对应编辑器目录：
+通过配置文件中的 `support` 字段，`spaceflow install` 会自动将扩展关联到对应编辑器目录：
 
 | 编辑器      | 配置目录     |
 | ----------- | ------------ |
