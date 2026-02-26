@@ -14,5 +14,6 @@
   "noToolsFound": "❌ 没有找到任何 MCP 工具",
   "noToolsHint": "   提示: 确保已安装支持 MCP 的扩展，并导出 mcpService 或 getMcpTools",
   "toolsFound": "✅ 共发现 {{count}} 个 MCP 工具",
+  "ttyHint": "💡 MCP Server 需要由 MCP 客户端（如 Cursor、Claude Desktop）通过管道启动。\n   请将以下配置添加到你的 MCP 客户端中：\n\n   \"spaceflow\": {\n     \"command\": \"pnpm\",\n     \"args\": [\"space\", \"mcp\"]\n   }",
   "serverStarted": "🚀 MCP Server 已启动，共 {{count}} 个工具"
 }

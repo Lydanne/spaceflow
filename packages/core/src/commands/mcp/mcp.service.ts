@@ -24,10 +24,7 @@ export class McpService {
       console.error(t("mcp:scanning"));
     }
 
-    // 加载所有扩展
-    await this.extensionLoader.discoverAndLoad();
-
-    // 获取所有扩展
+    // 获取所有扩展（已在 exec() 阶段通过 registerExtension 注册完毕）
     const extensions = this.extensionLoader.getExtensions();
     const mcpServers = this.extensionLoader.getMcpServers();
 
@@ -73,7 +70,14 @@ export class McpService {
       }
     }
 
-    // 启动 MCP Server
+    // 如果 stdin 是 TTY（用户手动在终端运行），只打印信息不阻塞
+    if (process.stdin.isTTY) {
+      console.error("");
+      console.error(t("mcp:ttyHint"));
+      return;
+    }
+
+    // 被 MCP 客户端通过管道调用，正常启动 stdio server
     await this.runServer(allTools, verbose);
   }
 

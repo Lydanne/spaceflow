@@ -14,5 +14,6 @@
   "noToolsFound": "❌ No MCP tools found",
   "noToolsHint": "   Hint: Make sure you have installed MCP-enabled extensions that export mcpService or getMcpTools",
   "toolsFound": "✅ Found {{count}} MCP tools",
+  "ttyHint": "💡 MCP Server must be started by an MCP client (e.g. Cursor, Claude Desktop) via pipe.\n   Add the following config to your MCP client:\n\n   \"spaceflow\": {\n     \"command\": \"pnpm\",\n     \"args\": [\"space\", \"mcp\"]\n   }",
   "serverStarted": "🚀 MCP Server started with {{count}} tools"
 }
