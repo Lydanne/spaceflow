@@ -1,6 +1,6 @@
 {
   "name": "@spaceflow/review-summary",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Spaceflow 审查统计命令，根据时间范围统计 PR 贡献情况，按人员汇总并排序",
   "license": "MIT",
   "author": "Lydanne",
