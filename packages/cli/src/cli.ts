@@ -8,6 +8,8 @@ import {
   ensureSpaceflowPackageJson,
   ensureDependencies,
   getDependencies,
+  loadEnvFiles,
+  getEnvFilePaths,
 } from "@spaceflow/shared";
 
 /**
@@ -69,13 +71,10 @@ function generateIndexContent(extensions: string[]): string {
     .map((name) => `    import('${name}').then(m => m.default || m.extension || m),`)
     .join("\n");
 
-  return `import { exec, initCliI18n, loadEnvFiles, getEnvFilePaths } from '@spaceflow/core';
+  return `import { exec, initCliI18n } from '@spaceflow/core';
 
 async function bootstrap() {
-  // 1. 先加载 .env 文件，确保 process.env 在 schema 求值前已就绪
-  loadEnvFiles(getEnvFilePaths());
-
-  // 2. 初始化 i18n，再加载扩展（扩展 import 时会调用 t() 获取翻译）
+  // 初始化 i18n，再加载扩展（扩展 import 时会调用 t() 获取翻译）
   initCliI18n();
 
   const extensions = await Promise.all([
@@ -135,6 +134,9 @@ function executeIndexFile(indexPath: string): void {
 }
 
 // ---- 主流程 ----
+
+// 0. 先加载 .env 文件，确保 process.env 在子进程（含 schema 模块求值）前已就绪
+loadEnvFiles(getEnvFilePaths());
 
 // 1. 确保 .spaceflow/ 目录结构完整（目录 + package.json + .gitignore）
 const spaceflowDir = getSpaceflowDir();
