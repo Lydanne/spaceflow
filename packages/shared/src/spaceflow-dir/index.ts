@@ -105,9 +105,10 @@ export function ensureSpaceflowPackageJson(spaceflowDir: string): void {
   // 从 spaceflow.json/.spaceflowrc 读取扩展依赖
   const extDeps = getDependencies();
 
-  // 构建期望的 dependencies：@spaceflow/core + 所有扩展包
+  // 构建期望的 dependencies：@spaceflow/core + @spaceflow/shared + 所有扩展包
   const expectedDeps: Record<string, string> = {
     "@spaceflow/core": coreVersion,
+    "@spaceflow/shared": coreVersion,
     ...extDeps,
   };
 

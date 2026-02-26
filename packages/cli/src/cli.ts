@@ -56,9 +56,13 @@ function generateIndexContent(extensions: string[]): string {
     .join("\n");
 
   return `import { exec, initCliI18n } from '@spaceflow/core';
+import { loadEnvFiles, getEnvFilePaths } from '@spaceflow/shared';
 
 async function bootstrap() {
-  // 先初始化 i18n，再加载扩展（扩展 import 时会调用 t() 获取翻译）
+  // 1. 先加载 .env 文件，确保 process.env 在 schema 求值前已就绪
+  loadEnvFiles(getEnvFilePaths());
+
+  // 2. 初始化 i18n，再加载扩展（扩展 import 时会调用 t() 获取翻译）
   initCliI18n();
 
   const extensions = await Promise.all([

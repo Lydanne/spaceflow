@@ -95,6 +95,9 @@ importers:
       '@spaceflow/scripts':
         specifier: workspace:*
         version: link:../extensions/scripts
+      '@spaceflow/shared':
+        specifier: workspace:*
+        version: link:../packages/shared
       '@spaceflow/shell':
         specifier: workspace:*
         version: link:../extensions/shell
@@ -376,6 +379,9 @@ importers:
 
   packages/shared:
     dependencies:
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.4.7
       json-stringify-pretty-compact:
         specifier: ^4.0.0
         version: 4.0.0

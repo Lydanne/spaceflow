@@ -2,6 +2,7 @@ import { readFileSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import stringify from "json-stringify-pretty-compact";
+import { config as dotenvConfig } from "dotenv";
 
 /** 默认编辑器 */
 export const DEFAULT_SUPPORT_EDITOR = "claudeCode";
@@ -101,6 +102,19 @@ export function getEnvFilePaths(cwd?: string): string[] {
     join(homedir(), ENV_FILE_NAME),
     join(homedir(), ".spaceflow", ENV_FILE_NAME),
   ];
+}
+
+/**
+ * 加载 .env 文件到 process.env
+ * 按优先级从高到低加载，先加载的变量不会被后加载的覆盖
+ * @param paths .env 文件路径列表（按优先级从高到低排列）
+ */
+export function loadEnvFiles(paths: string[]): void {
+  for (const envPath of paths) {
+    if (existsSync(envPath)) {
+      dotenvConfig({ path: envPath, override: false });
+    }
+  }
 }
 
 /**

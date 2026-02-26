@@ -4,8 +4,6 @@ import {
   GitSdkService,
   GitProviderService,
   LlmProxyService,
-  loadEnvFiles,
-  getEnvFilePaths,
   FileAdapter,
 } from "@spaceflow/core";
 import { join } from "path";
@@ -17,9 +15,7 @@ import { UnifiedConfigReader } from "./config";
  */
 export function initializeContainer(container: ServiceContainer, cwd?: string): void {
   const workDir = cwd || process.cwd();
-  // 加载环境变量
-  loadEnvFiles(getEnvFilePaths(workDir));
-  // 初始化核心服务
+  // 初始化核心服务（.env 已在 CLI 壳子阶段加载）
   const config = new UnifiedConfigReader(workDir);
   const output = new OutputService();
   const storageDir = join(workDir, ".spaceflow", "cache");

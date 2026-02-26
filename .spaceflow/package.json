@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "@spaceflow/core": "workspace:*",
+    "@spaceflow/shared": "workspace:*",
     "@spaceflow/shell": "workspace:*",
     "@spaceflow/scripts": "workspace:*",
     "@spaceflow/review": "workspace:*",

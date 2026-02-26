@@ -48,6 +48,7 @@ export {
   getConfigPath,
   getConfigPaths,
   getEnvFilePaths,
+  loadEnvFiles,
   readConfigSync,
   writeConfigSync,
   getSupportedEditors,

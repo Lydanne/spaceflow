@@ -32,6 +32,7 @@
     "lint": "oxlint src"
   },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "json-stringify-pretty-compact": "^4.0.0"
   },
   "devDependencies": {
