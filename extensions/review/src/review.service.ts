@@ -1,12 +1,11 @@
 import {
-  ConfigReaderService,
   GitProviderService,
   PullRequest,
   PullRequestCommit,
   ChangedFile,
   CreatePullReviewComment,
   REVIEW_STATE,
-  CiConfig,
+  type CiConfig,
   type LLMMode,
   LlmProxyService,
   logStreamEvent,
@@ -145,7 +144,6 @@ export class ReviewService {
   constructor(
     protected readonly gitProvider: GitProviderService,
     protected readonly config: IConfigReader,
-    protected readonly configReader: ConfigReaderService,
     protected readonly reviewSpecService: ReviewSpecService,
     protected readonly llmProxyService: LlmProxyService,
     protected readonly reviewReportService: ReviewReportService,
@@ -171,7 +169,7 @@ export class ReviewService {
   }
 
   async getContextFromEnv(options: ReviewOptions): Promise<ReviewContext> {
-    const reviewConf = this.configReader.getPluginConfig<ReviewConfig>("review");
+    const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
     const ciConf = this.config.get<CiConfig>("ci");
     const repository = ciConf?.repository;
 
@@ -705,7 +703,7 @@ export class ReviewService {
 
         // 如果文件有变更，将该文件的历史问题标记为无效
         // 简化策略：避免复杂的行号更新逻辑
-        const reviewConf = this.configReader.getPluginConfig<ReviewConfig>("review");
+        const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
         if (
           reviewConf.invalidateChangedFiles !== "off" &&
           reviewConf.invalidateChangedFiles !== "keep"
@@ -1864,7 +1862,7 @@ ${fileChanges || "无"}`;
     verbose?: VerboseLevel,
   ): Promise<void> {
     // 获取配置
-    const reviewConf = this.configReader.getPluginConfig<ReviewConfig>("review");
+    const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
 
     // 如果配置启用且有 AI 生成的标题，只在第一轮审查时更新 PR 标题
     if (reviewConf.autoUpdatePrTitle && result.title && result.round === 1) {

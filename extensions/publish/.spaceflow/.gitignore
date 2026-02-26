@@ -1,0 +1,5 @@
+# Spaceflow Extension dependencies
+node_modules/
+pnpm-lock.yaml
+config-schema.json
+bin/

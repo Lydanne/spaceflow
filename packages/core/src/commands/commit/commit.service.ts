@@ -1,4 +1,4 @@
-import { ConfigReaderService } from "@spaceflow/core";
+import type { IConfigReader } from "@spaceflow/core";
 import { execSync, spawnSync } from "child_process";
 import { existsSync, readFileSync } from "fs";
 import micromatch from "micromatch";
@@ -54,7 +54,7 @@ interface CommitContext {
 
 export class CommitService {
   constructor(
-    private readonly configReader: ConfigReaderService,
+    private readonly configReader: IConfigReader,
     private readonly llmProxyService: LlmProxyService,
   ) {}
 

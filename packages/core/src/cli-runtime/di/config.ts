@@ -1,4 +1,4 @@
-import { ConfigReader, type IConfigReader } from "@spaceflow/core";
+import { type IConfigReader, loadSpaceflowConfig } from "@spaceflow/core";
 import type { ZodSchema } from "zod";
 
 /**
@@ -69,13 +69,12 @@ function getNestedValue(obj: Record<string, any>, path: string): any {
  * 负责从配置文件和环境变量读取配置
  */
 export class UnifiedConfigReader implements IConfigReader {
-  private baseReader: ConfigReader;
   private mergedConfig: Record<string, unknown>;
   private schemas = new Map<string, ZodSchema>();
 
   constructor(cwd?: string) {
-    this.baseReader = new ConfigReader(cwd);
-    this.mergedConfig = this.mergeEnvConfig(this.baseReader.getRawConfig());
+    const config = loadSpaceflowConfig(cwd) as Record<string, unknown>;
+    this.mergedConfig = this.mergeEnvConfig(config);
   }
 
   /**
@@ -145,8 +144,8 @@ export class UnifiedConfigReader implements IConfigReader {
    * 重新加载配置
    */
   reload(cwd?: string): void {
-    this.baseReader.reload(cwd);
-    this.mergedConfig = this.mergeEnvConfig(this.baseReader.getRawConfig());
+    const config = loadSpaceflowConfig(cwd) as Record<string, unknown>;
+    this.mergedConfig = this.mergeEnvConfig(config);
   }
 
   /**

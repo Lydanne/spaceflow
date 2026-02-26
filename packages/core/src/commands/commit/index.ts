@@ -1,4 +1,4 @@
-import { defineExtension, type ConfigReaderService, type LlmProxyService } from "@spaceflow/core";
+import { defineExtension, type LlmProxyService } from "@spaceflow/core";
 import { CommitService } from "./commit.service";
 import { CommitScopeConfigSchema } from "./commit.config";
 
@@ -34,7 +34,7 @@ export const commitExtension = defineExtension({
         },
       ],
       run: async (_args, options, ctx) => {
-        const configReader = ctx.getService<ConfigReaderService>("config");
+        const configReader = ctx.config;
         const llmProxy = ctx.getService<LlmProxyService>("llmProxy");
         if (!llmProxy) {
           ctx.output.error("commit 命令需要配置 LLM 服务，请在 spaceflow.json 中配置 llm 字段");

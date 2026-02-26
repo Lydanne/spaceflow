@@ -49,7 +49,6 @@ describe("ReviewService", () => {
   let mockDeletionImpactService: any;
   let mockGitSdkService: any;
   let mockLlmProxyService: any;
-  let mockConfigReaderService: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -80,6 +79,8 @@ describe("ReviewService", () => {
 
     configService = {
       get: vi.fn(),
+      getPluginConfig: vi.fn().mockReturnValue({}),
+      registerSchema: vi.fn(),
     };
 
     mockReviewSpecService = {
@@ -140,15 +141,9 @@ describe("ReviewService", () => {
       getAvailableAdapters: vi.fn().mockReturnValue(["claude-code", "openai"]),
     };
 
-    mockConfigReaderService = {
-      getPluginConfig: vi.fn().mockReturnValue({}),
-      getSystemConfig: vi.fn().mockReturnValue({}),
-    };
-
     service = new ReviewService(
       gitProvider as any,
       configService as any,
-      mockConfigReaderService as any,
       mockReviewSpecService as any,
       mockLlmProxyService as any,
       mockReviewReportService as any,

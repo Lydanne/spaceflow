@@ -1,6 +1,6 @@
 import "./locales";
 import { defineExtension, t } from "@spaceflow/core";
-import type { GitProviderService, ConfigReaderService } from "@spaceflow/core";
+import type { GitProviderService } from "@spaceflow/core";
 import { publishSchema } from "./publish.config";
 import { PublishService } from "./publish.service";
 import { MonorepoService } from "./monorepo.service";
@@ -23,7 +23,6 @@ export const extension = defineExtension({
       ],
       run: async (_args, options, ctx) => {
         const gitProvider = ctx.getService<GitProviderService>("gitProvider");
-        const configReader = ctx.getService<ConfigReaderService>("config");
 
         if (!gitProvider) {
           ctx.output.error("publish 命令需要配置 Git Provider");
@@ -31,12 +30,7 @@ export const extension = defineExtension({
         }
 
         const monorepoService = new MonorepoService();
-        const publishService = new PublishService(
-          gitProvider,
-          ctx.config,
-          configReader,
-          monorepoService,
-        );
+        const publishService = new PublishService(gitProvider, ctx.config, monorepoService);
 
         const publishOptions = {
           dryRun: !!options?.dryRun,

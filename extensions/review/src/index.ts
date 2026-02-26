@@ -1,12 +1,6 @@
 import "./locales";
 import { defineExtension, t } from "@spaceflow/core";
-import type {
-  GitProviderService,
-  ConfigReaderService,
-  LlmProxyService,
-  GitSdkService,
-  LLMMode,
-} from "@spaceflow/core";
+import type { GitProviderService, LlmProxyService, GitSdkService, LLMMode } from "@spaceflow/core";
 import { parseVerbose } from "@spaceflow/core";
 import { reviewSchema, type AnalyzeDeletionsMode } from "./review.config";
 import { ReviewService } from "./review.service";
@@ -65,7 +59,6 @@ export const extension = defineExtension({
         }
 
         const gitProvider = ctx.getService<GitProviderService>("gitProvider");
-        const configReader = ctx.getService<ConfigReaderService>("config");
         const llmProxy = ctx.hasService("llmProxy")
           ? ctx.getService<LlmProxyService>("llmProxy")
           : (undefined as unknown as LlmProxyService);
@@ -81,7 +74,6 @@ export const extension = defineExtension({
         const reviewService = new ReviewService(
           gitProvider,
           ctx.config,
-          configReader,
           reviewSpecService,
           llmProxy,
           reviewReportService,

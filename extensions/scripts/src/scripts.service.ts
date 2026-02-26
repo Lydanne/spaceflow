@@ -1,4 +1,4 @@
-import { GitProviderService, BranchProtection, CiConfig } from "@spaceflow/core";
+import { GitProviderService, type BranchProtection, type CiConfig } from "@spaceflow/core";
 import type { IConfigReader } from "@spaceflow/core";
 
 export interface ScriptsOptions {

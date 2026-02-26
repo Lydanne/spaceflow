@@ -1,9 +1,8 @@
 import {
   GitProviderService,
-  type ConfigReaderService,
   type IConfigReader,
   type BranchProtection,
-  ciConfig,
+  type CiConfig,
 } from "@spaceflow/core";
 import { type PublishConfig } from "./publish.config";
 import { MonorepoService, type PackageInfo } from "./monorepo.service";
@@ -61,16 +60,15 @@ export class PublishService {
   constructor(
     protected readonly gitProvider: GitProviderService,
     protected readonly config: IConfigReader,
-    protected readonly configReader: ConfigReaderService,
     protected readonly monorepoService: MonorepoService,
   ) {}
 
   getContextFromEnv(options: PublishOptions): PublishContext {
     this.gitProvider.validateConfig();
 
-    const ciConf = ciConfig();
-    const repository = ciConf.repository;
-    const branch = ciConf.refName;
+    const ciConf = this.config.get<CiConfig>("ci");
+    const repository = ciConf?.repository;
+    const branch = ciConf?.refName;
 
     if (!repository) {
       throw new Error("缺少配置 ci.repository (环境变量 GITHUB_REPOSITORY)");
@@ -97,7 +95,7 @@ export class PublishService {
   }
 
   async execute(context: PublishContext): Promise<PublishResult> {
-    const publishConf = this.configReader.getPluginConfig<PublishConfig>("publish");
+    const publishConf = this.config.getPluginConfig<PublishConfig>("publish");
     const monorepoConf = publishConf.monorepo;
 
     // CI 环境下自动 fetch tags，确保 release-it 能正确计算版本

@@ -1,32 +1,3 @@
-export * from "./git-provider.config";
-export * from "./ci.config";
-export * from "./llm.config";
-export * from "./feishu.config";
-export * from "./storage.config";
 export * from "./spaceflow.config";
-export * from "./config-reader.service";
 export * from "./schema-generator.service";
-export * from "./config-loader";
-
-// 新版配置系统（不依赖 NestJS）
-export { ConfigReader } from "./config-reader";
 export { loadEnvFiles } from "./load-env";
-
-import { gitProviderConfig } from "./git-provider.config";
-import { ciConfig } from "./ci.config";
-import { llmConfig } from "./llm.config";
-import { feishuConfig } from "./feishu.config";
-import { storageConfig } from "./storage.config";
-import { spaceflowConfig } from "./spaceflow.config";
-
-/**
- * 所有配置加载器
- */
-export const configLoaders = [
-  gitProviderConfig,
-  ciConfig,
-  llmConfig,
-  feishuConfig,
-  storageConfig,
-  spaceflowConfig,
-];
