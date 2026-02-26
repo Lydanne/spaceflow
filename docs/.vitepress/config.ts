@@ -2,7 +2,7 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   title: "Spaceflow",
-  description: "可扩展的 AI 工作流引擎，统一 CI/CD 管理与 AI 代码审查",
+  description: "可扩展的 AI 工程化工作流平台",
   lang: "zh-CN",
   base: "/spaceflow/",
 
@@ -16,15 +16,17 @@ export default defineConfig({
         items: [
           { text: "配置", link: "/reference/config" },
           { text: "CLI 命令", link: "/reference/cli" },
+          { text: "环境变量", link: "/reference/env-variables" },
           { text: "Review Spec", link: "/reference/review-spec" },
         ],
       },
       {
         text: "进阶",
         items: [
-          { text: "插件开发", link: "/advanced/plugin-development" },
+          { text: "扩展开发", link: "/advanced/plugin-development" },
           { text: "核心模块", link: "/advanced/core-modules" },
           { text: "GitHub Actions", link: "/advanced/github-actions" },
+          { text: "i18n 国际化", link: "/advanced/i18n" },
         ],
       },
     ],
@@ -67,7 +69,7 @@ export default defineConfig({
           ],
         },
         {
-          text: "外部命令",
+          text: "扩展命令",
           collapsed: false,
           items: [
             { text: "review — 代码审查", link: "/guide/commands/review" },
@@ -84,8 +86,8 @@ export default defineConfig({
           items: [
             { text: "配置参考", link: "/reference/config" },
             { text: "CLI 命令参考", link: "/reference/cli" },
-            { text: "Review Spec 规范", link: "/reference/review-spec" },
             { text: "环境变量", link: "/reference/env-variables" },
+            { text: "Review Spec 规范", link: "/reference/review-spec" },
           ],
         },
       ],
@@ -93,7 +95,7 @@ export default defineConfig({
         {
           text: "进阶",
           items: [
-            { text: "插件开发指南", link: "/advanced/plugin-development" },
+            { text: "扩展开发指南", link: "/advanced/plugin-development" },
             { text: "核心模块", link: "/advanced/core-modules" },
             { text: "GitHub Actions", link: "/advanced/github-actions" },
             { text: "i18n 国际化", link: "/advanced/i18n" },

@@ -31,6 +31,7 @@ spaceflow create --from git@github.com:org/tpl.git --ref v1.0 api my-api
 | 模板      | 说明                                     |
 | --------- | ---------------------------------------- |
 | `command` | 命令型 Extension，提供 CLI 命令          |
+| `mcp`     | MCP Server 型 Extension                  |
 | `skills`  | 技能型 Extension，提供编辑器 AI 技能文件 |
 
 ## 远程模板
@@ -57,10 +58,7 @@ spaceflow create --from git@github.com:org/tpl.git --ref v1.0 api my-api
 ```text
 my-cmd/
 ├── src/
-│   ├── my-cmd.command.ts      # 命令定义
-│   ├── my-cmd.service.ts      # 业务逻辑
-│   ├── my-cmd.module.ts       # NestJS 模块
-│   └── index.ts               # Extension 入口
+│   └── index.ts               # Extension 入口（defineExtension）
 ├── package.json
 ├── tsconfig.json
 └── README.md

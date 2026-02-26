@@ -15,9 +15,9 @@ spaceflow mcp --inspector
 ## 工作原理
 
 1. **扫描 Extension** — 加载所有已安装的 Extension
-2. **收集工具** — 查找带有 `@McpServer` 装饰器的类，提取其 MCP 工具定义
+2. **收集工具** — 查找 `ExtensionDefinition` 中的 `mcp` 字段，提取 MCP 工具定义
 3. **启动服务** — 通过 stdio 传输协议启动 MCP Server
-4. **注册工具** — 将所有工具注册到 MCP Server，支持 JSON Schema 参数校验
+4. **注册工具** — 将所有工具注册到 MCP Server，支持 Zod Schema 参数校验
 
 ## MCP Inspector
 
@@ -67,34 +67,38 @@ Inspector 会自动下载并启动 `@modelcontextprotocol/inspector`，提供：
 
 ## 开发 MCP 工具
 
-Extension 可以通过 `@McpServer` 和 `@McpTool` 装饰器暴露 MCP 工具：
+Extension 通过 `defineExtension` 的 `mcp` 字段声明 MCP 工具：
 
 ```typescript
-import { McpServer, McpTool, Injectable } from "@spaceflow/core";
+import { defineExtension, z } from "@spaceflow/core";
 
-@McpServer({ name: "my-tools", description: "我的工具集" })
-@Injectable()
-export class MyMcpTools {
-  @McpTool({
-    name: "hello",
-    description: "打招呼",
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "名字" },
+export default defineExtension({
+  name: "my-tools",
+  commands: [],
+  mcp: {
+    name: "my-tools",
+    version: "1.0.0",
+    description: "我的工具集",
+    tools: [
+      {
+        name: "hello",
+        description: "打招呼",
+        inputSchema: z.object({
+          name: z.string().describe("名字"),
+        }),
+        handler: async (input, ctx) => {
+          const { name } = input as { name: string };
+          return { content: [{ type: "text", text: `Hello, ${name}!` }] };
+        },
       },
-      required: ["name"],
-    },
-  })
-  async hello(args: { name: string }): Promise<string> {
-    return `Hello, ${args.name}!`;
-  }
-}
+    ],
+  },
+});
 ```
 
 ## 命令行选项
 
-| 选项 | 简写 | 说明 |
-|------|------|------|
-| `--inspector` | `-i` | 启动 MCP Inspector 调试模式 |
-| `--verbose` | `-v` | 详细日志（`-v` 基本，`-vv` 详细，`-vvv` 调试） |
+| 选项          | 简写 | 说明                                           |
+| ------------- | ---- | ---------------------------------------------- |
+| `--inspector` | `-i` | 启动 MCP Inspector 调试模式                    |
+| `--verbose`   | `-v` | 详细日志（`-v` 基本，`-vv` 详细，`-vvv` 调试） |

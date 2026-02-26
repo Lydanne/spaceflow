@@ -1,6 +1,6 @@
 # 配置文件
 
-Spaceflow 使用 `spaceflow.json` 作为项目配置文件，统一存放在 `.spaceflow/` 目录下。也支持 `.spaceflowrc` 格式的 RC 文件。
+Spaceflow 支持 `spaceflow.json` 和 `.spaceflowrc` 两种配置文件格式，内容完全一致。
 
 ## 配置文件位置
 
@@ -15,19 +15,88 @@ Spaceflow 使用 `spaceflow.json` 作为项目配置文件，统一存放在 `.s
 
 ```json
 {
-  "$schema": "./.spaceflow/config-schema.json",
+  "$schema": ".spaceflow/config-schema.json",
+  "support": ["claudeCode"],
+  "dependencies": {
+    "@spaceflow/review": "latest"
+  },
   "review": { ... },
-  "publish": { ... },
-  "dependencies": { ... },
-  "support": ["claudeCode"]
+  "publish": { ... }
 }
 ```
 
 ## 配置项
 
+### `support`
+
+配置需要关联的 AI 编辑器。安装 Extension 时，会将资源关联到对应编辑器目录。
+
+```json
+{
+  "support": ["claudeCode", "windsurf", "cursor"]
+}
+```
+
+| 值           | 编辑器目录   |
+| ------------ | ------------ |
+| `claudeCode` | `.claude/`   |
+| `windsurf`   | `.windsurf/` |
+| `cursor`     | `.cursor/`   |
+| `opencode`   | `.opencode/` |
+
+默认值为 `["claudeCode"]`。
+
+### `dependencies`
+
+已安装的外部 Extension 注册表。由 `spaceflow install` 命令自动管理。
+
+```json
+{
+  "dependencies": {
+    "@spaceflow/review": "latest",
+    "@spaceflow/publish": "workspace:*",
+    "@spaceflow/shell": "link:./extensions/shell"
+  }
+}
+```
+
+支持的值格式：
+
+| 格式              | 类型     | 示例                                      |
+| ----------------- | -------- | ----------------------------------------- |
+| `latest` / `^1.0` | npm 版本 | `"latest"`, `"^1.0.0"`                    |
+| `workspace:*`     | 工作区   | `"workspace:*"`                           |
+| `link:./path`     | 本地链接 | `"link:./extensions/review"`              |
+| `git+ssh://...`   | Git 仓库 | `"git+ssh://git@github.com/org/repo.git"` |
+
+### `lang`
+
+界面语言设置。
+
+```json
+{
+  "lang": "zh-CN"
+}
+```
+
+支持 `zh-CN`（默认）和 `en`。
+
+### `gitProvider`
+
+Git 平台配置。
+
+```json
+{
+  "gitProvider": {
+    "provider": "github",
+    "serverUrl": "https://api.github.com"
+  }
+}
+```
+
 ### `review`
 
-AI 代码审查相关配置。
+AI 代码审查相关配置（需安装 `@spaceflow/review`）。
 
 ```json
 {
@@ -47,22 +116,23 @@ AI 代码审查相关配置。
 }
 ```
 
-| 字段                  | 类型       | 默认值       | 说明                                         |
-| --------------------- | ---------- | ------------ | -------------------------------------------- |
-| `references`          | `string[]` | `[]`         | 审查规范文件目录，支持本地路径和远程仓库 URL |
-| `includes`            | `string[]` | `["*/**/*"]` | 审查文件匹配模式（glob）                     |
-| `generateDescription` | `boolean`  | `false`      | 是否自动生成 PR 描述                         |
-| `autoUpdatePrTitle`   | `boolean`  | `false`      | 是否自动更新 PR 标题                         |
-| `lineComments`        | `boolean`  | `true`       | 是否生成行内评论                             |
-| `verifyFixes`         | `boolean`  | `false`      | 是否验证修复建议                             |
-| `analyzeDeletions`    | `boolean`  | `false`      | 是否分析删除代码的影响                       |
-| `concurrency`         | `number`   | `10`         | 并发审查文件数                               |
-| `retries`             | `number`   | `3`          | 失败重试次数                                 |
-| `retryDelay`          | `number`   | `1000`       | 重试间隔（毫秒）                             |
+| 字段                   | 类型       | 默认值        | 说明                                     |
+| ---------------------- | ---------- | ------------- | ---------------------------------------- |
+| `references`           | `string[]` | `[]`          | 审查规范来源，支持本地路径和远程仓库 URL |
+| `includes`             | `string[]` | `["*/**/*"]`  | 审查文件匹配模式（glob）                 |
+| `generateDescription`  | `boolean`  | `false`       | 是否自动生成 PR 描述                     |
+| `autoUpdatePrTitle`    | `boolean`  | `false`       | 是否自动更新 PR 标题                     |
+| `lineComments`         | `boolean`  | `true`        | 是否生成行内评论                         |
+| `verifyFixes`          | `boolean`  | `false`       | 是否验证修复建议                         |
+| `analyzeDeletions`     | `boolean`  | `false`       | 是否分析删除代码的影响                   |
+| `deletionAnalysisMode` | `string`   | `"open-code"` | 删除分析模式                             |
+| `concurrency`          | `number`   | `10`          | 并发审查文件数                           |
+| `retries`              | `number`   | `3`           | 失败重试次数                             |
+| `retryDelay`           | `number`   | `1000`        | 重试间隔（毫秒）                         |
 
 ### `publish`
 
-版本发布相关配置，基于 [release-it](https://github.com/release-it/release-it)。
+版本发布相关配置（需安装 `@spaceflow/publish`），基于 [release-it](https://github.com/release-it/release-it)。
 
 ```json
 {
@@ -84,58 +154,26 @@ AI 代码审查相关配置。
       "tag": "latest"
     },
     "git": {
+      "lockBranch": false,
       "pushWhitelistUsernames": ["github-actions[bot]"]
     }
   }
 }
 ```
 
-### `dependencies`
+### `commit`
 
-已安装的外部 Extension 注册表。由 `spaceflow install` 命令自动管理。
+AI 智能提交相关配置。
 
 ```json
 {
-  "dependencies": {
-    "@spaceflow/review": "link:./extensions/review",
-    "@spaceflow/publish": "link:./extensions/publish",
-    "@spaceflow/shell": "link:./extensions/shell"
+  "commit": {
+    "strategy": "rules-first",
+    "rules": [
+      { "pattern": "docs/**", "scope": "docs" },
+      { "pattern": ".github/**", "scope": "ci" }
+    ]
   }
-}
-```
-
-支持的值格式：
-
-| 格式            | 类型     | 示例                                    |
-| --------------- | -------- | --------------------------------------- |
-| `link:./path`   | 本地链接 | `link:./extensions/review`              |
-| `^1.0.0`        | npm 版本 | `^1.0.0`                                |
-| `git+ssh://...` | Git 仓库 | `git+ssh://git@github.com/org/repo.git` |
-
-### `support`
-
-配置需要关联的 AI 编辑器。安装 Extension 时，会在对应编辑器目录下创建符号链接。
-
-```json
-{
-  "support": ["claudeCode", "windsurf", "cursor"]
-}
-```
-
-| 值           | 编辑器目录   |
-| ------------ | ------------ |
-| `claudeCode` | `.claude/`   |
-| `windsurf`   | `.windsurf/` |
-| `cursor`     | `.cursor/`   |
-| `opencode`   | `.opencode/` |
-
-### `lang`
-
-界面语言设置。
-
-```json
-{
-  "lang": "zh-CN"
 }
 ```
 
@@ -143,8 +181,9 @@ AI 代码审查相关配置。
 
 1. **命令行参数**（最高优先级）
 2. **环境变量**
-3. **`spaceflow.json` 配置**
-4. **Extension 默认值**（最低优先级）
+3. **项目配置文件**（`.spaceflowrc` > `.spaceflow/spaceflow.json`）
+4. **全局配置文件**（`~/.spaceflowrc` > `~/.spaceflow/spaceflow.json`）
+5. **Extension 默认值**（最低优先级）
 
 ## JSON Schema
 
@@ -158,6 +197,6 @@ spaceflow schema
 
 ```json
 {
-  "$schema": "./.spaceflow/config-schema.json"
+  "$schema": ".spaceflow/config-schema.json"
 }
 ```

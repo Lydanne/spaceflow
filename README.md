@@ -8,7 +8,7 @@
 
 - **AI 代码审查**：基于 LLM（OpenAI、Claude、Gemini）的自动化 PR 审查，支持行级评论和增量审查
 - **自动化发布**：基于 Conventional Commits 的版本管理，支持 Monorepo 拓扑排序发布
-- **扩展系统**：通过 NestJS 模块化架构，支持自定义命令扩展
+- **扩展系统**：基于 `defineExtension` 的纯函数式扩展体系，支持 npm 包、本地路径和 Git 仓库安装
 - **多编辑器集成**：自动关联扩展到 Claude Code、Windsurf、Cursor、OpenCode 等编辑器
 - **多平台适配**：支持 GitHub、Gitea、GitLab 等 Git 托管平台
 - **CI 流程编排**：分支锁定保护下执行 Shell 命令或 JS 脚本
@@ -32,43 +32,45 @@ pnpm spaceflow install @spaceflow/publish
 ```text
 spaceflow/
 ├── packages/
-│   ├── cli/              # CLI 入口（@spaceflow/cli）
-│   └── core/             # 核心能力库（@spaceflow/core）
-│       └── src/
-│           ├── config/             # 配置管理
-│           ├── extension-system/   # 扩展系统
-│           ├── locales/            # 国际化资源
-│           └── shared/             # 共享模块
-│               ├── git-provider/   # Git 平台适配器
-│               ├── git-sdk/        # Git 命令封装
-│               ├── llm-proxy/      # LLM 统一代理
-│               ├── llm-jsonput/    # JSON 结构化输出
-│               ├── feishu-sdk/     # 飞书 SDK
-│               ├── logger/         # 日志系统（TUI/Plain）
-│               ├── parallel/       # 并行执行工具
-│               └── storage/        # 通用存储服务
-├── extensions/         # 扩展
-│   ├── review/         # AI 代码审查（@spaceflow/review）
-│   ├── publish/        # 自动化发布（@spaceflow/publish）
-│   ├── scripts/        # 脚本执行（@spaceflow/scripts）
-│   ├── shell/          # Shell 执行（@spaceflow/shell）
-│   └── review-summary/ # 审查统计（@spaceflow/review-summary）
-├── actions/            # GitHub Actions
-├── docs/               # 文档站点（VitePress）
-└── templates/          # 扩展模板
+│   ├── cli/              # @spaceflow/cli — CLI 壳子
+│   ├── core/             # @spaceflow/core — 核心运行时
+│   │   └── src/
+│   │       ├── cli-runtime/        # DI 容器、ExtensionLoader、exec() 入口
+│   │       ├── commands/           # 13 个内置命令
+│   │       ├── config/             # 配置管理
+│   │       ├── extension-system/   # 扩展类型定义与 defineExtension
+│   │       ├── locales/            # 国际化资源
+│   │       └── shared/             # 共享模块
+│   │           ├── git-provider/   # Git 平台适配器
+│   │           ├── git-sdk/        # Git 命令封装
+│   │           ├── llm-proxy/      # LLM 统一代理
+│   │           ├── logger/         # 日志系统（TUI/Plain）
+│   │           ├── parallel/       # 并行执行工具
+│   │           └── storage/        # 通用存储服务
+│   └── shared/           # @spaceflow/shared — 公共工具库
+├── extensions/           # 扩展
+│   ├── review/           # @spaceflow/review — AI 代码审查
+│   ├── publish/          # @spaceflow/publish — 自动化发布
+│   ├── scripts/          # @spaceflow/scripts — 脚本执行
+│   ├── shell/            # @spaceflow/shell — Shell 执行
+│   └── review-summary/   # @spaceflow/review-summary — 审查统计
+├── actions/              # GitHub Actions
+├── docs/                 # 文档站点（VitePress）
+└── templates/            # 扩展模板（command / mcp / skills）
 ```
 
 ## 包一览
 
-| 包名                        | 说明                                       |
-| --------------------------- | ------------------------------------------ |
-| `@spaceflow/cli`            | CLI 工具，提供 `spaceflow` / `space` 命令  |
-| `@spaceflow/core`           | 核心能力库，提供共享模块和扩展系统基础设施 |
-| `@spaceflow/review`         | AI 代码审查扩展                            |
-| `@spaceflow/publish`        | 自动化版本发布扩展                         |
-| `@spaceflow/scripts`        | CI 环境下执行 JS 脚本                      |
-| `@spaceflow/shell`          | CI 环境下执行 Shell 命令                   |
-| `@spaceflow/review-summary` | PR 贡献审查统计                            |
+| 包名                        | 说明                                                         |
+| --------------------------- | ------------------------------------------------------------ |
+| `@spaceflow/cli`            | CLI 壳子入口，负责引导和启动                                 |
+| `@spaceflow/core`           | 核心运行时 + 13 个内置命令 + 共享模块（Git、LLM、Logger 等） |
+| `@spaceflow/shared`         | 轻量公共工具库，CLI 和 core 共同依赖                         |
+| `@spaceflow/review`         | AI 代码审查扩展                                              |
+| `@spaceflow/publish`        | 自动化版本发布扩展                                           |
+| `@spaceflow/scripts`        | CI 环境下执行 JS 脚本                                        |
+| `@spaceflow/shell`          | CI 环境下执行 Shell 命令                                     |
+| `@spaceflow/review-summary` | PR 贡献审查统计                                              |
 
 ## 内置命令
 
@@ -79,17 +81,18 @@ spaceflow/
 | `build`      | 构建扩展             |
 | `dev`        | 开发模式运行         |
 | `create`     | 创建新扩展           |
+| `update`     | 更新扩展             |
+| `mcp`        | 启动 MCP Server      |
 | `list`       | 列出已安装扩展       |
 | `clear`      | 清理缓存             |
 | `runx` / `x` | 执行扩展命令         |
 | `schema`     | 生成配置 JSON Schema |
 | `commit`     | AI 智能提交          |
 | `setup`      | 初始化项目配置       |
-| `mcp`        | 启动 MCP Server      |
 
 ## 配置
 
-在项目根目录创建 `spaceflow.json`：
+在项目根目录创建 `.spaceflowrc` 或 `.spaceflow/spaceflow.json`：
 
 ```json
 {

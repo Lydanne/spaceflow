@@ -24,7 +24,7 @@ spaceflow setup
 
 1. **创建 `.spaceflow/` 目录** — 包含 `package.json`（用于管理 Extension 依赖）
 2. **生成 JSON Schema** — 创建 `config-schema.json`，提供编辑器自动补全
-3. **创建 `spaceflow.json`** — 默认配置文件（如果不存在）
+3. **创建配置文件** — 创建 `.spaceflowrc`（如果不存在）
 
 生成的默认配置：
 
@@ -50,7 +50,7 @@ spaceflow setup -g
 执行以下操作：
 
 1. **创建 `~/.spaceflow/` 目录** — 全局配置目录
-2. **读取本地配置** — 读取当前项目的 `spaceflow.json`
+2. **读取本地配置** — 读取当前项目的配置文件
 3. **读取 `.env` 文件** — 解析 `SPACEFLOW_` 前缀的环境变量
 4. **合并配置** — 本地配置 < 实例配置 < 环境变量配置
 5. **写入全局配置** — 保存到 `~/.spaceflow/spaceflow.json`
@@ -82,6 +82,6 @@ SPACEFLOW_REVIEW_RETRIES=5
 
 ## 命令行选项
 
-| 选项 | 简写 | 说明 |
-|------|------|------|
+| 选项       | 简写 | 说明       |
+| ---------- | ---- | ---------- |
 | `--global` | `-g` | 全局初始化 |

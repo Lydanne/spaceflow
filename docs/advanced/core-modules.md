@@ -1,179 +1,183 @@
 # 核心模块
 
-`@spaceflow/core` 提供的共享模块，所有 Extension 都可以导入使用。
+`@spaceflow/core` 提供了一系列共享模块，Extension 可以直接导入使用。在新架构中，不再使用 NestJS 依赖注入，而是直接实例化或通过 `SpaceflowContext` 获取服务。
 
 ## 模块总览
 
-| 模块 | 导出 | 说明 |
-|------|------|------|
-| Git Provider | `GitProviderModule`, `GitProviderService` | Git 平台适配（GitHub / Gitea） |
-| Git SDK | `GitSdkModule`, `GitSdkService` | Git 命令封装 |
-| LLM Proxy | `LlmProxyModule`, `LlmProxyService` | 多 LLM 统一代理 |
-| Feishu SDK | `FeishuSdkModule`, `FeishuSdkService` | 飞书 API |
-| Storage | `StorageModule`, `StorageService` | 本地存储 |
-| Parallel | `ParallelModule`, `ParallelService` | 并行执行工具 |
-| Logger | `Logger` | 日志系统 |
-| i18n | `t()`, `initI18n()`, `addLocaleResources()` | 国际化 |
-| Config | `loadSpaceflowConfig()` | 配置加载 |
+| 模块         | 说明                                    |
+| ------------ | --------------------------------------- |
+| Git Provider | Git 平台适配（GitHub / Gitea / GitLab） |
+| Git SDK      | Git 命令封装                            |
+| LLM Proxy    | 多 LLM 统一代理                         |
+| Logger       | 日志系统（Plain / TUI）                 |
+| 飞书 SDK     | 飞书开放平台 API                        |
+| Storage      | 本地存储（支持 TTL）                    |
+| Parallel     | 并行执行工具                            |
+| i18n         | 国际化                                  |
 
 ## Git Provider
 
-Git 平台适配器，支持 GitHub 和 Gitea。
+Git 平台适配器，支持 GitHub、Gitea 和 GitLab。
 
 ```typescript
-import { GitProviderModule, GitProviderService } from "@spaceflow/core";
+import { GitProviderService } from "@spaceflow/core";
 
-@Module({
-  imports: [GitProviderModule.forFeature()],
-})
-export class MyModule {}
+const gitProvider = new GitProviderService();
 
-@Injectable()
-export class MyService {
-  constructor(private readonly gitProvider: GitProviderService) {}
+// 获取 PR diff
+const diff = await gitProvider.getPullRequestDiff(prNumber);
 
-  async createComment(prNumber: number, body: string): Promise<void> {
-    await this.gitProvider.createPRComment(prNumber, body);
-  }
+// 创建 PR 评论
+await gitProvider.createPullRequestComment(prNumber, body);
 
-  async listFiles(prNumber: number): Promise<string[]> {
-    const files = await this.gitProvider.getPRFiles(prNumber);
-    return files.map((f) => f.filename);
-  }
-}
+// 创建行内审查评论
+await gitProvider.createReviewComment(prNumber, {
+  path: "src/index.ts",
+  line: 42,
+  body: "建议优化此处逻辑",
+});
+
+// 更新 PR 信息
+await gitProvider.updatePullRequest(prNumber, { title, body });
 ```
 
 ### 支持的平台
 
-| 平台 | 适配器 | 检测方式 |
-|------|--------|----------|
-| GitHub | `GithubAdapter` | `GITHUB_TOKEN` 环境变量 |
-| Gitea | `GiteaAdapter` | `GITEA_TOKEN` 环境变量 |
+| 平台   | 环境变量                            | 说明       |
+| ------ | ----------------------------------- | ---------- |
+| GitHub | `GITHUB_TOKEN`                      | GitHub API |
+| Gitea  | `GITEA_TOKEN`, `GITEA_SERVER_URL`   | Gitea API  |
+| GitLab | `GITLAB_TOKEN`, `GITLAB_SERVER_URL` | GitLab API |
 
-默认使用 GitHub。可通过 `GIT_PROVIDER_TYPE` 环境变量显式指定。
+平台类型通过 `GIT_PROVIDER_TYPE` 环境变量或配置文件的 `gitProvider.provider` 指定。
 
 ## Git SDK
 
-封装常用 Git 命令操作。
+Git 命令封装，提供常用 Git 操作。
 
 ```typescript
-import { GitSdkModule, GitSdkService } from "@spaceflow/core";
+import { GitSdkService } from "@spaceflow/core";
 
-@Injectable()
-export class MyService {
-  constructor(private readonly gitSdk: GitSdkService) {}
+const gitSdk = new GitSdkService();
 
-  async getChanges(): Promise<string> {
-    return this.gitSdk.diff("main", "HEAD");
-  }
-
-  async getCurrentBranch(): Promise<string> {
-    return this.gitSdk.currentBranch();
-  }
-}
+const diff = await gitSdk.diff("HEAD~1", "HEAD");
+const log = await gitSdk.log({ maxCount: 10 });
+const status = await gitSdk.status();
 ```
+
+### 主要方法
+
+| 方法       | 说明           |
+| ---------- | -------------- |
+| `diff()`   | 获取代码差异   |
+| `log()`    | 获取提交历史   |
+| `status()` | 获取工作区状态 |
+| `add()`    | 暂存文件       |
+| `commit()` | 提交更改       |
+| `push()`   | 推送到远程     |
+| `fetch()`  | 获取远程更新   |
 
 ## LLM Proxy
 
-多 LLM 统一代理，支持 OpenAI、Claude、Claude Code、OpenCode 等。
+多 LLM 统一代理，支持 OpenAI 和 Claude。
 
 ```typescript
-import { LlmProxyModule, LlmProxyService } from "@spaceflow/core";
+import { LlmProxyService } from "@spaceflow/core";
 
-@Injectable()
-export class MyService {
-  constructor(private readonly llm: LlmProxyService) {}
+const llm = new LlmProxyService();
 
-  async analyze(code: string): Promise<string> {
-    const result = await this.llm.chat({
-      messages: [
-        { role: "system", content: "你是一个代码分析助手" },
-        { role: "user", content: `分析以下代码:\n${code}` },
-      ],
-    });
-    return result.content;
-  }
-}
+const result = await llm.chat({
+  messages: [
+    { role: "system", content: "你是一个代码分析助手" },
+    { role: "user", content: "分析以下代码..." },
+  ],
+});
+console.log(result.content);
 ```
+
+### 支持的模型
+
+| 模式     | 环境变量                                | 说明       |
+| -------- | --------------------------------------- | ---------- |
+| `openai` | `OPENAI_API_KEY`, `OPENAI_API_BASE_URL` | OpenAI API |
+| `claude` | `ANTHROPIC_API_KEY`                     | Claude API |
+
+通过 `LLM_PROVIDER` 环境变量或命令行 `-l` 参数指定模式。
 
 ## Logger
 
-日志系统，支持 Plain 模式（CI/管道）和 TUI 模式（终端交互）。
+日志系统，支持 Plain 和 TUI 两种模式。
 
 ```typescript
-import { Logger } from "@spaceflow/core";
+import { LoggerService } from "@spaceflow/core";
 
-const logger = new Logger("my-extension");
-await logger.init(); // 加载 TUI 渲染器
+const logger = new LoggerService();
 
-// 基础日志
-logger.info("信息");
-logger.success("成功");
+logger.info("操作开始");
+logger.debug("调试信息");
 logger.warn("警告");
 logger.error("错误");
+```
 
-// Spinner
-const spinner = logger.spin("处理中...");
-spinner.update("仍在处理...");
-spinner.succeed("处理完成");
+也可通过 `SpaceflowContext` 使用内置的输出服务：
 
-// 进度条
-const progress = logger.progress({ total: 100, label: "下载" });
-progress.update(50);
-progress.finish();
-
-// 子 Logger
-const child = logger.child("compile");
-child.info("编译中..."); // 输出: [my-extension:compile] 编译中...
+```typescript
+run: async (args, options, ctx) => {
+  ctx.output.info("信息");
+  ctx.output.success("成功");
+  ctx.output.warn("警告");
+  ctx.output.error("错误");
+  ctx.output.debug("调试");
+};
 ```
 
 ### 日志级别
 
-| 级别 | 说明 |
-|------|------|
-| `silent` | 不输出任何日志 |
-| `info` | 默认级别 |
-| `verbose` | 详细日志（`-v`） |
-| `debug` | 调试日志（`-vv`） |
+| 级别    | 说明                   |
+| ------- | ---------------------- |
+| `error` | 错误，始终显示         |
+| `warn`  | 警告，始终显示         |
+| `info`  | 信息，默认显示         |
+| `debug` | 调试，`-v` 时显示      |
+| `trace` | 详细跟踪，`-vv` 时显示 |
 
-## Feishu SDK
+## 飞书 SDK
 
-飞书 API 封装，支持发送消息。
+飞书开放平台 API 封装。
 
 ```typescript
-import { FeishuSdkModule, FeishuSdkService } from "@spaceflow/core";
+import { FeishuSdkService } from "@spaceflow/core";
 
-@Injectable()
-export class MyService {
-  constructor(private readonly feishu: FeishuSdkService) {}
+const feishu = new FeishuSdkService();
 
-  async notify(chatId: string, message: string): Promise<void> {
-    await this.feishu.sendMessage(chatId, message);
-  }
-}
+await feishu.sendMessage({
+  chatId: "oc_xxx",
+  content: message,
+});
 ```
 
-需要配置环境变量 `FEISHU_APP_ID` 和 `FEISHU_APP_SECRET`。
+### 环境变量
+
+| 变量                | 说明         |
+| ------------------- | ------------ |
+| `FEISHU_APP_ID`     | 飞书应用 ID  |
+| `FEISHU_APP_SECRET` | 飞书应用密钥 |
 
 ## Storage
 
-本地存储服务。
+本地存储，支持 TTL（过期时间）。通过 `SpaceflowContext` 使用：
 
 ```typescript
-import { StorageModule, StorageService } from "@spaceflow/core";
+run: async (args, options, ctx) => {
+  // 存储数据，TTL 1小时
+  await ctx.storage.set("cache-key", { data: "value" }, 3600);
 
-@Injectable()
-export class MyService {
-  constructor(private readonly storage: StorageService) {}
+  // 读取数据
+  const cached = await ctx.storage.get<MyData>("cache-key");
 
-  async saveData(key: string, data: unknown): Promise<void> {
-    await this.storage.set(key, data);
-  }
-
-  async loadData<T>(key: string): Promise<T | undefined> {
-    return this.storage.get<T>(key);
-  }
-}
+  // 删除数据
+  await ctx.storage.del("cache-key");
+};
 ```
 
 ## Parallel
@@ -181,20 +185,34 @@ export class MyService {
 并行执行工具，支持并发控制。
 
 ```typescript
-import { ParallelModule, ParallelService } from "@spaceflow/core";
+import { ParallelService } from "@spaceflow/core";
 
-@Injectable()
-export class MyService {
-  constructor(private readonly parallel: ParallelService) {}
+const parallel = new ParallelService();
 
-  async processFiles(files: string[]): Promise<void> {
-    await this.parallel.run(
-      files,
-      async (file) => {
-        // 处理单个文件
-      },
-      { concurrency: 10 },
-    );
-  }
-}
+const results = await parallel.run(
+  files,
+  async (file) => {
+    return processFile(file);
+  },
+  { concurrency: 5 },
+);
 ```
+
+## i18n
+
+国际化工具函数。
+
+```typescript
+import { t, addLocaleResources } from "@spaceflow/core";
+
+// 注册翻译资源
+addLocaleResources("my-ext", {
+  "zh-CN": { greeting: "你好" },
+  en: { greeting: "Hello" },
+});
+
+// 使用翻译
+const message = t("my-ext:greeting"); // "你好" 或 "Hello"
+```
+
+详细说明请参考 [i18n 国际化](/advanced/i18n)。

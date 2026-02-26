@@ -14,7 +14,7 @@ spaceflow install ./extensions/my-plugin
 # 安装 git 仓库
 spaceflow install git@github.com:org/plugin.git
 
-# 安装所有 spaceflow.json 中的 dependencies
+# 安装配置文件中所有 dependencies
 spaceflow install
 
 # 全局安装
@@ -23,22 +23,22 @@ spaceflow install @spaceflow/review -g
 
 ## 支持的 source 类型
 
-| 类型     | 示例                            | 说明                                 |
-| -------- | ------------------------------- | ------------------------------------ |
-| npm 包   | `@spaceflow/review`             | 执行 `pnpm add <package>`            |
-| 本地路径 | `./extensions/my-plugin`        | 注册 `link:` 引用到 `spaceflow.json` |
-| git 仓库 | `git@github.com:org/plugin.git` | 克隆到 `.spaceflow/deps/`            |
+| 类型     | 示例                            | 说明                        |
+| -------- | ------------------------------- | --------------------------- |
+| npm 包   | `@spaceflow/review`             | 执行 `pnpm add <package>`   |
+| 本地路径 | `./extensions/my-plugin`        | 注册 `link:` 引用到配置文件 |
+| git 仓库 | `git@github.com:org/plugin.git` | 克隆到 `.spaceflow/deps/`   |
 
 ## 安装流程
 
 1. **解析 source** — 判断是 npm 包、本地路径还是 git 仓库
 2. **安装依赖** — 根据类型执行对应的安装操作
-3. **更新配置** — 将 Extension 注册到 `spaceflow.json` 的 `dependencies` 字段
+3. **更新配置** — 将 Extension 注册到配置文件的 `dependencies` 字段
 4. **关联编辑器** — 将 Extension 的 skills 关联到 `support` 中配置的编辑器目录
 
 ## 无参数模式
 
-不传 source 时，会读取 `spaceflow.json` 中的 `dependencies` 字段，安装所有已注册的 Extension：
+不传 source 时，会读取配置文件中的 `dependencies` 字段，安装所有已注册的 Extension：
 
 ```bash
 spaceflow install

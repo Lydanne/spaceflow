@@ -1,6 +1,6 @@
 # 配置参考
 
-`spaceflow.json` 完整配置项参考。
+`spaceflow.json` / `.spaceflowrc` 完整配置项参考。
 
 ## 配置文件位置
 
@@ -17,9 +17,19 @@
 
 ```json
 {
-  "$schema": "./.spaceflow/config-schema.json",
+  "$schema": ".spaceflow/config-schema.json",
   "lang": "zh-CN",
   "support": ["claudeCode", "windsurf", "cursor"],
+  "gitProvider": {
+    "provider": "github",
+    "serverUrl": "https://api.github.com"
+  },
+  "dependencies": {
+    "@spaceflow/review": "latest",
+    "@spaceflow/publish": "workspace:*",
+    "@spaceflow/shell": "link:./extensions/shell",
+    "@spaceflow/scripts": "link:./extensions/scripts"
+  },
   "review": {
     "references": ["./references", "https://github.com/org/review-spec"],
     "includes": ["*/**/*.ts", "!*/**/*.spec.*", "!*/**/*.config.*"],
@@ -57,14 +67,16 @@
       "versionArgs": ["--workspaces false"]
     },
     "git": {
+      "lockBranch": false,
       "pushWhitelistUsernames": ["github-actions[bot]"]
     }
   },
-  "dependencies": {
-    "@spaceflow/review": "link:./extensions/review",
-    "@spaceflow/publish": "link:./extensions/publish",
-    "@spaceflow/shell": "link:./extensions/shell",
-    "@spaceflow/scripts": "link:./extensions/scripts"
+  "commit": {
+    "strategy": "rules-first",
+    "rules": [
+      { "pattern": "docs/**", "scope": "docs" },
+      { "pattern": ".github/**", "scope": "ci" }
+    ]
   }
 }
 ```
@@ -75,7 +87,7 @@
 
 - **类型**：`string`
 - **说明**：JSON Schema 路径，用于编辑器自动补全
-- **示例**：`"./.spaceflow/config-schema.json"`
+- **示例**：`".spaceflow/config-schema.json"`
 
 ### `lang`
 
@@ -95,7 +107,16 @@
 - **类型**：`Record<string, string>`
 - **说明**：已安装的外部 Extension 注册表，由 `spaceflow install` 自动管理
 
+## gitProvider 配置
+
+| 字段        | 类型     | 默认值     | 说明                                              |
+| ----------- | -------- | ---------- | ------------------------------------------------- |
+| `provider`  | `string` | `"github"` | Git 平台类型：`"github"` / `"gitea"` / `"gitlab"` |
+| `serverUrl` | `string` | 自动检测   | 平台 API 地址                                     |
+
 ## review 配置
+
+需安装 `@spaceflow/review`。
 
 | 字段                   | 类型       | 默认值        | 说明                                   |
 | ---------------------- | ---------- | ------------- | -------------------------------------- |
@@ -123,6 +144,8 @@
 
 ## publish 配置
 
+需安装 `@spaceflow/publish`。
+
 ### `publish.monorepo`
 
 | 字段            | 类型      | 默认值  | 说明               |
@@ -147,4 +170,12 @@
 
 | 字段                     | 类型       | 说明                   |
 | ------------------------ | ---------- | ---------------------- |
+| `lockBranch`             | `boolean`  | 发布时是否锁定分支     |
 | `pushWhitelistUsernames` | `string[]` | 允许推送的用户名白名单 |
+
+## commit 配置
+
+| 字段       | 类型       | 默认值          | 说明                          |
+| ---------- | ---------- | --------------- | ----------------------------- |
+| `strategy` | `string`   | `"rules-first"` | Scope 策略                    |
+| `rules`    | `object[]` | `[]`            | Scope 规则（pattern + scope） |

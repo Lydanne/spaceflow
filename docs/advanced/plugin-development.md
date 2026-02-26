@@ -1,22 +1,27 @@
-# 插件开发指南
+# 扩展开发指南
 
 本指南介绍如何开发自定义 Spaceflow Extension。
 
 ## 前置知识
 
-- [NestJS](https://nestjs.com/) 基础（Module、Injectable、依赖注入）
-- [nest-commander](https://docs.nestjs.com/recipes/nest-commander) CLI 命令定义
-- TypeScript
+- TypeScript 基础
+- [Commander.js](https://github.com/tj/commander.js) CLI 命令概念（可选）
+- [Zod](https://zod.dev/) Schema 定义（可选，用于配置校验）
 
 ## 快速开始
 
 ### 使用模板创建
 
 ```bash
-spaceflow create my-extension
-```
+# 创建命令型 Extension
+spaceflow create command my-extension
 
-这会在当前目录下创建一个标准的 Extension 模板。
+# 创建 MCP Server 型 Extension
+spaceflow create mcp my-mcp
+
+# 创建技能型 Extension
+spaceflow create skills my-skill
+```
 
 ### 手动创建
 
@@ -24,8 +29,7 @@ spaceflow create my-extension
 mkdir spaceflow-plugin-hello
 cd spaceflow-plugin-hello
 pnpm init
-pnpm add @spaceflow/core
-pnpm add -D typescript @types/node
+pnpm add -D @spaceflow/cli typescript @types/node
 ```
 
 ## 目录结构
@@ -33,16 +37,8 @@ pnpm add -D typescript @types/node
 ```text
 spaceflow-plugin-hello/
 ├── src/
-│   ├── hello.command.ts       # 命令定义
 │   ├── hello.service.ts       # 业务逻辑
-│   ├── hello.module.ts        # NestJS 模块
-│   ├── locales/               # i18n 资源
-│   │   ├── zh-cn/
-│   │   │   └── hello.json
-│   │   ├── en/
-│   │   │   └── hello.json
-│   │   └── index.ts
-│   └── index.ts               # Extension 入口
+│   └── index.ts               # Extension 入口（defineExtension）
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -50,147 +46,189 @@ spaceflow-plugin-hello/
 
 ## Extension 入口
 
-每个 Extension 必须实现 `SpaceflowExtension` 接口：
+使用 `defineExtension()` 定义扩展，这是一个纯函数式 API：
 
 ```typescript
 // src/index.ts
-import type {
-  SpaceflowExtension,
-  SpaceflowExtensionMetadata,
-} from "@spaceflow/core";
-import { HelloModule } from "./hello.module";
-import { helloLocales } from "./locales";
-
-export class HelloExtension implements SpaceflowExtension {
-  getMetadata(): SpaceflowExtensionMetadata {
-    return {
-      name: "hello",
-      commands: ["hello"],
-      configKey: "hello",
-      description: "示例 Extension",
-      locales: helloLocales,
-    };
-  }
-
-  getModule() {
-    return HelloModule;
-  }
-}
-
-export default HelloExtension;
-```
-
-## 命令定义
-
-使用 `@Command` 装饰器定义 CLI 命令：
-
-```typescript
-// src/hello.command.ts
-import { Command, CommandRunner, Option } from "@spaceflow/core";
-import { t } from "@spaceflow/core";
+import { defineExtension } from "@spaceflow/core";
 import { HelloService } from "./hello.service";
 
-interface HelloOptions {
-  readonly name?: string;
-}
-
-@Command({
+export default defineExtension({
   name: "hello",
-  description: t("hello:description"),
-})
-export class HelloCommand extends CommandRunner {
-  constructor(private readonly helloService: HelloService) {
-    super();
-  }
+  version: "1.0.0",
+  description: "示例 Extension",
+  configKey: "hello",
 
-  async run(_params: string[], options: HelloOptions): Promise<void> {
-    const name = options.name ?? "World";
-    console.log(this.helloService.greet(name));
-  }
-
-  @Option({
-    flags: "-n, --name <name>",
-    description: t("hello:options.name"),
-  })
-  parseName(val: string): string {
-    return val;
-  }
-}
+  commands: [
+    {
+      name: "hello",
+      description: "打招呼命令",
+      arguments: "[name]",
+      options: [
+        {
+          flags: "-g, --greeting <greeting>",
+          description: "自定义问候语",
+          default: "Hello",
+        },
+        {
+          flags: "-v, --verbose",
+          description: "详细输出",
+        },
+      ],
+      run: async (args, options, ctx) => {
+        const helloService = new HelloService();
+        const name = args[0] || "World";
+        const greeting = (options.greeting as string) || "Hello";
+        ctx.output.info(helloService.greet(greeting, name));
+      },
+    },
+  ],
+});
 ```
 
 ## 业务逻辑
 
 ```typescript
 // src/hello.service.ts
-import { Injectable } from "@spaceflow/core";
-
-@Injectable()
 export class HelloService {
-  greet(name: string): string {
-    return `Hello, ${name}!`;
+  greet(greeting: string, name: string): string {
+    return `${greeting}, ${name}!`;
   }
 }
 ```
 
-## NestJS 模块
+## 使用 SpaceflowContext
+
+命令的 `run` 函数接收 `SpaceflowContext`，提供运行时能力：
 
 ```typescript
-// src/hello.module.ts
-import { Module } from "@spaceflow/core";
-import { HelloCommand } from "./hello.command";
-import { HelloService } from "./hello.service";
+run: async (args, options, ctx) => {
+  // 读取配置
+  const config = ctx.config.getPluginConfig<MyConfig>("hello");
 
-@Module({
-  providers: [HelloCommand, HelloService],
-})
-export class HelloModule {}
+  // 输出
+  ctx.output.info("信息");
+  ctx.output.success("成功");
+  ctx.output.warn("警告");
+  ctx.output.error("错误");
+
+  // 存储
+  await ctx.storage.set("key", { data: "value" });
+  const data = await ctx.storage.get<MyData>("key");
+
+  // 获取其他已注册的服务
+  if (ctx.hasService("myService")) {
+    const svc = ctx.getService<MyService>("myService");
+  }
+};
 ```
 
-## 使用核心能力
+## 注册服务
 
-Extension 可以导入 `@spaceflow/core` 提供的共享模块：
+Extension 可以通过 `services` 字段注册可被其他扩展使用的服务：
 
 ```typescript
-import { Module } from "@spaceflow/core";
-import { GitSdkModule } from "@spaceflow/core";
-import { LlmProxyModule } from "@spaceflow/core";
-
-@Module({
-  imports: [
-    GitSdkModule,       // Git 命令封装
-    LlmProxyModule,     // 多 LLM 代理
+export default defineExtension({
+  name: "hello",
+  commands: [
+    /* ... */
   ],
-  providers: [MyCommand, MyService],
-})
-export class MyModule {}
+  services: [
+    {
+      key: "hello.service",
+      factory: (ctx) => new HelloService(ctx),
+    },
+  ],
+});
 ```
 
-在 Service 中注入使用：
+其他扩展可通过 `ctx.getService("hello.service")` 获取。
+
+## 配置 Schema
+
+使用 Zod 定义配置 Schema，提供类型校验和 JSON Schema 自动生成：
 
 ```typescript
-import { Injectable } from "@spaceflow/core";
-import { GitSdkService } from "@spaceflow/core";
+import { defineExtension, z } from "@spaceflow/core";
 
-@Injectable()
-export class MyService {
-  constructor(private readonly gitSdk: GitSdkService) {}
-
-  async getDiff(): Promise<string> {
-    return this.gitSdk.diff("HEAD~1", "HEAD");
-  }
-}
+export default defineExtension({
+  name: "hello",
+  configKey: "hello",
+  configSchema: () =>
+    z.object({
+      greeting: z.string().default("Hello").describe("默认问候语"),
+      maxRetries: z.number().default(3).describe("最大重试次数"),
+    }),
+  commands: [
+    {
+      name: "hello",
+      description: "打招呼命令",
+      run: async (args, options, ctx) => {
+        const config = ctx.config.getPluginConfig<{ greeting: string }>(
+          "hello",
+        );
+        ctx.output.info(config?.greeting || "Hello");
+      },
+    },
+  ],
+});
 ```
 
-### 可用的核心模块
+运行 `spaceflow schema` 后，`hello` 的配置会自动出现在 JSON Schema 中。
 
-| 模块 | 说明 |
-|------|------|
-| `GitProviderModule` | Git 平台适配器（GitHub / Gitea） |
-| `GitSdkModule` | Git 命令封装 |
-| `LlmProxyModule` | 多 LLM 统一代理 |
-| `FeishuSdkModule` | 飞书 API |
-| `StorageModule` | 本地存储 |
-| `ParallelModule` | 并行执行工具 |
+## 生命周期钩子
+
+```typescript
+export default defineExtension({
+  name: "hello",
+  commands: [
+    /* ... */
+  ],
+
+  // 所有服务注册完毕后调用
+  onInit: async (ctx) => {
+    ctx.output.debug("hello extension initialized");
+  },
+
+  // CLI 退出前调用
+  onDestroy: async (ctx) => {
+    ctx.output.debug("hello extension destroyed");
+  },
+});
+```
+
+## MCP 工具
+
+Extension 可以同时提供 CLI 命令和 MCP 工具：
+
+```typescript
+import { defineExtension, z } from "@spaceflow/core";
+
+export default defineExtension({
+  name: "hello",
+  commands: [
+    /* ... */
+  ],
+  mcp: {
+    name: "hello-tools",
+    version: "1.0.0",
+    description: "Hello MCP 工具集",
+    tools: [
+      {
+        name: "greet",
+        description: "生成问候语",
+        inputSchema: z.object({
+          name: z.string().describe("名字"),
+        }),
+        handler: async (input, ctx) => {
+          const { name } = input as { name: string };
+          return { content: [{ type: "text", text: `Hello, ${name}!` }] };
+        },
+      },
+    ],
+  },
+});
+```
 
 ## package.json 规范
 
@@ -200,56 +238,41 @@ export class MyService {
   "version": "1.0.0",
   "description": "Spaceflow Hello Extension",
   "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "type": "module",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+  "scripts": {
+    "build": "spaceflow build",
+    "dev": "spaceflow dev"
+  },
+  "devDependencies": {
+    "@spaceflow/cli": "workspace:*"
   },
   "peerDependencies": {
-    "@spaceflow/core": "^0.17.0"
+    "@spaceflow/core": "workspace:*"
   },
   "spaceflow": {
-    "commands": ["hello"],
-    "configKey": "hello"
+    "type": "flow",
+    "entry": "."
   }
 }
 ```
 
-## i18n 支持
+### 多导出格式
 
-在 `locales/` 目录下管理翻译资源：
-
-```typescript
-// src/locales/index.ts
-import zhCN from "./zh-cn/hello.json";
-import en from "./en/hello.json";
-import { addLocaleResources } from "@spaceflow/core";
-
-export const helloLocales: Record<string, Record<string, string>> = {
-  "zh-CN": zhCN,
-  en,
-};
-
-// Side-effect: 立即注册资源
-addLocaleResources("hello", helloLocales);
-```
+如果 Extension 同时提供命令、技能和 MCP：
 
 ```json
-// src/locales/zh-cn/hello.json
 {
-  "description": "打招呼命令",
-  "options.name": "名字"
-}
-```
-
-```json
-// src/locales/en/hello.json
-{
-  "description": "Say hello",
-  "options.name": "Name"
+  "spaceflow": {
+    "exports": {
+      "hello": { "type": "flow", "entry": "." },
+      "hello-skills": { "type": "skill", "entry": "./skills" },
+      "hello-mcp": {
+        "type": "mcp",
+        "entry": ".",
+        "mcp": { "command": "node", "args": ["dist/mcp.js"] }
+      }
+    }
+  }
 }
 ```
 
@@ -261,9 +284,11 @@ addLocaleResources("hello", helloLocales);
 spaceflow build
 ```
 
+Extension 使用 Rspack 构建，默认配置会自动处理 TypeScript 编译和打包。
+
 ### 本地测试
 
-在 `spaceflow.json` 中使用 `link:` 引用本地 Extension：
+在配置文件中使用 `link:` 引用本地 Extension：
 
 ```json
 {
@@ -272,6 +297,8 @@ spaceflow build
   }
 }
 ```
+
+然后运行 `spaceflow install` 即可加载。
 
 ### 发布到 npm
 
