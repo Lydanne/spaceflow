@@ -4,6 +4,7 @@ import { execSync } from "child_process";
 import { createRequire } from "module";
 import { homedir } from "os";
 import { detectPackageManager } from "../package-manager";
+import { getDependencies } from "../config";
 
 /** .spaceflow 目录名 */
 export const SPACEFLOW_DIR = ".spaceflow";
@@ -90,7 +91,9 @@ export function getSpaceflowCoreVersion(): string {
 }
 
 /**
- * 确保 .spaceflow 目录及 package.json 存在，并保持 @spaceflow/core 版本与 cli 一致
+ * 确保 .spaceflow 目录及 package.json 存在
+ * - 保持 @spaceflow/core 版本与 cli 一致
+ * - 同步 spaceflow.json/.spaceflowrc 中的 dependencies（扩展包）
  * @param spaceflowDir .spaceflow 目录路径
  */
 export function ensureSpaceflowPackageJson(spaceflowDir: string): void {
@@ -99,41 +102,71 @@ export function ensureSpaceflowPackageJson(spaceflowDir: string): void {
   const packageJsonPath = join(spaceflowDir, PACKAGE_JSON);
   const coreVersion = getSpaceflowCoreVersion();
 
+  // 从 spaceflow.json/.spaceflowrc 读取扩展依赖
+  const extDeps = getDependencies();
+
+  // 构建期望的 dependencies：@spaceflow/core + 所有扩展包
+  const expectedDeps: Record<string, string> = {
+    "@spaceflow/core": coreVersion,
+    ...extDeps,
+  };
+
   if (existsSync(packageJsonPath)) {
-    // 已存在：检查并更新 @spaceflow/core 版本
     try {
       const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
-      if (pkg.dependencies?.["@spaceflow/core"] !== coreVersion) {
-        pkg.dependencies = pkg.dependencies || {};
-        pkg.dependencies["@spaceflow/core"] = coreVersion;
+      const currentDeps = pkg.dependencies || {};
+
+      // 检查是否需要更新
+      const needsUpdate = JSON.stringify(currentDeps) !== JSON.stringify(expectedDeps);
+
+      if (needsUpdate) {
+        pkg.dependencies = expectedDeps;
         writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2) + "\n");
       }
     } catch {
       // ignore
     }
   } else {
-    // 不存在：创建
     const packageJson = {
       name: "spaceflow",
       private: true,
       type: "module",
-      dependencies: {
-        "@spaceflow/core": coreVersion,
-      },
+      dependencies: expectedDeps,
     };
     writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
   }
 }
 
 /**
- * 确保 .spaceflow/node_modules 已安装
+ * 确保 .spaceflow/node_modules 已安装且与 package.json 的 dependencies 一致
  * @param spaceflowDir .spaceflow 目录路径
  */
 export function ensureDependencies(spaceflowDir: string): void {
   const nodeModulesDir = join(spaceflowDir, "node_modules");
   const packageJsonPath = join(spaceflowDir, PACKAGE_JSON);
 
-  if (!existsSync(packageJsonPath) || existsSync(nodeModulesDir)) {
+  if (!existsSync(packageJsonPath)) {
+    return;
+  }
+
+  // 检查是否需要安装：node_modules 不存在，或有依赖包缺失
+  let needsInstall = !existsSync(nodeModulesDir);
+  if (!needsInstall) {
+    try {
+      const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+      const deps = pkg.dependencies || {};
+      for (const name of Object.keys(deps)) {
+        if (!existsSync(join(nodeModulesDir, ...name.split("/")))) {
+          needsInstall = true;
+          break;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!needsInstall) {
     return;
   }
 

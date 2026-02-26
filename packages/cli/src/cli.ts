@@ -3,7 +3,12 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
 import { homedir } from "os";
-import { SPACEFLOW_DIR, ensureSpaceflowPackageJson, ensureDependencies } from "@spaceflow/shared";
+import {
+  SPACEFLOW_DIR,
+  ensureSpaceflowPackageJson,
+  ensureDependencies,
+  getDependencies,
+} from "@spaceflow/shared";
 
 /**
  * Spaceflow CLI — 壳子入口
@@ -15,8 +20,6 @@ import { SPACEFLOW_DIR, ensureSpaceflowPackageJson, ensureDependencies } from "@
  * 4. 生成 .spaceflow/bin/index.js（静态 import 入口文件）
  * 5. spawn 子进程执行 node .spaceflow/bin/index.js
  */
-
-const CORE_PACKAGES = ["@spaceflow/core", "@spaceflow/cli"];
 
 /**
  * 获取 .spaceflow 目录路径（优先本地，回退全局）
@@ -34,22 +37,11 @@ function getSpaceflowDir(): string {
 }
 
 /**
- * 从 .spaceflow/package.json 读取外部扩展包名列表
+ * 从 spaceflow.json / .spaceflowrc 读取外部扩展包名列表
  */
-function readExternalExtensions(spaceflowDir: string): string[] {
-  const pkgJsonPath = join(spaceflowDir, "package.json");
-  if (!existsSync(pkgJsonPath)) {
-    return [];
-  }
-
-  try {
-    const content = readFileSync(pkgJsonPath, "utf-8");
-    const pkg = JSON.parse(content);
-    const deps = pkg.dependencies || {};
-    return Object.keys(deps).filter((name) => !CORE_PACKAGES.includes(name));
-  } catch {
-    return [];
-  }
+function readExternalExtensions(): string[] {
+  const deps = getDependencies();
+  return Object.keys(deps);
 }
 
 /**
@@ -127,7 +119,7 @@ ensureSpaceflowPackageJson(spaceflowDir);
 ensureDependencies(spaceflowDir);
 
 // 3. 读取外部扩展列表
-const extNames = readExternalExtensions(spaceflowDir);
+const extNames = readExternalExtensions();
 
 // 4. 生成 .spaceflow/bin/index.js
 const indexPath = generateBinFile(spaceflowDir, extNames);

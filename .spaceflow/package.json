@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@spaceflow/core": "workspace:*"
+    "@spaceflow/core": "workspace:*",
+    "@spaceflow/shell": "workspace:*",
+    "@spaceflow/scripts": "workspace:*",
+    "@spaceflow/review": "workspace:*",
+    "@spaceflow/publish": "workspace:*"
   }
 }
