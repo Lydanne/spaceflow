@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.38.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.37.0...@spaceflow/review@0.38.0) (2026-02-26)
+
+### 修复BUG
+
+* **cli:** 修复扩展自动安装逻辑，优化 npm 包名解析 ([0271dd4](https://github.com/Lydanne/spaceflow/commit/0271dd48e0169ae5055cfab28e0656e777de10f4))
+
+### 其他修改
+
+* **cli:** released version 0.28.0 [no ci] ([944de26](https://github.com/Lydanne/spaceflow/commit/944de26607e91123818bad469ee7b7487473de5f))
+* **publish:** released version 0.30.0 [no ci] ([2010489](https://github.com/Lydanne/spaceflow/commit/2010489a0d3cddb9ada1c0fc4e833cdeb0c1e706))
+* **review-summary:** released version 0.7.0 [no ci] ([21aced5](https://github.com/Lydanne/spaceflow/commit/21aced5a10fd522122e5f2c6f4ce3a318b80dff2))
+* **scripts:** released version 0.7.0 [no ci] ([6392c03](https://github.com/Lydanne/spaceflow/commit/6392c03e2c8dc9376ae24baaa3ef3fc62be9c762))
+* **shell:** released version 0.7.0 [no ci] ([da9dd6b](https://github.com/Lydanne/spaceflow/commit/da9dd6b07b0cfc807a20fecaa84418c90fc97b7b))
+
 ## [0.37.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.36.0...@spaceflow/review@0.37.0) (2026-02-26)
 
 ### 代码重构
