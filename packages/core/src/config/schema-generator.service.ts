@@ -85,7 +85,6 @@ export class SchemaGeneratorService {
 
     // 写入文件
     fs.writeFileSync(outputPath, JSON.stringify(fullSchema, null, 2), "utf-8");
-    console.log(`✅ JSON Schema 已生成: ${outputPath}`);
 
     // 自动添加到 .gitignore
     this.addToGitignore(dir, path.basename(outputPath));

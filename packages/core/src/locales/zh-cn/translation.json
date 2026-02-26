@@ -7,5 +7,7 @@
   "common.options.ci": "是否在 CI 环境中运行",
   "config.parseWarning": "警告: 无法解析配置文件 {{path}}",
   "config.validationFailed": "Spaceflow 配置验证失败:\n{{errors}}",
-  "extensionLoader.loadFailed": "⚠️ 加载 Extension {{name}} 失败: {{error}}"
+  "extensionLoader.loadFailed": "⚠️ 加载 Extension {{name}} 失败: {{error}}",
+  "extensionLoader.autoInstalling": "📦 自动安装缺失的扩展: {{packages}}",
+  "extensionLoader.autoInstallFailed": "⚠️ 自动安装扩展失败，请手动执行 spaceflow install"
 }

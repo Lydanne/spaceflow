@@ -588,7 +588,7 @@ export class InstallService {
 
     // Extension 安装后的路径
     // 对 npm 包使用完整包名（含 @scope/ 前缀）作为 node_modules 路径
-    const depModuleName = sourceType === "npm" ? (name || extractNpmPackageName(source)) : depName;
+    const depModuleName = sourceType === "npm" ? name || extractNpmPackageName(source) : depName;
     const depPath = join(spaceflowDir, "node_modules", depModuleName);
 
     // 读取插件配置
@@ -621,6 +621,25 @@ export class InstallService {
 
     // 自动生成 schema
     this.generateSchema();
+  }
+
+  /**
+   * 检查 .spaceflowrc 中声明的依赖是否有未安装的
+   */
+  hasMissingExtensions(): boolean {
+    const cwd = process.cwd();
+    const dependencies = this.parseExtensionsFromConfig(cwd);
+    const spaceflowDir = getSpaceflowDir(false);
+    const globalDir = getSpaceflowDir(true);
+
+    for (const name of Object.keys(dependencies)) {
+      const localInstalled = existsSync(join(spaceflowDir, "node_modules", name, "package.json"));
+      const globalInstalled = existsSync(join(globalDir, "node_modules", name, "package.json"));
+      if (!localInstalled && !globalInstalled) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -699,7 +718,9 @@ export class InstallService {
       }
     }
 
-    console.log(t("install:allExtensionsDone"));
+    if (shouldLog(options?.verbose, 1)) {
+      console.log(t("install:allExtensionsDone"));
+    }
 
     // 自动生成 schema
     this.generateSchema();
@@ -1314,10 +1335,14 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
     }
   }
 
-  protected async updateConfigFile(context: InstallContext, verbose: VerboseLevel = 1): Promise<void> {
+  protected async updateConfigFile(
+    context: InstallContext,
+    verbose: VerboseLevel = 1,
+  ): Promise<void> {
     const { source, type, depPath } = context;
     // dependencies key 使用完整包名（npm 类型保留 @scope/ 前缀）
-    const name = context.name || (type === "npm" ? extractNpmPackageName(source) : extractName(source));
+    const name =
+      context.name || (type === "npm" ? extractNpmPackageName(source) : extractName(source));
     const cwd = process.cwd();
 
     // 根据类型生成正确的 value（和 package.json 格式一致）
@@ -1344,7 +1369,9 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
 
     if (updated) {
       if (shouldLog(verbose, 1))
-        console.log(t("install:configUpdated", { path: findConfigFileWithField("dependencies", cwd) }));
+        console.log(
+          t("install:configUpdated", { path: findConfigFileWithField("dependencies", cwd) }),
+        );
     } else {
       if (shouldLog(verbose, 1)) console.log(t("install:configAlreadyExists"));
     }

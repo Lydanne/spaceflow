@@ -3,9 +3,9 @@
   "private": true,
   "dependencies": {
     "@spaceflow/core": "workspace:*",
-    "@spaceflow/scripts": "workspace:*",
     "@spaceflow/shell": "workspace:*",
-    "@spaceflow/publish": "workspace:*",
-    "@spaceflow/review": "workspace:*"
+    "@spaceflow/scripts": "workspace:*",
+    "@spaceflow/review": "workspace:*",
+    "@spaceflow/publish": "workspace:*"
   }
 }

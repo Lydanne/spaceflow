@@ -3,8 +3,15 @@ import * as fs from "fs";
 import { createRequire } from "module";
 import { homedir } from "os";
 import type { ExtensionDefinition, CommandDefinition } from "@spaceflow/core";
-import { SPACEFLOW_DIR, PACKAGE_JSON, t } from "@spaceflow/core";
+import {
+  SPACEFLOW_DIR,
+  PACKAGE_JSON,
+  t,
+  getDependencies,
+  SchemaGeneratorService,
+} from "@spaceflow/core";
 import type { SpaceflowContext } from "@spaceflow/core";
+import { InstallService } from "./commands/install/install.service";
 
 /**
  * 扩展加载器
@@ -79,21 +86,34 @@ export class ExtensionLoader {
 
   /**
    * 发现并加载外部扩展
+   * 自动检测 .spaceflowrc 中的 dependencies，确保 .spaceflow 目录和扩展已安装
    */
   async discoverAndLoad(): Promise<void> {
-    const spaceflowDirs = this.getSpaceflowDirs();
+    // 跳过核心包
+    const corePackages = ["@spaceflow/core", "@spaceflow/cli"];
 
-    // 收集所有 dependencies
+    // 1. 从 .spaceflowrc 读取声明的 dependencies
+    const configDeps = getDependencies();
+    const requiredExtensions = Object.entries(configDeps).filter(
+      ([name]) => !corePackages.includes(name),
+    );
+
+    // 2. 检测是否有缺失的扩展，有则自动 setup + install
+    if (requiredExtensions.length > 0) {
+      const installService = new InstallService(new SchemaGeneratorService());
+      if (installService.hasMissingExtensions()) {
+        await installService.updateAllExtensions({ verbose: 0 });
+      }
+    }
+
+    // 3. 收集 .spaceflow/package.json 中已安装的 dependencies 并加载
+    const spaceflowDirs = this.getSpaceflowDirs();
     const allDependencies: Record<string, string> = {};
     for (const dir of spaceflowDirs) {
       const deps = this.readDependencies(dir);
       Object.assign(allDependencies, deps);
     }
 
-    // 跳过核心包
-    const corePackages = ["@spaceflow/core", "@spaceflow/cli"];
-
-    // 加载所有扩展
     for (const [name, version] of Object.entries(allDependencies)) {
       if (corePackages.includes(name)) {
         continue;

@@ -7,5 +7,7 @@
   "common.options.ci": "Run in CI environment",
   "config.parseWarning": "Warning: unable to parse config file {{path}}",
   "config.validationFailed": "Spaceflow config validation failed:\n{{errors}}",
-  "extensionLoader.loadFailed": "⚠️ Failed to load Extension {{name}}: {{error}}"
+  "extensionLoader.loadFailed": "⚠️ Failed to load Extension {{name}}: {{error}}",
+  "extensionLoader.autoInstalling": "📦 Auto-installing missing extensions: {{packages}}",
+  "extensionLoader.autoInstallFailed": "⚠️ Auto-install failed, please run spaceflow install manually"
 }
