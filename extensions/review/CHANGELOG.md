@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.39.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.38.0...@spaceflow/review@0.39.0) (2026-02-26)
+
+### 修复BUG
+
+* **cli:** 自动安装扩展时根据命令行参数动态设置 verbose 级别 ([d2da6f5](https://github.com/Lydanne/spaceflow/commit/d2da6f5eb30425e48bb4fd924c73bb9237a437ab))
+
+### 其他修改
+
+* **cli:** released version 0.29.0 [no ci] ([5fd87d3](https://github.com/Lydanne/spaceflow/commit/5fd87d31511d13d4937b1b1a247ad8a322d6fc9c))
+* **publish:** released version 0.31.0 [no ci] ([e928d60](https://github.com/Lydanne/spaceflow/commit/e928d6061e05c03fc92303a246b2563a5100740b))
+* **review-summary:** released version 0.8.0 [no ci] ([0e73a97](https://github.com/Lydanne/spaceflow/commit/0e73a97b035692b0fe7f59e36585cffccf6c6854))
+* **scripts:** released version 0.8.0 [no ci] ([efea246](https://github.com/Lydanne/spaceflow/commit/efea246fe1bbd8815c7af44e8fd40df57a0219d6))
+* **shell:** released version 0.8.0 [no ci] ([607b93b](https://github.com/Lydanne/spaceflow/commit/607b93bd911e3da102a73dd4513a4733b40c8672))
+
 ## [0.38.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.37.0...@spaceflow/review@0.38.0) (2026-02-26)
 
 ### 修复BUG
