@@ -25,7 +25,10 @@ async function bootstrap() {
   }
 
   // 发现并加载外部扩展
-  await extensionLoader.discoverAndLoad();
+  // install/setup 命令本身会处理安装，跳过自动安装
+  const subCommand = process.argv[2];
+  const skipAutoInstall = ["install", "i", "setup", "uninstall"].includes(subCommand);
+  await extensionLoader.discoverAndLoad({ skipAutoInstall });
 
   // 创建 CLI 程序
   const program = new Command();

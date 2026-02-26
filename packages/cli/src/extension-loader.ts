@@ -88,7 +88,7 @@ export class ExtensionLoader {
    * 发现并加载外部扩展
    * 自动检测 .spaceflowrc 中的 dependencies，确保 .spaceflow 目录和扩展已安装
    */
-  async discoverAndLoad(): Promise<void> {
+  async discoverAndLoad(options?: { skipAutoInstall?: boolean }): Promise<void> {
     // 跳过核心包
     const corePackages = ["@spaceflow/core", "@spaceflow/cli"];
 
@@ -98,8 +98,8 @@ export class ExtensionLoader {
       ([name]) => !corePackages.includes(name),
     );
 
-    // 2. 检测是否有缺失的扩展，有则自动 setup + install
-    if (requiredExtensions.length > 0) {
+    // 2. 检测是否有缺失的扩展，有则自动 setup + install（install/setup 命令跳过）
+    if (!options?.skipAutoInstall && requiredExtensions.length > 0) {
       const installService = new InstallService(new SchemaGeneratorService());
       if (installService.hasMissingExtensions()) {
         await installService.updateAllExtensions({ verbose: 0 });

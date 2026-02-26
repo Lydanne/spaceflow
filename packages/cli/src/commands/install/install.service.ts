@@ -682,9 +682,11 @@ export class InstallService {
       const sourceType = getSourceType(source);
 
       // 获取安装后的路径
-      const packageName = source.startsWith("workspace:")
-        ? name
-        : await this.getPackageNameFromSource(source, sourceType, spaceflowDir);
+      // workspace: 和 npm 类型时，name（.spaceflowrc 的 key）就是包名
+      const packageName =
+        source.startsWith("workspace:") || sourceType === "npm"
+          ? name
+          : await this.getPackageNameFromSource(source, sourceType, spaceflowDir);
       const depPath = join(spaceflowDir, "node_modules", packageName);
 
       if (!existsSync(depPath)) {
@@ -766,8 +768,9 @@ export class InstallService {
         packageSpec = source.startsWith("git+") ? source : buildGitPackageSpec(source, ref);
         packageName = await this.getPackageNameFromSource(source, sourceType, spaceflowDir);
       } else {
+        // npm 类型：.spaceflowrc 中 key 是包名，value 是版本范围（如 "^0.37.0"）
+        packageName = name;
         packageSpec = source;
-        packageName = await this.getPackageNameFromSource(source, sourceType, spaceflowDir);
       }
 
       if (pkg.dependencies[packageName] !== packageSpec) {
