@@ -84,6 +84,7 @@
     "test:cov": "vitest run --coverage"
   },
   "dependencies": {
+    "@spaceflow/shared": "workspace:*",
     "@anthropic-ai/claude-agent-sdk": "^0.2.7",
     "@larksuiteoapi/node-sdk": "^1.55.0",
     "@modelcontextprotocol/sdk": "^1.26.0",

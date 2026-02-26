@@ -1,13 +1,13 @@
 {
-  "name": "@spaceflow/cli",
+  "name": "@spaceflow/shared",
   "version": "0.29.0",
-  "description": "Spaceflow CLI 工具",
+  "description": "Spaceflow 公共工具库",
   "license": "MIT",
   "author": "Lydanne",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Lydanne/spaceflow.git",
-    "directory": "packages/cli"
+    "directory": "packages/shared"
   },
   "publishConfig": {
     "access": "public"
@@ -17,31 +17,27 @@
     "package.json",
     "README.md"
   ],
-  "bin": {
-    "space": "dist/cli.js",
-    "spaceflow": "dist/cli.js"
-  },
   "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "rspack build -c rspack.config.mjs",
     "format": "oxfmt src --write",
-    "lint": "oxlint src",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:cov": "vitest run --coverage"
+    "lint": "oxlint src"
   },
   "dependencies": {
-    "@spaceflow/shared": "workspace:*"
+    "json-stringify-pretty-compact": "^4.0.0"
   },
   "devDependencies": {
     "@rspack/cli": "^1.7.4",
     "@rspack/core": "^1.7.4",
     "@types/node": "catalog:",
-    "@vitest/coverage-v8": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:",
-    "typescript-eslint": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

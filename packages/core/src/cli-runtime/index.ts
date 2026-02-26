@@ -33,17 +33,12 @@ export async function exec(extensions: ExtensionDefinition[] = []): Promise<void
     extensionLoader.registerExtension(ext);
   }
 
-  // 5. 注册外部扩展（静态传入，不需要动态扫描）
+  // 5. 注册外部扩展（由 CLI 壳子加载并传入）
   for (const ext of extensions) {
     extensionLoader.registerExtension(ext);
   }
 
-  // 6. 发现并加载额外的外部扩展（从 .spaceflow/package.json）
-  const subCommand = process.argv[2];
-  const skipAutoInstall = ["install", "i", "setup", "uninstall"].includes(subCommand);
-  await extensionLoader.discoverAndLoad({ skipAutoInstall });
-
-  // 7. 创建 CLI 程序
+  // 6. 创建 CLI 程序
   const program = new Command();
   program.name("spaceflow").description("Spaceflow CLI").version("1.0.0");
 

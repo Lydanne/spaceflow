@@ -3,19 +3,19 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
 import { homedir } from "os";
+import { SPACEFLOW_DIR, ensureSpaceflowPackageJson, ensureDependencies } from "@spaceflow/shared";
 
 /**
  * Spaceflow CLI — 壳子入口
  *
  * 职责：
- * 1. 读取 .spaceflow/package.json 的 dependencies（外部扩展列表）
- * 2. 生成 .spaceflow/bin/index.js（静态导入所有扩展 + 调用 Core.exec()）
- * 3. 执行 node .spaceflow/bin/index.js，将所有参数透传
+ * 1. 确保 .spaceflow/ 目录、package.json、.gitignore 完整
+ * 2. 确保依赖已安装（pnpm install）
+ * 3. 读取外部扩展列表
+ * 4. 生成 .spaceflow/bin/index.js（静态 import 入口文件）
+ * 5. spawn 子进程执行 node .spaceflow/bin/index.js
  */
 
-const SPACEFLOW_DIR = ".spaceflow";
-const BIN_DIR = "bin";
-const INDEX_FILE = "index.js";
 const CORE_PACKAGES = ["@spaceflow/core", "@spaceflow/cli"];
 
 /**
@@ -30,12 +30,11 @@ function getSpaceflowDir(): string {
   if (existsSync(globalDir)) {
     return globalDir;
   }
-  // 默认使用本地目录
   return localDir;
 }
 
 /**
- * 从 .spaceflow/package.json 读取外部扩展列表
+ * 从 .spaceflow/package.json 读取外部扩展包名列表
  */
 function readExternalExtensions(spaceflowDir: string): string[] {
   const pkgJsonPath = join(spaceflowDir, "package.json");
@@ -55,11 +54,9 @@ function readExternalExtensions(spaceflowDir: string): string[] {
 
 /**
  * 生成 .spaceflow/bin/index.js 内容
- * 静态导入所有扩展，调用 Core.exec()
  */
 function generateIndexContent(extensions: string[]): string {
   const imports = extensions.map((name, i) => `import ext${i} from '${name}';`).join("\n");
-
   const extArray = extensions.length > 0 ? extensions.map((_, i) => `  ext${i},`).join("\n") : "";
 
   return `import { exec } from '@spaceflow/core';
@@ -79,20 +76,19 @@ bootstrap().catch((err) => {
 }
 
 /**
- * 生成并写入 .spaceflow/bin/index.js
+ * 生成 .spaceflow/bin/index.js 文件
  */
 function generateBinFile(spaceflowDir: string, extensions: string[]): string {
-  const binDir = join(spaceflowDir, BIN_DIR);
-  const indexPath = join(binDir, INDEX_FILE);
+  const binDir = join(spaceflowDir, "bin");
+  const indexPath = join(binDir, "index.js");
 
-  // 确保 bin 目录存在
   if (!existsSync(binDir)) {
     mkdirSync(binDir, { recursive: true });
   }
 
   const content = generateIndexContent(extensions);
 
-  // 仅在内容变化时写入，避免不必要的文件系统操作
+  // 仅在内容变化时写入
   if (existsSync(indexPath)) {
     const existing = readFileSync(indexPath, "utf-8");
     if (existing === content) {
@@ -122,7 +118,19 @@ function executeIndexFile(indexPath: string): void {
 }
 
 // ---- 主流程 ----
+
+// 1. 确保 .spaceflow/ 目录结构完整（目录 + package.json + .gitignore）
 const spaceflowDir = getSpaceflowDir();
-const extensions = readExternalExtensions(spaceflowDir);
-const indexPath = generateBinFile(spaceflowDir, extensions);
+ensureSpaceflowPackageJson(spaceflowDir);
+
+// 2. 确保依赖已安装
+ensureDependencies(spaceflowDir);
+
+// 3. 读取外部扩展列表
+const extNames = readExternalExtensions(spaceflowDir);
+
+// 4. 生成 .spaceflow/bin/index.js
+const indexPath = generateBinFile(spaceflowDir, extNames);
+
+// 5. 执行生成的入口文件
 executeIndexFile(indexPath);
