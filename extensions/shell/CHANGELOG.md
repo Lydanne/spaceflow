@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.11.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.10.0...@spaceflow/shell@0.11.0) (2026-02-26)
+
+### 文档更新
+
+* **cli:** 更新 CLI README 以明确其定位和工作原理 ([88a4e8e](https://github.com/Lydanne/spaceflow/commit/88a4e8e6cc5be014cf418367c89e00f65cc6d57c))
+* **core:** 更新核心包 README，反映新架构和职责 ([5d8ed7b](https://github.com/Lydanne/spaceflow/commit/5d8ed7b131af4deaf8f815e4db547e52de337758))
+* **publish:** 更新 README 以反映扩展包独立安装方式 ([042ac92](https://github.com/Lydanne/spaceflow/commit/042ac920fe6e8e018cf50539a990f6231582e460))
+* **review:** 更新 README.md 以反映扩展架构和配置变更 ([560f270](https://github.com/Lydanne/spaceflow/commit/560f27080f3739c2e222cdd985222cfaacafbab6))
+* **shared:** 为 shared 包添加 README 文档 ([5d171d5](https://github.com/Lydanne/spaceflow/commit/5d171d5872f849a62251c646294903d11a0c46d2))
+* 更新文档以反映新架构和扩展系统重构 ([828c436](https://github.com/Lydanne/spaceflow/commit/828c436bdbba7798ee3211fc77c4f2ef485c6f55))
+
+### 其他修改
+
+* **cli:** released version 0.31.0 [no ci] ([9038e40](https://github.com/Lydanne/spaceflow/commit/9038e4018cfcbea7ab466ee94546324fcebceabe))
+* **core:** released version 0.10.0 [no ci] ([21facb5](https://github.com/Lydanne/spaceflow/commit/21facb554c145cac4f6daac121157e5c11db4191))
+* **publish:** released version 0.33.0 [no ci] ([fdb0720](https://github.com/Lydanne/spaceflow/commit/fdb0720db798414d226541dba922155cf0cfe849))
+* **review-summary:** released version 0.11.0 [no ci] ([d68ceef](https://github.com/Lydanne/spaceflow/commit/d68ceef911941e80fc1e71d530bf0b412b54a64a))
+* **review:** released version 0.41.0 [no ci] ([df19355](https://github.com/Lydanne/spaceflow/commit/df193555f523bfde891cd2ab96f823713199749a))
+* **scripts:** released version 0.11.0 [no ci] ([4c1d726](https://github.com/Lydanne/spaceflow/commit/4c1d726587a0be3187957e069b78d6eaefa7fddc))
+* **shared:** released version 0.2.0 [no ci] ([2a9db6f](https://github.com/Lydanne/spaceflow/commit/2a9db6fb0ef4af1bfd0bdeac23119df329c34351))
+
 ## [0.10.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.9.0...@spaceflow/shell@0.10.0) (2026-02-26)
 
 ### 代码重构
