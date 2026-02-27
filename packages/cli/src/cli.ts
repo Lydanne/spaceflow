@@ -55,7 +55,9 @@ function readExternalExtensions(cwd: string): string[] {
  */
 function generateIndexContent(extensions: string[], version: string): string {
   const dynamicImports = extensions
-    .map((name) => `    import('${name}').then(m => m.default || m.extension || m),`)
+    .map(
+      (name) => `    import('${name}').then(m => m.default || m.extension || m).catch(() => null),`,
+    )
     .join("\n");
 
   return `import { exec, initCliI18n } from '@spaceflow/core';
@@ -64,9 +66,10 @@ async function bootstrap() {
   // 初始化 i18n，再加载扩展（扩展 import 时会调用 t() 获取翻译）
   initCliI18n();
 
-  const extensions = await Promise.all([
+  const results = await Promise.all([
 ${dynamicImports}
   ]);
+  const extensions = results.filter(Boolean);
 
   await exec(extensions, { cliVersion: '${version}' });
 }
