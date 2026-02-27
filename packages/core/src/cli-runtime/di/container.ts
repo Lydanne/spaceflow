@@ -25,6 +25,7 @@ interface ServiceRegistration<T = unknown> {
  */
 export class ServiceContainer implements SpaceflowContext {
   private registrations = new Map<string, ServiceRegistration>();
+  private _cwd!: string;
   private _config!: IConfigReader;
   private _output!: IOutputService;
   private _storage!: IStorageService;
@@ -32,7 +33,13 @@ export class ServiceContainer implements SpaceflowContext {
   /**
    * 设置核心服务（config, output, storage）
    */
-  setCoreServices(config: IConfigReader, output: IOutputService, storage: IStorageService): void {
+  setCoreServices(
+    config: IConfigReader,
+    output: IOutputService,
+    storage: IStorageService,
+    cwd: string,
+  ): void {
+    this._cwd = cwd;
     this._config = config;
     this._output = output;
     this._storage = storage;
@@ -93,6 +100,10 @@ export class ServiceContainer implements SpaceflowContext {
     } catch {
       return undefined;
     }
+  }
+
+  get cwd(): string {
+    return this._cwd;
   }
 
   get config(): IConfigReader {

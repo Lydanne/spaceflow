@@ -6,6 +6,7 @@ import {
   LlmProxyService,
   FileAdapter,
 } from "@spaceflow/core";
+import { findProjectRoot } from "@spaceflow/shared";
 import { join } from "path";
 import type { ServiceContainer } from "./container";
 import { UnifiedConfigReader } from "./config";
@@ -14,13 +15,13 @@ import { UnifiedConfigReader } from "./config";
  * 初始化服务容器
  */
 export function initializeContainer(container: ServiceContainer, cwd?: string): void {
-  const workDir = cwd || process.cwd();
+  const workDir = cwd || process.env.SPACEFLOW_CWD || findProjectRoot();
   // 初始化核心服务（.env 已在 CLI 壳子阶段加载）
   const config = new UnifiedConfigReader(workDir);
   const output = new OutputService();
   const storageDir = join(workDir, ".spaceflow", "cache");
   const storage = new StorageService(new FileAdapter(storageDir));
-  container.setCoreServices(config, output, storage);
+  container.setCoreServices(config, output, storage, workDir);
   // 注册服务工厂
   registerServiceFactories(container);
 }

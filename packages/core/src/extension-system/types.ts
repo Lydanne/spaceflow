@@ -19,6 +19,8 @@ export interface OptionDefinition {
  * 命令和 MCP 工具共用此上下文
  */
 export interface SpaceflowContext {
+  /** 当前工作目录（优先 SPACEFLOW_CWD 环境变量） */
+  readonly cwd: string;
   /** 配置读取器 */
   readonly config: IConfigReader;
   /** 输出服务 */
