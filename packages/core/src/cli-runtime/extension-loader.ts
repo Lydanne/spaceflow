@@ -11,6 +11,16 @@ export class ExtensionLoader {
 
   constructor(private readonly ctx: SpaceflowContext) {}
 
+  /** 当前工作目录（项目根） */
+  get cwd(): string {
+    return this.ctx.cwd;
+  }
+
+  /** 获取上下文（供内部命令使用） */
+  getContext(): SpaceflowContext {
+    return this.ctx;
+  }
+
   /**
    * 注册扩展
    */

@@ -21,7 +21,7 @@ export class McpService {
       return;
     }
     if (shouldLog(verbose, 1)) {
-      const cwd = this.extensionLoader["ctx"].cwd;
+      const cwd = this.extensionLoader.cwd;
       console.error(t("mcp:cwdInfo", { cwd }));
       console.error(t("mcp:scanning"));
     }
@@ -52,7 +52,7 @@ export class McpService {
             methodName: "handler",
           },
           handler: tool.handler,
-          ctx: this.extensionLoader["ctx"],
+          ctx: this.extensionLoader.getContext(),
         });
       }
     }
