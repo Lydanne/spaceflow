@@ -137,6 +137,17 @@ export function ensureSpaceflowPackageJson(spaceflowDir: string, cwd?: string): 
     };
     writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
   }
+
+  // pnpm 非 workspace 模式：创建空 pnpm-workspace.yaml，让 .spaceflow 成为独立 workspace root
+  if (!coreVersion.startsWith("workspace:")) {
+    const pm = detectPackageManager(projectDir);
+    if (pm === "pnpm") {
+      const wsYamlPath = join(spaceflowDir, "pnpm-workspace.yaml");
+      if (!existsSync(wsYamlPath)) {
+        writeFileSync(wsYamlPath, "");
+      }
+    }
+  }
 }
 
 /**
