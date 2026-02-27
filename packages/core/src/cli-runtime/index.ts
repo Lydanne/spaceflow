@@ -1,3 +1,5 @@
+declare const __CORE_VERSION__: string;
+
 import { Command } from "commander";
 import type { ExtensionDefinition } from "@spaceflow/core";
 import { ServiceContainer, initializeContainer } from "./di";
@@ -16,7 +18,14 @@ export { internalExtensions } from "./internal-extensions";
  *
  * @param extensions 外部扩展定义列表（来自 .spaceflow/bin/index.js 的静态导入）
  */
-export async function exec(extensions: ExtensionDefinition[] = []): Promise<void> {
+export interface ExecOptions {
+  cliVersion?: string;
+}
+
+export async function exec(
+  extensions: ExtensionDefinition[] = [],
+  options: ExecOptions = {},
+): Promise<void> {
   // 1. 初始化 i18n（如果尚未初始化，由生成的 bin/index.js 提前调用）
   initCliI18n();
 
@@ -40,7 +49,14 @@ export async function exec(extensions: ExtensionDefinition[] = []): Promise<void
 
   // 6. 创建 CLI 程序
   const program = new Command();
-  program.name("spaceflow").description("Spaceflow CLI").version("1.0.0");
+  const cliVersion = options.cliVersion || "0.0.0";
+  const coreVersion = typeof __CORE_VERSION__ !== "undefined" ? __CORE_VERSION__ : "0.0.0";
+  const versionOutput = `spaceflow/${cliVersion} core/${coreVersion}`;
+
+  program
+    .name("spaceflow")
+    .description("Spaceflow CLI")
+    .version(versionOutput, "-V, --version", "显示版本信息");
 
   // 定义全局 verbose 选项（支持计数：-v, -vv, -vvv）
   program.option(
