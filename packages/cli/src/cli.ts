@@ -2,12 +2,11 @@
 declare const __CLI_VERSION__: string;
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
-import { join, dirname, resolve } from "path";
+import { join, resolve } from "path";
 import { execSync } from "child_process";
-import { homedir } from "os";
 import {
   SPACEFLOW_DIR,
-  RC_FILE_NAME,
+  findProjectRoot,
   ensureSpaceflowPackageJson,
   ensureDependencies,
   getDependencies,
@@ -32,34 +31,14 @@ import { z } from "zod";
  */
 
 /**
- * 获取有效工作目录
- * 优先使用 SPACEFLOW_CWD 环境变量（MCP 场景由编辑器注入），否则 process.cwd()
+ * 获取有效工作目录（项目根）
+ * 优先使用 SPACEFLOW_CWD 环境变量，否则从 process.cwd() 向上查找 .spaceflowrc 所在目录
  */
 function getEffectiveCwd(): string {
-  return resolve(process.env.SPACEFLOW_CWD || process.cwd());
-}
-
-/**
- * 获取 .spaceflow 目录路径
- * 1. 从 cwd 向上遍历查找 .spaceflowrc，找到则在同级目录下使用 .spaceflow
- * 2. 都没找到则回退到 ~/.spaceflow
- */
-function getSpaceflowDir(cwd: string): string {
-  let current = resolve(cwd);
-  const home = homedir();
-
-  while (true) {
-    // 检查当前目录是否有 .spaceflowrc
-    if (existsSync(join(current, RC_FILE_NAME))) {
-      return join(current, SPACEFLOW_DIR);
-    }
-    const parent = dirname(current);
-    if (parent === current) break; // 文件系统根
-    current = parent;
+  if (process.env.SPACEFLOW_CWD) {
+    return resolve(process.env.SPACEFLOW_CWD);
   }
-
-  // 没有找到 .spaceflowrc，回退到全局目录 ~/.spaceflow
-  return join(home, SPACEFLOW_DIR);
+  return findProjectRoot(process.cwd());
 }
 
 /**
@@ -129,12 +108,11 @@ function generateBinFile(spaceflowDir: string, extensions: string[], version: st
 /**
  * 执行生成的 index.js
  */
-function executeIndexFile(indexPath: string, cwd: string): void {
+function executeIndexFile(indexPath: string, projectRoot: string): void {
   try {
     execSync(`node "${indexPath}" ${process.argv.slice(2).join(" ")}`, {
-      cwd,
       stdio: "inherit",
-      env: { ...process.env, SPACEFLOW_CWD: cwd },
+      env: { ...process.env, SPACEFLOW_CWD: projectRoot },
     });
   } catch (error: any) {
     // execSync 在子进程非零退出时抛出错误
@@ -160,7 +138,7 @@ function isMcpCommand(): boolean {
  * @param cwd 项目根目录
  */
 async function connectProjectMcpClient(cwd: string): Promise<Client> {
-  const resolvedCwd = resolve(cwd);
+  const resolvedCwd = findProjectRoot(cwd);
   const cliPath = process.argv[1];
   const transport = new StdioClientTransport({
     command: "node",
@@ -185,7 +163,7 @@ async function startMcpMetaServer(): Promise<void> {
   const clientCache = new Map<string, Client>();
 
   async function getProjectClient(cwd: string): Promise<Client> {
-    const resolvedCwd = resolve(cwd);
+    const resolvedCwd = findProjectRoot(cwd);
     let client = clientCache.get(resolvedCwd);
     if (!client) {
       client = await connectProjectMcpClient(resolvedCwd);
@@ -205,14 +183,7 @@ async function startMcpMetaServer(): Promise<void> {
     },
     async ({ cwd }) => {
       try {
-        const resolvedCwd = resolve(cwd);
-        if (!existsSync(resolvedCwd)) {
-          return {
-            content: [{ type: "text" as const, text: `Error: 目录不存在: ${resolvedCwd}` }],
-            isError: true,
-          };
-        }
-        const client = await getProjectClient(resolvedCwd);
+        const client = await getProjectClient(cwd);
         const { tools } = await client.listTools();
         return {
           content: [
@@ -257,14 +228,7 @@ async function startMcpMetaServer(): Promise<void> {
     },
     async ({ cwd, tool_name, tool_args }) => {
       try {
-        const resolvedCwd = resolve(cwd);
-        if (!existsSync(resolvedCwd)) {
-          return {
-            content: [{ type: "text" as const, text: `Error: 目录不存在: ${resolvedCwd}` }],
-            isError: true,
-          };
-        }
-        const client = await getProjectClient(resolvedCwd);
+        const client = await getProjectClient(cwd);
         const args = tool_args ? JSON.parse(tool_args) : {};
         const result = await client.callTool({ name: tool_name, arguments: args });
         // 直接返回底层 mcp server 的结果
@@ -320,7 +284,7 @@ if (isMcpCommand()) {
   loadEnvFiles(getEnvFilePaths(effectiveCwd));
 
   // 2. 确保 .spaceflow/ 目录结构完整（目录 + package.json + .gitignore）
-  const spaceflowDir = getSpaceflowDir(effectiveCwd);
+  const spaceflowDir = join(effectiveCwd, SPACEFLOW_DIR);
   ensureSpaceflowPackageJson(spaceflowDir, effectiveCwd);
 
   // 3. 确保依赖已安装
