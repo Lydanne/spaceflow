@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.19.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@0.18.0...@spaceflow/scripts@0.19.0) (2026-02-27)
+
+### 修复BUG
+
+* **review:** 修复重复 AI 评论问题，改进评论查找和清理逻辑 ([5ec3757](https://github.com/Lydanne/spaceflow/commit/5ec3757533f618aa6210ccebecabf411b2dae9a4))
+* **review:** 修改 generateDescription 选项处理逻辑，仅在明确指定时设置为 true ([48e710a](https://github.com/Lydanne/spaceflow/commit/48e710ade62e0aeaf2effa3db58dbcb2b2a0983e))
+
+### 其他修改
+
+* **core:** released version 0.17.0 [no ci] ([4e8f807](https://github.com/Lydanne/spaceflow/commit/4e8f8074fa9d174995e97c9466c379ba81227f9f))
+* **publish:** released version 0.41.0 [no ci] ([e96a488](https://github.com/Lydanne/spaceflow/commit/e96a48824bbb305142b78afa989e3473eec0c1c2))
+* **review-summary:** released version 0.19.0 [no ci] ([f1b6a2e](https://github.com/Lydanne/spaceflow/commit/f1b6a2e21cc2f9e07bb8e100a358abcba16f2d03))
+* **review:** released version 0.49.0 [no ci] ([404588d](https://github.com/Lydanne/spaceflow/commit/404588d61e77d2230b53c22afad404d20f5e1665))
+* **shell:** released version 0.18.0 [no ci] ([88bf217](https://github.com/Lydanne/spaceflow/commit/88bf2178e3361516871c887fda75f7a0086ed55f))
+
 ## [0.18.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@0.17.0...@spaceflow/scripts@0.18.0) (2026-02-27)
 
 ### 新特性
