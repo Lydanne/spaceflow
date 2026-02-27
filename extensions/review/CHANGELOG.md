@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.50.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.49.0...@spaceflow/review@0.50.0) (2026-02-27)
+
+### 新特性
+
+* **core:** 为 Gitea 和 GitHub 适配器完善已解决评论列表功能 ([7134c83](https://github.com/Lydanne/spaceflow/commit/7134c83b0b440bdfb688d93e86c9552302bf45b2))
+* **review:** 增强已解决问题同步功能，支持记录解决者 ([2c74996](https://github.com/Lydanne/spaceflow/commit/2c74996471e003f8666f8ccec715590f0f64c017))
+
+### 其他修改
+
+* **core:** released version 0.18.0 [no ci] ([7d931eb](https://github.com/Lydanne/spaceflow/commit/7d931eba98a172cf6ad365f09b780251ad35b212))
+* **publish:** released version 0.42.0 [no ci] ([61ac6b2](https://github.com/Lydanne/spaceflow/commit/61ac6b233564550d35e84759eff60a9e04181c46))
+* **review-summary:** released version 0.19.0 [no ci] ([f1b6a2e](https://github.com/Lydanne/spaceflow/commit/f1b6a2e21cc2f9e07bb8e100a358abcba16f2d03))
+* **scripts:** released version 0.19.0 [no ci] ([e198652](https://github.com/Lydanne/spaceflow/commit/e198652a1dcbd137dcd0fe4d7a2f404e12a991bc))
+* **shell:** released version 0.19.0 [no ci] ([2dc2597](https://github.com/Lydanne/spaceflow/commit/2dc25974cfeac9c80d03a601e722133bccb25086))
+
 ## [0.49.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.48.0...@spaceflow/review@0.49.0) (2026-02-27)
 
 ### 修复BUG
