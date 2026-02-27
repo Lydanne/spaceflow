@@ -26,12 +26,20 @@ import {
  */
 
 /**
+ * 获取有效工作目录
+ * 优先使用 SPACEFLOW_CWD 环境变量（MCP 场景由编辑器注入），否则 process.cwd()
+ */
+function getEffectiveCwd(): string {
+  return resolve(process.env.SPACEFLOW_CWD || process.cwd());
+}
+
+/**
  * 获取 .spaceflow 目录路径
  * 从 cwd 向上遍历查找已存在的 .spaceflow 目录，
- * 如果整个目录树中都没有，则回退到 cwd/.spaceflow
+ * 如果整个目录树中都没有，则回退到 ~/.spaceflow
  */
-function getSpaceflowDir(): string {
-  let current = resolve(process.cwd());
+function getSpaceflowDir(cwd: string): string {
+  let current = resolve(cwd);
   const home = homedir();
 
   while (true) {
@@ -51,8 +59,8 @@ function getSpaceflowDir(): string {
 /**
  * 从 spaceflow.json / .spaceflowrc 读取外部扩展包名列表
  */
-function readExternalExtensions(): string[] {
-  const deps = getDependencies(undefined, { local: true });
+function readExternalExtensions(cwd: string): string[] {
+  const deps = getDependencies(cwd, { local: true });
   return Object.keys(deps);
 }
 
@@ -115,12 +123,12 @@ function generateBinFile(spaceflowDir: string, extensions: string[], version: st
 /**
  * 执行生成的 index.js
  */
-function executeIndexFile(indexPath: string): void {
+function executeIndexFile(indexPath: string, cwd: string): void {
   try {
     execSync(`node "${indexPath}" ${process.argv.slice(2).join(" ")}`, {
-      cwd: process.cwd(),
+      cwd,
       stdio: "inherit",
-      env: process.env,
+      env: { ...process.env, SPACEFLOW_CWD: cwd },
     });
   } catch (error: any) {
     // execSync 在子进程非零退出时抛出错误
@@ -131,24 +139,27 @@ function executeIndexFile(indexPath: string): void {
 
 // ---- 主流程 ----
 
-// 0. 先加载 .env 文件，确保 process.env 在子进程（含 schema 模块求值）前已就绪
-loadEnvFiles(getEnvFilePaths());
+// 0. 解析有效工作目录（优先 SPACEFLOW_CWD 环境变量）
+const effectiveCwd = getEffectiveCwd();
 
-// 1. 确保 .spaceflow/ 目录结构完整（目录 + package.json + .gitignore）
-const spaceflowDir = getSpaceflowDir();
+// 1. 先加载 .env 文件，确保 process.env 在子进程（含 schema 模块求值）前已就绪
+loadEnvFiles(getEnvFilePaths(effectiveCwd));
+
+// 2. 确保 .spaceflow/ 目录结构完整（目录 + package.json + .gitignore）
+const spaceflowDir = getSpaceflowDir(effectiveCwd);
 ensureSpaceflowPackageJson(spaceflowDir);
 
-// 2. 确保依赖已安装
+// 3. 确保依赖已安装
 ensureDependencies(spaceflowDir);
 
-// 3. CLI 版本号（由 rspack DefinePlugin 在构建时注入）
+// 4. CLI 版本号（由 rspack DefinePlugin 在构建时注入）
 const cliVersion = __CLI_VERSION__;
 
-// 4. 读取外部扩展列表
-const extNames = readExternalExtensions();
+// 5. 读取外部扩展列表
+const extNames = readExternalExtensions(effectiveCwd);
 
-// 5. 生成 .spaceflow/bin/index.js
+// 6. 生成 .spaceflow/bin/index.js
 const indexPath = generateBinFile(spaceflowDir, extNames, cliVersion);
 
-// 6. 执行生成的入口文件
-executeIndexFile(indexPath);
+// 7. 执行生成的入口文件
+executeIndexFile(indexPath, effectiveCwd);

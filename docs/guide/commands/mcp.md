@@ -33,7 +33,41 @@ Inspector 会自动下载并启动 `@modelcontextprotocol/inspector`，提供：
 - 工具调用测试
 - 请求/响应日志
 
+## 工作目录
+
+MCP Server 需要知道项目的工作目录，以便找到 `.spaceflowrc` 配置和已安装的扩展。
+
+通过环境变量 `SPACEFLOW_CWD` 指定工作区路径：
+
+```json
+{
+  "env": {
+    "SPACEFLOW_CWD": "/path/to/your/project"
+  }
+}
+```
+
+> **注意**: 当 MCP 客户端（如 Windsurf、Cursor）启动 MCP Server 时，`process.cwd()` 可能不是你的项目目录。建议始终配置 `SPACEFLOW_CWD` 以确保 MCP Server 能正确加载扩展。
+
 ## 在编辑器中配置
+
+### Windsurf
+
+在 `~/.codeium/windsurf/mcp_config.json` 中添加：
+
+```json
+{
+  "mcpServers": {
+    "spaceflow": {
+      "command": "npx",
+      "args": ["@spaceflow/cli", "mcp"],
+      "env": {
+        "SPACEFLOW_CWD": "/path/to/your/project"
+      }
+    }
+  }
+}
+```
 
 ### Claude Desktop
 
@@ -43,8 +77,11 @@ Inspector 会自动下载并启动 `@modelcontextprotocol/inspector`，提供：
 {
   "mcpServers": {
     "spaceflow": {
-      "command": "spaceflow",
-      "args": ["mcp"]
+      "command": "npx",
+      "args": ["@spaceflow/cli", "mcp"],
+      "env": {
+        "SPACEFLOW_CWD": "/path/to/your/project"
+      }
     }
   }
 }
@@ -58,8 +95,11 @@ Inspector 会自动下载并启动 `@modelcontextprotocol/inspector`，提供：
 {
   "mcpServers": {
     "spaceflow": {
-      "command": "spaceflow",
-      "args": ["mcp"]
+      "command": "npx",
+      "args": ["@spaceflow/cli", "mcp"],
+      "env": {
+        "SPACEFLOW_CWD": "/path/to/your/project"
+      }
     }
   }
 }
@@ -95,6 +135,12 @@ export default defineExtension({
   },
 });
 ```
+
+## 环境变量
+
+| 变量            | 说明                                   |
+| --------------- | -------------------------------------- |
+| `SPACEFLOW_CWD` | 指定工作区路径，优先于 `process.cwd()` |
 
 ## 命令行选项
 

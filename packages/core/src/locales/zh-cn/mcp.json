@@ -5,6 +5,8 @@
   "inspectorDebugCmd": "   调试命令: pnpm space mcp",
   "inspectorFailed": "❌ 启动 MCP Inspector 失败: {{error}}",
   "extensionDescription": "启动 MCP Server，提供所有已安装扩展的 MCP 工具",
+  "cwdInfo": "📂 工作目录: {{cwd}}",
+  "cwdEnvHint": "   💡 可通过环境变量 SPACEFLOW_CWD 指定工作区路径",
   "scanning": "🔍 扫描已安装的扩展...",
   "foundExtensions": "   发现 {{count}} 个扩展",
   "checkingExport": "     检查 {{key}}: __mcp_server__={{hasMcpServer}}",
@@ -12,8 +14,8 @@
   "containerFailed": "     ⚠️ 从容器获取 {{key}} 失败: {{error}}",
   "loadToolsFailed": "   ⚠️ {{name}}: 加载 MCP 工具失败",
   "noToolsFound": "❌ 没有找到任何 MCP 工具",
-  "noToolsHint": "   提示: 确保已安装支持 MCP 的扩展，并导出 mcpService 或 getMcpTools",
+  "noToolsHint": "   提示: 确保已安装支持 MCP 的扩展，并导出 mcpService 或 getMcpTools\n   如果工作目录不正确，请在 MCP 配置中设置环境变量:\n   \"env\": { \"SPACEFLOW_CWD\": \"/path/to/your/project\" }",
   "toolsFound": "✅ 共发现 {{count}} 个 MCP 工具",
-  "ttyHint": "💡 MCP Server 需要由 MCP 客户端（如 Cursor、Claude Desktop）通过管道启动。\n   请将以下配置添加到你的 MCP 客户端中：\n\n   \"spaceflow\": {\n     \"command\": \"pnpm\",\n     \"args\": [\"space\", \"mcp\"]\n   }",
+  "ttyHint": "💡 MCP Server 需要由 MCP 客户端（如 Cursor、Claude Desktop）通过管道启动。\n   请将以下配置添加到你的 MCP 客户端中：\n\n   \"spaceflow\": {\n     \"command\": \"npx\",\n     \"args\": [\"@spaceflow/cli\", \"mcp\"],\n     \"env\": { \"SPACEFLOW_CWD\": \"/path/to/your/project\" }\n   }",
   "serverStarted": "🚀 MCP Server 已启动，共 {{count}} 个工具"
 }

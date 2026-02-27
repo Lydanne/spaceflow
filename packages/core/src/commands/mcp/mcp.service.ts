@@ -21,6 +21,11 @@ export class McpService {
       return;
     }
     if (shouldLog(verbose, 1)) {
+      const cwd = process.env.SPACEFLOW_CWD || process.cwd();
+      console.error(t("mcp:cwdInfo", { cwd }));
+      if (!process.env.SPACEFLOW_CWD) {
+        console.error(t("mcp:cwdEnvHint"));
+      }
       console.error(t("mcp:scanning"));
     }
 

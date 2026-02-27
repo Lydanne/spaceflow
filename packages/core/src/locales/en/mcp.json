@@ -5,6 +5,8 @@
   "inspectorDebugCmd": "   Debug command: pnpm space mcp",
   "inspectorFailed": "❌ Failed to start MCP Inspector: {{error}}",
   "extensionDescription": "Start MCP Server with all installed extension tools",
+  "cwdInfo": "📂 Working directory: {{cwd}}",
+  "cwdEnvHint": "   💡 Set SPACEFLOW_CWD environment variable to specify workspace path",
   "scanning": "🔍 Scanning installed extensions...",
   "foundExtensions": "   Found {{count}} extensions",
   "checkingExport": "     Checking {{key}}: __mcp_server__={{hasMcpServer}}",
@@ -12,8 +14,8 @@
   "containerFailed": "     ⚠️ Failed to get {{key}} from container: {{error}}",
   "loadToolsFailed": "   ⚠️ {{name}}: Failed to load MCP tools",
   "noToolsFound": "❌ No MCP tools found",
-  "noToolsHint": "   Hint: Make sure you have installed MCP-enabled extensions that export mcpService or getMcpTools",
+  "noToolsHint": "   Hint: Make sure you have installed MCP-enabled extensions that export mcpService or getMcpTools\n   If the working directory is incorrect, set the environment variable in your MCP config:\n   \"env\": { \"SPACEFLOW_CWD\": \"/path/to/your/project\" }",
   "toolsFound": "✅ Found {{count}} MCP tools",
-  "ttyHint": "💡 MCP Server must be started by an MCP client (e.g. Cursor, Claude Desktop) via pipe.\n   Add the following config to your MCP client:\n\n   \"spaceflow\": {\n     \"command\": \"pnpm\",\n     \"args\": [\"space\", \"mcp\"]\n   }",
+  "ttyHint": "💡 MCP Server must be started by an MCP client (e.g. Cursor, Claude Desktop) via pipe.\n   Add the following config to your MCP client:\n\n   \"spaceflow\": {\n     \"command\": \"npx\",\n     \"args\": [\"@spaceflow/cli\", \"mcp\"],\n     \"env\": { \"SPACEFLOW_CWD\": \"/path/to/your/project\" }\n   }",
   "serverStarted": "🚀 MCP Server started with {{count}} tools"
 }
