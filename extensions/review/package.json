@@ -1,6 +1,6 @@
 {
   "name": "@spaceflow/review",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "description": "Spaceflow 代码审查插件，使用 LLM 对 PR 代码进行自动审查",
   "license": "MIT",
   "author": "Lydanne",
