@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.11.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@0.10.0...@spaceflow/core@0.11.0) (2026-02-27)
+
+### 新特性
+
+* **cli:** 为 CLI 添加版本号支持，并在执行扩展时传递版本信息 ([cdcd311](https://github.com/Lydanne/spaceflow/commit/cdcd311ab9c44090b68ab594b67ca42f8e846a8a))
+* **cli:** 支持通过 SPACEFLOW_CWD 环境变量指定工作目录 ([f24fe3c](https://github.com/Lydanne/spaceflow/commit/f24fe3ccfa0d219a2490585b6fd96c2f32019702))
+* **core:** 在构建时注入核心版本号并支持在CLI中显示 ([8061cf8](https://github.com/Lydanne/spaceflow/commit/8061cf8af4ce22bbcdd2cce96472cef22c53a3b1))
+* **publish:** 优化发布流程，在 after:bump 阶段增加构建步骤 ([9e1c859](https://github.com/Lydanne/spaceflow/commit/9e1c85977714cc43640e47c1a50c44d06e2af23c))
+
+### 代码重构
+
+* **cli:** 简化 getSpaceflowDir 逻辑，直接回退到全局目录 ([6763afa](https://github.com/Lydanne/spaceflow/commit/6763afab09c1a303a8a278cb8880490f2f39e769))
+
+### 其他修改
+
+* **cli:** released version 0.32.0 [no ci] ([0702e0e](https://github.com/Lydanne/spaceflow/commit/0702e0e4c5dd6c1d067297372d718225dab9aaee))
+* **cli:** released version 0.33.0 [no ci] ([5a227d6](https://github.com/Lydanne/spaceflow/commit/5a227d6d964451096a3f08aaa7529902cd05a11b))
+* **publish:** released version 0.33.0 [no ci] ([fdb0720](https://github.com/Lydanne/spaceflow/commit/fdb0720db798414d226541dba922155cf0cfe849))
+* **publish:** released version 0.34.0 [no ci] ([6b949b5](https://github.com/Lydanne/spaceflow/commit/6b949b5894dda61198c115d60fd39a08511d64c3))
+* **review-summary:** released version 0.11.0 [no ci] ([d68ceef](https://github.com/Lydanne/spaceflow/commit/d68ceef911941e80fc1e71d530bf0b412b54a64a))
+* **review-summary:** released version 0.12.0 [no ci] ([1765e00](https://github.com/Lydanne/spaceflow/commit/1765e00a7209acd4a94c79c3dcb2988061154bc5))
+* **review:** released version 0.41.0 [no ci] ([df19355](https://github.com/Lydanne/spaceflow/commit/df193555f523bfde891cd2ab96f823713199749a))
+* **review:** released version 0.42.0 [no ci] ([366684a](https://github.com/Lydanne/spaceflow/commit/366684a36ab5ccad0cf8de848376fe8427b70b3f))
+* **scripts:** released version 0.11.0 [no ci] ([4c1d726](https://github.com/Lydanne/spaceflow/commit/4c1d726587a0be3187957e069b78d6eaefa7fddc))
+* **scripts:** released version 0.12.0 [no ci] ([eea067c](https://github.com/Lydanne/spaceflow/commit/eea067c4d7d76b14f0a57edabcb27787f2775212))
+* **shell:** released version 0.11.0 [no ci] ([3df4552](https://github.com/Lydanne/spaceflow/commit/3df4552e24e6f73b3cb8116c348453dd46dd1db5))
+* **shell:** released version 0.12.0 [no ci] ([415a373](https://github.com/Lydanne/spaceflow/commit/415a373a32e59e78d2607938dfb7d10d91062e73))
+
 ## [0.10.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@0.9.0...@spaceflow/core@0.10.0) (2026-02-26)
 
 ### 文档更新
