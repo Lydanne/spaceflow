@@ -95,15 +95,16 @@ export function getSpaceflowCoreVersion(): string {
  * - 保持 @spaceflow/core 版本与 cli 一致
  * - 同步 spaceflow.json/.spaceflowrc 中的 dependencies（扩展包）
  * @param spaceflowDir .spaceflow 目录路径
+ * @param cwd 项目根目录（用于读取 .spaceflowrc 中的 dependencies），默认为 spaceflowDir 的父目录
  */
-export function ensureSpaceflowPackageJson(spaceflowDir: string): void {
+export function ensureSpaceflowPackageJson(spaceflowDir: string, cwd?: string): void {
   ensureSpaceflowDir(spaceflowDir);
 
   const packageJsonPath = join(spaceflowDir, PACKAGE_JSON);
   const coreVersion = getSpaceflowCoreVersion();
 
   // 只从当前目录级别读取扩展依赖（不向上遍历祖先目录）
-  const projectDir = join(spaceflowDir, "..");
+  const projectDir = cwd || join(spaceflowDir, "..");
   const extDeps = getDependencies(projectDir, { local: true });
 
   // 构建期望的 dependencies：@spaceflow/core + 所有扩展包

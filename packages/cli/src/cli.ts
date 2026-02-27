@@ -7,6 +7,7 @@ import { execSync } from "child_process";
 import { homedir } from "os";
 import {
   SPACEFLOW_DIR,
+  RC_FILE_NAME,
   ensureSpaceflowPackageJson,
   ensureDependencies,
   getDependencies,
@@ -35,24 +36,24 @@ function getEffectiveCwd(): string {
 
 /**
  * 获取 .spaceflow 目录路径
- * 从 cwd 向上遍历查找已存在的 .spaceflow 目录，
- * 如果整个目录树中都没有，则回退到 ~/.spaceflow
+ * 1. 从 cwd 向上遍历查找 .spaceflowrc，找到则在同级目录下使用 .spaceflow
+ * 2. 都没找到则回退到 ~/.spaceflow
  */
 function getSpaceflowDir(cwd: string): string {
   let current = resolve(cwd);
   const home = homedir();
 
   while (true) {
-    const candidate = join(current, SPACEFLOW_DIR);
-    if (existsSync(candidate)) {
-      return candidate;
+    // 检查当前目录是否有 .spaceflowrc
+    if (existsSync(join(current, RC_FILE_NAME))) {
+      return join(current, SPACEFLOW_DIR);
     }
     const parent = dirname(current);
     if (parent === current) break; // 文件系统根
     current = parent;
   }
 
-  // 没有找到任何工作区级 .spaceflow，回退到全局目录 ~/.spaceflow
+  // 没有找到 .spaceflowrc，回退到全局目录 ~/.spaceflow
   return join(home, SPACEFLOW_DIR);
 }
 
@@ -147,7 +148,7 @@ loadEnvFiles(getEnvFilePaths(effectiveCwd));
 
 // 2. 确保 .spaceflow/ 目录结构完整（目录 + package.json + .gitignore）
 const spaceflowDir = getSpaceflowDir(effectiveCwd);
-ensureSpaceflowPackageJson(spaceflowDir);
+ensureSpaceflowPackageJson(spaceflowDir, effectiveCwd);
 
 // 3. 确保依赖已安装
 ensureDependencies(spaceflowDir);
