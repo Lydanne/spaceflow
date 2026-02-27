@@ -98,7 +98,7 @@ export const extension = defineExtension({
           deletionAnalysisMode: options?.deletionAnalysisMode as LLMMode,
           deletionOnly: !!options?.deletionOnly,
           outputFormat: options?.outputFormat as ReportFormat,
-          generateDescription: !!options?.generateDescription,
+          generateDescription: options?.generateDescription ? true : undefined,
           showAll: !!options?.showAll,
           flush: isFlush,
           eventAction: options?.eventAction as string,
