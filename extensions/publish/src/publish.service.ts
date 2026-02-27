@@ -433,30 +433,38 @@ export class PublishService {
       return Object.keys(hooks).length > 0 ? hooks : undefined;
     }
 
-    // 如果使用 pnpm 且需要发布
-    if (npmConf?.packageManager === "pnpm" && npmConf?.publish && !skipWrite) {
-      const tag = prerelease || npmConf.tag || "latest";
-      const publishArgs = npmConf.publishArgs ?? [];
-      const registry = npmConf.registry;
+    // after:bump 阶段：先重新构建（确保 DefinePlugin 注入新版本号），再发布
+    if (!skipWrite) {
+      const afterBumpCmds: string[] = [];
 
-      // 构建 pnpm publish 命令
-      // monorepo 模式下已切换到包目录，不需要 -C 参数
-      let publishCmd = `pnpm publish --tag ${tag} --no-git-checks`;
-      if (registry) {
-        publishCmd += ` --registry ${registry}`;
-      }
-      if (publishArgs.length > 0) {
-        publishCmd += ` ${publishArgs.join(" ")}`;
+      // 1. 重新构建：版本号已更新到 package.json，重新构建使产物包含新版本
+      afterBumpCmds.push("pnpm run build");
+
+      // 2. 如果使用 pnpm 且需要发布
+      if (npmConf?.packageManager === "pnpm" && npmConf?.publish) {
+        const tag = prerelease || npmConf.tag || "latest";
+        const publishArgs = npmConf.publishArgs ?? [];
+        const registry = npmConf.registry;
+
+        // 构建 pnpm publish 命令
+        // monorepo 模式下已切换到包目录，不需要 -C 参数
+        let publishCmd = `pnpm publish --tag ${tag} --no-git-checks`;
+        if (registry) {
+          publishCmd += ` --registry ${registry}`;
+        }
+        if (publishArgs.length > 0) {
+          publishCmd += ` ${publishArgs.join(" ")}`;
+        }
+        afterBumpCmds.push(publishCmd);
       }
 
       // 合并到 after:bump hook
       const existingAfterBump = hooks["after:bump"];
       if (existingAfterBump) {
-        hooks["after:bump"] = Array.isArray(existingAfterBump)
-          ? [...existingAfterBump, publishCmd]
-          : [existingAfterBump, publishCmd];
+        const existing = Array.isArray(existingAfterBump) ? existingAfterBump : [existingAfterBump];
+        hooks["after:bump"] = [...existing, ...afterBumpCmds];
       } else {
-        hooks["after:bump"] = publishCmd;
+        hooks["after:bump"] = afterBumpCmds.length === 1 ? afterBumpCmds[0] : afterBumpCmds;
       }
     }
 
