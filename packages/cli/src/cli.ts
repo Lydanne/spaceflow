@@ -42,14 +42,8 @@ function getSpaceflowDir(): string {
     current = parent;
   }
 
-  // 检查全局目录
-  const globalDir = join(home, SPACEFLOW_DIR);
-  if (existsSync(globalDir)) {
-    return globalDir;
-  }
-
-  // 都没有，回退到 cwd（后续 ensureSpaceflowPackageJson 会创建）
-  return join(process.cwd(), SPACEFLOW_DIR);
+  // 没有找到任何工作区级 .spaceflow，回退到全局目录 ~/.spaceflow
+  return join(home, SPACEFLOW_DIR);
 }
 
 /**
