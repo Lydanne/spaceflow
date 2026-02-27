@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.51.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.50.0...@spaceflow/review@0.51.0) (2026-02-27)
+
+### 其他修改
+
+* **review-summary:** released version 0.20.0 [no ci] ([bb3f815](https://github.com/Lydanne/spaceflow/commit/bb3f81567bf6946964a19b9207b8b9beff690b8a))
+* **review:** 移除 .spaceflow 目录及其配置文件 ([64b310d](https://github.com/Lydanne/spaceflow/commit/64b310d8a77614a259a8d7588a09169626efb3ae))
+* **scripts:** released version 0.20.0 [no ci] ([e1fac49](https://github.com/Lydanne/spaceflow/commit/e1fac49257bf4a5902c5884ec0e054384a7859d6))
+* **shell:** released version 0.20.0 [no ci] ([8b69b53](https://github.com/Lydanne/spaceflow/commit/8b69b5340fe99973add2bea3e7d53f2082d0da54))
+
 ## [0.50.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.49.0...@spaceflow/review@0.50.0) (2026-02-27)
 
 ### 新特性
