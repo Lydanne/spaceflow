@@ -138,7 +138,7 @@ function isMcpCommand(): boolean {
  * @param cwd 项目根目录
  */
 async function connectProjectMcpClient(cwd: string): Promise<Client> {
-  const resolvedCwd = findProjectRoot(cwd);
+  const resolvedCwd = resolve(cwd);
   const cliPath = process.argv[1];
   const transport = new StdioClientTransport({
     command: "node",
