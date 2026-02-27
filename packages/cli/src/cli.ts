@@ -31,14 +31,12 @@ import { z } from "zod";
  */
 
 /**
- * 获取有效工作目录（项目根）
- * 优先使用 SPACEFLOW_CWD 环境变量，否则从 process.cwd() 向上查找 .spaceflowrc 所在目录
+ * 获取有效工作目录
+ * 优先使用 SPACEFLOW_CWD 环境变量（MCP 场景由编辑器注入），否则 process.cwd()
+ * 注意：不做 findProjectRoot，避免改变 .spaceflow 目录定位逻辑
  */
 function getEffectiveCwd(): string {
-  if (process.env.SPACEFLOW_CWD) {
-    return resolve(process.env.SPACEFLOW_CWD);
-  }
-  return findProjectRoot(process.cwd());
+  return resolve(process.env.SPACEFLOW_CWD || process.cwd());
 }
 
 /**
@@ -277,15 +275,18 @@ if (isMcpCommand()) {
   });
 } else {
   // 正常 CLI 流程
-  // 0. 解析有效工作目录（优先 SPACEFLOW_CWD 环境变量）
+  // 0. 解析有效工作目录
+  //    effectiveCwd: 用户实际所在目录（保持 process.cwd() 不变，build 等命令依赖它）
+  //    projectRoot:  .spaceflowrc 所在目录（决定 .spaceflow 目录位置和配置读取）
   const effectiveCwd = getEffectiveCwd();
+  const projectRoot = findProjectRoot(effectiveCwd);
 
   // 1. 先加载 .env 文件，确保 process.env 在子进程（含 schema 模块求值）前已就绪
-  loadEnvFiles(getEnvFilePaths(effectiveCwd));
+  loadEnvFiles(getEnvFilePaths(projectRoot));
 
   // 2. 确保 .spaceflow/ 目录结构完整（目录 + package.json + .gitignore）
-  const spaceflowDir = join(effectiveCwd, SPACEFLOW_DIR);
-  ensureSpaceflowPackageJson(spaceflowDir, effectiveCwd);
+  const spaceflowDir = join(projectRoot, SPACEFLOW_DIR);
+  ensureSpaceflowPackageJson(spaceflowDir, projectRoot);
 
   // 3. 确保依赖已安装
   // MCP 代理模式下使用 pipe 避免 pnpm install 输出污染 stdout（MCP 协议通道）
@@ -295,11 +296,11 @@ if (isMcpCommand()) {
   const cliVersion = __CLI_VERSION__;
 
   // 5. 读取外部扩展列表
-  const extNames = readExternalExtensions(effectiveCwd);
+  const extNames = readExternalExtensions(projectRoot);
 
   // 6. 生成 .spaceflow/bin/index.js
   const indexPath = generateBinFile(spaceflowDir, extNames, cliVersion);
 
-  // 7. 执行生成的入口文件
-  executeIndexFile(indexPath, effectiveCwd);
+  // 7. 执行生成的入口文件（传 projectRoot 作为 SPACEFLOW_CWD，保持 process.cwd() 不变）
+  executeIndexFile(indexPath, projectRoot);
 }
