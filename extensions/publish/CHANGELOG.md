@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.35.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/publish@0.34.0...@spaceflow/publish@0.35.0) (2026-02-27)
+
+### 新特性
+
+* **cli:** 为 CLI 添加版本号支持，并在执行扩展时传递版本信息 ([cdcd311](https://github.com/Lydanne/spaceflow/commit/cdcd311ab9c44090b68ab594b67ca42f8e846a8a))
+* **cli:** 支持通过 SPACEFLOW_CWD 环境变量指定工作目录 ([f24fe3c](https://github.com/Lydanne/spaceflow/commit/f24fe3ccfa0d219a2490585b6fd96c2f32019702))
+* **core:** 在构建时注入核心版本号并支持在CLI中显示 ([8061cf8](https://github.com/Lydanne/spaceflow/commit/8061cf8af4ce22bbcdd2cce96472cef22c53a3b1))
+* **publish:** 优化发布流程，在 after:bump 阶段增加构建步骤 ([9e1c859](https://github.com/Lydanne/spaceflow/commit/9e1c85977714cc43640e47c1a50c44d06e2af23c))
+
+### 其他修改
+
+* **cli:** released version 0.33.0 [no ci] ([5a227d6](https://github.com/Lydanne/spaceflow/commit/5a227d6d964451096a3f08aaa7529902cd05a11b))
+* **core:** released version 0.11.0 [no ci] ([6ea0b41](https://github.com/Lydanne/spaceflow/commit/6ea0b41fe64b0dad32ec33cad420620bfc02acdb))
+* **review-summary:** released version 0.12.0 [no ci] ([1765e00](https://github.com/Lydanne/spaceflow/commit/1765e00a7209acd4a94c79c3dcb2988061154bc5))
+* **review:** released version 0.42.0 [no ci] ([366684a](https://github.com/Lydanne/spaceflow/commit/366684a36ab5ccad0cf8de848376fe8427b70b3f))
+* **scripts:** released version 0.12.0 [no ci] ([eea067c](https://github.com/Lydanne/spaceflow/commit/eea067c4d7d76b14f0a57edabcb27787f2775212))
+* **shell:** released version 0.12.0 [no ci] ([415a373](https://github.com/Lydanne/spaceflow/commit/415a373a32e59e78d2607938dfb7d10d91062e73))
+
 ## [0.34.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/publish@0.33.0...@spaceflow/publish@0.34.0) (2026-02-27)
 
 ### 代码重构
