@@ -37,7 +37,7 @@ interface GraphQLReviewThread {
   resolvedBy?: { login: string; databaseId: number } | null;
   path?: string | null;
   line?: number | null;
-  comments: { nodes: Array<{ databaseId: number }> };
+  comments: { nodes: Array<{ databaseId: number; body?: string }> };
 }
 
 /**
@@ -838,12 +838,14 @@ export class GithubAdapter implements GitProvider {
     const result: ResolvedThread[] = [];
     for (const thread of threads) {
       if (!thread.isResolved) continue;
+      const firstComment = thread.comments.nodes[0];
       result.push({
         path: thread.path ?? undefined,
         line: thread.line ?? undefined,
         resolvedBy: thread.resolvedBy
           ? { id: thread.resolvedBy.databaseId, login: thread.resolvedBy.login }
           : null,
+        body: firstComment?.body,
       });
     }
     return result;
@@ -868,7 +870,7 @@ export class GithubAdapter implements GitProvider {
                 path
                 line
                 comments(first: 1) {
-                  nodes { databaseId }
+                  nodes { databaseId body }
                 }
               }
             }

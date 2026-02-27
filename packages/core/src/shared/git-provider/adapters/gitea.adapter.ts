@@ -497,8 +497,30 @@ export class GiteaAdapter implements GitProvider {
     await this.request<void>("DELETE", `/repos/${owner}/${repo}/pulls/comments/${commentId}`);
   }
 
-  async listResolvedThreads(): Promise<ResolvedThread[]> {
-    return [];
+  async listResolvedThreads(owner: string, repo: string, index: number): Promise<ResolvedThread[]> {
+    const result: ResolvedThread[] = [];
+    try {
+      const reviews = await this.listPullReviews(owner, repo, index);
+      for (const review of reviews) {
+        if (!review.id) continue;
+        const comments = await this.listPullReviewComments(owner, repo, index, review.id);
+        for (const comment of comments) {
+          if (!comment.resolver) continue;
+          result.push({
+            path: comment.path,
+            line: comment.position,
+            resolvedBy: {
+              id: comment.resolver.id,
+              login: comment.resolver.login,
+            },
+            body: comment.body,
+          });
+        }
+      }
+    } catch {
+      // 获取失败时返回空数组，不影响主流程
+    }
+    return result;
   }
 
   // ============ Reaction 操作 ============

@@ -406,6 +406,8 @@ export interface ResolvedThread {
     id?: number;
     login?: string;
   } | null;
+  /** 评论内容（用于提取 issue key 精确匹配） */
+  body?: string;
 }
 
 /** 用户信息 */
