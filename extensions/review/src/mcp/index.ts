@@ -5,19 +5,15 @@ import { join } from "path";
 import { existsSync } from "fs";
 
 /** MCP 工具输入 schema */
-export const listRulesInputSchema = z.object({
-  cwd: z.string().optional().describe(t("review:mcp.dto.cwd")),
-});
+export const listRulesInputSchema = z.object({});
 
 export const getRulesForFileInputSchema = z.object({
   filePath: z.string().describe(t("review:mcp.dto.filePath")),
-  cwd: z.string().optional().describe(t("review:mcp.dto.cwd")),
   includeExamples: z.boolean().optional().describe(t("review:mcp.dto.includeExamples")),
 });
 
 export const getRuleDetailInputSchema = z.object({
   ruleId: z.string().describe(t("review:mcp.dto.ruleId")),
-  cwd: z.string().optional().describe(t("review:mcp.dto.cwd")),
 });
 
 /**
@@ -80,9 +76,8 @@ export const tools = [
     name: "list_rules",
     description: t("review:mcp.listRules"),
     inputSchema: listRulesInputSchema,
-    handler: async (input, ctx) => {
-      const { cwd } = input as z.infer<typeof listRulesInputSchema>;
-      const workDir = cwd || process.cwd();
+    handler: async (_input, ctx) => {
+      const workDir = ctx.cwd;
       const specs = await loadAllSpecs(workDir, ctx);
       const rules = specs.flatMap((spec) =>
         spec.rules.map((rule) => ({
@@ -105,10 +100,8 @@ export const tools = [
     description: t("review:mcp.getRulesForFile"),
     inputSchema: getRulesForFileInputSchema,
     handler: async (input, ctx) => {
-      const { filePath, cwd, includeExamples } = input as z.infer<
-        typeof getRulesForFileInputSchema
-      >;
-      const workDir = cwd || process.cwd();
+      const { filePath, includeExamples } = input as z.infer<typeof getRulesForFileInputSchema>;
+      const workDir = ctx.cwd;
       const allSpecs = await loadAllSpecs(workDir, ctx);
       const specService = new ReviewSpecService();
       const applicableSpecs = specService.filterApplicableSpecs(allSpecs, [{ filename: filePath }]);
@@ -146,8 +139,8 @@ export const tools = [
     description: t("review:mcp.getRuleDetail"),
     inputSchema: getRuleDetailInputSchema,
     handler: async (input, ctx) => {
-      const { ruleId, cwd } = input as z.infer<typeof getRuleDetailInputSchema>;
-      const workDir = cwd || process.cwd();
+      const { ruleId } = input as z.infer<typeof getRuleDetailInputSchema>;
+      const workDir = ctx.cwd;
       const specs = await loadAllSpecs(workDir, ctx);
       const specService = new ReviewSpecService();
       const result = specService.findRuleById(ruleId, specs);
