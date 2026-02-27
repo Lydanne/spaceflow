@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.18.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.17.0...@spaceflow/shell@0.18.0) (2026-02-27)
+
+### 新特性
+
+* **mcp:** 添加 MCP 资源支持，包括扩展资源和内置配置/扩展列表资源 ([ab19889](https://github.com/Lydanne/spaceflow/commit/ab198890a13c998c17987734da3875834f747a70))
+
+### 其他修改
+
+* **cli:** released version 0.38.0 [no ci] ([b8c1a54](https://github.com/Lydanne/spaceflow/commit/b8c1a546876b1ad74d5da755c9ecafea9a99798d))
+* **core:** released version 0.16.0 [no ci] ([4486a32](https://github.com/Lydanne/spaceflow/commit/4486a320fccea858e400b79c5b4f18ed4a6f58ea))
+* **publish:** released version 0.40.0 [no ci] ([8fe14c7](https://github.com/Lydanne/spaceflow/commit/8fe14c7faffa2784b91710d3f129911534bf64d2))
+* **review-summary:** released version 0.18.0 [no ci] ([164fb64](https://github.com/Lydanne/spaceflow/commit/164fb64c511d93466585cb5d6df7cd6be0922c8c))
+* **review:** released version 0.48.0 [no ci] ([4e92d6f](https://github.com/Lydanne/spaceflow/commit/4e92d6f72dcd1e94fbf8a9a772b561da9d39c92c))
+* **scripts:** released version 0.18.0 [no ci] ([289be06](https://github.com/Lydanne/spaceflow/commit/289be06674264d98ab9e1da908d088fff4e1cf7e))
+
 ## [0.17.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.16.0...@spaceflow/shell@0.17.0) (2026-02-27)
 
 ### 新特性
