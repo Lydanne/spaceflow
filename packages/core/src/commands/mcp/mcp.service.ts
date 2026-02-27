@@ -29,7 +29,6 @@ export class McpService {
       console.error(t("mcp:scanning"));
     }
 
-    // 获取所有扩展（已在 exec() 阶段通过 registerExtension 注册完毕）
     const extensions = this.extensionLoader.getExtensions();
     const mcpServers = this.extensionLoader.getMcpServers();
 
@@ -37,7 +36,6 @@ export class McpService {
       console.error(t("mcp:foundExtensions", { count: extensions.length }));
     }
 
-    // 收集所有扩展的 MCP 工具
     const allTools: Array<{ tool: McpToolMetadata; handler: any; ctx: any }> = [];
     for (const { extensionName, mcp } of mcpServers) {
       if (shouldLog(verbose, 2)) {
@@ -57,7 +55,7 @@ export class McpService {
             methodName: "handler",
           },
           handler: tool.handler,
-          ctx: this.extensionLoader["ctx"], // 获取 SpaceflowContext
+          ctx: this.extensionLoader["ctx"],
         });
       }
     }

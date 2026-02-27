@@ -31,7 +31,9 @@
     "test:cov": "vitest run --coverage"
   },
   "dependencies": {
-    "@spaceflow/shared": "workspace:*"
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@spaceflow/shared": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@rspack/cli": "^1.7.4",

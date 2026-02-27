@@ -221,13 +221,19 @@ importers:
 
   packages/cli:
     dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.26.0
+        version: 1.26.0(zod@4.3.6)
       '@spaceflow/shared':
         specifier: workspace:*
         version: link:../shared
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
     devDependencies:
       '@rspack/cli':
         specifier: ^1.7.4
-        version: 1.7.4(@rspack/core@1.7.4)(@types/express@4.17.25)(webpack@5.103.0(@swc/core@1.15.3))
+        version: 1.7.4(@rspack/core@1.7.4)(webpack@5.103.0(@swc/core@1.15.3))
       '@rspack/core':
         specifier: ^1.7.4
         version: 1.7.4
@@ -385,7 +391,7 @@ importers:
     devDependencies:
       '@rspack/cli':
         specifier: ^1.7.4
-        version: 1.7.4(@rspack/core@1.7.4)(@types/express@4.17.25)(webpack@5.103.0)
+        version: 1.7.4(@rspack/core@1.7.4)(webpack@5.103.0)
       '@rspack/core':
         specifier: ^1.7.4
         version: 1.7.4
@@ -6178,43 +6184,43 @@ snapshots:
       '@rspack/binding-win32-ia32-msvc': 1.7.4
       '@rspack/binding-win32-x64-msvc': 1.7.4
 
-  '@rspack/cli@1.7.4(@rspack/core@1.7.4)(@types/express@4.17.25)(webpack@5.103.0(@swc/core@1.15.3))':
-    dependencies:
-      '@discoveryjs/json-ext': 0.5.7
-      '@rspack/core': 1.7.4
-      '@rspack/dev-server': 1.1.5(@rspack/core@1.7.4)(@types/express@4.17.25)(webpack@5.103.0(@swc/core@1.15.3))
-      exit-hook: 4.0.0
-      webpack-bundle-analyzer: 4.10.2
-    transitivePeerDependencies:
-      - '@types/express'
-      - bufferutil
-      - debug
-      - supports-color
-      - utf-8-validate
-      - webpack
-      - webpack-cli
-
-  '@rspack/cli@1.7.4(@rspack/core@1.7.4)(@types/express@4.17.25)(webpack@5.103.0)':
-    dependencies:
-      '@discoveryjs/json-ext': 0.5.7
-      '@rspack/core': 1.7.4
-      '@rspack/dev-server': 1.1.5(@rspack/core@1.7.4)(@types/express@4.17.25)(webpack@5.103.0)
-      exit-hook: 4.0.0
-      webpack-bundle-analyzer: 4.10.2
-    transitivePeerDependencies:
-      - '@types/express'
-      - bufferutil
-      - debug
-      - supports-color
-      - utf-8-validate
-      - webpack
-      - webpack-cli
-
   '@rspack/cli@1.7.4(@rspack/core@1.7.4)(@types/express@5.0.5)(webpack@5.103.0(@swc/core@1.15.3))':
     dependencies:
       '@discoveryjs/json-ext': 0.5.7
       '@rspack/core': 1.7.4
       '@rspack/dev-server': 1.1.5(@rspack/core@1.7.4)(@types/express@5.0.5)(webpack@5.103.0(@swc/core@1.15.3))
+      exit-hook: 4.0.0
+      webpack-bundle-analyzer: 4.10.2
+    transitivePeerDependencies:
+      - '@types/express'
+      - bufferutil
+      - debug
+      - supports-color
+      - utf-8-validate
+      - webpack
+      - webpack-cli
+
+  '@rspack/cli@1.7.4(@rspack/core@1.7.4)(webpack@5.103.0(@swc/core@1.15.3))':
+    dependencies:
+      '@discoveryjs/json-ext': 0.5.7
+      '@rspack/core': 1.7.4
+      '@rspack/dev-server': 1.1.5(@rspack/core@1.7.4)(webpack@5.103.0(@swc/core@1.15.3))
+      exit-hook: 4.0.0
+      webpack-bundle-analyzer: 4.10.2
+    transitivePeerDependencies:
+      - '@types/express'
+      - bufferutil
+      - debug
+      - supports-color
+      - utf-8-validate
+      - webpack
+      - webpack-cli
+
+  '@rspack/cli@1.7.4(@rspack/core@1.7.4)(webpack@5.103.0)':
+    dependencies:
+      '@discoveryjs/json-ext': 0.5.7
+      '@rspack/core': 1.7.4
+      '@rspack/dev-server': 1.1.5(@rspack/core@1.7.4)(webpack@5.103.0)
       exit-hook: 4.0.0
       webpack-bundle-analyzer: 4.10.2
     transitivePeerDependencies:
@@ -6232,40 +6238,6 @@ snapshots:
       '@rspack/binding': 1.7.4
       '@rspack/lite-tapable': 1.1.0
 
-  '@rspack/dev-server@1.1.5(@rspack/core@1.7.4)(@types/express@4.17.25)(webpack@5.103.0(@swc/core@1.15.3))':
-    dependencies:
-      '@rspack/core': 1.7.4
-      chokidar: 3.6.0
-      http-proxy-middleware: 2.0.9(@types/express@4.17.25)
-      p-retry: 6.2.1
-      webpack-dev-server: 5.2.2(webpack@5.103.0(@swc/core@1.15.3))
-      ws: 8.18.3
-    transitivePeerDependencies:
-      - '@types/express'
-      - bufferutil
-      - debug
-      - supports-color
-      - utf-8-validate
-      - webpack
-      - webpack-cli
-
-  '@rspack/dev-server@1.1.5(@rspack/core@1.7.4)(@types/express@4.17.25)(webpack@5.103.0)':
-    dependencies:
-      '@rspack/core': 1.7.4
-      chokidar: 3.6.0
-      http-proxy-middleware: 2.0.9(@types/express@4.17.25)
-      p-retry: 6.2.1
-      webpack-dev-server: 5.2.2(webpack@5.103.0)
-      ws: 8.18.3
-    transitivePeerDependencies:
-      - '@types/express'
-      - bufferutil
-      - debug
-      - supports-color
-      - utf-8-validate
-      - webpack
-      - webpack-cli
-
   '@rspack/dev-server@1.1.5(@rspack/core@1.7.4)(@types/express@5.0.5)(webpack@5.103.0(@swc/core@1.15.3))':
     dependencies:
       '@rspack/core': 1.7.4
@@ -6273,6 +6245,40 @@ snapshots:
       http-proxy-middleware: 2.0.9(@types/express@5.0.5)
       p-retry: 6.2.1
       webpack-dev-server: 5.2.2(webpack@5.103.0(@swc/core@1.15.3))
+      ws: 8.18.3
+    transitivePeerDependencies:
+      - '@types/express'
+      - bufferutil
+      - debug
+      - supports-color
+      - utf-8-validate
+      - webpack
+      - webpack-cli
+
+  '@rspack/dev-server@1.1.5(@rspack/core@1.7.4)(webpack@5.103.0(@swc/core@1.15.3))':
+    dependencies:
+      '@rspack/core': 1.7.4
+      chokidar: 3.6.0
+      http-proxy-middleware: 2.0.9
+      p-retry: 6.2.1
+      webpack-dev-server: 5.2.2(webpack@5.103.0(@swc/core@1.15.3))
+      ws: 8.18.3
+    transitivePeerDependencies:
+      - '@types/express'
+      - bufferutil
+      - debug
+      - supports-color
+      - utf-8-validate
+      - webpack
+      - webpack-cli
+
+  '@rspack/dev-server@1.1.5(@rspack/core@1.7.4)(webpack@5.103.0)':
+    dependencies:
+      '@rspack/core': 1.7.4
+      chokidar: 3.6.0
+      http-proxy-middleware: 2.0.9
+      p-retry: 6.2.1
+      webpack-dev-server: 5.2.2(webpack@5.103.0)
       ws: 8.18.3
     transitivePeerDependencies:
       - '@types/express'
@@ -8071,6 +8077,16 @@ snapshots:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+
+  http-proxy-middleware@2.0.9:
+    dependencies:
+      '@types/http-proxy': 1.17.17
+      http-proxy: 1.18.1
+      is-glob: 4.0.3
+      is-plain-obj: 3.0.0
+      micromatch: 4.0.8
+    transitivePeerDependencies:
+      - debug
 
   http-proxy-middleware@2.0.9(@types/express@4.17.25):
     dependencies:

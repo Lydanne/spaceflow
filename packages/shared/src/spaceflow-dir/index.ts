@@ -153,8 +153,12 @@ export function ensureSpaceflowPackageJson(spaceflowDir: string, cwd?: string): 
 /**
  * 确保 .spaceflow/node_modules 已安装且与 package.json 的 dependencies 一致
  * @param spaceflowDir .spaceflow 目录路径
+ * @param options.stdio execSync 的 stdio 配置，默认 "inherit"
  */
-export function ensureDependencies(spaceflowDir: string): void {
+export function ensureDependencies(
+  spaceflowDir: string,
+  options?: { stdio?: "inherit" | "pipe" | "ignore" },
+): void {
   const nodeModulesDir = join(spaceflowDir, "node_modules");
   const packageJsonPath = join(spaceflowDir, PACKAGE_JSON);
 
@@ -185,7 +189,7 @@ export function ensureDependencies(spaceflowDir: string): void {
 
   const pm = detectPackageManager(spaceflowDir);
   try {
-    execSync(`${pm} install`, { cwd: spaceflowDir, stdio: "inherit" });
+    execSync(`${pm} install`, { cwd: spaceflowDir, stdio: options?.stdio ?? "inherit" });
   } catch {
     console.warn(`⚠ ${pm} install 失败，部分扩展可能无法加载`);
   }
