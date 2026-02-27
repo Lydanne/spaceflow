@@ -137,6 +137,29 @@ export interface ServiceDefinition {
 }
 
 /**
+ * MCP 资源定义
+ */
+export interface McpResourceDefinition {
+  /** 资源名称（唯一标识符） */
+  name: string;
+  /** 资源 URI（固定 URI，如 "config://spaceflow"） */
+  uri: string;
+  /** 资源标题（人类可读） */
+  title?: string;
+  /** 资源描述 */
+  description?: string;
+  /** MIME 类型（默认 application/json） */
+  mimeType?: string;
+  /**
+   * 资源读取处理函数
+   * @param uri 请求的 URI
+   * @param ctx Spaceflow 上下文
+   * @returns 资源内容（字符串）
+   */
+  handler: (uri: string, ctx: SpaceflowContext) => Promise<string>;
+}
+
+/**
  * MCP 工具定义
  */
 export interface McpToolDefinition {
@@ -174,6 +197,8 @@ export interface ExtensionDefinition {
   commands: CommandDefinition[];
   /** MCP 工具列表 */
   tools?: McpToolDefinition[];
+  /** MCP 资源列表 */
+  resources?: McpResourceDefinition[];
   /** 服务定义列表 */
   services?: ServiceDefinition[];
   /**

@@ -16,6 +16,7 @@
   "noToolsFound": "❌ No MCP tools found",
   "noToolsHint": "   Hint: Make sure you have installed MCP-enabled extensions that export mcpService or getMcpTools\n   If the working directory is incorrect, set the environment variable in your MCP config:\n   \"env\": { \"SPACEFLOW_CWD\": \"/path/to/your/project\" }",
   "toolsFound": "✅ Found {{count}} MCP tools",
+  "resourcesFound": "📦 Found {{count}} MCP resources",
   "ttyHint": "💡 MCP Server must be started by an MCP client (e.g. Cursor, Claude Desktop) via pipe.\n   Add the following config to your MCP client:\n\n   \"spaceflow\": {\n     \"command\": \"npx\",\n     \"args\": [\"@spaceflow/cli\", \"mcp\"],\n     \"env\": { \"SPACEFLOW_CWD\": \"/path/to/your/project\" }\n   }",
   "serverStarted": "🚀 MCP Server started with {{count}} tools"
 }

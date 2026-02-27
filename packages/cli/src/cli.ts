@@ -248,6 +248,87 @@ async function startMcpMetaServer(): Promise<void> {
     },
   );
 
+  // Meta-tool 3: list_resources
+  server.registerTool(
+    "list_resources",
+    {
+      description: "列出指定项目目录下可用的 Spaceflow MCP 资源列表",
+      inputSchema: z.object({
+        cwd: z.string().describe("项目根目录的绝对路径"),
+      }),
+    },
+    async ({ cwd }) => {
+      try {
+        const client = await getProjectClient(cwd);
+        const { resources } = await client.listResources();
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                resources.map((r) => ({
+                  name: r.name,
+                  uri: r.uri,
+                  description: r.description,
+                  mimeType: r.mimeType,
+                })),
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // Meta-tool 4: read_resource
+  server.registerTool(
+    "read_resource",
+    {
+      description: "读取指定项目目录下的 Spaceflow MCP 资源内容",
+      inputSchema: z.object({
+        cwd: z.string().describe("项目根目录的绝对路径"),
+        uri: z.string().describe("资源 URI（如 spaceflow://config）"),
+      }),
+    },
+    async ({ cwd, uri }) => {
+      try {
+        const client = await getProjectClient(cwd);
+        const result = await client.readResource({ uri });
+        const texts = result.contents.map((c) => ("text" in c ? c.text : JSON.stringify(c)));
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: texts.join("\n"),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
   // 启动 stdio 传输
   const transport = new StdioServerTransport();
   await server.connect(transport);

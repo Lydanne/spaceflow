@@ -81,4 +81,24 @@ export class ExtensionLoader {
     }
     return result;
   }
+
+  /**
+   * 获取所有 MCP 资源
+   * 返回扩展中定义的 resources 字段
+   */
+  getResources(): Array<{
+    extensionName: string;
+    resources: NonNullable<ExtensionDefinition["resources"]>;
+  }> {
+    const result: Array<{
+      extensionName: string;
+      resources: NonNullable<ExtensionDefinition["resources"]>;
+    }> = [];
+    for (const ext of this.extensions.values()) {
+      if (ext.resources && ext.resources.length > 0) {
+        result.push({ extensionName: ext.name, resources: ext.resources });
+      }
+    }
+    return result;
+  }
 }

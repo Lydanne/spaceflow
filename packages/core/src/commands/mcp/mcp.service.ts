@@ -1,11 +1,18 @@
 import { t } from "@spaceflow/core";
-import type { VerboseLevel } from "@spaceflow/core";
+import type { VerboseLevel, McpResourceDefinition, SpaceflowContext } from "@spaceflow/core";
 import { shouldLog, type McpToolMetadata } from "@spaceflow/core";
+import { readConfigSync } from "@spaceflow/shared";
 import type { ExtensionLoader } from "../../cli-runtime/extension-loader";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { spawn } from "child_process";
+
+/** 内部 resource 收集结构 */
+interface CollectedResource {
+  resource: McpResourceDefinition;
+  ctx: SpaceflowContext;
+}
 
 export class McpService {
   constructor(private readonly extensionLoader: ExtensionLoader) {}
@@ -57,16 +64,27 @@ export class McpService {
       }
     }
 
-    if (allTools.length === 0) {
+    // 收集扩展 resources + 内置 resources
+    const allResources = this.collectResources(verbose);
+
+    if (allTools.length === 0 && allResources.length === 0) {
       console.error(t("mcp:noToolsFound"));
       console.error(t("mcp:noToolsHint"));
       process.exit(1);
     }
 
     if (shouldLog(verbose, 1)) {
-      console.error(t("mcp:toolsFound", { count: allTools.length }));
-      for (const { tool } of allTools) {
-        console.error(`   - ${tool.name}`);
+      if (allTools.length > 0) {
+        console.error(t("mcp:toolsFound", { count: allTools.length }));
+        for (const { tool } of allTools) {
+          console.error(`   - ${tool.name}`);
+        }
+      }
+      if (allResources.length > 0) {
+        console.error(t("mcp:resourcesFound", { count: allResources.length }));
+        for (const { resource } of allResources) {
+          console.error(`   - ${resource.name} (${resource.uri})`);
+        }
       }
     }
 
@@ -78,7 +96,93 @@ export class McpService {
     }
 
     // 被 MCP 客户端通过管道调用，正常启动 stdio server
-    await this.runServer(allTools, verbose);
+    await this.runServer(allTools, allResources, verbose);
+  }
+
+  /**
+   * 收集所有 MCP 资源（扩展 + 内置）
+   */
+  private collectResources(verbose?: VerboseLevel): CollectedResource[] {
+    const ctx = this.extensionLoader.getContext();
+    const allResources: CollectedResource[] = [];
+
+    // 1. 收集扩展声明的 resources
+    const extensionResources = this.extensionLoader.getResources();
+    for (const { extensionName, resources } of extensionResources) {
+      if (shouldLog(verbose, 2)) {
+        console.error(`   扩展 ${extensionName} 提供 ${resources.length} 个 MCP 资源`);
+      }
+      for (const resource of resources) {
+        allResources.push({ resource, ctx });
+      }
+    }
+
+    // 2. 内置资源：项目配置（过滤敏感字段）
+    allResources.push({
+      resource: {
+        name: "spaceflow-config",
+        uri: "spaceflow://config",
+        title: "Spaceflow Configuration",
+        description: "当前项目的 Spaceflow 配置（已过滤敏感字段）",
+        mimeType: "application/json",
+        handler: async (_uri, ctx) => {
+          const config = readConfigSync(ctx.cwd);
+          return JSON.stringify(this.sanitizeConfig(config), null, 2);
+        },
+      },
+      ctx,
+    });
+
+    // 3. 内置资源：扩展列表
+    allResources.push({
+      resource: {
+        name: "spaceflow-extensions",
+        uri: "spaceflow://extensions",
+        title: "Installed Extensions",
+        description: "当前项目已安装的 Spaceflow 扩展及其工具/资源",
+        mimeType: "application/json",
+        handler: async () => {
+          const extensions = this.extensionLoader.getExtensions();
+          const summary = extensions.map((ext) => ({
+            name: ext.name,
+            version: ext.version,
+            description: ext.description,
+            commands: ext.commands.map((c) => c.name),
+            tools: (ext.tools || []).map((t) => ({ name: t.name, description: t.description })),
+            resources: (ext.resources || []).map((r) => ({
+              name: r.name,
+              uri: r.uri,
+              description: r.description,
+            })),
+          }));
+          return JSON.stringify(summary, null, 2);
+        },
+      },
+      ctx,
+    });
+
+    return allResources;
+  }
+
+  /**
+   * 过滤配置中的敏感字段
+   */
+  private sanitizeConfig(config: Record<string, any>): Record<string, any> {
+    const sensitiveKeys = ["token", "apiKey", "appSecret", "authToken", "apikey", "secret"];
+    const sanitize = (obj: any): any => {
+      if (obj === null || obj === undefined || typeof obj !== "object") return obj;
+      if (Array.isArray(obj)) return obj.map(sanitize);
+      const result: Record<string, any> = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (sensitiveKeys.some((sk) => key.toLowerCase().includes(sk.toLowerCase()))) {
+          result[key] = value ? "***" : "";
+        } else {
+          result[key] = sanitize(value);
+        }
+      }
+      return result;
+    };
+    return sanitize(config);
   }
 
   /**
@@ -86,6 +190,7 @@ export class McpService {
    */
   private async runServer(
     allTools: Array<{ tool: McpToolMetadata; handler: any; ctx: any }>,
+    allResources: CollectedResource[],
     verbose?: VerboseLevel,
   ): Promise<void> {
     const server = new McpServer({ name: "spaceflow", version: "1.0.0" });
@@ -120,6 +225,43 @@ export class McpService {
                 },
               ],
               isError: true,
+            };
+          }
+        },
+      );
+    }
+
+    // 注册所有资源（使用 v2 API: server.registerResource）
+    for (const { resource, ctx } of allResources) {
+      server.registerResource(
+        resource.name,
+        resource.uri,
+        {
+          title: resource.title,
+          description: resource.description,
+          mimeType: resource.mimeType || "application/json",
+        },
+        async (uri) => {
+          try {
+            const text = await resource.handler(uri.href, ctx);
+            return {
+              contents: [
+                {
+                  uri: uri.href,
+                  mimeType: resource.mimeType || "application/json",
+                  text,
+                },
+              ],
+            };
+          } catch (error) {
+            return {
+              contents: [
+                {
+                  uri: uri.href,
+                  mimeType: "text/plain",
+                  text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              ],
             };
           }
         },
