@@ -1,8 +1,10 @@
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
+import { readFileSync } from "fs";
 import rspack from "@rspack/core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf-8"));
 
 export default {
   optimization: {
@@ -17,6 +19,9 @@ export default {
       raw: true,
       entryOnly: true,
       include: /cli\.js$/,
+    }),
+    new rspack.DefinePlugin({
+      __CLI_VERSION__: JSON.stringify(pkg.version),
     }),
   ],
   target: "node",

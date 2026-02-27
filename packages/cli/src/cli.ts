@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+declare const __CLI_VERSION__: string;
+
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, dirname, resolve } from "path";
 import { execSync } from "child_process";
@@ -60,7 +62,7 @@ function readExternalExtensions(): string[] {
  * 使用 dynamic import 加载扩展，确保 i18n 在扩展模块执行前已初始化
  * （扩展在 import 阶段就会调用 t() 获取 description，必须先初始化 i18n）
  */
-function generateIndexContent(extensions: string[]): string {
+function generateIndexContent(extensions: string[], version: string): string {
   const dynamicImports = extensions
     .map((name) => `    import('${name}').then(m => m.default || m.extension || m),`)
     .join("\n");
@@ -75,7 +77,7 @@ async function bootstrap() {
 ${dynamicImports}
   ]);
 
-  await exec(extensions);
+  await exec(extensions, { cliVersion: '${version}' });
 }
 
 bootstrap().catch((err) => {
@@ -88,7 +90,7 @@ bootstrap().catch((err) => {
 /**
  * 生成 .spaceflow/bin/index.js 文件
  */
-function generateBinFile(spaceflowDir: string, extensions: string[]): string {
+function generateBinFile(spaceflowDir: string, extensions: string[], version: string): string {
   const binDir = join(spaceflowDir, "bin");
   const indexPath = join(binDir, "index.js");
 
@@ -96,7 +98,7 @@ function generateBinFile(spaceflowDir: string, extensions: string[]): string {
     mkdirSync(binDir, { recursive: true });
   }
 
-  const content = generateIndexContent(extensions);
+  const content = generateIndexContent(extensions, version);
 
   // 仅在内容变化时写入
   if (existsSync(indexPath)) {
@@ -139,11 +141,14 @@ ensureSpaceflowPackageJson(spaceflowDir);
 // 2. 确保依赖已安装
 ensureDependencies(spaceflowDir);
 
-// 3. 读取外部扩展列表
+// 3. CLI 版本号（由 rspack DefinePlugin 在构建时注入）
+const cliVersion = __CLI_VERSION__;
+
+// 4. 读取外部扩展列表
 const extNames = readExternalExtensions();
 
-// 4. 生成 .spaceflow/bin/index.js
-const indexPath = generateBinFile(spaceflowDir, extNames);
+// 5. 生成 .spaceflow/bin/index.js
+const indexPath = generateBinFile(spaceflowDir, extNames, cliVersion);
 
-// 5. 执行生成的入口文件
+// 6. 执行生成的入口文件
 executeIndexFile(indexPath);
