@@ -1,6 +1,6 @@
 {
   "name": "@spaceflow/shell",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Spaceflow Shell 插件，用于在分支锁定/解锁之间执行 Shell 命令",
   "license": "MIT",
   "author": "Lydanne",
