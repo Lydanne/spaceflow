@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.34.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@0.33.0...@spaceflow/cli@0.34.0) (2026-02-27)
+
+### 新特性
+
+* **cli:** 优化 .spaceflow 目录查找逻辑，改为基于 .spaceflowrc 定位 ([7d98f64](https://github.com/Lydanne/spaceflow/commit/7d98f64ac6d0dce2965da4ca45f0c62524c8fc7c))
+
+### 其他修改
+
+* **core:** released version 0.11.0 [no ci] ([6ea0b41](https://github.com/Lydanne/spaceflow/commit/6ea0b41fe64b0dad32ec33cad420620bfc02acdb))
+* **publish:** released version 0.35.0 [no ci] ([c5a2c07](https://github.com/Lydanne/spaceflow/commit/c5a2c07a9e4e9274f2e7c650e69b8d3f84fc240f))
+* **review-summary:** released version 0.13.0 [no ci] ([18f5e8a](https://github.com/Lydanne/spaceflow/commit/18f5e8aa62e680f6532f74b3a3c1613cf71d703f))
+* **review:** released version 0.43.0 [no ci] ([559fbc7](https://github.com/Lydanne/spaceflow/commit/559fbc7f6a6f529f3e1999a88543c7e89392bb65))
+* **scripts:** released version 0.13.0 [no ci] ([b1c0499](https://github.com/Lydanne/spaceflow/commit/b1c049977190719026d6ac8b1964e1a4d0745ede))
+* **shared:** released version 0.3.0 [no ci] ([a7d20f7](https://github.com/Lydanne/spaceflow/commit/a7d20f7bb9784ec8dafe466c9fba699b43e5abb8))
+* **shell:** released version 0.13.0 [no ci] ([ab45a39](https://github.com/Lydanne/spaceflow/commit/ab45a39b93e26011e81abcabd90964e34e4ab9b8))
+
 ## [0.33.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@0.32.0...@spaceflow/cli@0.33.0) (2026-02-27)
 
 ### 新特性
