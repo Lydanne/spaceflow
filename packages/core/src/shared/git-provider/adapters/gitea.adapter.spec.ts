@@ -383,11 +383,11 @@ describe("GiteaAdapter", () => {
   });
 
   describe("listPullReviews", () => {
-    it("应请求正确的 URL", async () => {
+    it("应请求正确的 URL（带分页参数）", async () => {
       fetchSpy.mockResolvedValue(mockResponse([]));
       await adapter.listPullReviews("owner", "repo", 42);
       expect(fetchSpy).toHaveBeenCalledWith(
-        "https://gitea.example.com/api/v1/repos/owner/repo/pulls/42/reviews",
+        "https://gitea.example.com/api/v1/repos/owner/repo/pulls/42/reviews?page=1&limit=50",
         expect.anything(),
       );
     });

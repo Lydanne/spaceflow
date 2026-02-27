@@ -438,7 +438,20 @@ export class GiteaAdapter implements GitProvider {
   }
 
   async listPullReviews(owner: string, repo: string, index: number): Promise<PullReview[]> {
-    return this.request<PullReview[]>("GET", `/repos/${owner}/${repo}/pulls/${index}/reviews`);
+    const allReviews: PullReview[] = [];
+    let page = 1;
+    const limit = 50;
+    while (true) {
+      const reviews = await this.request<PullReview[]>(
+        "GET",
+        `/repos/${owner}/${repo}/pulls/${index}/reviews?page=${page}&limit=${limit}`,
+      );
+      if (!reviews || reviews.length === 0) break;
+      allReviews.push(...reviews);
+      if (reviews.length < limit) break;
+      page++;
+    }
+    return allReviews;
   }
 
   async updatePullReview(

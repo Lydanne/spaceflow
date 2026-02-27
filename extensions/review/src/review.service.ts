@@ -1880,8 +1880,16 @@ ${fileChanges || "无"}`;
     // 获取评论的 reactions，同步 valid 状态（👎 标记为无效）
     await this.syncReactionsToIssues(owner, repo, prNumber, result, verbose);
 
-    // 查找已有的 AI 评论（Issue Comment）
-    const existingComment = await this.findExistingAiComment(owner, repo, prNumber);
+    // 查找已有的 AI 评论（Issue Comment），可能存在多个重复评论
+    if (shouldLog(verbose, 2)) {
+      console.log(`[postOrUpdateReviewComment] owner=${owner}, repo=${repo}, prNumber=${prNumber}`);
+    }
+    const existingComments = await this.findExistingAiComments(owner, repo, prNumber, verbose);
+    if (shouldLog(verbose, 2)) {
+      console.log(
+        `[postOrUpdateReviewComment] found ${existingComments.length} existing AI comments`,
+      );
+    }
 
     // 调试：检查 issues 是否有 author
     if (shouldLog(verbose, 3)) {
@@ -1904,9 +1912,19 @@ ${fileChanges || "无"}`;
 
     // 1. 发布或更新主评论（使用 Issue Comment API，支持删除和更新）
     try {
-      if (existingComment?.id) {
-        await this.gitProvider.updateIssueComment(owner, repo, existingComment.id, reviewBody);
+      if (existingComments.length > 0) {
+        // 更新第一个 AI 评论
+        await this.gitProvider.updateIssueComment(owner, repo, existingComments[0].id, reviewBody);
         console.log(`✅ 已更新 AI Review 评论`);
+        // 删除多余的重复 AI 评论
+        for (const duplicate of existingComments.slice(1)) {
+          try {
+            await this.gitProvider.deleteIssueComment(owner, repo, duplicate.id);
+            console.log(`🗑️ 已删除重复的 AI Review 评论 (id: ${duplicate.id})`);
+          } catch {
+            console.warn(`⚠️ 删除重复评论失败 (id: ${duplicate.id})`);
+          }
+        }
       } else {
         await this.gitProvider.createIssueComment(owner, repo, prNumber, { body: reviewBody });
         console.log(`✅ 已发布 AI Review 评论`);
@@ -1994,19 +2012,35 @@ ${fileChanges || "无"}`;
   }
 
   /**
-   * 查找已有的 AI 评论（Issue Comment）
+   * 查找已有的所有 AI 评论（Issue Comment）
+   * 返回所有包含 REVIEW_COMMENT_MARKER 的评论，用于更新第一个并清理重复项
    */
-  protected async findExistingAiComment(
+  protected async findExistingAiComments(
     owner: string,
     repo: string,
     prNumber: number,
-  ): Promise<{ id: number } | null> {
+    verbose?: VerboseLevel,
+  ): Promise<{ id: number }[]> {
     try {
       const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
-      const aiComment = comments.find((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
-      return aiComment?.id ? { id: aiComment.id } : null;
-    } catch {
-      return null;
+      if (shouldLog(verbose, 2)) {
+        console.log(
+          `[findExistingAiComments] listIssueComments returned ${Array.isArray(comments) ? comments.length : typeof comments} comments`,
+        );
+        if (Array.isArray(comments)) {
+          for (const c of comments.slice(0, 5)) {
+            console.log(
+              `[findExistingAiComments] comment id=${c.id}, body starts with: ${c.body?.slice(0, 80) ?? "(no body)"}`,
+            );
+          }
+        }
+      }
+      return comments
+        .filter((c) => c.body?.includes(REVIEW_COMMENT_MARKER) && c.id)
+        .map((c) => ({ id: c.id! }));
+    } catch (error) {
+      console.warn("[findExistingAiComments] error:", error);
+      return [];
     }
   }
 
