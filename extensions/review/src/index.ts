@@ -8,7 +8,7 @@ import { ReviewSpecService } from "./review-spec";
 import { ReviewReportService, type ReportFormat } from "./review-report";
 import { IssueVerifyService } from "./issue-verify.service";
 import { DeletionImpactService } from "./deletion-impact.service";
-import { reviewMcpServer } from "./mcp";
+import { tools } from "./mcp";
 
 export const extension = defineExtension({
   name: "review",
@@ -16,7 +16,7 @@ export const extension = defineExtension({
   description: t("review:extensionDescription"),
   configKey: "review",
   configSchema: reviewSchema,
-  mcp: reviewMcpServer,
+  tools,
   commands: [
     {
       name: "review",

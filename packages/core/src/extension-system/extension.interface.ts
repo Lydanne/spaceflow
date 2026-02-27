@@ -1,9 +1,3 @@
-/** .spaceflow 目录名 */
-export const SPACEFLOW_DIR = ".spaceflow";
-
-/** package.json 文件名 */
-export const PACKAGE_JSON = "package.json";
-
 /**
  * Extension 元数据
  */

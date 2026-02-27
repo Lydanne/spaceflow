@@ -48,7 +48,7 @@ export * from "./shared/spaceflow-dir";
 export * from "./shared/rspack-config";
 
 // MCP - Model Context Protocol 支持
-// 注意：McpServerDefinition 和 McpToolDefinition 已在 extension-system/types.ts 中定义
+// 注意：McpToolDefinition 已在 extension-system/types.ts 中定义（用于 defineExtension 的 tools 字段）
 // 这里只导出装饰器和工具函数，避免重复导出
 export {
   MCP_SERVER_METADATA,

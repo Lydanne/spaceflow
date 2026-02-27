@@ -153,20 +153,6 @@ export interface McpToolDefinition {
 }
 
 /**
- * MCP 服务器定义
- */
-export interface McpServerDefinition {
-  /** 服务器名称 */
-  name: string;
-  /** 服务器版本 */
-  version?: string;
-  /** 服务器描述 */
-  description?: string;
-  /** 工具列表 */
-  tools: McpToolDefinition[];
-}
-
-/**
  * 扩展定义
  */
 export interface ExtensionDefinition {
@@ -184,8 +170,8 @@ export interface ExtensionDefinition {
   configDependencies?: string[];
   /** 命令列表 */
   commands: CommandDefinition[];
-  /** MCP 服务器定义 */
-  mcp?: McpServerDefinition;
+  /** MCP 工具列表 */
+  tools?: McpToolDefinition[];
   /** 服务定义列表 */
   services?: ServiceDefinition[];
   /**

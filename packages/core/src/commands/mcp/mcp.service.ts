@@ -30,18 +30,18 @@ export class McpService {
     }
 
     const extensions = this.extensionLoader.getExtensions();
-    const mcpServers = this.extensionLoader.getMcpServers();
+    const extensionTools = this.extensionLoader.getTools();
 
     if (shouldLog(verbose, 2)) {
       console.error(t("mcp:foundExtensions", { count: extensions.length }));
     }
 
     const allTools: Array<{ tool: McpToolMetadata; handler: any; ctx: any }> = [];
-    for (const { extensionName, mcp } of mcpServers) {
+    for (const { extensionName, tools } of extensionTools) {
       if (shouldLog(verbose, 2)) {
-        console.error(`   扩展 ${extensionName} 提供 ${mcp.tools.length} 个 MCP 工具`);
+        console.error(`   扩展 ${extensionName} 提供 ${tools.length} 个 MCP 工具`);
       }
-      for (const tool of mcp.tools) {
+      for (const tool of tools) {
         if (shouldLog(verbose, 3)) {
           console.error(`      - ${tool.name}: ${tool.description}`);
         }

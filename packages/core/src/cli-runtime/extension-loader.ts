@@ -56,19 +56,19 @@ export class ExtensionLoader {
   }
 
   /**
-   * 获取所有 MCP 服务
-   * 返回扩展中定义的 mcp 字段
+   * 获取所有 MCP 工具
+   * 返回扩展中定义的 tools 字段
    */
-  getMcpServers(): Array<{ extensionName: string; mcp: NonNullable<ExtensionDefinition["mcp"]> }> {
-    const mcpServers: Array<{
+  getTools(): Array<{ extensionName: string; tools: NonNullable<ExtensionDefinition["tools"]> }> {
+    const result: Array<{
       extensionName: string;
-      mcp: NonNullable<ExtensionDefinition["mcp"]>;
+      tools: NonNullable<ExtensionDefinition["tools"]>;
     }> = [];
     for (const ext of this.extensions.values()) {
-      if (ext.mcp) {
-        mcpServers.push({ extensionName: ext.name, mcp: ext.mcp });
+      if (ext.tools && ext.tools.length > 0) {
+        result.push({ extensionName: ext.name, tools: ext.tools });
       }
     }
-    return mcpServers;
+    return result;
   }
 }
