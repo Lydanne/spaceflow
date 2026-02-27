@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shared@0.4.0...@spaceflow/shared@0.5.0) (2026-02-27)
+
+### 新特性
+
+* **cli:** 实现 MCP meta-tool 代理模式 ([86426e9](https://github.com/Lydanne/spaceflow/commit/86426e979ea989a3688721f33e17035d7c96c984))
+
+### 其他修改
+
+* **cli:** released version 0.35.0 [no ci] ([527b4bc](https://github.com/Lydanne/spaceflow/commit/527b4bcec3a2dbe10f6f5848e80418df733a57db))
+* **core:** released version 0.13.0 [no ci] ([9244d7c](https://github.com/Lydanne/spaceflow/commit/9244d7cf8d217ea3af22d1ef1fa7a2ccec852615))
+* **publish:** released version 0.37.0 [no ci] ([c1e39bd](https://github.com/Lydanne/spaceflow/commit/c1e39bd28f52a40ca4423ae1088b3b29cffe4946))
+* **review-summary:** released version 0.15.0 [no ci] ([626b7dd](https://github.com/Lydanne/spaceflow/commit/626b7dd5b73c62d5f5c48f7dc585f60eb775dad0))
+* **review:** released version 0.45.0 [no ci] ([bd215c4](https://github.com/Lydanne/spaceflow/commit/bd215c4fa86341c1c995b28e438bca1e528efcdd))
+* **scripts:** released version 0.15.0 [no ci] ([bf9e533](https://github.com/Lydanne/spaceflow/commit/bf9e53349884b3bd4ca845f493d28421a5ffc91d))
+* **shell:** released version 0.15.0 [no ci] ([0dc9b31](https://github.com/Lydanne/spaceflow/commit/0dc9b31f4d73ac359e2efa7f07e1e5778f9e85c2))
+
 ## [0.4.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shared@0.3.0...@spaceflow/shared@0.4.0) (2026-02-27)
 
 ### 新特性
