@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.42.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.41.0...@spaceflow/review@0.42.0) (2026-02-27)
+
+### 代码重构
+
+* **cli:** 简化 getSpaceflowDir 逻辑，直接回退到全局目录 ([6763afa](https://github.com/Lydanne/spaceflow/commit/6763afab09c1a303a8a278cb8880490f2f39e769))
+
+### 其他修改
+
+* **cli:** released version 0.32.0 [no ci] ([0702e0e](https://github.com/Lydanne/spaceflow/commit/0702e0e4c5dd6c1d067297372d718225dab9aaee))
+* **publish:** released version 0.34.0 [no ci] ([6b949b5](https://github.com/Lydanne/spaceflow/commit/6b949b5894dda61198c115d60fd39a08511d64c3))
+* **review-summary:** released version 0.11.0 [no ci] ([d68ceef](https://github.com/Lydanne/spaceflow/commit/d68ceef911941e80fc1e71d530bf0b412b54a64a))
+* **scripts:** released version 0.11.0 [no ci] ([4c1d726](https://github.com/Lydanne/spaceflow/commit/4c1d726587a0be3187957e069b78d6eaefa7fddc))
+* **shell:** released version 0.11.0 [no ci] ([3df4552](https://github.com/Lydanne/spaceflow/commit/3df4552e24e6f73b3cb8116c348453dd46dd1db5))
+
 ## [0.41.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.40.0...@spaceflow/review@0.41.0) (2026-02-26)
 
 ### 文档更新
