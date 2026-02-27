@@ -50,7 +50,8 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
         lines.push(`- **发现时间**: ${formatDateToUTC8(issue.date)}`);
       }
       if (issue.fixed) {
-        lines.push(`- **修复时间**: ${formatDateToUTC8(issue.fixed)}`);
+        const fixedByStr = issue.fixedBy?.login ? ` (by @${issue.fixedBy.login})` : "";
+        lines.push(`- **修复时间**: ${formatDateToUTC8(issue.fixed)}${fixedByStr}`);
       }
       if (issue.suggestion) {
         const ext = extname(issue.file).slice(1) || "";

@@ -2046,7 +2046,7 @@ ${fileChanges || "无"}`;
 
   /**
    * 从 PR 的所有 resolved review threads 中同步 fixed 状态到 result.issues
-   * 直接通过 GraphQL 查询所有 resolved threads 的 path+line，匹配 issues
+   * 优先通过评论 body 中的 issue key 精确匹配，回退到 path+line 匹配
    */
   protected async syncResolvedComments(
     owner: string,
@@ -2059,16 +2059,41 @@ ${fileChanges || "无"}`;
       if (resolvedThreads.length === 0) {
         return;
       }
+      // 构建 issue key → issue 的映射，用于精确匹配
+      const issueByKey = new Map<string, ReviewResult["issues"][0]>();
+      for (const issue of result.issues) {
+        issueByKey.set(this.generateIssueKey(issue), issue);
+      }
       const now = new Date().toISOString();
       for (const thread of resolvedThreads) {
         if (!thread.path) continue;
-        const matchedIssue = result.issues.find(
-          (issue) =>
-            issue.file === thread.path && this.lineMatchesPosition(issue.line, thread.line),
-        );
+        // 优先通过 issue key 精确匹配
+        let matchedIssue: ReviewResult["issues"][0] | undefined;
+        if (thread.body) {
+          const issueKey = this.extractIssueKeyFromBody(thread.body);
+          if (issueKey) {
+            matchedIssue = issueByKey.get(issueKey);
+          }
+        }
+        // 回退：path:line 匹配
+        if (!matchedIssue) {
+          matchedIssue = result.issues.find(
+            (issue) =>
+              issue.file === thread.path && this.lineMatchesPosition(issue.line, thread.line),
+          );
+        }
         if (matchedIssue && !matchedIssue.fixed) {
           matchedIssue.fixed = now;
-          console.log(`🟢 问题已标记为已解决: ${matchedIssue.file}:${matchedIssue.line}`);
+          if (thread.resolvedBy) {
+            matchedIssue.fixedBy = {
+              id: thread.resolvedBy.id?.toString(),
+              login: thread.resolvedBy.login,
+            };
+          }
+          console.log(
+            `🟢 问题已标记为已解决: ${matchedIssue.file}:${matchedIssue.line}` +
+              (thread.resolvedBy?.login ? ` (by @${thread.resolvedBy.login})` : ""),
+          );
         }
       }
     } catch (error) {
@@ -2235,8 +2260,22 @@ ${fileChanges || "无"}`;
   }
 
   /**
+   * 从评论 body 中提取 issue key（AI 行级评论末尾的 HTML 注释标记）
+   * 格式：`<!-- issue-key: file:line:ruleId -->`
+   * 返回 null 表示非 AI 评论（即用户真实回复）
+   */
+  protected extractIssueKeyFromBody(body: string): string | null {
+    const match = body.match(/<!-- issue-key: (.+?) -->/);
+    return match ? match[1] : null;
+  }
+
+  /**
    * 同步评论回复到对应的 issues
    * review 评论回复是通过同一个 review 下的后续评论实现的
+   *
+   * 通过 AI 评论 body 中嵌入的 issue key（`<!-- issue-key: file:line:ruleId -->`）精确匹配 issue：
+   * - 含 issue key 的评论是 AI 自身评论，过滤掉不作为回复
+   * - 不含 issue key 的评论是用户真实回复，归到其前面最近的 AI 评论对应的 issue
    */
   protected async syncRepliesToIssues(
     _owner: string,
@@ -2253,7 +2292,12 @@ ${fileChanges || "无"}`;
     result: ReviewResult,
   ): Promise<void> {
     try {
-      // 按文件路径和行号分组评论，第一条是原始评论，后续是回复
+      // 构建 issue key → issue 的映射，用于快速查找
+      const issueByKey = new Map<string, ReviewResult["issues"][0]>();
+      for (const issue of result.issues) {
+        issueByKey.set(this.generateIssueKey(issue), issue);
+      }
+      // 按文件路径和行号分组评论
       const commentsByLocation = new Map<string, typeof reviewComments>();
       for (const comment of reviewComments) {
         if (!comment.path || !comment.position) continue;
@@ -2262,7 +2306,7 @@ ${fileChanges || "无"}`;
         comments.push(comment);
         commentsByLocation.set(key, comments);
       }
-      // 遍历每个位置的评论，将非第一条评论作为回复
+      // 遍历每个位置的评论
       for (const [, comments] of commentsByLocation) {
         if (comments.length <= 1) continue;
         // 按创建时间排序
@@ -2271,24 +2315,40 @@ ${fileChanges || "无"}`;
           const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
           return timeA - timeB;
         });
-        const firstComment = comments[0];
-        // 找到对应的 issue
-        const matchedIssue = result.issues.find(
-          (issue) =>
-            issue.file === firstComment.path &&
-            this.lineMatchesPosition(issue.line, firstComment.position),
-        );
-        if (!matchedIssue) continue;
-        // 后续评论作为回复
-        const replies = comments.slice(1).map((c) => ({
-          user: {
-            id: c.user?.id?.toString(),
-            login: c.user?.login || "unknown",
-          },
-          body: c.body || "",
-          createdAt: c.created_at || "",
-        }));
-        matchedIssue.replies = replies;
+        // 遍历评论，用 issue key 精确匹配
+        let lastIssueKey: string | null = null;
+        for (const comment of comments) {
+          const issueKey = this.extractIssueKeyFromBody(comment.body || "");
+          if (issueKey) {
+            // AI 自身评论，记录 issue key 但不作为回复
+            lastIssueKey = issueKey;
+            continue;
+          }
+          // 用户真实回复，通过前面最近的 AI 评论的 issue key 精确匹配
+          let matchedIssue = lastIssueKey ? (issueByKey.get(lastIssueKey) ?? null) : null;
+          // 回退：如果 issue key 匹配失败，使用 path:position 匹配
+          if (!matchedIssue) {
+            matchedIssue =
+              result.issues.find(
+                (issue) =>
+                  issue.file === comment.path &&
+                  this.lineMatchesPosition(issue.line, comment.position),
+              ) ?? null;
+          }
+          if (!matchedIssue) continue;
+          // 追加回复（而非覆盖，同一 issue 可能有多条用户回复）
+          if (!matchedIssue.replies) {
+            matchedIssue.replies = [];
+          }
+          matchedIssue.replies.push({
+            user: {
+              id: comment.user?.id?.toString(),
+              login: comment.user?.login || "unknown",
+            },
+            body: comment.body || "",
+            createdAt: comment.created_at || "",
+          });
+        }
       }
     } catch (error) {
       console.warn("⚠️ 同步评论回复失败:", error);
@@ -2368,6 +2428,7 @@ ${fileChanges || "无"}`;
       lines.push(`- **Commit**: ${issue.commit}`);
     }
     lines.push(`- **开发人员**: ${issue.author ? "@" + issue.author.login : "未知"}`);
+    lines.push(`<!-- issue-key: ${this.generateIssueKey(issue)} -->`);
     if (issue.suggestion) {
       const ext = extname(issue.file).slice(1) || "";
       const cleanSuggestion = issue.suggestion.replace(/```/g, "//").trim();

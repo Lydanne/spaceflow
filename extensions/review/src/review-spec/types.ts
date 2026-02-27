@@ -74,6 +74,7 @@ export interface ReviewIssue {
   reason: string;
   date?: string; // 发现问题的时间
   fixed?: string; // 修复时间
+  fixedBy?: UserInfo; // 解决者
   valid?: string; // 问题是否有效
   suggestion?: string;
   commit?: string;

@@ -1751,7 +1751,7 @@ describe("ReviewService", () => {
 
   describe("ReviewService.postOrUpdateReviewComment", () => {
     it("should post review comment", async () => {
-      const configReader = (service as any).configReader;
+      const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({});
       gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
@@ -1763,7 +1763,7 @@ describe("ReviewService", () => {
     });
 
     it("should update PR title when autoUpdatePrTitle enabled", async () => {
-      const configReader = (service as any).configReader;
+      const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({ autoUpdatePrTitle: true });
       gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
@@ -1776,7 +1776,7 @@ describe("ReviewService", () => {
     });
 
     it("should handle createIssueComment error gracefully", async () => {
-      const configReader = (service as any).configReader;
+      const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({});
       gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
@@ -1790,7 +1790,7 @@ describe("ReviewService", () => {
     });
 
     it("should include line comments when configured", async () => {
-      const configReader = (service as any).configReader;
+      const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({ lineComments: true });
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       gitProvider.listIssueComments.mockResolvedValue([] as any);
@@ -1820,19 +1820,61 @@ describe("ReviewService", () => {
   });
 
   describe("ReviewService.syncResolvedComments", () => {
-    it("should mark matched issues as fixed", async () => {
+    it("should mark matched issues as fixed via path:line fallback", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       gitProvider.listResolvedThreads.mockResolvedValue([
         { path: "test.ts", line: 10, resolvedBy: { login: "user1" } },
       ] as any);
-      const result = { issues: [{ file: "test.ts", line: "10" }] };
+      const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
       await (service as any).syncResolvedComments("o", "r", 1, result);
       expect((result.issues[0] as any).fixed).toBeDefined();
+      expect((result.issues[0] as any).fixedBy).toEqual({ id: undefined, login: "user1" });
+    });
+
+    it("should mark matched issues as fixed via issue key in body", async () => {
+      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
+      gitProvider.listResolvedThreads.mockResolvedValue([
+        {
+          path: "test.ts",
+          line: 10,
+          resolvedBy: { login: "user1" },
+          body: `🟡 **问题**\n<!-- issue-key: test.ts:10:RuleA -->`,
+        },
+      ] as any);
+      const result = {
+        issues: [{ file: "test.ts", line: "10", ruleId: "RuleA" }],
+      };
+      await (service as any).syncResolvedComments("o", "r", 1, result);
+      expect((result.issues[0] as any).fixed).toBeDefined();
+      expect((result.issues[0] as any).fixedBy).toEqual({ id: undefined, login: "user1" });
+    });
+
+    it("should match correct issue by issue key when multiple issues at same position", async () => {
+      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
+      gitProvider.listResolvedThreads.mockResolvedValue([
+        {
+          path: "test.ts",
+          line: 10,
+          resolvedBy: { login: "user1" },
+          body: `🟡 **问题B**\n<!-- issue-key: test.ts:10:RuleB -->`,
+        },
+      ] as any);
+      const result = {
+        issues: [
+          { file: "test.ts", line: "10", ruleId: "RuleA" } as any,
+          { file: "test.ts", line: "10", ruleId: "RuleB" } as any,
+        ],
+      };
+      await (service as any).syncResolvedComments("o", "r", 1, result);
+      expect(result.issues[0].fixed).toBeUndefined(); // RuleA 未解决
+      expect(result.issues[0].fixedBy).toBeUndefined();
+      expect(result.issues[1].fixed).toBeDefined(); // RuleB 已解决
+      expect(result.issues[1].fixedBy).toEqual({ id: undefined, login: "user1" });
     });
 
     it("should skip when no resolved threads", async () => {
       gitProvider.listResolvedThreads.mockResolvedValue([] as any);
-      const result = { issues: [{ file: "test.ts", line: "10" }] };
+      const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
       await (service as any).syncResolvedComments("o", "r", 1, result);
       expect((result.issues[0] as any).fixed).toBeUndefined();
     });
@@ -1841,7 +1883,7 @@ describe("ReviewService", () => {
       gitProvider.listResolvedThreads.mockResolvedValue([
         { path: undefined, line: 10, resolvedBy: { login: "user1" } },
       ] as any);
-      const result = { issues: [{ file: "test.ts", line: "10" }] };
+      const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
       await (service as any).syncResolvedComments("o", "r", 1, result);
       expect((result.issues[0] as any).fixed).toBeUndefined();
     });
@@ -1982,7 +2024,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc" } } as any);
       gitProvider.createIssueComment.mockResolvedValue({} as any);
-      const configReader = (service as any).configReader;
+      const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({});
       const context = {
         owner: "o",
@@ -2017,7 +2059,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc" } } as any);
       gitProvider.createIssueComment.mockResolvedValue({} as any);
-      const configReader = (service as any).configReader;
+      const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({});
       const context = {
         owner: "o",
@@ -2128,7 +2170,7 @@ describe("ReviewService", () => {
 
     it("should merge references from options and config", async () => {
       configService.get.mockReturnValue({ repository: "owner/repo", refName: "main" });
-      const configReader = (service as any).configReader;
+      const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({ references: ["config-ref"] });
       const options = { dryRun: false, ci: false, references: ["opt-ref"] };
       const context = await service.getContextFromEnv(options as any);
@@ -2445,15 +2487,27 @@ describe("ReviewService", () => {
     });
   });
 
+  describe("ReviewService.extractIssueKeyFromBody", () => {
+    it("should extract issue key from AI comment body", () => {
+      const body = `🟡 **问题描述**\n- **规则**: \`Rule1\`\n<!-- issue-key: test.ts:10:Rule1 -->`;
+      expect((service as any).extractIssueKeyFromBody(body)).toBe("test.ts:10:Rule1");
+    });
+
+    it("should return null for user reply without issue key marker", () => {
+      expect((service as any).extractIssueKeyFromBody("这个问题已经修复了")).toBeNull();
+      expect((service as any).extractIssueKeyFromBody("")).toBeNull();
+    });
+  });
+
   describe("ReviewService.syncRepliesToIssues", () => {
-    it("should sync replies to matched issues", async () => {
+    it("should sync user replies to matched issues and filter out AI comments", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       const reviewComments = [
         {
           id: 1,
           path: "test.ts",
           position: 10,
-          body: "original",
+          body: `🟡 **问题描述**\n<!-- issue-key: test.ts:10:JsTs.Base.Rule1 -->`,
           user: { id: 1, login: "bot" },
           created_at: "2024-01-01",
         },
@@ -2461,15 +2515,58 @@ describe("ReviewService", () => {
           id: 2,
           path: "test.ts",
           position: 10,
-          body: "reply",
+          body: "reply from user",
           user: { id: 2, login: "dev" },
           created_at: "2024-01-02",
         },
       ];
-      const result = { issues: [{ file: "test.ts", line: "10", replies: [] }] };
+      const result = {
+        issues: [{ file: "test.ts", line: "10", ruleId: "JsTs.Base.Rule1", replies: [] }],
+      };
       await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
       expect(result.issues[0].replies).toHaveLength(1);
-      expect(result.issues[0].replies[0].body).toBe("reply");
+      expect(result.issues[0].replies[0].body).toBe("reply from user");
+      expect(result.issues[0].replies[0].user.login).toBe("dev");
+    });
+
+    it("should match user reply to correct issue by issue key when multiple issues at same position", async () => {
+      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
+      const reviewComments = [
+        {
+          id: 1,
+          path: "test.ts",
+          position: 10,
+          body: `🔴 **问题A**\n<!-- issue-key: test.ts:10:JsTs.Base.RuleA -->`,
+          user: { id: 1, login: "bot" },
+          created_at: "2024-01-01T01:00:00Z",
+        },
+        {
+          id: 2,
+          path: "test.ts",
+          position: 10,
+          body: `🟡 **问题B**\n<!-- issue-key: test.ts:10:JsTs.Base.RuleB -->`,
+          user: { id: 1, login: "bot" },
+          created_at: "2024-01-01T02:00:00Z",
+        },
+        {
+          id: 3,
+          path: "test.ts",
+          position: 10,
+          body: "针对问题B的回复",
+          user: { id: 2, login: "dev" },
+          created_at: "2024-01-01T03:00:00Z",
+        },
+      ];
+      const result = {
+        issues: [
+          { file: "test.ts", line: "10", ruleId: "JsTs.Base.RuleA" } as any,
+          { file: "test.ts", line: "10", ruleId: "JsTs.Base.RuleB" } as any,
+        ],
+      };
+      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
+      expect(result.issues[0].replies).toBeUndefined(); // RuleA 无回复
+      expect(result.issues[1].replies).toHaveLength(1);
+      expect(result.issues[1].replies[0].body).toBe("针对问题B的回复");
     });
 
     it("should skip comments without path or position", async () => {
@@ -2493,6 +2590,34 @@ describe("ReviewService", () => {
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
+
+    it("should fallback to path:position match when no issue key is available", async () => {
+      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
+      const reviewComments = [
+        {
+          id: 1,
+          path: "test.ts",
+          position: 10,
+          body: "some comment without issue key",
+          user: { id: 1, login: "user1" },
+          created_at: "2024-01-01",
+        },
+        {
+          id: 2,
+          path: "test.ts",
+          position: 10,
+          body: "user reply",
+          user: { id: 2, login: "user2" },
+          created_at: "2024-01-02",
+        },
+      ];
+      const result = {
+        issues: [{ file: "test.ts", line: "10", ruleId: "SomeRule" } as any],
+      };
+      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
+      // 两条都不含 issue key，都会通过 fallback path:position 匹配
+      expect(result.issues[0].replies).toHaveLength(2);
+    });
   });
 
   describe("ReviewService.execute - CI with existingResult", () => {
@@ -2512,7 +2637,7 @@ describe("ReviewService", () => {
         summary: [],
         round: 1,
       });
-      const configReader = (service as any).configReader;
+      const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({});
       gitProvider.getPullRequest.mockResolvedValue({ title: "PR", head: { sha: "abc" } } as any);
       gitProvider.getPullRequestCommits.mockResolvedValue([
@@ -2546,7 +2671,7 @@ describe("ReviewService", () => {
         summary: [],
         round: 1,
       });
-      const configReader = (service as any).configReader;
+      const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({});
       gitProvider.getPullRequest.mockResolvedValue({ title: "PR", head: { sha: "abc" } } as any);
       gitProvider.getPullRequestCommits.mockResolvedValue([
@@ -2779,7 +2904,7 @@ describe("ReviewService", () => {
       gitProvider.getPullRequestCommits.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc" } } as any);
       gitProvider.updateIssueComment.mockResolvedValue({} as any);
-      const configReader = (service as any).configReader;
+      const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({});
       const context = { owner: "o", repo: "r", prNumber: 1, ci: true, dryRun: false, verbose: 1 };
       const result = await (service as any).executeCollectOnly(context);
