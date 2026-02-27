@@ -16,6 +16,27 @@ export const RC_FILE_NAME = ".spaceflowrc";
 /** .env 文件名 */
 const ENV_FILE_NAME = ".env";
 
+/**
+ * 查找项目根目录
+ * 从 cwd 向上遍历查找 .spaceflowrc，返回其所在目录；找不到则回退到 homedir()
+ * @param cwd 起始目录，默认为 process.cwd()
+ */
+export function findProjectRoot(cwd?: string): string {
+  let current = resolve(cwd || process.cwd());
+  const home = homedir();
+
+  while (true) {
+    if (existsSync(join(current, RC_FILE_NAME))) {
+      return current;
+    }
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  return home;
+}
+
 // 不应该被深度合并的字段，这些字段应该直接覆盖而非合并
 const NO_MERGE_FIELDS = ["dependencies"];
 

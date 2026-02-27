@@ -44,6 +44,7 @@ export {
   DEFAULT_SUPPORT_EDITOR,
   CONFIG_FILE_NAME,
   RC_FILE_NAME,
+  findProjectRoot,
   deepMerge,
   getConfigPath,
   getConfigPaths,
