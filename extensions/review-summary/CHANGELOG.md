@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.17.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.16.0...@spaceflow/review-summary@0.17.0) (2026-02-27)
+
+### 新特性
+
+* **shared:** 新增 findProjectRoot 函数用于查找项目根目录 ([7135262](https://github.com/Lydanne/spaceflow/commit/71352621f13e17a192821363e655607cfc097307))
+
+### 修复BUG
+
+* **cli:** 为扩展动态导入添加错误处理，防止单个扩展加载失败导致整体崩溃 ([09230dd](https://github.com/Lydanne/spaceflow/commit/09230ddf88568286b1f65c389976cb9a1a2fc880))
+* **cli:** 修复 connectProjectMcpClient 函数中工作目录解析问题 ([94a927c](https://github.com/Lydanne/spaceflow/commit/94a927c8850b0b754459e0d8833be70721bc38d1))
+
+### 代码重构
+
+* **cli:** 分离工作目录和项目根目录概念，修复 .spaceflow 目录定位逻辑 ([5b7daab](https://github.com/Lydanne/spaceflow/commit/5b7daab2a3965fbd298ff85ad210d45028ff9d3d))
+* **cli:** 重构工作目录和 .spaceflow 目录获取逻辑 ([a9708da](https://github.com/Lydanne/spaceflow/commit/a9708da6ea5b4315f802a0709125e24fe42bb10f))
+* **core:** 优化 ExtensionLoader 访问器，简化 MCP 服务上下文获取 ([c1ac91f](https://github.com/Lydanne/spaceflow/commit/c1ac91f1990b565dbbc449e8349561e65fae368f))
+* **core:** 简化 MCP 架构，移除 McpServerDefinition 层级 ([0d963a8](https://github.com/Lydanne/spaceflow/commit/0d963a874d03df50a140c57707b5363407e6b37d))
+* **core:** 统一工作目录管理，优化 MCP 服务上下文 ([efe7244](https://github.com/Lydanne/spaceflow/commit/efe72444ff6207077a503200c629373a97e47a2c))
+* **review:** 简化 MCP 工具的输入参数，统一从上下文获取工作目录 ([104893b](https://github.com/Lydanne/spaceflow/commit/104893b689bf32444850b06a2f4566292a1f8eba))
+
+### 其他修改
+
+* **.spaceflow:** 初始化 Spaceflow 扩展的包结构和依赖 ([5ac8d70](https://github.com/Lydanne/spaceflow/commit/5ac8d7008edcb96168a15ffc04973d154ca9f955))
+* **cli:** released version 0.37.0 [no ci] ([a260a9a](https://github.com/Lydanne/spaceflow/commit/a260a9a13f1f7d8457ea036e40f5562548b4513e))
+* **core:** released version 0.15.0 [no ci] ([e44cd0a](https://github.com/Lydanne/spaceflow/commit/e44cd0af8caadf1f2b89179d1ea44ecc0d018966))
+* **publish:** released version 0.39.0 [no ci] ([f4db046](https://github.com/Lydanne/spaceflow/commit/f4db04635eab83ad44f8f3b935aa66ecfd02feff))
+* **review:** released version 0.47.0 [no ci] ([994893e](https://github.com/Lydanne/spaceflow/commit/994893edb3355ecf7f0c9f3e8bec6090511f987c))
+* **scripts:** released version 0.16.0 [no ci] ([77be50e](https://github.com/Lydanne/spaceflow/commit/77be50ea413e7b5c969c111429fd8cc425263cd1))
+* **shared:** released version 0.6.0 [no ci] ([fcfdf75](https://github.com/Lydanne/spaceflow/commit/fcfdf75efa2146b5ed91e5c7f273a4f938c032b8))
+* **shell:** released version 0.16.0 [no ci] ([538e157](https://github.com/Lydanne/spaceflow/commit/538e15783ed4482a25faf251a1513eae0dfb33ad))
+
 ## [0.16.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.15.0...@spaceflow/review-summary@0.16.0) (2026-02-27)
 
 ### 新特性
