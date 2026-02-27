@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.35.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@0.34.0...@spaceflow/cli@0.35.0) (2026-02-27)
+
+### 新特性
+
+* **shared:** 在非 workspace 模式下为 pnpm 创建空 pnpm-workspace.yaml ([0b72b8c](https://github.com/Lydanne/spaceflow/commit/0b72b8c50068f8d1ce131f70e60438fb0ad3c0f9))
+
+### 其他修改
+
+* **core:** released version 0.12.0 [no ci] ([c0ed70e](https://github.com/Lydanne/spaceflow/commit/c0ed70ec187c9585eefafba44963b00abf883030))
+* **publish:** released version 0.36.0 [no ci] ([28f3b14](https://github.com/Lydanne/spaceflow/commit/28f3b14f7db914556ddf143709a00d6fa877e417))
+* **review-summary:** released version 0.14.0 [no ci] ([4e39c73](https://github.com/Lydanne/spaceflow/commit/4e39c7337f74ac66f10c15cfae2b6c32eccae561))
+* **review:** released version 0.44.0 [no ci] ([5d984a2](https://github.com/Lydanne/spaceflow/commit/5d984a244412aed8ef2215b013127fd38d831e1e))
+* **scripts:** released version 0.14.0 [no ci] ([6b3bb66](https://github.com/Lydanne/spaceflow/commit/6b3bb6659666f58cfd8aa109f12df13694c9895f))
+* **shared:** released version 0.4.0 [no ci] ([ea8bcde](https://github.com/Lydanne/spaceflow/commit/ea8bcdebc41ccbfa7ed9fd66f867c327976aa334))
+* **shell:** released version 0.14.0 [no ci] ([04f61bf](https://github.com/Lydanne/spaceflow/commit/04f61bfd5a45ab37319aadd6fd4a064259e62e1d))
+
 ## [0.34.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@0.33.0...@spaceflow/cli@0.34.0) (2026-02-27)
 
 ### 新特性
