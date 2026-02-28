@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.52.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.51.0...@spaceflow/review@0.52.0) (2026-02-28)
+
+### 测试用例
+
+* **review:** 增强 AI 评论识别和过滤功能的测试覆盖 ([bda706b](https://github.com/Lydanne/spaceflow/commit/bda706b99aab113521afe6bcd386a590811e20a6))
+
 ## [0.51.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.50.0...@spaceflow/review@0.51.0) (2026-02-27)
 
 ### 其他修改
