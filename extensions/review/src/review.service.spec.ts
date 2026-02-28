@@ -2499,6 +2499,29 @@ describe("ReviewService", () => {
     });
   });
 
+  describe("ReviewService.isAiGeneratedComment", () => {
+    it("should detect comment with issue-key marker", () => {
+      const body = `🟡 **问题**\n<!-- issue-key: test.ts:10:Rule1 -->`;
+      expect((service as any).isAiGeneratedComment(body)).toBe(true);
+    });
+
+    it("should detect comment with structured AI format (规则 + 文件)", () => {
+      const body = ` **魔法字符串问题**\n- **文件**: \`test.ts:64-98\`\n- **规则**: \`JsTs.Base.NoMagicStringsAndNumbers\` (来自 \`js&ts.base.md\`)`;
+      expect((service as any).isAiGeneratedComment(body)).toBe(true);
+    });
+
+    it("should return false for normal user reply", () => {
+      expect((service as any).isAiGeneratedComment("这个问题已经修复了")).toBe(false);
+      expect((service as any).isAiGeneratedComment("LGTM")).toBe(false);
+      expect((service as any).isAiGeneratedComment("")).toBe(false);
+    });
+
+    it("should return false for partial match (only 规则 or only 文件)", () => {
+      expect((service as any).isAiGeneratedComment("- **规则**: something")).toBe(false);
+      expect((service as any).isAiGeneratedComment("- **文件**: something")).toBe(false);
+    });
+  });
+
   describe("ReviewService.syncRepliesToIssues", () => {
     it("should sync user replies to matched issues and filter out AI comments", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
@@ -2617,6 +2640,44 @@ describe("ReviewService", () => {
       await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
       // 两条都不含 issue key，都会通过 fallback path:position 匹配
       expect(result.issues[0].replies).toHaveLength(2);
+    });
+
+    it("should filter out bot comments with AI structured format but without issue-key", async () => {
+      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
+      const reviewComments = [
+        {
+          id: 1,
+          path: "test.ts",
+          position: 10,
+          body: `🟡 **问题描述**\n<!-- issue-key: test.ts:10:JsTs.Base.ComplexFunc -->`,
+          user: { id: 1, login: "bot" },
+          created_at: "2024-01-01T01:00:00Z",
+        },
+        {
+          id: 2,
+          path: "test.ts",
+          position: 10,
+          body: ` **魔法字符串问题**\n- **文件**: \`test.ts:64-98\`\n- **规则**: \`JsTs.Base.NoMagicStringsAndNumbers\` (来自 \`js&ts.base.md\`)\n- **Commit**: 3390baa\n- **建议**:\n\`\`\`ts\nconst UNKNOWN = '未知';\n\`\`\``,
+          user: { id: 12, login: "GiteaActions" },
+          created_at: "2024-01-01T02:00:00Z",
+        },
+        {
+          id: 3,
+          path: "test.ts",
+          position: 10,
+          body: "已修复，谢谢",
+          user: { id: 5, login: "dev" },
+          created_at: "2024-01-01T03:00:00Z",
+        },
+      ];
+      const result = {
+        issues: [{ file: "test.ts", line: "10", ruleId: "JsTs.Base.ComplexFunc" } as any],
+      };
+      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
+      // bot 的结构化评论应被过滤，只保留用户的真实回复
+      expect(result.issues[0].replies).toHaveLength(1);
+      expect(result.issues[0].replies[0].body).toBe("已修复，谢谢");
+      expect(result.issues[0].replies[0].user.login).toBe("dev");
     });
   });
 

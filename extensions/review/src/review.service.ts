@@ -2270,12 +2270,26 @@ ${fileChanges || "无"}`;
   }
 
   /**
+   * 判断评论是否为 AI 生成的评论（非用户真实回复）
+   * 除 issue-key 标记外，还通过结构化格式特征识别
+   */
+  protected isAiGeneratedComment(body: string): boolean {
+    if (!body) return false;
+    // 含 issue-key 标记
+    if (body.includes("<!-- issue-key:")) return true;
+    // 含 AI 评论的结构化格式特征（同时包含「规则」和「文件」字段）
+    if (body.includes("- **规则**:") && body.includes("- **文件**:")) return true;
+    return false;
+  }
+
+  /**
    * 同步评论回复到对应的 issues
    * review 评论回复是通过同一个 review 下的后续评论实现的
    *
    * 通过 AI 评论 body 中嵌入的 issue key（`<!-- issue-key: file:line:ruleId -->`）精确匹配 issue：
    * - 含 issue key 的评论是 AI 自身评论，过滤掉不作为回复
-   * - 不含 issue key 的评论是用户真实回复，归到其前面最近的 AI 评论对应的 issue
+   * - 不含 issue key 但匹配 AI 格式特征的评论也视为 AI 评论，过滤掉
+   * - 其余评论是用户真实回复，归到其前面最近的 AI 评论对应的 issue
    */
   protected async syncRepliesToIssues(
     _owner: string,
@@ -2318,10 +2332,15 @@ ${fileChanges || "无"}`;
         // 遍历评论，用 issue key 精确匹配
         let lastIssueKey: string | null = null;
         for (const comment of comments) {
-          const issueKey = this.extractIssueKeyFromBody(comment.body || "");
+          const commentBody = comment.body || "";
+          const issueKey = this.extractIssueKeyFromBody(commentBody);
           if (issueKey) {
-            // AI 自身评论，记录 issue key 但不作为回复
+            // AI 自身评论（含 issue-key），记录 issue key 但不作为回复
             lastIssueKey = issueKey;
+            continue;
+          }
+          // 跳过不含 issue-key 但匹配 AI 格式特征的评论（如其他轮次的 bot 评论）
+          if (this.isAiGeneratedComment(commentBody)) {
             continue;
           }
           // 用户真实回复，通过前面最近的 AI 评论的 issue key 精确匹配
