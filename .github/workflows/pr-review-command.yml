@@ -35,7 +35,7 @@ jobs:
           pnpm install -g opencode-ai
 
       - name: Run Review
-        uses: ./actions
+        uses: ./
         env:
           GIT_PROVIDER_TYPE: github
           CLAUDE_CODE_BASE_URL: https://ark.cn-beijing.volces.com/api/coding

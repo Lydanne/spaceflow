@@ -17,15 +17,15 @@ export const extension = defineExtension({
       description: t("review-summary:description"),
       options: [
         {
-          flags: "--preset <preset>",
+          flags: "-p, --preset <preset>",
           description: t("review-summary:options.preset"),
         },
         {
-          flags: "--since <date>",
+          flags: "-s, --since <date>",
           description: t("review-summary:options.since"),
         },
         {
-          flags: "--until <date>",
+          flags: "-u, --until <date>",
           description: t("review-summary:options.until"),
         },
         {
