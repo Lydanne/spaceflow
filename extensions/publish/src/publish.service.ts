@@ -71,11 +71,11 @@ export class PublishService {
     const branch = ciConf?.refName;
 
     if (!repository) {
-      throw new Error("缺少配置 ci.repository (环境变量 GITHUB_REPOSITORY)");
+      throw new Error("缺少配置 ci.repository (环境变量 GITHUB_REPOSITORY / GITEA_REPOSITORY)");
     }
 
     if (!branch) {
-      throw new Error("缺少配置 ci.refName (环境变量 GITHUB_REF_NAME)");
+      throw new Error("缺少配置 ci.refName (环境变量 GITHUB_REF_NAME / GITEA_REF_NAME)");
     }
 
     const [owner, repo] = repository.split("/");
