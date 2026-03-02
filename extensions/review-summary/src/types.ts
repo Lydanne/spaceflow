@@ -165,6 +165,8 @@ export interface ReviewSummaryConfig {
   scoreWeights?: WeightedScoreWeights;
   /** 分数累计模式权重配置（strategy 为 "commit-based" 时生效） */
   commitBasedWeights?: CommitBasedWeights;
+  /** 创建 Issue 时添加的标签名称，默认 "report" */
+  issueLabel?: string;
 }
 
 /** 周期统计结果 */

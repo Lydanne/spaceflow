@@ -655,9 +655,12 @@ export class PeriodSummaryService {
     content: string,
   ): Promise<{ type: OutputTarget; location: string }> {
     const title = `📊 周期统计报告: ${result.period.since} ~ ${result.period.until}`;
+    const config = this.getStrategyConfig();
+    const labelName = config.issueLabel ?? "report";
     const issue: Issue = await this.gitProvider.createIssue(context.owner, context.repo, {
       title,
       body: content,
+      labels: [labelName],
     });
     const location = issue.html_url ?? `#${issue.number}`;
     if (shouldLog(context.verbose, 1)) {
