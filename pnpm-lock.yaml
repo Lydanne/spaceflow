@@ -188,10 +188,16 @@ importers:
       '@spaceflow/review':
         specifier: workspace:*
         version: link:../review
+      micromatch:
+        specifier: ^4.0.8
+        version: 4.0.8
     devDependencies:
       '@spaceflow/cli':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@types/micromatch':
+        specifier: ^4.0.9
+        version: 4.0.10
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.1

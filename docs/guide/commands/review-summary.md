@@ -66,6 +66,23 @@ spaceflow review-summary -p this-month -o file --output-file report.md
 | `last-15-days` | 最近 15 天              |
 | `last-30-days` | 最近 30 天              |
 
+## 文件过滤
+
+统计代码行数和变更文件时，支持通过 glob 模式过滤文件，排除测试、配置等非业务代码：
+
+```json
+{
+  "review-summary": {
+    "includes": ["*/**/*.ts", "!*/**/*.spec.*", "!*/**/*.config.*"]
+  }
+}
+```
+
+- 支持 `!` 排除模式（如 `!*/**/*.spec.*` 排除测试文件）
+- 使用 [micromatch](https://github.com/micromatch/micromatch) 语法，`matchBase` 模式
+- **未配置时自动 fallback 读取 `review.includes`**，与代码审查使用相同的过滤规则
+- 过滤同时影响 `additions`、`deletions` 和 `changedFiles` 统计
+
 ## 评分策略
 
 支持四种评分策略，通过 `strategy` 配置切换：

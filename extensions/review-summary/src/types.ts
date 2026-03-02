@@ -191,6 +191,8 @@ export interface DefectRateWeights {
 export interface ReviewSummaryConfig {
   /** 评分策略，默认 "weighted" */
   strategy?: ScoreStrategy;
+  /** 文件过滤 glob 模式，未设置时 fallback 读取 review.includes，支持 ! 排除模式 */
+  includes?: string[];
   /** 加权模式权重配置（strategy 为 "weighted" 时生效） */
   scoreWeights?: WeightedScoreWeights;
   /** 分数累计模式权重配置（strategy 为 "commit-based" 时生效） */

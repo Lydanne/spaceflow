@@ -19,10 +19,12 @@
     "dev": "spaceflow dev"
   },
   "dependencies": {
-    "@spaceflow/review": "workspace:*"
+    "@spaceflow/review": "workspace:*",
+    "micromatch": "^4.0.8"
   },
   "devDependencies": {
     "@spaceflow/cli": "workspace:*",
+    "@types/micromatch": "^4.0.9",
     "@types/node": "catalog:"
   },
   "peerDependencies": {

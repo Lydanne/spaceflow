@@ -2,6 +2,7 @@ import { GitProviderService, shouldLog, normalizeVerbose } from "@spaceflow/core
 import type { IConfigReader } from "@spaceflow/core";
 import type { PullRequest, Issue, CiConfig } from "@spaceflow/core";
 import { MarkdownFormatter, type ReviewIssue } from "@spaceflow/review";
+import micromatch from "micromatch";
 import { writeFileSync } from "fs";
 import { join } from "path";
 import type {
@@ -159,8 +160,13 @@ export class PeriodSummaryService {
     let additions = 0;
     let deletions = 0;
     let changedFiles = 0;
+    const includes = this.resolveIncludes();
     try {
-      const files = await this.gitProvider.getPullRequestFiles(owner, repo, pr.number!);
+      const allFiles = await this.gitProvider.getPullRequestFiles(owner, repo, pr.number!);
+      const files =
+        includes.length > 0
+          ? allFiles.filter((f) => micromatch.isMatch(f.filename ?? "", includes, { matchBase: true }))
+          : allFiles;
       changedFiles = files.length;
       for (const file of files) {
         additions += file.additions ?? 0;
@@ -372,6 +378,22 @@ export class PeriodSummaryService {
   }
 
   /**
+   * 解析文件过滤 glob 模式：优先使用 review-summary.includes，fallback 到 review.includes
+   */
+  protected resolveIncludes(): string[] {
+    const config = this.getStrategyConfig();
+    if (config.includes && config.includes.length > 0) {
+      return config.includes;
+    }
+    try {
+      const reviewConfig = this.config.get<{ includes?: string[] }>("review");
+      return reviewConfig?.includes ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * 获取当前评分策略配置
    */
   protected getStrategyConfig(): ReviewSummaryConfig {
@@ -470,7 +492,10 @@ export class PeriodSummaryService {
     const weights = { ...DEFAULT_DEFECT_RATE_WEIGHTS, ...config.defectRateWeights };
     if (stats.prs.length === 0) return 0;
     let complianceSum = 0;
+    let counted = 0;
     for (const pr of stats.prs) {
+      // 跳过 merge PR（标题以 "Merge" 开头），合并操作不纳入缺陷率统计
+      if (pr.title.startsWith("Merge")) continue;
       const totalLines = pr.additions + pr.deletions;
       const per100 = Math.max(1, totalLines / 100);
       const penalty =
@@ -478,8 +503,10 @@ export class PeriodSummaryService {
       const recovery = (pr.fixedErrors + pr.fixedWarns) * weights.fixedDiscount;
       const compliance = Math.min(1, Math.max(0, 1 - penalty + recovery));
       complianceSum += compliance;
+      counted++;
     }
-    const avgCompliance = complianceSum / stats.prs.length;
+    if (counted === 0) return 0;
+    const avgCompliance = complianceSum / counted;
     return Math.round((1 - avgCompliance) * 1000) / 10;
   }
 
