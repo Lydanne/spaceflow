@@ -294,6 +294,7 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
     lines.push(`| ❌ 无效 | ${stats.invalid} |`);
     lines.push(`| ⚠️ 待处理 | ${stats.pending} |`);
     lines.push(`| 修复率 | ${stats.fixRate}% |`);
+    lines.push(`| 解决率 | ${stats.resolveRate}% |`);
     return lines.join("\n");
   }
 }

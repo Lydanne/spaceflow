@@ -904,7 +904,8 @@ export class ReviewService {
     const invalid = issues.filter((i) => i.valid === "false").length;
     const pending = total - fixed - resolved - invalid;
     const fixRate = total > 0 ? Math.round((fixed / total) * 100 * 10) / 10 : 0;
-    return { total, fixed, resolved, invalid, pending, fixRate };
+    const resolveRate = total > 0 ? Math.round(((fixed + resolved) / total) * 100 * 10) / 10 : 0;
+    return { total, fixed, resolved, invalid, pending, fixRate, resolveRate };
   }
 
   /**

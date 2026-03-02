@@ -128,6 +128,7 @@ export class TerminalFormatter implements ReviewReportFormatter {
     lines.push(`   ${RED}❌ 无效: ${stats.invalid}${RESET}`);
     lines.push(`   ${YELLOW}⚠️  待处理: ${stats.pending}${RESET}`);
     lines.push(`   修复率: ${stats.fixRate}%`);
+    lines.push(`   解决率: ${stats.resolveRate}%`);
     return lines.join("\n");
   }
 }
