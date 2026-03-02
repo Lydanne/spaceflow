@@ -265,16 +265,16 @@ export default defineExtension({
   "spaceflow": {
     "exports": {
       "hello": { "type": "flow", "entry": "." },
-      "hello-skills": { "type": "skill", "entry": "./skills" },
-      "hello-mcp": {
-        "type": "mcp",
-        "entry": ".",
-        "mcp": { "command": "node", "args": ["dist/mcp.js"] }
-      }
+      "hello-skills": { "type": "extension", "entry": "./skills" },
+      "hello-mcp": { "type": "mcp", "entry": "." }
     }
   }
 }
 ```
+
+::: tip MCP 工具聚合
+声明了 `mcp` 导出类型的 Extension，其 MCP 工具会被 `spaceflow mcp` 自动聚合。无需为每个 Extension 单独配置 MCP Server，详见 [MCP 服务](/guide/commands/mcp)。
+:::
 
 ## 构建与发布
 

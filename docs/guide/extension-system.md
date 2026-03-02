@@ -145,12 +145,8 @@ Extension 的 `package.json` 中通过 `spaceflow` 字段声明导出类型：
   "spaceflow": {
     "exports": {
       "review": { "type": "flow", "entry": "." },
-      "review-rules": { "type": "skill", "entry": "./skills" },
-      "review-mcp": {
-        "type": "mcp",
-        "entry": ".",
-        "mcp": { "command": "node", "args": ["dist/mcp.js"] }
-      }
+      "review-rules": { "type": "extension", "entry": "./skills" },
+      "review-mcp": { "type": "mcp", "entry": "." }
     }
   }
 }
@@ -158,12 +154,12 @@ Extension 的 `package.json` 中通过 `spaceflow` 字段声明导出类型：
 
 导出类型：
 
-| 类型      | 说明               | 安装行为                                   |
-| --------- | ------------------ | ------------------------------------------ |
-| `flow`    | CLI 子命令（默认） | 注册为 `spaceflow <command>`               |
-| `skill`   | 技能文件           | 复制到编辑器的 `skills/` 目录              |
-| `command` | 编辑器命令         | 生成 `.md` 文件到编辑器的 `commands/` 目录 |
-| `mcp`     | MCP Server         | 注册到编辑器的 `mcp.json` 配置             |
+| 类型        | 说明               | 安装行为                                   |
+| ----------- | ------------------ | ------------------------------------------ |
+| `flow`      | CLI 子命令（默认） | 注册为 `spaceflow <command>`               |
+| `extension` | 技能文件           | 复制到编辑器的 `skills/` 目录              |
+| `command`   | 编辑器命令         | 生成 `.md` 文件到编辑器的 `commands/` 目录 |
+| `mcp`       | MCP 工具           | 由 `spaceflow mcp` 统一聚合                |
 
 ## 管理命令
 
