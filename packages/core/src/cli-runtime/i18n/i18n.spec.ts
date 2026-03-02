@@ -1,4 +1,5 @@
-import { initI18n, t, addLocaleResources, resetI18n } from "./i18n";
+import { t, addLocaleResources, resetI18n } from "./i18n";
+import { initCliI18n as initI18n } from "./init";
 import zhCN from "../../locales/zh-cn/translation.json";
 import en from "../../locales/en/translation.json";
 

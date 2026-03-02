@@ -1,3 +1,5 @@
-export const loadConfig = jest.fn().mockResolvedValue({
+import { vi, type Mock } from "vitest";
+
+export const loadConfig: Mock = vi.fn().mockResolvedValue({
   config: {},
 });
