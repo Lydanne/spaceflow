@@ -65,7 +65,7 @@ function buildResult(
  * 解析服务器 URL
  * - 优先使用 GIT_PROVIDER_URL
  * - Gitea: GITEA_SERVER_URL > GITHUB_SERVER_URL
- * - GitHub: GITHUB_API_URL > 默认 https://api.github.com
+ * - GitHub: GITHUB_API_URL > GITEA_API_URL > 默认 https://api.github.com
  * - GitLab: CI_SERVER_URL > GITLAB_URL
  */
 function resolveServerUrl(
@@ -76,7 +76,7 @@ function resolveServerUrl(
     return env.GIT_PROVIDER_URL;
   }
   if (provider === "github") {
-    return env.GITHUB_API_URL || "https://api.github.com";
+    return env.GITHUB_API_URL || env.GITEA_API_URL || "https://api.github.com";
   }
   if (provider === "gitlab") {
     return env.CI_SERVER_URL || env.GITLAB_URL || "https://gitlab.com";
@@ -95,7 +95,7 @@ function resolveServerUrl(
  * 解析 API Token
  * - 优先使用 GIT_PROVIDER_TOKEN
  * - Gitea: GITEA_TOKEN > GITHUB_TOKEN
- * - GitHub: GITHUB_TOKEN
+ * - GitHub: GITHUB_TOKEN > GITEA_TOKEN
  * - GitLab: GITLAB_TOKEN > CI_JOB_TOKEN
  */
 function resolveToken(provider: GitProviderType, env: Record<string, string | undefined>): string {
@@ -103,7 +103,7 @@ function resolveToken(provider: GitProviderType, env: Record<string, string | un
     return env.GIT_PROVIDER_TOKEN;
   }
   if (provider === "github") {
-    return env.GITHUB_TOKEN || "";
+    return env.GITHUB_TOKEN || env.GITEA_TOKEN || "";
   }
   if (provider === "gitlab") {
     return env.GITLAB_TOKEN || env.CI_JOB_TOKEN || "";

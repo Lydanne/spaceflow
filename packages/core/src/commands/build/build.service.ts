@@ -117,7 +117,7 @@ export class BuildService {
   private discoverExtensionDirs(): string[] {
     const dependencies = getDependencies(this.projectRoot);
     const parentDirs = new Set<string>();
-    for (const source of Object.values(dependencies)) {
+    for (const source of Object.values(dependencies) as string[]) {
       if (!source.startsWith("link:")) continue;
       const linkPath = source.slice(5);
       const absolutePath = resolve(this.projectRoot, linkPath);

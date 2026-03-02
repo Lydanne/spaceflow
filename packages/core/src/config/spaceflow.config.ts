@@ -41,15 +41,15 @@ const GitProviderConfigSchema = z.object({
 const CiConfigSchema = z.object({
   repository: z
     .string()
-    .default(process.env.GITHUB_REPOSITORY || "")
+    .default(process.env.GITHUB_REPOSITORY || process.env.GITEA_REPOSITORY || "")
     .describe("仓库名称 (owner/repo 格式)"),
   refName: z
     .string()
-    .default(process.env.GITHUB_REF_NAME || "")
+    .default(process.env.GITHUB_REF_NAME || process.env.GITEA_REF_NAME || "")
     .describe("当前分支名称"),
   actor: z
     .string()
-    .default(process.env.GITHUB_ACTOR || "")
+    .default(process.env.GITHUB_ACTOR || process.env.GITEA_ACTOR || "")
     .describe("当前操作者"),
 });
 

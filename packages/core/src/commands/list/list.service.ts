@@ -46,7 +46,7 @@ export class ListService {
     const editors = getSupportedEditors(cwd);
     // 收集所有外部扩展信息
     const extensionInfos: ExtensionListInfo[] = [];
-    for (const [name, source] of Object.entries(dependencies)) {
+    for (const [name, source] of Object.entries(dependencies) as [string, string][]) {
       const type = getSourceType(source);
       const installed = await this.checkInstalled(name, source, type, editors);
       extensionInfos.push({ name, source, type, installed, commands: [] });

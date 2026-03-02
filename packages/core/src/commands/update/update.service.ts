@@ -312,7 +312,7 @@ export class UpdateService {
       return false;
     }
 
-    const { source } = this.parseExtensionConfig(dependencies[name]);
+    const { source } = this.parseExtensionConfig(dependencies[name] as ExtensionConfig);
     const sourceType = this.getSourceType(source);
 
     if (shouldLog(verbose, 1)) console.log(t("update:updating", { name }));
@@ -344,7 +344,7 @@ export class UpdateService {
     let successCount = 0;
     let failCount = 0;
 
-    for (const [name, config] of Object.entries(dependencies)) {
+    for (const [name, config] of Object.entries(dependencies) as [string, ExtensionConfig][]) {
       const { source } = this.parseExtensionConfig(config);
       const sourceType = this.getSourceType(source);
 
