@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { LLMMode } from "../shared/llm-proxy";
-import { registerPluginSchema } from "./schema-generator.service";
 import { detectProvider } from "../shared/git-provider/detect-provider";
 
 // 从 @spaceflow/shared 重导出配置工具函数
@@ -177,7 +176,7 @@ const StorageConfigSchema = z.object({
 // ============ 统一配置 Schema ============
 
 /** Spaceflow 完整配置 Schema */
-const SpaceflowConfigSchema = z.object({
+export const SpaceflowConfigSchema = z.object({
   /** 界面语言，如 zh-CN、en */
   lang: z.string().optional().describe("界面语言，如 zh-CN、en"),
   /** 已安装的技能包注册表 */
@@ -196,13 +195,6 @@ const SpaceflowConfigSchema = z.object({
   feishu: z.preprocess((v) => v ?? {}, FeishuConfigSchema).describe("飞书 SDK 配置"),
   /** Storage 配置 */
   storage: z.preprocess((v) => v ?? {}, StorageConfigSchema).describe("存储服务配置"),
-});
-
-// 注册完整 schema（供 JSON Schema 生成使用）
-registerPluginSchema({
-  configKey: "spaceflow",
-  schemaFactory: () => SpaceflowConfigSchema,
-  description: "Spaceflow 配置",
 });
 
 // ============ 类型导出 ============

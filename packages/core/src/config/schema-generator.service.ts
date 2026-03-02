@@ -1,6 +1,7 @@
 import { z } from "zod";
 import * as fs from "fs";
 import * as path from "path";
+import { SpaceflowConfigSchema } from "./spaceflow.config";
 
 /** Schema 注册信息 */
 export interface SchemaRegistry {
@@ -39,20 +40,14 @@ export class SchemaGeneratorService {
    * @param outputPath 输出路径
    */
   generateJsonSchema(outputPath: string): void {
-    const properties: Record<string, unknown> = {
-      dependencies: {
-        type: "object",
-        description: "已安装的技能包注册表",
-        additionalProperties: { type: "string" },
-      },
-      support: {
-        type: "array",
-        description: "支持的编辑器列表",
-        items: { type: "string" },
-      },
-    };
+    // 从 SpaceflowConfigSchema 生成基础 JSON Schema
+    const baseSchema = z.toJSONSchema(SpaceflowConfigSchema, {
+      target: "draft-07",
+    }) as { properties?: Record<string, unknown>; [key: string]: unknown };
 
-    // 添加所有插件的 schema
+    const properties: Record<string, unknown> = { ...(baseSchema.properties || {}) };
+
+    // 添加所有插件的 schema（扩展插件配置）
     for (const [configKey, registry] of schemaRegistry) {
       try {
         const schema = registry.schemaFactory();
