@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.28.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.27.0...@spaceflow/review-summary@0.28.0) (2026-03-02)
+
+### 代码重构
+
+* **review:** 优化问题验证逻辑，将 resolved 状态纳入有效性判断 ([1e2302d](https://github.com/Lydanne/spaceflow/commit/1e2302d81cd0f653d606483ef6c9138143ca6d60))
+
+### 代码格式
+
+* 格式化代码并更新 Prettier 忽略规则 ([baed10e](https://github.com/Lydanne/spaceflow/commit/baed10e7cd91fda1285d7e2e0019d291cb563055))
+
+### 其他修改
+
+* **core:** released version 0.23.0 [no ci] ([07a2d7d](https://github.com/Lydanne/spaceflow/commit/07a2d7d51223aeb98161f91fa931b4cb63b03cda))
+* **publish:** released version 0.47.0 [no ci] ([3f59345](https://github.com/Lydanne/spaceflow/commit/3f593450066c9138adac5b101edb8057a5de1ff6))
+* **review:** released version 0.60.0 [no ci] ([a3d381c](https://github.com/Lydanne/spaceflow/commit/a3d381ced314e95135a0a13d4ee1ff1cb72b465d))
+* **scripts:** released version 0.25.0 [no ci] ([88292c0](https://github.com/Lydanne/spaceflow/commit/88292c07b7787bcd4492c8b88cfb516b3e81d9be))
+* **shell:** released version 0.25.0 [no ci] ([fc78e10](https://github.com/Lydanne/spaceflow/commit/fc78e10a0bab04d575867732b922a2a1989a594e))
+
 ## [0.27.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.26.0...@spaceflow/review-summary@0.27.0) (2026-03-02)
 
 ### 代码重构
