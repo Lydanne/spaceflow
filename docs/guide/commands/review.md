@@ -301,6 +301,8 @@ Review 命令会加载 `references` 配置中指定的审查规范文件，用�
 
 ### GitHub Actions
 
+::: v-pre
+
 ```yaml
 name: PR Review
 on:
@@ -327,8 +329,10 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
+:::
+
 **关键配置**：
 
 - **`concurrency`**：同一 PR 的多次推送会取消前一次审查，避免并发冲突
-- **`event-action`**：传入 `${{ github.event.action }}`，当 PR 关闭时自动进入状态刷新模式
+- **`event-action`**：传入 GitHub event action，当 PR 关闭时自动进入状态刷新模式
 - **权限**：需要 `pull-requests: write` 和 `issues: write` 权限用于发布评论
