@@ -409,30 +409,7 @@ export class ReviewService {
       return this.executeCollectOnly(context);
     }
 
-    if (shouldLog(verbose, 1)) {
-      console.log(`📂 解析规则来源: ${specSources.length} 个`);
-    }
-    const specDirs = await this.reviewSpecService.resolveSpecSources(specSources);
-    if (shouldLog(verbose, 2)) {
-      console.log(`   解析到 ${specDirs.length} 个规则目录`, specDirs);
-    }
-
-    let specs: ReviewSpec[] = [];
-    for (const specDir of specDirs) {
-      const dirSpecs = await this.reviewSpecService.loadReviewSpecs(specDir);
-      specs.push(...dirSpecs);
-    }
-    if (shouldLog(verbose, 1)) {
-      console.log(`   找到 ${specs.length} 个规则文件`);
-    }
-
-    // 去重规则：后加载的覆盖先加载的
-    const beforeDedup = specs.reduce((sum, s) => sum + s.rules.length, 0);
-    specs = this.reviewSpecService.deduplicateSpecs(specs);
-    const afterDedup = specs.reduce((sum, s) => sum + s.rules.length, 0);
-    if (beforeDedup !== afterDedup && shouldLog(verbose, 1)) {
-      console.log(`   去重规则: ${beforeDedup} -> ${afterDedup} 条`);
-    }
+    const specs = await this.loadSpecs(specSources, verbose);
 
     let pr: PullRequest | undefined;
     let commits: PullRequestCommit[] = [];
@@ -719,19 +696,12 @@ export class ReviewService {
 
         // 验证历史问题是否已修复
         if (context.verifyFixes) {
-          const unfixedExistingIssues = existingIssues.filter(
-            (i) => i.valid !== "false" && !i.fixed,
+          existingIssues = await this.verifyAndUpdateIssues(
+            context,
+            existingIssues,
+            commits,
+            { specs, fileContents },
           );
-          if (unfixedExistingIssues.length > 0 && llmMode) {
-            existingIssues = await this.issueVerifyService.verifyIssueFixes(
-              existingIssues,
-              fileContents,
-              specs,
-              llmMode,
-              verbose,
-              context.verifyConcurrency,
-            );
-          }
         } else {
           if (shouldLog(verbose, 1)) {
             console.log(`   ⏭️  跳过历史问题验证 (verifyFixes=false)`);
@@ -873,14 +843,25 @@ export class ReviewService {
     // 4. 同步评论 reactions（👍/👎）
     await this.syncReactionsToIssues(owner, repo, prNumber, existingResult, verbose);
 
-    // 5. 统计问题状态并设置到 result
+    // 5. LLM 验证历史问题是否已修复
+    try {
+      existingResult.issues = await this.verifyAndUpdateIssues(
+        context,
+        existingResult.issues,
+        commits,
+      );
+    } catch (error) {
+      console.warn("⚠️ LLM 验证修复状态失败，跳过:", error);
+    }
+
+    // 6. 统计问题状态并设置到 result
     const stats = this.calculateIssueStats(existingResult.issues);
     existingResult.stats = stats;
 
-    // 6. 输出统计信息
+    // 7. 输出统计信息
     console.log(this.reviewReportService.formatStatsTerminal(stats, prNumber));
 
-    // 7. 更新 PR 评论（如果不是 dry-run）
+    // 8. 更新 PR 评论（如果不是 dry-run）
     if (ci && !dryRun) {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 更新 PR 评论...`);
@@ -895,6 +876,106 @@ export class ReviewService {
   }
 
   /**
+   * 加载并去重审查规则
+   */
+  protected async loadSpecs(specSources: string[], verbose?: VerboseLevel): Promise<ReviewSpec[]> {
+    if (shouldLog(verbose, 1)) {
+      console.log(`📂 解析规则来源: ${specSources.length} 个`);
+    }
+    const specDirs = await this.reviewSpecService.resolveSpecSources(specSources);
+    if (shouldLog(verbose, 2)) {
+      console.log(`   解析到 ${specDirs.length} 个规则目录`, specDirs);
+    }
+
+    let specs: ReviewSpec[] = [];
+    for (const specDir of specDirs) {
+      const dirSpecs = await this.reviewSpecService.loadReviewSpecs(specDir);
+      specs.push(...dirSpecs);
+    }
+    if (shouldLog(verbose, 1)) {
+      console.log(`   找到 ${specs.length} 个规则文件`);
+    }
+
+    const beforeDedup = specs.reduce((sum, s) => sum + s.rules.length, 0);
+    specs = this.reviewSpecService.deduplicateSpecs(specs);
+    const afterDedup = specs.reduce((sum, s) => sum + s.rules.length, 0);
+    if (beforeDedup !== afterDedup && shouldLog(verbose, 1)) {
+      console.log(`   去重规则: ${beforeDedup} -> ${afterDedup} 条`);
+    }
+
+    return specs;
+  }
+
+  /**
+   * LLM 验证历史问题是否已修复
+   * 如果传入 preloaded（specs/fileContents），直接使用；否则从 PR 获取
+   */
+  protected async verifyAndUpdateIssues(
+    context: ReviewContext,
+    issues: ReviewIssue[],
+    commits: PullRequestCommit[],
+    preloaded?: { specs: ReviewSpec[]; fileContents: FileContentsMap },
+  ): Promise<ReviewIssue[]> {
+    const { owner, repo, prNumber, llmMode, specSources, verbose } = context;
+    const unfixedIssues = issues.filter(
+      (i) => i.valid !== "false" && !i.fixed,
+    );
+
+    if (unfixedIssues.length === 0) {
+      return issues;
+    }
+
+    if (!llmMode) {
+      if (shouldLog(verbose, 1)) {
+        console.log(`   ⏭️  跳过 LLM 验证（缺少 llmMode）`);
+      }
+      return issues;
+    }
+
+    if (!preloaded && (!specSources?.length || !prNumber)) {
+      if (shouldLog(verbose, 1)) {
+        console.log(`   ⏭️  跳过 LLM 验证（缺少 specSources 或 prNumber）`);
+      }
+      return issues;
+    }
+
+    if (shouldLog(verbose, 1)) {
+      console.log(`\n🔍 开始 LLM 验证 ${unfixedIssues.length} 个未修复问题...`);
+    }
+
+    let specs: ReviewSpec[];
+    let fileContents: FileContentsMap;
+
+    if (preloaded) {
+      specs = preloaded.specs;
+      fileContents = preloaded.fileContents;
+    } else {
+      const pr = await this.gitProvider.getPullRequest(owner, repo, prNumber!);
+      const changedFiles = await this.gitProvider.getPullRequestFiles(owner, repo, prNumber!);
+      const headSha = pr?.head?.sha || "HEAD";
+      specs = await this.loadSpecs(specSources, verbose);
+      fileContents = await this.getFileContents(
+        owner,
+        repo,
+        changedFiles,
+        commits,
+        headSha,
+        prNumber!,
+        verbose,
+      );
+    }
+
+    return this.issueVerifyService.verifyIssueFixes(
+      issues,
+      fileContents,
+      specs,
+      llmMode,
+      verbose,
+      context.verifyConcurrency,
+    );
+  }
+
+  /**
    * 计算问题状态统计
    */
   protected calculateIssueStats(issues: ReviewIssue[]): ReviewStats {
@@ -904,7 +985,8 @@ export class ReviewService {
     const invalid = issues.filter((i) => i.valid === "false").length;
     const pending = total - fixed - resolved - invalid;
     const fixRate = total > 0 ? Math.round((fixed / total) * 100 * 10) / 10 : 0;
-    return { total, fixed, resolved, invalid, pending, fixRate };
+    const resolveRate = total > 0 ? Math.round(((fixed + resolved) / total) * 100 * 10) / 10 : 0;
+    return { total, fixed, resolved, invalid, pending, fixRate, resolveRate };
   }
 
   /**
@@ -1949,37 +2031,52 @@ ${fileChanges || "无"}`;
         .map((issue) => this.issueToReviewComment(issue))
         .filter((comment): comment is CreatePullReviewComment => comment !== null);
     }
-    if (comments.length > 0) {
+    if (reviewConf.lineComments) {
       const reviewBody = this.buildLineReviewBody(lineIssues, result.round, result.issues);
-      try {
-        await this.gitProvider.createPullReview(owner, repo, prNumber, {
-          event: REVIEW_STATE.COMMENT,
-          body: reviewBody,
-          comments,
-          commit_id: commitId,
-        });
-        console.log(`✅ 已发布 ${comments.length} 条行级评论`);
-      } catch {
-        // 批量失败时逐条发布，跳过无法定位的评论
-        console.warn("⚠️ 批量发布行级评论失败，尝试逐条发布...");
-        let successCount = 0;
-        for (const comment of comments) {
-          try {
-            await this.gitProvider.createPullReview(owner, repo, prNumber, {
-              event: REVIEW_STATE.COMMENT,
-              body: successCount === 0 ? reviewBody : undefined,
-              comments: [comment],
-              commit_id: commitId,
-            });
-            successCount++;
-          } catch {
-            console.warn(`⚠️ 跳过无法定位的评论: ${comment.path}:${comment.new_position}`);
+      if (comments.length > 0) {
+        try {
+          await this.gitProvider.createPullReview(owner, repo, prNumber, {
+            event: REVIEW_STATE.COMMENT,
+            body: reviewBody,
+            comments,
+            commit_id: commitId,
+          });
+          console.log(`✅ 已发布 ${comments.length} 条行级评论`);
+        } catch {
+          // 批量失败时逐条发布，跳过无法定位的评论
+          console.warn("⚠️ 批量发布行级评论失败，尝试逐条发布...");
+          let successCount = 0;
+          for (const comment of comments) {
+            try {
+              await this.gitProvider.createPullReview(owner, repo, prNumber, {
+                event: REVIEW_STATE.COMMENT,
+                body: successCount === 0 ? reviewBody : undefined,
+                comments: [comment],
+                commit_id: commitId,
+              });
+              successCount++;
+            } catch {
+              console.warn(`⚠️ 跳过无法定位的评论: ${comment.path}:${comment.new_position}`);
+            }
+          }
+          if (successCount > 0) {
+            console.log(`✅ 逐条发布成功 ${successCount}/${comments.length} 条行级评论`);
+          } else {
+            console.warn("⚠️ 所有行级评论均无法定位，已跳过");
           }
         }
-        if (successCount > 0) {
-          console.log(`✅ 逐条发布成功 ${successCount}/${comments.length} 条行级评论`);
-        } else {
-          console.warn("⚠️ 所有行级评论均无法定位，已跳过");
+      } else {
+        // 本轮无新问题，仍发布 Round 状态（含上轮回顾）
+        try {
+          await this.gitProvider.createPullReview(owner, repo, prNumber, {
+            event: REVIEW_STATE.COMMENT,
+            body: reviewBody,
+            comments: [],
+            commit_id: commitId,
+          });
+          console.log(`✅ 已发布 Round ${result.round} 审查状态（无新问题）`);
+        } catch (error) {
+          console.warn("⚠️ 发布审查状态失败:", error);
         }
       }
     }
@@ -2419,8 +2516,12 @@ ${fileChanges || "无"}`;
     if (warnCount > 0) badges.push(`🟡 ${warnCount}`);
 
     const parts: string[] = [REVIEW_LINE_COMMENTS_MARKER];
-    parts.push(`### � Spaceflow Review · Round ${round}`);
-    parts.push(`> **${issues.length}** 个新问题 · **${fileCount}** 个文件${badges.length > 0 ? " · " + badges.join(" ") : ""}`);
+    parts.push(`### 🚀 Spaceflow Review · Round ${round}`);
+    if (issues.length === 0) {
+      parts.push(`> ✅ 未发现新问题`);
+    } else {
+      parts.push(`> **${issues.length}** 个新问题 · **${fileCount}** 个文件${badges.length > 0 ? " · " + badges.join(" ") : ""}`);
+    }
 
     // 上轮回顾
     if (round > 1) {

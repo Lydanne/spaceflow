@@ -28,24 +28,26 @@ export class TerminalFormatter implements ReviewReportFormatter {
       return "没有需要审查的文件";
     }
 
-    const issuesByFile = new Map<string, { resolved: number; unresolved: number }>();
+    const issuesByFile = new Map<string, { resolved: number; errors: number; warns: number }>();
     for (const issue of issues) {
-      const stats = issuesByFile.get(issue.file) || { resolved: 0, unresolved: 0 };
+      const stats = issuesByFile.get(issue.file) || { resolved: 0, errors: 0, warns: 0 };
       if (issue.fixed) {
         stats.resolved++;
+      } else if (issue.severity === "error") {
+        stats.errors++;
       } else {
-        stats.unresolved++;
+        stats.warns++;
       }
       issuesByFile.set(issue.file, stats);
     }
 
     const lines: string[] = [];
     for (const fileSummary of summaries) {
-      const stats = issuesByFile.get(fileSummary.file) || { resolved: 0, unresolved: 0 };
+      const stats = issuesByFile.get(fileSummary.file) || { resolved: 0, errors: 0, warns: 0 };
       const resolvedText = stats.resolved > 0 ? `${GREEN}✅ ${stats.resolved} 已解决${RESET}` : "";
-      const unresolvedText =
-        stats.unresolved > 0 ? `${YELLOW}❌ ${stats.unresolved} 未解决${RESET}` : "";
-      const statsText = [resolvedText, unresolvedText].filter(Boolean).join(" / ");
+      const errorText = stats.errors > 0 ? `${RED}🔴 ${stats.errors} error${RESET}` : "";
+      const warnText = stats.warns > 0 ? `${YELLOW}🟡 ${stats.warns} warn${RESET}` : "";
+      const statsText = [resolvedText, errorText, warnText].filter(Boolean).join(" / ");
 
       if (statsText) {
         lines.push(`${BOLD}${fileSummary.file}${RESET} (${statsText}): ${fileSummary.summary}`);
@@ -126,6 +128,7 @@ export class TerminalFormatter implements ReviewReportFormatter {
     lines.push(`   ${RED}❌ 无效: ${stats.invalid}${RESET}`);
     lines.push(`   ${YELLOW}⚠️  待处理: ${stats.pending}${RESET}`);
     lines.push(`   修复率: ${stats.fixRate}%`);
+    lines.push(`   解决率: ${stats.resolveRate}%`);
     return lines.join("\n");
   }
 }

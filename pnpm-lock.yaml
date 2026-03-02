@@ -185,6 +185,9 @@ importers:
       '@spaceflow/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@spaceflow/review':
+        specifier: workspace:*
+        version: link:../review
     devDependencies:
       '@spaceflow/cli':
         specifier: workspace:*

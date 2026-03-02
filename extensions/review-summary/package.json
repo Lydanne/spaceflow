@@ -18,6 +18,9 @@
     "build": "spaceflow build",
     "dev": "spaceflow dev"
   },
+  "dependencies": {
+    "@spaceflow/review": "workspace:*"
+  },
   "devDependencies": {
     "@spaceflow/cli": "workspace:*",
     "@types/node": "catalog:"

@@ -385,7 +385,36 @@ export class GiteaAdapter implements GitProvider {
   // ============ Issue 操作 ============
 
   async createIssue(owner: string, repo: string, options: CreateIssueOption): Promise<Issue> {
-    return this.request<Issue>("POST", `/repos/${owner}/${repo}/issues`, options);
+    const body: Record<string, unknown> = {
+      title: options.title,
+      body: options.body,
+      assignees: options.assignees,
+      milestone: options.milestone,
+      due_date: options.due_date,
+    };
+    if (options.labels?.length) {
+      body.labels = await this.resolveLabelIds(owner, repo, options.labels);
+    }
+    return this.request<Issue>("POST", `/repos/${owner}/${repo}/issues`, body);
+  }
+
+  /**
+   * 将标签名称列表转换为 Gitea label ID 列表
+   */
+  protected async resolveLabelIds(owner: string, repo: string, names: string[]): Promise<number[]> {
+    const allLabels = await this.request<Array<{ id: number; name: string }>>(
+      "GET",
+      `/repos/${owner}/${repo}/labels`,
+    );
+    const nameToId = new Map(allLabels.map((l) => [l.name.toLowerCase(), l.id]));
+    const ids: number[] = [];
+    for (const name of names) {
+      const id = nameToId.get(name.toLowerCase());
+      if (id !== undefined) {
+        ids.push(id);
+      }
+    }
+    return ids;
   }
 
   async listIssueComments(owner: string, repo: string, index: number): Promise<IssueComment[]> {

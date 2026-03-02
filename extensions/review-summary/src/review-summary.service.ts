@@ -1,6 +1,7 @@
 import { GitProviderService, shouldLog, normalizeVerbose } from "@spaceflow/core";
 import type { IConfigReader } from "@spaceflow/core";
 import type { PullRequest, Issue, CiConfig } from "@spaceflow/core";
+import { MarkdownFormatter, type ReviewIssue } from "@spaceflow/review";
 import { writeFileSync } from "fs";
 import { join } from "path";
 import type {
@@ -11,22 +12,30 @@ import type {
   UserStats,
   OutputTarget,
   TimePreset,
+  WeightedScoreWeights,
+  CommitBasedWeights,
+  ReviewSummaryConfig,
+  ScoreStrategy,
 } from "./types";
 
-/** 分数权重配置 */
-const SCORE_WEIGHTS = {
-  /** 每个 PR 的基础分 */
+/** 加权模式默认权重 */
+const DEFAULT_WEIGHTED_WEIGHTS: Required<WeightedScoreWeights> = {
   prBase: 10,
-  /** 每 100 行新增代码的分数 */
   additionsPer100: 2,
-  /** 每 100 行删除代码的分数 */
   deletionsPer100: 1,
-  /** 每个变更文件的分数 */
   changedFile: 0.5,
-  /** 每个未修复问题的扣分 */
   issueDeduction: 3,
-  /** 每个已修复问题的加分 */
   fixedBonus: 1,
+};
+
+/** 分数累计模式默认权重 */
+const DEFAULT_COMMIT_BASED_WEIGHTS: Required<CommitBasedWeights> = {
+  validCommit: 5,
+  errorDeduction: 2,
+  warnDeduction: 1,
+  errorFixedBonus: 1,
+  warnFixedBonus: 0.5,
+  minCommitLines: 5,
 };
 
 /**
@@ -140,7 +149,8 @@ export class PeriodSummaryService {
     } catch {
       // 如果获取文件失败，使用默认值
     }
-    const { issueCount, fixedCount } = await this.extractIssueStats(owner, repo, pr.number!);
+    const issueStats = await this.extractIssueStats(owner, repo, pr.number!);
+    const validCommitCount = await this.countValidCommits(owner, repo, pr.number!);
     return {
       number: pr.number!,
       title: pr.title ?? "",
@@ -149,8 +159,8 @@ export class PeriodSummaryService {
       additions,
       deletions,
       changedFiles,
-      issueCount,
-      fixedCount,
+      ...issueStats,
+      validCommitCount,
       description: this.extractDescription(pr),
     };
   }
@@ -162,31 +172,125 @@ export class PeriodSummaryService {
     owner: string,
     repo: string,
     prNumber: number,
-  ): Promise<{ issueCount: number; fixedCount: number }> {
+  ): Promise<{
+    issueCount: number;
+    fixedCount: number;
+    errorCount: number;
+    warnCount: number;
+    fixedErrors: number;
+    fixedWarns: number;
+  }> {
+    const empty = { issueCount: 0, fixedCount: 0, errorCount: 0, warnCount: 0, fixedErrors: 0, fixedWarns: 0 };
     try {
       const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
-      let issueCount = 0;
-      let fixedCount = 0;
+      // 优先从 review 模块嵌入的结构化数据中精确提取
+      const formatter = new MarkdownFormatter();
       for (const comment of comments) {
         const body = comment.body ?? "";
-        const issueMatch = body.match(/发现\s*(\d+)\s*个问题/);
-        if (issueMatch) {
-          issueCount = Math.max(issueCount, parseInt(issueMatch[1], 10));
-        }
-        const fixedMatch = body.match(/已修复[：:]\s*(\d+)/);
-        if (fixedMatch) {
-          fixedCount = Math.max(fixedCount, parseInt(fixedMatch[1], 10));
-        }
-        const statsMatch = body.match(/🔴\s*(\d+).*🟡\s*(\d+)/);
-        if (statsMatch) {
-          const errorCount = parseInt(statsMatch[1], 10);
-          const warnCount = parseInt(statsMatch[2], 10);
-          issueCount = Math.max(issueCount, errorCount + warnCount);
+        const parsed = formatter.parse(body);
+        if (parsed?.result?.issues) {
+          return this.computeIssueStatsFromReviewIssues(parsed.result.issues);
         }
       }
-      return { issueCount, fixedCount };
+      // 回退：没有结构化数据时，从评论文本正则提取（兼容旧数据）
+      return this.extractIssueStatsFromText(comments);
     } catch {
-      return { issueCount: 0, fixedCount: 0 };
+      return empty;
+    }
+  }
+
+  /**
+   * 从 ReviewIssue 列表中精确计算各类问题统计
+   */
+  protected computeIssueStatsFromReviewIssues(issues: ReviewIssue[]): {
+    issueCount: number;
+    fixedCount: number;
+    errorCount: number;
+    warnCount: number;
+    fixedErrors: number;
+    fixedWarns: number;
+  } {
+    const errorCount = issues.filter((i) => i.severity === "error").length;
+    const warnCount = issues.filter((i) => i.severity === "warn").length;
+    const fixedErrors = issues.filter((i) => i.severity === "error" && i.fixed).length;
+    const fixedWarns = issues.filter((i) => i.severity === "warn" && i.fixed).length;
+    return {
+      issueCount: issues.length,
+      fixedCount: fixedErrors + fixedWarns,
+      errorCount,
+      warnCount,
+      fixedErrors,
+      fixedWarns,
+    };
+  }
+
+  /**
+   * 回退：从评论文本正则提取问题统计（兼容无结构化数据的旧评论）
+   */
+  protected extractIssueStatsFromText(
+    comments: { body?: string }[],
+  ): {
+    issueCount: number;
+    fixedCount: number;
+    errorCount: number;
+    warnCount: number;
+    fixedErrors: number;
+    fixedWarns: number;
+  } {
+    let issueCount = 0;
+    let fixedCount = 0;
+    let errorCount = 0;
+    let warnCount = 0;
+    for (const comment of comments) {
+      const body = comment.body ?? "";
+      const issueMatch = body.match(/发现\s*(\d+)\s*个问题/);
+      if (issueMatch) {
+        issueCount = Math.max(issueCount, parseInt(issueMatch[1], 10));
+      }
+      const fixedMatch = body.match(/已修复[：:]\s*(\d+)/);
+      if (fixedMatch) {
+        fixedCount = Math.max(fixedCount, parseInt(fixedMatch[1], 10));
+      }
+      const statsMatch = body.match(/🔴\s*(\d+).*🟡\s*(\d+)/);
+      if (statsMatch) {
+        errorCount = Math.max(errorCount, parseInt(statsMatch[1], 10));
+        warnCount = Math.max(warnCount, parseInt(statsMatch[2], 10));
+        issueCount = Math.max(issueCount, errorCount + warnCount);
+      }
+    }
+    // 文本模式无法区分修复类型，统一设为 0
+    return { issueCount, fixedCount, errorCount, warnCount, fixedErrors: 0, fixedWarns: 0 };
+  }
+
+  /**
+   * 统计 PR 中有效 commit 数量（逐 commit 获取行数判断）
+   */
+  protected async countValidCommits(owner: string, repo: string, prNumber: number): Promise<number> {
+    const config = this.getStrategyConfig();
+    const minLines = config.commitBasedWeights?.minCommitLines ?? DEFAULT_COMMIT_BASED_WEIGHTS.minCommitLines;
+    try {
+      const commits = await this.gitProvider.getPullRequestCommits(owner, repo, prNumber);
+      let validCount = 0;
+      for (const commit of commits) {
+        if (!commit.sha) continue;
+        // 跳过 merge commit（commit message 以 "Merge" 开头）
+        if (commit.commit?.message?.startsWith("Merge")) continue;
+        try {
+          const commitInfo = await this.gitProvider.getCommit(owner, repo, commit.sha);
+          const totalLines = (commitInfo.files ?? []).reduce(
+            (sum, file) => sum + (file.additions ?? 0) + (file.deletions ?? 0),
+            0,
+          );
+          if (totalLines >= minLines) {
+            validCount++;
+          }
+        } catch {
+          // 获取单个 commit 失败，跳过
+        }
+      }
+      return validCount;
+    } catch {
+      return 0;
     }
   }
 
@@ -216,6 +320,11 @@ export class PeriodSummaryService {
           totalChangedFiles: 0,
           totalIssues: 0,
           totalFixed: 0,
+          totalErrors: 0,
+          totalWarns: 0,
+          totalFixedErrors: 0,
+          totalFixedWarns: 0,
+          totalValidCommits: 0,
           score: 0,
           features: [],
           prs: [],
@@ -228,30 +337,79 @@ export class PeriodSummaryService {
       userStats.totalChangedFiles += pr.changedFiles;
       userStats.totalIssues += pr.issueCount;
       userStats.totalFixed += pr.fixedCount;
+      userStats.totalErrors += pr.errorCount;
+      userStats.totalWarns += pr.warnCount;
+      userStats.totalFixedErrors += pr.fixedErrors;
+      userStats.totalFixedWarns += pr.fixedWarns;
+      userStats.totalValidCommits += pr.validCommitCount;
       if (pr.description) {
         userStats.features.push(pr.description);
       }
       userStats.prs.push(pr);
     }
-    for (const userStats of userMap.values()) {
-      userStats.score = this.calculateScore(userStats);
-    }
+    this.applyScoreStrategy(userMap);
     return userMap;
   }
 
   /**
-   * 计算用户综合分数
+   * 获取当前评分策略配置
    */
-  protected calculateScore(stats: UserStats): number {
-    const prScore = stats.prCount * SCORE_WEIGHTS.prBase;
-    const additionsScore = (stats.totalAdditions / 100) * SCORE_WEIGHTS.additionsPer100;
-    const deletionsScore = (stats.totalDeletions / 100) * SCORE_WEIGHTS.deletionsPer100;
-    const filesScore = stats.totalChangedFiles * SCORE_WEIGHTS.changedFile;
+  protected getStrategyConfig(): ReviewSummaryConfig {
+    try {
+      return this.config.get<ReviewSummaryConfig>("review-summary") ?? {};
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * 根据配置的策略计算所有用户的分数
+   */
+  protected applyScoreStrategy(userMap: Map<string, UserStats>): void {
+    const config = this.getStrategyConfig();
+    const strategy: ScoreStrategy = config.strategy ?? "weighted";
+    for (const userStats of userMap.values()) {
+      switch (strategy) {
+        case "commit-based":
+          userStats.score = this.calculateCommitBasedScore(userStats, config);
+          break;
+        case "weighted":
+        default:
+          userStats.score = this.calculateWeightedScore(userStats, config);
+          break;
+      }
+    }
+  }
+
+  /**
+   * 加权模式：计算用户综合分数
+   */
+  protected calculateWeightedScore(stats: UserStats, config: ReviewSummaryConfig): number {
+    const weights = { ...DEFAULT_WEIGHTED_WEIGHTS, ...config.scoreWeights };
+    const prScore = stats.prCount * weights.prBase;
+    const additionsScore = (stats.totalAdditions / 100) * weights.additionsPer100;
+    const deletionsScore = (stats.totalDeletions / 100) * weights.deletionsPer100;
+    const filesScore = stats.totalChangedFiles * weights.changedFile;
     const unfixedIssues = stats.totalIssues - stats.totalFixed;
-    const issueDeduction = unfixedIssues * SCORE_WEIGHTS.issueDeduction;
-    const fixedBonus = stats.totalFixed * SCORE_WEIGHTS.fixedBonus;
+    const issueDeduction = unfixedIssues * weights.issueDeduction;
+    const fixedBonus = stats.totalFixed * weights.fixedBonus;
     const totalScore =
       prScore + additionsScore + deletionsScore + filesScore - issueDeduction + fixedBonus;
+    return Math.max(0, Math.round(totalScore * 10) / 10);
+  }
+
+  /**
+   * 分数累计模式：按有效 commit 加分，按 error/warn 扣分
+   */
+  protected calculateCommitBasedScore(stats: UserStats, config: ReviewSummaryConfig): number {
+    const weights = { ...DEFAULT_COMMIT_BASED_WEIGHTS, ...config.commitBasedWeights };
+    const commitScore = stats.totalValidCommits * weights.validCommit;
+    const errorDeduction = stats.totalErrors * weights.errorDeduction;
+    const warnDeduction = stats.totalWarns * weights.warnDeduction;
+    const fixedBonus =
+      stats.totalFixedErrors * weights.errorFixedBonus +
+      stats.totalFixedWarns * weights.warnFixedBonus;
+    const totalScore = commitScore - errorDeduction - warnDeduction + fixedBonus;
     return Math.max(0, Math.round(totalScore * 10) / 10);
   }
 
@@ -497,9 +655,12 @@ export class PeriodSummaryService {
     content: string,
   ): Promise<{ type: OutputTarget; location: string }> {
     const title = `📊 周期统计报告: ${result.period.since} ~ ${result.period.until}`;
+    const config = this.getStrategyConfig();
+    const labelName = config.issueLabel ?? "report";
     const issue: Issue = await this.gitProvider.createIssue(context.owner, context.repo, {
       title,
       body: content,
+      labels: [labelName],
     });
     const location = issue.html_url ?? `#${issue.number}`;
     if (shouldLog(context.verbose, 1)) {

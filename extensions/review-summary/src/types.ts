@@ -71,6 +71,16 @@ export interface PrStats {
   issueCount: number;
   /** 已修复的问题数 */
   fixedCount: number;
+  /** error 级别问题数 */
+  errorCount: number;
+  /** warn 级别问题数 */
+  warnCount: number;
+  /** 已修复的 error 问题数 */
+  fixedErrors: number;
+  /** 已修复的 warn 问题数 */
+  fixedWarns: number;
+  /** 有效 commit 数（单个 commit 新增+删除 >= minCommitLines 行） */
+  validCommitCount: number;
   /** PR 描述/功能摘要 */
   description: string;
 }
@@ -91,12 +101,72 @@ export interface UserStats {
   totalIssues: number;
   /** 总已修复问题数 */
   totalFixed: number;
+  /** 总 error 级别问题数 */
+  totalErrors: number;
+  /** 总 warn 级别问题数 */
+  totalWarns: number;
+  /** 总已修复 error 数 */
+  totalFixedErrors: number;
+  /** 总已修复 warn 数 */
+  totalFixedWarns: number;
+  /** 总有效 commit 数 */
+  totalValidCommits: number;
   /** 综合分数 */
   score: number;
   /** 功能摘要列表 */
   features: string[];
   /** 该用户的 PR 列表 */
   prs: PrStats[];
+}
+
+/** 评分策略类型 */
+export type ScoreStrategy = "weighted" | "commit-based";
+
+/** 加权模式权重配置 */
+export interface WeightedScoreWeights {
+  /** 每个 PR 的基础分，默认 10 */
+  prBase?: number;
+  /** 每 100 行新增代码的分数，默认 2 */
+  additionsPer100?: number;
+  /** 每 100 行删除代码的分数，默认 1 */
+  deletionsPer100?: number;
+  /** 每个变更文件的分数，默认 0.5 */
+  changedFile?: number;
+  /** 每个未修复问题的扣分，默认 3 */
+  issueDeduction?: number;
+  /** 每个已修复问题的加分，默认 1 */
+  fixedBonus?: number;
+}
+
+/** 分数累计模式权重配置 */
+export interface CommitBasedWeights {
+  /** 每个有效 commit 的加分，默认 5 */
+  validCommit?: number;
+  /** 每个 error 问题的扣分，默认 2 */
+  errorDeduction?: number;
+  /** 每个 warn 问题的扣分，默认 1 */
+  warnDeduction?: number;
+  /** 修复一个 error 问题的加分，默认为 errorDeduction 的一半（1） */
+  errorFixedBonus?: number;
+  /** 修复一个 warn 问题的加分，默认为 warnDeduction 的一半（0.5） */
+  warnFixedBonus?: number;
+  /** 有效 commit 的最低代码行数（新增+删除），默认 5 */
+  minCommitLines?: number;
+}
+
+/** @deprecated 使用 WeightedScoreWeights 代替 */
+export type ScoreWeights = WeightedScoreWeights;
+
+/** review-summary 扩展配置 */
+export interface ReviewSummaryConfig {
+  /** 评分策略，默认 "weighted" */
+  strategy?: ScoreStrategy;
+  /** 加权模式权重配置（strategy 为 "weighted" 时生效） */
+  scoreWeights?: WeightedScoreWeights;
+  /** 分数累计模式权重配置（strategy 为 "commit-based" 时生效） */
+  commitBasedWeights?: CommitBasedWeights;
+  /** 创建 Issue 时添加的标签名称，默认 "report" */
+  issueLabel?: string;
 }
 
 /** 周期统计结果 */
