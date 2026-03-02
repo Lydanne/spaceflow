@@ -92,7 +92,7 @@ export class IssueVerifyService {
       }
 
       // valid === 'false' 的问题跳过复查（已确认无效的问题无需再次验证）
-      if (issue.valid === "false") {
+      if (issue.valid === FALSE) {
         if (shouldLog(verbose, 1)) {
           console.log(`   ⏭️  跳过无效问题: ${issue.file}:${issue.line} (${issue.ruleId})`);
         }
@@ -201,7 +201,7 @@ export class IssueVerifyService {
       if (result) {
         const updatedIssue: ReviewIssue = {
           ...issue,
-          valid: result.valid ? TRUE : FALSE,
+          valid: issue.fixed || issue.resolved ? TRUE : result.valid ? TRUE : FALSE,
         };
 
         if (result.fixed) {

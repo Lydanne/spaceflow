@@ -696,12 +696,10 @@ export class ReviewService {
 
         // 验证历史问题是否已修复
         if (context.verifyFixes) {
-          existingIssues = await this.verifyAndUpdateIssues(
-            context,
-            existingIssues,
-            commits,
-            { specs, fileContents },
-          );
+          existingIssues = await this.verifyAndUpdateIssues(context, existingIssues, commits, {
+            specs,
+            fileContents,
+          });
         } else {
           if (shouldLog(verbose, 1)) {
             console.log(`   ⏭️  跳过历史问题验证 (verifyFixes=false)`);
@@ -917,9 +915,7 @@ export class ReviewService {
     preloaded?: { specs: ReviewSpec[]; fileContents: FileContentsMap },
   ): Promise<ReviewIssue[]> {
     const { owner, repo, prNumber, llmMode, specSources, verbose } = context;
-    const unfixedIssues = issues.filter(
-      (i) => i.valid !== "false" && !i.fixed,
-    );
+    const unfixedIssues = issues.filter((i) => i.valid !== "false" && !i.fixed);
 
     if (unfixedIssues.length === 0) {
       return issues;
@@ -2520,7 +2516,9 @@ ${fileChanges || "无"}`;
     if (issues.length === 0) {
       parts.push(`> ✅ 未发现新问题`);
     } else {
-      parts.push(`> **${issues.length}** 个新问题 · **${fileCount}** 个文件${badges.length > 0 ? " · " + badges.join(" ") : ""}`);
+      parts.push(
+        `> **${issues.length}** 个新问题 · **${fileCount}** 个文件${badges.length > 0 ? " · " + badges.join(" ") : ""}`,
+      );
     }
 
     // 上轮回顾
@@ -2532,7 +2530,9 @@ ${fileChanges || "无"}`;
         const prevInvalid = prevIssues.filter((i) => i.valid === "false").length;
         const prevPending = prevIssues.length - prevFixed - prevResolved - prevInvalid;
         parts.push("");
-        parts.push(`<details><summary>📊 Round ${round - 1} 回顾 (${prevIssues.length} 个问题)</summary>\n`);
+        parts.push(
+          `<details><summary>📊 Round ${round - 1} 回顾 (${prevIssues.length} 个问题)</summary>\n`,
+        );
         parts.push(`| 状态 | 数量 |`);
         parts.push(`|------|------|`);
         if (prevFixed > 0) parts.push(`| ✅ 已修复 | ${prevFixed} |`);
@@ -2644,8 +2644,8 @@ ${fileChanges || "无"}`;
       // 将变更文件的历史 issue 标记为无效
       let invalidatedCount = 0;
       const updatedIssues = issues.map((issue) => {
-        // 如果 issue 已修复或已无效，不需要处理
-        if (issue.fixed || issue.valid === "false") {
+        // 如果 issue 已修复、已解决或已无效，不需要处理
+        if (issue.fixed || issue.resolved || issue.valid === "false") {
           return issue;
         }
 
@@ -2691,8 +2691,8 @@ ${fileChanges || "无"}`;
     let updatedCount = 0;
     let invalidatedCount = 0;
     const updatedIssues = issues.map((issue) => {
-      // 如果 issue 已修复或无效，不需要更新行号
-      if (issue.fixed || issue.valid === "false") {
+      // 如果 issue 已修复、已解决或无效，不需要更新行号
+      if (issue.fixed || issue.resolved || issue.valid === "false") {
         return issue;
       }
 
