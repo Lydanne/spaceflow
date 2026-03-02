@@ -15,6 +15,7 @@ import type {
   WeightedScoreWeights,
   CommitBasedWeights,
   IssueBasedWeights,
+  DefectRateWeights,
   ReviewSummaryConfig,
   ScoreStrategy,
 } from "./types";
@@ -48,6 +49,13 @@ const DEFAULT_ISSUE_BASED_WEIGHTS: Required<IssueBasedWeights> = {
   warnDeduction: 3,
   errorFixedBonus: 5,
   warnFixedBonus: 2,
+};
+
+/** defect-rate 模式默认权重 */
+const DEFAULT_DEFECT_RATE_WEIGHTS: Required<DefectRateWeights> = {
+  errorPenalty: 0.3,
+  warnPenalty: 0.1,
+  fixedDiscount: 0.05,
 };
 
 /**
@@ -382,6 +390,12 @@ export class PeriodSummaryService {
     const strategy: ScoreStrategy = config.strategy ?? "weighted";
     for (const userStats of userMap.values()) {
       switch (strategy) {
+        case "defect-rate": {
+          const rate = this.calculateDefectRate(userStats, config);
+          userStats.defectRate = rate;
+          userStats.score = Math.round((100 - rate) * 10) / 10;
+          break;
+        }
         case "issue-based":
           userStats.score = this.calculateIssueBasedScore(userStats, config);
           break;
@@ -450,6 +464,26 @@ export class PeriodSummaryService {
   }
 
   /**
+   * defect-rate 模式：基于问题密度（每百行代码）计算缺陷率
+   */
+  protected calculateDefectRate(stats: UserStats, config: ReviewSummaryConfig): number {
+    const weights = { ...DEFAULT_DEFECT_RATE_WEIGHTS, ...config.defectRateWeights };
+    if (stats.prs.length === 0) return 0;
+    let complianceSum = 0;
+    for (const pr of stats.prs) {
+      const totalLines = pr.additions + pr.deletions;
+      const per100 = Math.max(1, totalLines / 100);
+      const penalty =
+        (pr.errorCount * weights.errorPenalty + pr.warnCount * weights.warnPenalty) / per100;
+      const recovery = (pr.fixedErrors + pr.fixedWarns) * weights.fixedDiscount;
+      const compliance = Math.min(1, Math.max(0, 1 - penalty + recovery));
+      complianceSum += compliance;
+    }
+    const avgCompliance = complianceSum / stats.prs.length;
+    return Math.round((1 - avgCompliance) * 1000) / 10;
+  }
+
+  /**
    * 分数累计模式：按有效 commit 加分，按 error/warn 扣分
    */
   protected calculateCommitBasedScore(stats: UserStats, config: ReviewSummaryConfig): number {
@@ -468,6 +502,12 @@ export class PeriodSummaryService {
    * 按分数排序用户统计
    */
   protected sortUserStats(userMap: Map<string, UserStats>): UserStats[] {
+    const config = this.getStrategyConfig();
+    if (config.strategy === "defect-rate") {
+      return Array.from(userMap.values()).sort(
+        (a, b) => (a.defectRate ?? 0) - (b.defectRate ?? 0),
+      );
+    }
     return Array.from(userMap.values()).sort((a, b) => b.score - a.score);
   }
 
@@ -602,18 +642,32 @@ export class PeriodSummaryService {
     lines.push("");
     lines.push(`🏆 贡献者排名`);
     lines.push(`${"─".repeat(60)}`);
-    const header = [
-      "排名".padEnd(4),
-      "用户".padEnd(15),
-      "PR数".padStart(5),
-      "新增".padStart(8),
-      "删除".padStart(8),
-      "问题".padStart(5),
-      "分数".padStart(8),
-    ].join(" │ ");
+    const isDefectRate = result.userStats.some((u) => u.defectRate !== undefined);
+    const header = isDefectRate
+      ? [
+          "排名".padEnd(4),
+          "用户".padEnd(15),
+          "PR数".padStart(5),
+          "新增".padStart(8),
+          "删除".padStart(8),
+          "问题".padStart(5),
+          "缺陷率".padStart(8),
+        ].join(" │ ")
+      : [
+          "排名".padEnd(4),
+          "用户".padEnd(15),
+          "PR数".padStart(5),
+          "新增".padStart(8),
+          "删除".padStart(8),
+          "问题".padStart(5),
+          "分数".padStart(8),
+        ].join(" │ ");
     lines.push(header);
     lines.push("─".repeat(60));
     result.userStats.forEach((user, index) => {
+      const lastCol = isDefectRate
+        ? `${(user.defectRate ?? 0).toFixed(1)}%`.padStart(8)
+        : user.score.toFixed(1).padStart(8);
       const row = [
         `#${index + 1}`.padEnd(4),
         user.username.slice(0, 15).padEnd(15),
@@ -621,7 +675,7 @@ export class PeriodSummaryService {
         `+${user.totalAdditions}`.padStart(8),
         `-${user.totalDeletions}`.padStart(8),
         String(user.totalIssues).padStart(5),
-        user.score.toFixed(1).padStart(8),
+        lastCol,
       ].join(" │ ");
       lines.push(row);
     });
@@ -654,13 +708,24 @@ export class PeriodSummaryService {
     lines.push("");
     lines.push(`## 🏆 贡献者排名`);
     lines.push("");
-    lines.push(`| 排名 | 用户 | PR数 | 新增 | 删除 | 问题 | 分数 |`);
-    lines.push(`|------|------|------|------|------|------|------|`);
-    result.userStats.forEach((user, index) => {
-      lines.push(
-        `| #${index + 1} | ${user.username} | ${user.prCount} | +${user.totalAdditions} | -${user.totalDeletions} | ${user.totalIssues} | ${user.score.toFixed(1)} |`,
-      );
-    });
+    const isDefectRate = result.userStats.some((u) => u.defectRate !== undefined);
+    if (isDefectRate) {
+      lines.push(`| 排名 | 用户 | PR数 | 新增 | 删除 | 问题 | 缺陷率 |`);
+      lines.push(`|------|------|------|------|------|------|--------|`);
+      result.userStats.forEach((user, index) => {
+        lines.push(
+          `| #${index + 1} | ${user.username} | ${user.prCount} | +${user.totalAdditions} | -${user.totalDeletions} | ${user.totalIssues} | ${(user.defectRate ?? 0).toFixed(1)}% |`,
+        );
+      });
+    } else {
+      lines.push(`| 排名 | 用户 | PR数 | 新增 | 删除 | 问题 | 分数 |`);
+      lines.push(`|------|------|------|------|------|------|------|`);
+      result.userStats.forEach((user, index) => {
+        lines.push(
+          `| #${index + 1} | ${user.username} | ${user.prCount} | +${user.totalAdditions} | -${user.totalDeletions} | ${user.totalIssues} | ${user.score.toFixed(1)} |`,
+        );
+      });
+    }
     lines.push("");
     lines.push(`## 📋 功能摘要`);
     lines.push("");

@@ -113,6 +113,8 @@ export interface UserStats {
   totalValidCommits: number;
   /** 综合分数 */
   score: number;
+  /** 缺陷率（0-100），0 表示零缺陷，100 表示全部违规，仅 defect-rate 策略时填充 */
+  defectRate?: number;
   /** 功能摘要列表 */
   features: string[];
   /** 该用户的 PR 列表 */
@@ -120,7 +122,7 @@ export interface UserStats {
 }
 
 /** 评分策略类型 */
-export type ScoreStrategy = "weighted" | "commit-based" | "issue-based";
+export type ScoreStrategy = "weighted" | "commit-based" | "issue-based" | "defect-rate";
 
 /** 加权模式权重配置 */
 export interface WeightedScoreWeights {
@@ -175,6 +177,16 @@ export interface IssueBasedWeights {
   warnFixedBonus?: number;
 }
 
+/** defect-rate 模式权重配置 */
+export interface DefectRateWeights {
+  /** 每百行代码 1 个 error 降低的合规度，默认 0.3 */
+  errorPenalty?: number;
+  /** 每百行代码 1 个 warn 降低的合规度，默认 0.1 */
+  warnPenalty?: number;
+  /** 修复 1 个问题恢复的合规度，默认 0.05 */
+  fixedDiscount?: number;
+}
+
 /** review-summary 扩展配置 */
 export interface ReviewSummaryConfig {
   /** 评分策略，默认 "weighted" */
@@ -185,6 +197,8 @@ export interface ReviewSummaryConfig {
   commitBasedWeights?: CommitBasedWeights;
   /** issue-based 模式权重配置（strategy 为 "issue-based" 时生效） */
   issueBasedWeights?: IssueBasedWeights;
+  /** defect-rate 模式权重配置（strategy 为 "defect-rate" 时生效） */
+  defectRateWeights?: DefectRateWeights;
   /** 创建 Issue 时添加的标签名称，默认 "report" */
   issueLabel?: string;
 }
