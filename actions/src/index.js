@@ -165,9 +165,9 @@ async function run() {
     const devMode = core.getInput("dev-mode") === "true";
 
     // Get Git Provider server url and token from input or environment variables
-    const providerUrl = core.getInput("provider-url") || process.env.GIT_PROVIDER_URL || process.env.GITHUB_SERVER_URL || "";
+    const providerUrl = core.getInput("provider-url") || process.env.GIT_PROVIDER_URL || process.env.GITHUB_SERVER_URL || process.env.GITEA_SERVER_URL || "";
     const providerToken =
-      core.getInput("provider-token") || process.env.GIT_PROVIDER_TOKEN || process.env.GITHUB_TOKEN || "";
+      core.getInput("provider-token") || process.env.GIT_PROVIDER_TOKEN || process.env.GITHUB_TOKEN || process.env.GITEA_TOKEN || "";
 
     // Set environment variables for CLI to use
     if (providerUrl) {
@@ -231,9 +231,12 @@ async function run() {
       cwd: execCwd,
       env: {
         ...process.env,
-        GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY || "",
-        GITHUB_REF_NAME: process.env.GITHUB_REF_NAME || "",
-        GITHUB_EVENT_PATH: process.env.GITHUB_EVENT_PATH || "",
+        GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY || process.env.GITEA_REPOSITORY || "",
+        GITHUB_REF_NAME: process.env.GITHUB_REF_NAME || process.env.GITEA_REF_NAME || "",
+        GITHUB_EVENT_PATH: process.env.GITHUB_EVENT_PATH || process.env.GITEA_EVENT_PATH || "",
+        GITEA_REPOSITORY: process.env.GITEA_REPOSITORY || "",
+        GITEA_REF_NAME: process.env.GITEA_REF_NAME || "",
+        GITEA_EVENT_PATH: process.env.GITEA_EVENT_PATH || "",
       },
       listeners: {
         stdout: (data) => {
