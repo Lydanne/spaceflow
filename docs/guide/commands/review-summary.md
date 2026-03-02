@@ -68,12 +68,13 @@ spaceflow review-summary -p this-month -o file --output-file report.md
 
 ## 评分策略
 
-支持两种评分策略，通过 `strategy` 配置切换：
+支持三种评分策略，通过 `strategy` 配置切换：
 
-| 策略               | 说明                                                      |
-| ------------------ | --------------------------------------------------------- |
-| `weighted`（默认） | 加权模式 — 根据代码量、PR 数、问题数等多维度加权计算      |
-| `commit-based`     | 分数累计模式 — 按有效 commit 加分，按 error/warn 问题扣分 |
+| 策略               | 说明                                                                 |
+| ------------------ | -------------------------------------------------------------------- |
+| `weighted`（默认） | 加权模式 — 根据代码量、PR 数、问题数等多维度加权计算                 |
+| `issue-based`      | 审查质量模式 — 逐 PR 计算基础分(对数缩放 60-100) + 问题扣分/修复加分 |
+| `commit-based`     | 分数累计模式 — 按有效 commit 加分，按 error/warn 问题扣分            |
 
 ```json
 {
@@ -125,7 +126,68 @@ spaceflow review-summary -p this-month -o file --output-file report.md
 | `issueDeduction`  | number | 3      | 每个未修复问题的扣分    |
 | `fixedBonus`      | number | 1      | 每个已修复问题的加分    |
 
-### 策略二：分数累计模式（commit-based）
+### 策略二：审查质量模式（issue-based）
+
+逐 PR 计算分数，每个 PR 的基础分根据代码量对数缩放到 60-100 区间，再按审查问题扣分和修复加分，最终汇总求和：
+
+| 维度            | 权重        | 说明                                                   |
+| --------------- | ----------- | ------------------------------------------------------ |
+| PR 基础分       | **60-100**  | 根据代码量对数缩放，防止刷行数，小 PR 也有不错的基础分 |
+| error 问题      | **-8** / 个 | AI 审查发现的 error 级别问题                           |
+| warn 问题       | **-3** / 个 | AI 审查发现的 warn 级别问题                            |
+| 修复 error 问题 | **+5** / 个 | 修复一个 error，弥补扣分的 ~63%                        |
+| 修复 warn 问题  | **+2** / 个 | 修复一个 warn，弥补扣分的 ~67%                         |
+
+> **公式**: `PR分数 = PR基础分(60-100) - error扣分 - warn扣分 + 修复error加分 + 修复warn加分`（每个 PR 最低 0 分）
+>
+> **用户总分**: `Σ 所有 PR 分数`
+
+**PR 基础分计算**：
+
+使用对数缩放将代码量（additions + deletions）映射到 [minBase, maxBase] 区间：
+
+```text
+基础分 = minBase + (maxBase - minBase) × min(1, log₂(1 + 代码行数) / log₂(1 + capLines))
+```
+
+| 代码行数 | 基础分（约） |
+| -------- | ------------ |
+| 0 行     | 60           |
+| 30 行    | 80           |
+| 100 行   | 87           |
+| 300 行   | 93           |
+| 1000+ 行 | 100          |
+
+**自定义权重**（通过 `issueBasedWeights` 配置）：
+
+```json
+{
+  "review-summary": {
+    "strategy": "issue-based",
+    "issueBasedWeights": {
+      "minBase": 60,
+      "maxBase": 100,
+      "capLines": 1000,
+      "errorDeduction": 8,
+      "warnDeduction": 3,
+      "errorFixedBonus": 5,
+      "warnFixedBonus": 2
+    }
+  }
+}
+```
+
+| 配置项            | 类型   | 默认值 | 说明                                     |
+| ----------------- | ------ | ------ | ---------------------------------------- |
+| `minBase`         | number | 60     | PR 基础分下限                            |
+| `maxBase`         | number | 100    | PR 基础分上限                            |
+| `capLines`        | number | 1000   | 代码量封顶行数，超过此值基础分为 maxBase |
+| `errorDeduction`  | number | 8      | 每个 error 问题的扣分                    |
+| `warnDeduction`   | number | 3      | 每个 warn 问题的扣分                     |
+| `errorFixedBonus` | number | 5      | 修复一个 error 问题的加分                |
+| `warnFixedBonus`  | number | 2      | 修复一个 warn 问题的加分                 |
+
+### 策略三：分数累计模式（commit-based）
 
 按每个 PR 中的有效 commit 和审查问题逐项计分，最终按人员汇总求和：
 
@@ -324,6 +386,31 @@ PR 基础分:    3 × 10             = 30.0
 已修复加分:   1 × 1              =  1.0
 ─────────────────────────────────────
 总分:         30 + 25 + 3.2 + 14 - 3 + 1 = 70.2
+```
+
+#### 审查质量模式（issue-based）
+
+以 alice 为例（3 个 PR）：
+
+```text
+PR #142: 970 行代码, 2 error, 0 warn, 修复 1 error
+  基础分:          60 + 40 × min(1, log₂(971) / log₂(1001)) = 99.7
+  error 扣分:      2 × 8            = -16.0
+  修复 error 加分: 1 × 5            = +5.0
+  PR 分数:         99.7 - 16 + 5    = 88.7
+
+PR #145: 200 行代码, 0 error, 1 warn, 修复 1 warn
+  基础分:          60 + 40 × min(1, log₂(201) / log₂(1001)) = 90.6
+  warn 扣分:       1 × 3            = -3.0
+  修复 warn 加分:  1 × 2            = +2.0
+  PR 分数:         90.6 - 3 + 2     = 89.6
+
+PR #148: 80 行代码, 0 error, 0 warn
+  基础分:          60 + 40 × min(1, log₂(81) / log₂(1001)) = 85.4
+  PR 分数:         85.4
+
+─────────────────────────────────────
+总分:              88.7 + 89.6 + 85.4 = 263.7
 ```
 
 #### 分数累计模式（commit-based）

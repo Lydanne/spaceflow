@@ -14,6 +14,7 @@ import type {
   TimePreset,
   WeightedScoreWeights,
   CommitBasedWeights,
+  IssueBasedWeights,
   ReviewSummaryConfig,
   ScoreStrategy,
 } from "./types";
@@ -36,6 +37,17 @@ const DEFAULT_COMMIT_BASED_WEIGHTS: Required<CommitBasedWeights> = {
   errorFixedBonus: 1,
   warnFixedBonus: 0.5,
   minCommitLines: 5,
+};
+
+/** issue-based 模式默认权重 */
+const DEFAULT_ISSUE_BASED_WEIGHTS: Required<IssueBasedWeights> = {
+  minBase: 60,
+  maxBase: 100,
+  capLines: 1000,
+  errorDeduction: 8,
+  warnDeduction: 3,
+  errorFixedBonus: 5,
+  warnFixedBonus: 2,
 };
 
 /**
@@ -370,6 +382,9 @@ export class PeriodSummaryService {
     const strategy: ScoreStrategy = config.strategy ?? "weighted";
     for (const userStats of userMap.values()) {
       switch (strategy) {
+        case "issue-based":
+          userStats.score = this.calculateIssueBasedScore(userStats, config);
+          break;
         case "commit-based":
           userStats.score = this.calculateCommitBasedScore(userStats, config);
           break;
@@ -396,6 +411,42 @@ export class PeriodSummaryService {
     const totalScore =
       prScore + additionsScore + deletionsScore + filesScore - issueDeduction + fixedBonus;
     return Math.max(0, Math.round(totalScore * 10) / 10);
+  }
+
+  /**
+   * issue-based 模式：逐 PR 计算基础分(对数缩放) + 问题扣分/修复加分
+   */
+  protected calculateIssueBasedScore(stats: UserStats, config: ReviewSummaryConfig): number {
+    const weights = { ...DEFAULT_ISSUE_BASED_WEIGHTS, ...config.issueBasedWeights };
+    let totalScore = 0;
+    for (const pr of stats.prs) {
+      const baseScore = this.calculatePrBaseScore(
+        pr.additions + pr.deletions,
+        weights.minBase,
+        weights.maxBase,
+        weights.capLines,
+      );
+      const deduction =
+        pr.errorCount * weights.errorDeduction + pr.warnCount * weights.warnDeduction;
+      const bonus =
+        pr.fixedErrors * weights.errorFixedBonus + pr.fixedWarns * weights.warnFixedBonus;
+      totalScore += Math.max(0, baseScore - deduction + bonus);
+    }
+    return Math.round(totalScore * 10) / 10;
+  }
+
+  /**
+   * 计算单个 PR 的基础分（对数缩放，映射到 [minBase, maxBase] 区间）
+   */
+  protected calculatePrBaseScore(
+    totalLines: number,
+    minBase: number,
+    maxBase: number,
+    capLines: number,
+  ): number {
+    if (totalLines <= 0) return minBase;
+    const ratio = Math.min(1, Math.log2(1 + totalLines) / Math.log2(1 + capLines));
+    return minBase + (maxBase - minBase) * ratio;
   }
 
   /**

@@ -120,7 +120,7 @@ export interface UserStats {
 }
 
 /** 评分策略类型 */
-export type ScoreStrategy = "weighted" | "commit-based";
+export type ScoreStrategy = "weighted" | "commit-based" | "issue-based";
 
 /** 加权模式权重配置 */
 export interface WeightedScoreWeights {
@@ -157,6 +157,24 @@ export interface CommitBasedWeights {
 /** @deprecated 使用 WeightedScoreWeights 代替 */
 export type ScoreWeights = WeightedScoreWeights;
 
+/** issue-based 模式权重配置 */
+export interface IssueBasedWeights {
+  /** PR 基础分下限，默认 60 */
+  minBase?: number;
+  /** PR 基础分上限，默认 100 */
+  maxBase?: number;
+  /** 代码量封顶行数（additions + deletions），超过此值基础分为 maxBase，默认 1000 */
+  capLines?: number;
+  /** 每个 error 问题的扣分，默认 8 */
+  errorDeduction?: number;
+  /** 每个 warn 问题的扣分，默认 3 */
+  warnDeduction?: number;
+  /** 修复一个 error 问题的加分，默认 5 */
+  errorFixedBonus?: number;
+  /** 修复一个 warn 问题的加分，默认 2 */
+  warnFixedBonus?: number;
+}
+
 /** review-summary 扩展配置 */
 export interface ReviewSummaryConfig {
   /** 评分策略，默认 "weighted" */
@@ -165,6 +183,8 @@ export interface ReviewSummaryConfig {
   scoreWeights?: WeightedScoreWeights;
   /** 分数累计模式权重配置（strategy 为 "commit-based" 时生效） */
   commitBasedWeights?: CommitBasedWeights;
+  /** issue-based 模式权重配置（strategy 为 "issue-based" 时生效） */
+  issueBasedWeights?: IssueBasedWeights;
   /** 创建 Issue 时添加的标签名称，默认 "report" */
   issueLabel?: string;
 }
