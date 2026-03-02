@@ -376,6 +376,6 @@ jobs:
       - uses: Lydanne/spaceflow@main
         with:
           command: review-summary
-          args: "-p last-week -o issue -c"
+          args: "-p last-week -o issue"
           provider-token: ${{ secrets.GITHUB_TOKEN }}
 ```
