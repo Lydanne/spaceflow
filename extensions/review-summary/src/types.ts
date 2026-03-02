@@ -75,6 +75,10 @@ export interface PrStats {
   errorCount: number;
   /** warn 级别问题数 */
   warnCount: number;
+  /** 已修复的 error 问题数 */
+  fixedErrors: number;
+  /** 已修复的 warn 问题数 */
+  fixedWarns: number;
   /** 有效 commit 数（单个 commit 新增+删除 >= minCommitLines 行） */
   validCommitCount: number;
   /** PR 描述/功能摘要 */
@@ -101,6 +105,10 @@ export interface UserStats {
   totalErrors: number;
   /** 总 warn 级别问题数 */
   totalWarns: number;
+  /** 总已修复 error 数 */
+  totalFixedErrors: number;
+  /** 总已修复 warn 数 */
+  totalFixedWarns: number;
   /** 总有效 commit 数 */
   totalValidCommits: number;
   /** 综合分数 */
@@ -138,6 +146,10 @@ export interface CommitBasedWeights {
   errorDeduction?: number;
   /** 每个 warn 问题的扣分，默认 1 */
   warnDeduction?: number;
+  /** 修复一个 error 问题的加分，默认为 errorDeduction 的一半（1） */
+  errorFixedBonus?: number;
+  /** 修复一个 warn 问题的加分，默认为 warnDeduction 的一半（0.5） */
+  warnFixedBonus?: number;
   /** 有效 commit 的最低代码行数（新增+删除），默认 5 */
   minCommitLines?: number;
 }

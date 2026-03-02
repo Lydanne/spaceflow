@@ -1,6 +1,7 @@
 import { GitProviderService, shouldLog, normalizeVerbose } from "@spaceflow/core";
 import type { IConfigReader } from "@spaceflow/core";
 import type { PullRequest, Issue, CiConfig } from "@spaceflow/core";
+import { MarkdownFormatter, type ReviewIssue } from "@spaceflow/review";
 import { writeFileSync } from "fs";
 import { join } from "path";
 import type {
@@ -32,6 +33,8 @@ const DEFAULT_COMMIT_BASED_WEIGHTS: Required<CommitBasedWeights> = {
   validCommit: 5,
   errorDeduction: 2,
   warnDeduction: 1,
+  errorFixedBonus: 1,
+  warnFixedBonus: 0.5,
   minCommitLines: 5,
 };
 
@@ -146,7 +149,7 @@ export class PeriodSummaryService {
     } catch {
       // 如果获取文件失败，使用默认值
     }
-    const { issueCount, fixedCount, errorCount, warnCount } = await this.extractIssueStats(owner, repo, pr.number!);
+    const issueStats = await this.extractIssueStats(owner, repo, pr.number!);
     const validCommitCount = await this.countValidCommits(owner, repo, pr.number!);
     return {
       number: pr.number!,
@@ -156,10 +159,7 @@ export class PeriodSummaryService {
       additions,
       deletions,
       changedFiles,
-      issueCount,
-      fixedCount,
-      errorCount,
-      warnCount,
+      ...issueStats,
       validCommitCount,
       description: this.extractDescription(pr),
     };
@@ -172,36 +172,94 @@ export class PeriodSummaryService {
     owner: string,
     repo: string,
     prNumber: number,
-  ): Promise<{ issueCount: number; fixedCount: number; errorCount: number; warnCount: number }> {
+  ): Promise<{
+    issueCount: number;
+    fixedCount: number;
+    errorCount: number;
+    warnCount: number;
+    fixedErrors: number;
+    fixedWarns: number;
+  }> {
+    const empty = { issueCount: 0, fixedCount: 0, errorCount: 0, warnCount: 0, fixedErrors: 0, fixedWarns: 0 };
     try {
       const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
-      let issueCount = 0;
-      let fixedCount = 0;
-      let errorCount = 0;
-      let warnCount = 0;
+      // 优先从 review 模块嵌入的结构化数据中精确提取
+      const formatter = new MarkdownFormatter();
       for (const comment of comments) {
         const body = comment.body ?? "";
-        const issueMatch = body.match(/发现\s*(\d+)\s*个问题/);
-        if (issueMatch) {
-          issueCount = Math.max(issueCount, parseInt(issueMatch[1], 10));
-        }
-        const fixedMatch = body.match(/已修复[：:]\s*(\d+)/);
-        if (fixedMatch) {
-          fixedCount = Math.max(fixedCount, parseInt(fixedMatch[1], 10));
-        }
-        const statsMatch = body.match(/🔴\s*(\d+).*🟡\s*(\d+)/);
-        if (statsMatch) {
-          const parsedErrors = parseInt(statsMatch[1], 10);
-          const parsedWarns = parseInt(statsMatch[2], 10);
-          errorCount = Math.max(errorCount, parsedErrors);
-          warnCount = Math.max(warnCount, parsedWarns);
-          issueCount = Math.max(issueCount, parsedErrors + parsedWarns);
+        const parsed = formatter.parse(body);
+        if (parsed?.result?.issues) {
+          return this.computeIssueStatsFromReviewIssues(parsed.result.issues);
         }
       }
-      return { issueCount, fixedCount, errorCount, warnCount };
+      // 回退：没有结构化数据时，从评论文本正则提取（兼容旧数据）
+      return this.extractIssueStatsFromText(comments);
     } catch {
-      return { issueCount: 0, fixedCount: 0, errorCount: 0, warnCount: 0 };
+      return empty;
     }
+  }
+
+  /**
+   * 从 ReviewIssue 列表中精确计算各类问题统计
+   */
+  protected computeIssueStatsFromReviewIssues(issues: ReviewIssue[]): {
+    issueCount: number;
+    fixedCount: number;
+    errorCount: number;
+    warnCount: number;
+    fixedErrors: number;
+    fixedWarns: number;
+  } {
+    const errorCount = issues.filter((i) => i.severity === "error").length;
+    const warnCount = issues.filter((i) => i.severity === "warn").length;
+    const fixedErrors = issues.filter((i) => i.severity === "error" && i.fixed).length;
+    const fixedWarns = issues.filter((i) => i.severity === "warn" && i.fixed).length;
+    return {
+      issueCount: issues.length,
+      fixedCount: fixedErrors + fixedWarns,
+      errorCount,
+      warnCount,
+      fixedErrors,
+      fixedWarns,
+    };
+  }
+
+  /**
+   * 回退：从评论文本正则提取问题统计（兼容无结构化数据的旧评论）
+   */
+  protected extractIssueStatsFromText(
+    comments: { body?: string }[],
+  ): {
+    issueCount: number;
+    fixedCount: number;
+    errorCount: number;
+    warnCount: number;
+    fixedErrors: number;
+    fixedWarns: number;
+  } {
+    let issueCount = 0;
+    let fixedCount = 0;
+    let errorCount = 0;
+    let warnCount = 0;
+    for (const comment of comments) {
+      const body = comment.body ?? "";
+      const issueMatch = body.match(/发现\s*(\d+)\s*个问题/);
+      if (issueMatch) {
+        issueCount = Math.max(issueCount, parseInt(issueMatch[1], 10));
+      }
+      const fixedMatch = body.match(/已修复[：:]\s*(\d+)/);
+      if (fixedMatch) {
+        fixedCount = Math.max(fixedCount, parseInt(fixedMatch[1], 10));
+      }
+      const statsMatch = body.match(/🔴\s*(\d+).*🟡\s*(\d+)/);
+      if (statsMatch) {
+        errorCount = Math.max(errorCount, parseInt(statsMatch[1], 10));
+        warnCount = Math.max(warnCount, parseInt(statsMatch[2], 10));
+        issueCount = Math.max(issueCount, errorCount + warnCount);
+      }
+    }
+    // 文本模式无法区分修复类型，统一设为 0
+    return { issueCount, fixedCount, errorCount, warnCount, fixedErrors: 0, fixedWarns: 0 };
   }
 
   /**
@@ -264,6 +322,8 @@ export class PeriodSummaryService {
           totalFixed: 0,
           totalErrors: 0,
           totalWarns: 0,
+          totalFixedErrors: 0,
+          totalFixedWarns: 0,
           totalValidCommits: 0,
           score: 0,
           features: [],
@@ -279,6 +339,8 @@ export class PeriodSummaryService {
       userStats.totalFixed += pr.fixedCount;
       userStats.totalErrors += pr.errorCount;
       userStats.totalWarns += pr.warnCount;
+      userStats.totalFixedErrors += pr.fixedErrors;
+      userStats.totalFixedWarns += pr.fixedWarns;
       userStats.totalValidCommits += pr.validCommitCount;
       if (pr.description) {
         userStats.features.push(pr.description);
@@ -344,7 +406,10 @@ export class PeriodSummaryService {
     const commitScore = stats.totalValidCommits * weights.validCommit;
     const errorDeduction = stats.totalErrors * weights.errorDeduction;
     const warnDeduction = stats.totalWarns * weights.warnDeduction;
-    const totalScore = commitScore - errorDeduction - warnDeduction;
+    const fixedBonus =
+      stats.totalFixedErrors * weights.errorFixedBonus +
+      stats.totalFixedWarns * weights.warnFixedBonus;
+    const totalScore = commitScore - errorDeduction - warnDeduction + fixedBonus;
     return Math.max(0, Math.round(totalScore * 10) / 10);
   }
 

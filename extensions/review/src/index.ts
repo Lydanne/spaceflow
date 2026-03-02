@@ -1,4 +1,6 @@
 import "./locales";
+export * from "./review-spec";
+export * from "./review-report";
 import { defineExtension, t } from "@spaceflow/core";
 import type { GitProviderService, LlmProxyService, GitSdkService, LLMMode } from "@spaceflow/core";
 import { parseVerbose } from "@spaceflow/core";

@@ -129,19 +129,23 @@ spaceflow review-summary -p this-month -o file --output-file report.md
 
 按每个 PR 中的有效 commit 和审查问题逐项计分，最终按人员汇总求和：
 
-| 维度        | 权重        | 说明                                |
-| ----------- | ----------- | ----------------------------------- |
-| 有效 commit | **+5** / 个 | 单个 commit 代码变更 ≥ 5 行视为有效 |
-| error 问题  | **-2** / 个 | AI 审查发现的 error 级别问题        |
-| warn 问题   | **-1** / 个 | AI 审查发现的 warn 级别问题         |
+| 维度            | 权重          | 说明                                |
+| --------------- | ------------- | ----------------------------------- |
+| 有效 commit     | **+5** / 个   | 单个 commit 代码变更 ≥ 5 行视为有效 |
+| error 问题      | **-2** / 个   | AI 审查发现的 error 级别问题        |
+| warn 问题       | **-1** / 个   | AI 审查发现的 warn 级别问题         |
+| 修复 error 问题 | **+1** / 个   | 修复一个 error，加对应扣分的一半    |
+| 修复 warn 问题  | **+0.5** / 个 | 修复一个 warn，加对应扣分的一半     |
 
-> **公式**: `分数 = 有效commit数 × 5 - error数 × 2 - warn数 × 1`（最低 0 分）
+> **公式**: `分数 = 有效commit加分 - error扣分 - warn扣分 + 修复error加分 + 修复warn加分`（最低 0 分）
 
 **有效 commit 判定**：
 
 - 通过 API 逐个获取 commit 的文件变更信息
 - 单个 commit 的 `additions + deletions ≥ minCommitLines`（默认 5 行）视为有效
 - 自动跳过 merge commit
+
+**修复数统计**：直接从 `@spaceflow/review` 模块嵌入在 PR 评论中的结构化审查数据中精确提取每个问题的 `severity` 和 `fixed` 状态，无需猜测。
 
 **自定义权重**（通过 `commitBasedWeights` 配置）：
 
@@ -153,18 +157,22 @@ spaceflow review-summary -p this-month -o file --output-file report.md
       "validCommit": 5,
       "errorDeduction": 2,
       "warnDeduction": 1,
+      "errorFixedBonus": 1,
+      "warnFixedBonus": 0.5,
       "minCommitLines": 5
     }
   }
 }
 ```
 
-| 配置项           | 类型   | 默认值 | 说明                                    |
-| ---------------- | ------ | ------ | --------------------------------------- |
-| `validCommit`    | number | 5      | 每个有效 commit 的加分                  |
-| `errorDeduction` | number | 2      | 每个 error 问题的扣分                   |
-| `warnDeduction`  | number | 1      | 每个 warn 问题的扣分                    |
-| `minCommitLines` | number | 5      | 有效 commit 的最低代码行数（新增+删除） |
+| 配置项            | 类型   | 默认值 | 说明                                        |
+| ----------------- | ------ | ------ | ------------------------------------------- |
+| `validCommit`     | number | 5      | 每个有效 commit 的加分                      |
+| `errorDeduction`  | number | 2      | 每个 error 问题的扣分                       |
+| `warnDeduction`   | number | 1      | 每个 warn 问题的扣分                        |
+| `errorFixedBonus` | number | 1      | 修复一个 error 问题的加分（默认扣分的一半） |
+| `warnFixedBonus`  | number | 0.5    | 修复一个 warn 问题的加分（默认扣分的一半）  |
+| `minCommitLines`  | number | 5      | 有效 commit 的最低代码行数（新增+删除）     |
 
 > **注意**：commit-based 模式需要逐 commit 调用 API 获取行数信息，PR 较多时执行时间会较长。
 
@@ -306,14 +314,16 @@ PR 基础分:    3 × 10             = 30.0
 
 #### 分数累计模式（commit-based）
 
-以 alice 为例（12 个有效 commit, 1 个 error, 2 个 warn）：
+以 alice 为例（12 个有效 commit, 1 个 error, 2 个 warn, 修复 1 个 error + 1 个 warn）：
 
 ```text
-有效 commit:  12 × 5             = 60.0
-error 扣分:   1 × 2              = -2.0
-warn 扣分:    2 × 1              = -2.0
+有效 commit:     12 × 5           = 60.0
+error 扣分:      1 × 2            = -2.0
+warn 扣分:       2 × 1            = -2.0
+修复 error 加分: 1 × 1            = +1.0
+修复 warn 加分:  1 × 0.5          = +0.5
 ─────────────────────────────────────
-总分:         60 - 2 - 2 = 56.0
+总分:            60 - 2 - 2 + 1 + 0.5 = 57.5
 ```
 
 ## 数据来源
