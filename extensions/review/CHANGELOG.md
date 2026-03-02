@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.53.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.52.0...@spaceflow/review@0.53.0) (2026-03-02)
+
+### 修复BUG
+
+* **core:** 重构配置 Schema 生成逻辑，使用 SpaceflowConfigSchema 作为基础 ([c73eb1c](https://github.com/Lydanne/spaceflow/commit/c73eb1ce5b6f212b8a932a15224db7e63822f8d0))
+
+### 其他修改
+
+* **core:** released version 0.19.0 [no ci] ([c8bfe6b](https://github.com/Lydanne/spaceflow/commit/c8bfe6ba20893e2c3cd383ed7e7d3217b0492eb6))
+* **publish:** released version 0.43.0 [no ci] ([1074b9c](https://github.com/Lydanne/spaceflow/commit/1074b9c5fb21a447093ef23300c451d790710b33))
+
 ## [0.52.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.51.0...@spaceflow/review@0.52.0) (2026-02-28)
 
 ### 测试用例
