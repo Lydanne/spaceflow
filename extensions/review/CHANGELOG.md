@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.54.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.53.0...@spaceflow/review@0.54.0) (2026-03-02)
+
+### 新特性
+
+* **review:** 为行级评论 Review 添加统计信息摘要 ([58d5b37](https://github.com/Lydanne/spaceflow/commit/58d5b37ba54daa24bd2f8396318fedc87f388c74))
+
+### 其他修改
+
+* **review-summary:** released version 0.21.0 [no ci] ([11379c4](https://github.com/Lydanne/spaceflow/commit/11379c478859a12dd0340a78b1578487d9a24b31))
+* **scripts:** released version 0.21.0 [no ci] ([1f0a213](https://github.com/Lydanne/spaceflow/commit/1f0a2139d155807451dc968de8213bafe2e4edb8))
+* **shell:** released version 0.21.0 [no ci] ([b619af7](https://github.com/Lydanne/spaceflow/commit/b619af741e16053868a2eedd41f56d50134954d8))
+
 ## [0.53.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.52.0...@spaceflow/review@0.53.0) (2026-03-02)
 
 ### 修复BUG
