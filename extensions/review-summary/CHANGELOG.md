@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.25.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.24.0...@spaceflow/review-summary@0.25.0) (2026-03-02)
+
+### 新特性
+
+* **review-summary:** 实现 review-summary 命令核心功能 ([5964eec](https://github.com/Lydanne/spaceflow/commit/5964eec0e2ee4ac46f74808466429b0edc0cbaa1))
+
 ## [0.24.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.23.0...@spaceflow/review-summary@0.24.0) (2026-03-02)
 
 ### 新特性
