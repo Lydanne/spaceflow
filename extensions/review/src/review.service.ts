@@ -1969,18 +1969,20 @@ ${fileChanges || "无"}`;
       console.warn("⚠️ 清理旧行级评论失败:", error);
     }
     // 3. 发布新的行级评论（使用 PR Review API）
+    let lineIssues: ReviewIssue[] = [];
     let comments: CreatePullReviewComment[] = [];
     if (reviewConf.lineComments) {
-      comments = result.issues
-        .filter((issue) => !issue.fixed && issue.valid !== "false")
+      lineIssues = result.issues.filter((issue) => !issue.fixed && issue.valid !== "false");
+      comments = lineIssues
         .map((issue) => this.issueToReviewComment(issue))
         .filter((comment): comment is CreatePullReviewComment => comment !== null);
     }
     if (comments.length > 0) {
+      const reviewBody = this.buildLineReviewBody(lineIssues);
       try {
         await this.gitProvider.createPullReview(owner, repo, prNumber, {
           event: REVIEW_STATE.COMMENT,
-          body: REVIEW_LINE_COMMENTS_MARKER,
+          body: reviewBody,
           comments,
           commit_id: commitId,
         });
@@ -1993,7 +1995,7 @@ ${fileChanges || "无"}`;
           try {
             await this.gitProvider.createPullReview(owner, repo, prNumber, {
               event: REVIEW_STATE.COMMENT,
-              body: successCount === 0 ? REVIEW_LINE_COMMENTS_MARKER : undefined,
+              body: successCount === 0 ? reviewBody : undefined,
               comments: [comment],
               commit_id: commitId,
             });
@@ -2425,6 +2427,24 @@ ${fileChanges || "无"}`;
     if (deletedCount > 0) {
       console.log(`🗑️ 已删除 ${deletedCount} 个旧的 AI review`);
     }
+  }
+
+  /**
+   * 构建行级评论 Review 的 body（marker + 本轮统计信息）
+   */
+  protected buildLineReviewBody(issues: ReviewIssue[]): string {
+    const errorCount = issues.filter((i) => i.severity === "error").length;
+    const warnCount = issues.filter((i) => i.severity === "warn").length;
+    const fileCount = new Set(issues.map((i) => i.file)).size;
+
+    const parts: string[] = [REVIEW_LINE_COMMENTS_MARKER];
+    parts.push(`**Spaceflow Review** — ${issues.length} 个问题，涉及 ${fileCount} 个文件`);
+    const badges: string[] = [];
+    if (errorCount > 0) badges.push(`🔴 ${errorCount} error`);
+    if (warnCount > 0) badges.push(`🟡 ${warnCount} warn`);
+    if (badges.length > 0) parts.push(badges.join("  "));
+
+    return parts.join("\n");
   }
 
   /**
