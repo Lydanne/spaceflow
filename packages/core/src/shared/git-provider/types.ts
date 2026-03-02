@@ -277,8 +277,8 @@ export interface CreateIssueOption {
   body?: string;
   /** 指派人用户名列表 */
   assignees?: string[];
-  /** 标签 ID 列表 */
-  labels?: number[];
+  /** 标签名称列表，各平台 adapter 内部负责名称到 ID 的转换 */
+  labels?: string[];
   /** 里程碑 ID */
   milestone?: number;
   /** 截止日期 */
