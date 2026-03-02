@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.55.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.54.0...@spaceflow/review@0.55.0) (2026-03-02)
+
+### 新特性
+
+* **review:** 保留历史行级评论，为每轮 Review 生成独立评论并添加上轮回顾 ([de431a0](https://github.com/Lydanne/spaceflow/commit/de431a09b4e3b5e1ada9ee5f1ee65786d22b6ff9))
+* **review:** 支持用户手动 resolve 评论并在报告中区分 AI 修复与手动解决 ([c968b65](https://github.com/Lydanne/spaceflow/commit/c968b65c850bc68de3f4409aa3b5294e5a0311ff))
+
+### 修复BUG
+
+* **review:** 修复率计算仅统计 AI 修复的问题，排除手动解决的问题 ([12b3415](https://github.com/Lydanne/spaceflow/commit/12b3415749c9d8523e8b23365fbb39fc7657ff1d))
+
 ## [0.54.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.53.0...@spaceflow/review@0.54.0) (2026-03-02)
 
 ### 新特性
