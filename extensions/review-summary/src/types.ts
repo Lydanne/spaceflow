@@ -71,6 +71,12 @@ export interface PrStats {
   issueCount: number;
   /** 已修复的问题数 */
   fixedCount: number;
+  /** error 级别问题数 */
+  errorCount: number;
+  /** warn 级别问题数 */
+  warnCount: number;
+  /** 有效 commit 数（单个 commit 新增+删除 >= minCommitLines 行） */
+  validCommitCount: number;
   /** PR 描述/功能摘要 */
   description: string;
 }
@@ -91,6 +97,12 @@ export interface UserStats {
   totalIssues: number;
   /** 总已修复问题数 */
   totalFixed: number;
+  /** 总 error 级别问题数 */
+  totalErrors: number;
+  /** 总 warn 级别问题数 */
+  totalWarns: number;
+  /** 总有效 commit 数 */
+  totalValidCommits: number;
   /** 综合分数 */
   score: number;
   /** 功能摘要列表 */
@@ -99,8 +111,11 @@ export interface UserStats {
   prs: PrStats[];
 }
 
-/** 评分权重配置 */
-export interface ScoreWeights {
+/** 评分策略类型 */
+export type ScoreStrategy = "weighted" | "commit-based";
+
+/** 加权模式权重配置 */
+export interface WeightedScoreWeights {
   /** 每个 PR 的基础分，默认 10 */
   prBase?: number;
   /** 每 100 行新增代码的分数，默认 2 */
@@ -115,10 +130,29 @@ export interface ScoreWeights {
   fixedBonus?: number;
 }
 
+/** 分数累计模式权重配置 */
+export interface CommitBasedWeights {
+  /** 每个有效 commit 的加分，默认 5 */
+  validCommit?: number;
+  /** 每个 error 问题的扣分，默认 2 */
+  errorDeduction?: number;
+  /** 每个 warn 问题的扣分，默认 1 */
+  warnDeduction?: number;
+  /** 有效 commit 的最低代码行数（新增+删除），默认 5 */
+  minCommitLines?: number;
+}
+
+/** @deprecated 使用 WeightedScoreWeights 代替 */
+export type ScoreWeights = WeightedScoreWeights;
+
 /** review-summary 扩展配置 */
 export interface ReviewSummaryConfig {
-  /** 评分权重配置，可部分覆盖默认值 */
-  scoreWeights?: ScoreWeights;
+  /** 评分策略，默认 "weighted" */
+  strategy?: ScoreStrategy;
+  /** 加权模式权重配置（strategy 为 "weighted" 时生效） */
+  scoreWeights?: WeightedScoreWeights;
+  /** 分数累计模式权重配置（strategy 为 "commit-based" 时生效） */
+  commitBasedWeights?: CommitBasedWeights;
 }
 
 /** 周期统计结果 */

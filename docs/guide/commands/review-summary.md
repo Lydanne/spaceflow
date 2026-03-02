@@ -66,7 +66,24 @@ spaceflow review-summary -p this-month -o file --output-file report.md
 | `last-15-days` | 最近 15 天              |
 | `last-30-days` | 最近 30 天              |
 
-## 评分算法
+## 评分策略
+
+支持两种评分策略，通过 `strategy` 配置切换：
+
+| 策略               | 说明                                                      |
+| ------------------ | --------------------------------------------------------- |
+| `weighted`（默认） | 加权模式 — 根据代码量、PR 数、问题数等多维度加权计算      |
+| `commit-based`     | 分数累计模式 — 按有效 commit 加分，按 error/warn 问题扣分 |
+
+```json
+{
+  "review-summary": {
+    "strategy": "weighted"
+  }
+}
+```
+
+### 策略一：加权模式（weighted）
 
 综合分数由以下维度加权计算：
 
@@ -81,13 +98,12 @@ spaceflow review-summary -p this-month -o file --output-file report.md
 
 > **公式**: `分数 = PR基础分 + 新增代码分 + 删除代码分 + 文件分 - 未修复扣分 + 已修复加分`（最低 0 分）
 
-### 自定义权重
-
-在 `.spaceflowrc` 中通过 `scoreWeights` 配置部分或全部权重，未指定的维度使用默认值：
+**自定义权重**（通过 `scoreWeights` 配置，只需指定要修改的字段）：
 
 ```json
 {
   "review-summary": {
+    "strategy": "weighted",
     "scoreWeights": {
       "prBase": 15,
       "additionsPer100": 3,
@@ -109,7 +125,48 @@ spaceflow review-summary -p this-month -o file --output-file report.md
 | `issueDeduction`  | number | 3      | 每个未修复问题的扣分    |
 | `fixedBonus`      | number | 1      | 每个已修复问题的加分    |
 
-> 只需配置要修改的字段即可，例如只想加大问题扣分力度：`{ "scoreWeights": { "issueDeduction": 10 } }`
+### 策略二：分数累计模式（commit-based）
+
+按每个 PR 中的有效 commit 和审查问题逐项计分，最终按人员汇总求和：
+
+| 维度        | 权重        | 说明                                |
+| ----------- | ----------- | ----------------------------------- |
+| 有效 commit | **+5** / 个 | 单个 commit 代码变更 ≥ 5 行视为有效 |
+| error 问题  | **-2** / 个 | AI 审查发现的 error 级别问题        |
+| warn 问题   | **-1** / 个 | AI 审查发现的 warn 级别问题         |
+
+> **公式**: `分数 = 有效commit数 × 5 - error数 × 2 - warn数 × 1`（最低 0 分）
+
+**有效 commit 判定**：
+
+- 通过 API 逐个获取 commit 的文件变更信息
+- 单个 commit 的 `additions + deletions ≥ minCommitLines`（默认 5 行）视为有效
+- 自动跳过 merge commit
+
+**自定义权重**（通过 `commitBasedWeights` 配置）：
+
+```json
+{
+  "review-summary": {
+    "strategy": "commit-based",
+    "commitBasedWeights": {
+      "validCommit": 5,
+      "errorDeduction": 2,
+      "warnDeduction": 1,
+      "minCommitLines": 5
+    }
+  }
+}
+```
+
+| 配置项           | 类型   | 默认值 | 说明                                    |
+| ---------------- | ------ | ------ | --------------------------------------- |
+| `validCommit`    | number | 5      | 每个有效 commit 的加分                  |
+| `errorDeduction` | number | 2      | 每个 error 问题的扣分                   |
+| `warnDeduction`  | number | 1      | 每个 warn 问题的扣分                    |
+| `minCommitLines` | number | 5      | 有效 commit 的最低代码行数（新增+删除） |
+
+> **注意**：commit-based 模式需要逐 commit 调用 API 获取行数信息，PR 较多时执行时间会较长。
 
 ## 输出示例
 
@@ -232,6 +289,8 @@ spaceflow review-summary -p this-month -o file --output-file report.md
 
 ### 分数计算演示
 
+#### 加权模式（weighted）
+
 以 alice 为例（3 PR, +1250 行, -320 行, 28 文件, 2 问题, 1 已修复）：
 
 ```text
@@ -245,16 +304,29 @@ PR 基础分:    3 × 10             = 30.0
 总分:         30 + 25 + 3.2 + 14 - 3 + 1 = 70.2
 ```
 
+#### 分数累计模式（commit-based）
+
+以 alice 为例（12 个有效 commit, 1 个 error, 2 个 warn）：
+
+```text
+有效 commit:  12 × 5             = 60.0
+error 扣分:   1 × 2              = -2.0
+warn 扣分:    2 × 1              = -2.0
+─────────────────────────────────────
+总分:         60 - 2 - 2 = 56.0
+```
+
 ## 数据来源
 
 统计数据通过 Git Provider API 获取：
 
-| 数据     | 来源                                                       |
-| -------- | ---------------------------------------------------------- |
-| PR 列表  | `listAllPullRequests` — 筛选时间范围内已合并的 PR          |
-| 代码行数 | `getPullRequestFiles` — 统计每个文件的 additions/deletions |
-| 问题统计 | `listIssueComments` — 从 AI 审查评论中正则提取问题数       |
-| 功能描述 | PR 标题 — 自动去除 `[Tag]` 前缀                            |
+| 数据        | 来源                                                         |
+| ----------- | ------------------------------------------------------------ |
+| PR 列表     | `listAllPullRequests` — 筛选时间范围内已合并的 PR            |
+| 代码行数    | `getPullRequestFiles` — 统计每个文件的 additions/deletions   |
+| 问题统计    | `listIssueComments` — 从 AI 审查评论中正则提取 error/warn 数 |
+| 有效 commit | `getPullRequestCommits` + `getCommit` — 逐 commit 判断行数   |
+| 功能描述    | PR 标题 — 自动去除 `[Tag]` 前缀                              |
 
 ## 环境变量
 
