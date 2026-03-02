@@ -73,8 +73,10 @@ export interface ReviewIssue {
   specFile: string;
   reason: string;
   date?: string; // 发现问题的时间
-  fixed?: string; // 修复时间
-  fixedBy?: UserInfo; // 解决者
+  fixed?: string; // AI 验证修复时间
+  fixedBy?: UserInfo; // AI 验证修复者
+  resolved?: string; // 用户手动点击 resolve 的时间
+  resolvedBy?: UserInfo; // 手动 resolve 的操作者
   valid?: string; // 问题是否有效
   suggestion?: string;
   commit?: string;
@@ -115,8 +117,10 @@ export interface DeletionImpactResult {
 export interface ReviewStats {
   /** 总问题数 */
   total: number;
-  /** 已修复数 */
+  /** AI 验证已修复数 */
   fixed: number;
+  /** 用户手动 resolve 数 */
+  resolved: number;
   /** 无效问题数 */
   invalid: number;
   /** 待处理数 */

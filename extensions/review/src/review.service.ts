@@ -900,10 +900,11 @@ export class ReviewService {
   protected calculateIssueStats(issues: ReviewIssue[]): ReviewStats {
     const total = issues.length;
     const fixed = issues.filter((i) => i.fixed).length;
+    const resolved = issues.filter((i) => i.resolved && !i.fixed).length;
     const invalid = issues.filter((i) => i.valid === "false").length;
-    const pending = total - fixed - invalid;
-    const fixRate = total > 0 ? Math.round((fixed / total) * 100 * 10) / 10 : 0;
-    return { total, fixed, invalid, pending, fixRate };
+    const pending = total - fixed - resolved - invalid;
+    const fixRate = total > 0 ? Math.round(((fixed + resolved) / total) * 100 * 10) / 10 : 0;
+    return { total, fixed, resolved, invalid, pending, fixRate };
   }
 
   /**
@@ -1972,7 +1973,9 @@ ${fileChanges || "无"}`;
     let lineIssues: ReviewIssue[] = [];
     let comments: CreatePullReviewComment[] = [];
     if (reviewConf.lineComments) {
-      lineIssues = result.issues.filter((issue) => !issue.fixed && issue.valid !== "false");
+      lineIssues = result.issues.filter(
+        (issue) => !issue.fixed && !issue.resolved && issue.valid !== "false",
+      );
       comments = lineIssues
         .map((issue) => this.issueToReviewComment(issue))
         .filter((comment): comment is CreatePullReviewComment => comment !== null);
@@ -2047,7 +2050,8 @@ ${fileChanges || "无"}`;
   }
 
   /**
-   * 从 PR 的所有 resolved review threads 中同步 fixed 状态到 result.issues
+   * 从 PR 的所有 resolved review threads 中同步 resolved 状态到 result.issues
+   * 用户手动点击 resolve 的记录写入 resolved/resolvedBy 字段（区别于 AI 验证的 fixed/fixedBy）
    * 优先通过评论 body 中的 issue key 精确匹配，回退到 path+line 匹配
    */
   protected async syncResolvedComments(
@@ -2084,10 +2088,10 @@ ${fileChanges || "无"}`;
               issue.file === thread.path && this.lineMatchesPosition(issue.line, thread.line),
           );
         }
-        if (matchedIssue && !matchedIssue.fixed) {
-          matchedIssue.fixed = now;
+        if (matchedIssue && !matchedIssue.resolved) {
+          matchedIssue.resolved = now;
           if (thread.resolvedBy) {
-            matchedIssue.fixedBy = {
+            matchedIssue.resolvedBy = {
               id: thread.resolvedBy.id?.toString(),
               login: thread.resolvedBy.login,
             };
@@ -2545,8 +2549,8 @@ ${fileChanges || "无"}`;
       // 将变更文件的历史 issue 标记为无效
       let invalidatedCount = 0;
       const updatedIssues = issues.map((issue) => {
-        // 如果 issue 已修复或已无效，不需要处理
-        if (issue.fixed || issue.valid === "false") {
+        // 如果 issue 已修复、已解决或已无效，不需要处理
+        if (issue.fixed || issue.resolved || issue.valid === "false") {
           return issue;
         }
 
@@ -2592,8 +2596,8 @@ ${fileChanges || "无"}`;
     let updatedCount = 0;
     let invalidatedCount = 0;
     const updatedIssues = issues.map((issue) => {
-      // 如果 issue 已修复或无效，不需要更新行号
-      if (issue.fixed || issue.valid === "false") {
+      // 如果 issue 已修复、已解决或无效，不需要更新行号
+      if (issue.fixed || issue.resolved || issue.valid === "false") {
         return issue;
       }
 

@@ -1226,17 +1226,32 @@ describe("ReviewService", () => {
   describe("ReviewService.calculateIssueStats", () => {
     it("should calculate stats for empty array", () => {
       const stats = (service as any).calculateIssueStats([]);
-      expect(stats).toEqual({ total: 0, fixed: 0, invalid: 0, pending: 0, fixRate: 0 });
+      expect(stats).toEqual({
+        total: 0,
+        fixed: 0,
+        resolved: 0,
+        invalid: 0,
+        pending: 0,
+        fixRate: 0,
+      });
     });
 
     it("should calculate stats correctly", () => {
-      const issues = [{ fixed: "2024-01-01" }, { fixed: "2024-01-02" }, { valid: "false" }, {}, {}];
+      const issues = [
+        { fixed: "2024-01-01" },
+        { fixed: "2024-01-02" },
+        { resolved: "2024-01-03" },
+        { valid: "false" },
+        {},
+        {},
+      ];
       const stats = (service as any).calculateIssueStats(issues);
-      expect(stats.total).toBe(5);
+      expect(stats.total).toBe(6);
       expect(stats.fixed).toBe(2);
+      expect(stats.resolved).toBe(1);
       expect(stats.invalid).toBe(1);
       expect(stats.pending).toBe(2);
-      expect(stats.fixRate).toBe(40);
+      expect(stats.fixRate).toBe(50);
     });
   });
 
@@ -1820,18 +1835,18 @@ describe("ReviewService", () => {
   });
 
   describe("ReviewService.syncResolvedComments", () => {
-    it("should mark matched issues as fixed via path:line fallback", async () => {
+    it("should mark matched issues as resolved via path:line fallback", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       gitProvider.listResolvedThreads.mockResolvedValue([
         { path: "test.ts", line: 10, resolvedBy: { login: "user1" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
       await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect((result.issues[0] as any).fixed).toBeDefined();
-      expect((result.issues[0] as any).fixedBy).toEqual({ id: undefined, login: "user1" });
+      expect((result.issues[0] as any).resolved).toBeDefined();
+      expect((result.issues[0] as any).resolvedBy).toEqual({ id: undefined, login: "user1" });
     });
 
-    it("should mark matched issues as fixed via issue key in body", async () => {
+    it("should mark matched issues as resolved via issue key in body", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       gitProvider.listResolvedThreads.mockResolvedValue([
         {
@@ -1845,8 +1860,8 @@ describe("ReviewService", () => {
         issues: [{ file: "test.ts", line: "10", ruleId: "RuleA" }],
       };
       await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect((result.issues[0] as any).fixed).toBeDefined();
-      expect((result.issues[0] as any).fixedBy).toEqual({ id: undefined, login: "user1" });
+      expect((result.issues[0] as any).resolved).toBeDefined();
+      expect((result.issues[0] as any).resolvedBy).toEqual({ id: undefined, login: "user1" });
     });
 
     it("should match correct issue by issue key when multiple issues at same position", async () => {
@@ -1866,17 +1881,17 @@ describe("ReviewService", () => {
         ],
       };
       await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect(result.issues[0].fixed).toBeUndefined(); // RuleA 未解决
-      expect(result.issues[0].fixedBy).toBeUndefined();
-      expect(result.issues[1].fixed).toBeDefined(); // RuleB 已解决
-      expect(result.issues[1].fixedBy).toEqual({ id: undefined, login: "user1" });
+      expect(result.issues[0].resolved).toBeUndefined(); // RuleA 未解决
+      expect(result.issues[0].resolvedBy).toBeUndefined();
+      expect(result.issues[1].resolved).toBeDefined(); // RuleB 已解决
+      expect(result.issues[1].resolvedBy).toEqual({ id: undefined, login: "user1" });
     });
 
     it("should skip when no resolved threads", async () => {
       gitProvider.listResolvedThreads.mockResolvedValue([] as any);
       const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
       await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect((result.issues[0] as any).fixed).toBeUndefined();
+      expect((result.issues[0] as any).resolved).toBeUndefined();
     });
 
     it("should skip threads without path", async () => {
@@ -1885,7 +1900,7 @@ describe("ReviewService", () => {
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
       await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect((result.issues[0] as any).fixed).toBeUndefined();
+      expect((result.issues[0] as any).resolved).toBeUndefined();
     });
 
     it("should handle error gracefully", async () => {

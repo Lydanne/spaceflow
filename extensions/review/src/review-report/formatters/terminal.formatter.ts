@@ -31,7 +31,7 @@ export class TerminalFormatter implements ReviewReportFormatter {
     const issuesByFile = new Map<string, { resolved: number; unresolved: number }>();
     for (const issue of issues) {
       const stats = issuesByFile.get(issue.file) || { resolved: 0, unresolved: 0 };
-      if (issue.fixed) {
+      if (issue.fixed || issue.resolved) {
         stats.resolved++;
       } else {
         stats.unresolved++;
@@ -122,6 +122,7 @@ export class TerminalFormatter implements ReviewReportFormatter {
     const lines = [`\n${BOLD}${CYAN}📊 ${title}:${RESET}`];
     lines.push(`   总问题数: ${stats.total}`);
     lines.push(`   ${GREEN}✅ 已修复: ${stats.fixed}${RESET}`);
+    lines.push(`   ${GREEN}🟢 已解决: ${stats.resolved}${RESET}`);
     lines.push(`   ${RED}❌ 无效: ${stats.invalid}${RESET}`);
     lines.push(`   ${YELLOW}⚠️  待处理: ${stats.pending}${RESET}`);
     lines.push(`   修复率: ${stats.fixRate}%`);

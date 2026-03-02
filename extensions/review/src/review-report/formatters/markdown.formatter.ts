@@ -53,6 +53,10 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
         const fixedByStr = issue.fixedBy?.login ? ` (by @${issue.fixedBy.login})` : "";
         lines.push(`- **修复时间**: ${formatDateToUTC8(issue.fixed)}${fixedByStr}`);
       }
+      if (issue.resolved) {
+        const resolvedByStr = issue.resolvedBy?.login ? ` (by @${issue.resolvedBy.login})` : "";
+        lines.push(`- **解决时间**: ${formatDateToUTC8(issue.resolved)}${resolvedByStr}`);
+      }
       if (issue.suggestion) {
         const ext = extname(issue.file).slice(1) || "";
         const cleanSuggestion = issue.suggestion.replace(/```/g, "//").trim();
@@ -130,7 +134,7 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
     for (const issue of issues) {
       if (issue.valid === "false") continue;
       const stats = issuesByFile.get(issue.file) || { resolved: 0, unresolved: 0 };
-      if (issue.fixed) {
+      if (issue.fixed || issue.resolved) {
         stats.resolved++;
       } else {
         stats.unresolved++;
@@ -284,6 +288,7 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
     const lines = [`## 📊 ${title}\n`, `| 指标 | 数量 |`, `|------|------|`];
     lines.push(`| 总问题数 | ${stats.total} |`);
     lines.push(`| ✅ 已修复 | ${stats.fixed} |`);
+    lines.push(`| 🟢 已解决 | ${stats.resolved} |`);
     lines.push(`| ❌ 无效 | ${stats.invalid} |`);
     lines.push(`| ⚠️ 待处理 | ${stats.pending} |`);
     lines.push(`| 修复率 | ${stats.fixRate}% |`);
