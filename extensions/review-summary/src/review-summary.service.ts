@@ -71,7 +71,7 @@ export class PeriodSummaryService {
   /**
    * 从配置和选项获取执行上下文
    */
-  private getContextFromOptions(options: PeriodSummaryOptions): PeriodSummaryContext {
+  getContextFromOptions(options: PeriodSummaryOptions): PeriodSummaryContext {
     let owner: string;
     let repo: string;
     if (options.repository) {
