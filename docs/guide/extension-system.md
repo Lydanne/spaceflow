@@ -84,31 +84,33 @@ export default defineExtension({
 
 ### ExtensionDefinition
 
-| 字段                 | 类型                  | 必填 | 说明                     |
-| -------------------- | --------------------- | ---- | ------------------------ |
-| `name`               | `string`              | ✅   | 扩展名称                 |
-| `commands`           | `CommandDefinition[]` | ✅   | 命令列表                 |
-| `version`            | `string`              | ❌   | 版本号                   |
-| `description`        | `string`              | ❌   | 扩展描述                 |
-| `configKey`          | `string`              | ❌   | 对应配置文件中的配置路径 |
-| `configSchema`       | `() => ZodSchema`     | ❌   | 配置 Schema 工厂函数     |
-| `configDependencies` | `string[]`            | ❌   | 依赖的其他扩展配置 key   |
-| `services`           | `ServiceDefinition[]` | ❌   | 服务定义列表             |
-| `mcp`                | `McpServerDefinition` | ❌   | MCP 服务器定义           |
-| `onInit`             | `(ctx) => Promise`    | ❌   | 初始化钩子               |
-| `onDestroy`          | `(ctx) => Promise`    | ❌   | 销毁钩子                 |
+| 字段                 | 类型                      | 必填 | 说明                                 |
+| -------------------- | ------------------------- | ---- | ------------------------------------ |
+| `name`               | `string`                  | ✅   | 扩展名称                             |
+| `commands`           | `CommandDefinition[]`     | ✅   | 命令列表                             |
+| `version`            | `string`                  | ❌   | 版本号                               |
+| `description`        | `string`                  | ❌   | 扩展描述                             |
+| `configKey`          | `string`                  | ❌   | 对应配置文件中的配置路径             |
+| `configSchema`       | `() => ZodSchema`         | ❌   | 配置 Schema 工厂函数                 |
+| `configDependencies` | `string[]`                | ❌   | 依赖的其他扩展配置 key               |
+| `tools`              | `McpToolDefinition[]`     | ❌   | MCP 工具列表                         |
+| `resources`          | `McpResourceDefinition[]` | ❌   | MCP 资源列表                         |
+| `services`           | `ServiceDefinition[]`     | ❌   | 服务定义列表                         |
+| `onInit`             | `(ctx) => Promise`        | ❌   | 初始化钩子（所有服务注册完毕后调用） |
+| `onDestroy`          | `(ctx) => Promise`        | ❌   | 销毁钩子（CLI 退出前调用）           |
 
 ### CommandDefinition
 
-| 字段          | 类型                           | 必填 | 说明                                  |
-| ------------- | ------------------------------ | ---- | ------------------------------------- |
-| `name`        | `string`                       | ✅   | 命令名称                              |
-| `description` | `string`                       | ✅   | 命令描述                              |
-| `run`         | `(args, opts, ctx) => Promise` | ✅   | 执行函数                              |
-| `aliases`     | `string[]`                     | ❌   | 命令别名                              |
-| `arguments`   | `string`                       | ❌   | 位置参数，如 `"<name>"` 或 `"[file]"` |
-| `options`     | `OptionDefinition[]`           | ❌   | 命令选项                              |
-| `subcommands` | `CommandDefinition[]`          | ❌   | 子命令                                |
+| 字段              | 类型                           | 必填 | 说明                                  |
+| ----------------- | ------------------------------ | ---- | ------------------------------------- |
+| `name`            | `string`                       | ✅   | 命令名称                              |
+| `description`     | `string`                       | ✅   | 命令描述                              |
+| `run`             | `(args, opts, ctx) => Promise` | ✅   | 执行函数                              |
+| `aliases`         | `string[]`                     | ❌   | 命令别名                              |
+| `arguments`       | `string`                       | ❌   | 位置参数，如 `"<name>"` 或 `"[file]"` |
+| `argsDescription` | `Record<string, string>`       | ❌   | 参数描述映射                          |
+| `options`         | `OptionDefinition[]`           | ❌   | 命令选项                              |
+| `subcommands`     | `CommandDefinition[]`          | ❌   | 子命令                                |
 
 ### SpaceflowContext
 
@@ -116,6 +118,7 @@ export default defineExtension({
 
 ```typescript
 interface SpaceflowContext {
+  readonly cwd: string; // 当前工作目录（优先 SPACEFLOW_CWD 环境变量）
   readonly config: IConfigReader; // 配置读取
   readonly output: IOutputService; // 输出服务（info/success/warn/error/debug）
   readonly storage: IStorageService; // 存储服务

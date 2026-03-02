@@ -199,7 +199,7 @@ export default defineExtension({
 
 ## MCP 工具
 
-Extension 可以同时提供 CLI 命令和 MCP 工具：
+Extension 可以同时提供 CLI 命令和 MCP 工具。通过 `tools` 字段声明 MCP 工具：
 
 ```typescript
 import { defineExtension, z } from "@spaceflow/core";
@@ -209,24 +209,19 @@ export default defineExtension({
   commands: [
     /* ... */
   ],
-  mcp: {
-    name: "hello-tools",
-    version: "1.0.0",
-    description: "Hello MCP 工具集",
-    tools: [
-      {
-        name: "greet",
-        description: "生成问候语",
-        inputSchema: z.object({
-          name: z.string().describe("名字"),
-        }),
-        handler: async (input, ctx) => {
-          const { name } = input as { name: string };
-          return { content: [{ type: "text", text: `Hello, ${name}!` }] };
-        },
+  tools: [
+    {
+      name: "greet",
+      description: "生成问候语",
+      inputSchema: z.object({
+        name: z.string().describe("名字"),
+      }),
+      handler: async (input, ctx) => {
+        const { name } = input as { name: string };
+        return { content: [{ type: "text", text: `Hello, ${name}!` }] };
       },
-    ],
-  },
+    },
+  ],
 });
 ```
 

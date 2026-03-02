@@ -110,7 +110,7 @@ Inspector 会自动下载并启动 `@modelcontextprotocol/inspector`，提供：
 
 ## 开发 MCP 工具
 
-Extension 通过 `defineExtension` 的 `mcp` 字段声明 MCP 工具：
+Extension 通过 `defineExtension` 的 `tools` 字段声明 MCP 工具：
 
 ```typescript
 import { defineExtension, z } from "@spaceflow/core";
@@ -118,24 +118,19 @@ import { defineExtension, z } from "@spaceflow/core";
 export default defineExtension({
   name: "my-tools",
   commands: [],
-  mcp: {
-    name: "my-tools",
-    version: "1.0.0",
-    description: "我的工具集",
-    tools: [
-      {
-        name: "hello",
-        description: "打招呼",
-        inputSchema: z.object({
-          name: z.string().describe("名字"),
-        }),
-        handler: async (input, ctx) => {
-          const { name } = input as { name: string };
-          return { content: [{ type: "text", text: `Hello, ${name}!` }] };
-        },
+  tools: [
+    {
+      name: "hello",
+      description: "打招呼",
+      inputSchema: z.object({
+        name: z.string().describe("名字"),
+      }),
+      handler: async (input, ctx) => {
+        const { name } = input as { name: string };
+        return { content: [{ type: "text", text: `Hello, ${name}!` }] };
       },
-    ],
-  },
+    },
+  ],
 });
 ```
 
