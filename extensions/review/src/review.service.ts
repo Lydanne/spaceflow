@@ -337,12 +337,12 @@ export class ReviewService {
   }
 
   /**
-   * 从 GitHub Actions 事件文件中解析 PR 编号
-   * 在 CI 环境中，GitHub Actions 会将事件信息写入 GITHUB_EVENT_PATH 指向的文件
+   * 从 CI 事件文件中解析 PR 编号
+   * 在 CI 环境中，GitHub/Gitea Actions 会将事件信息写入 GITHUB_EVENT_PATH / GITEA_EVENT_PATH 指向的文件
    * @returns PR 编号，如果无法解析则返回 undefined
    */
   protected async getPrNumberFromEvent(): Promise<number | undefined> {
-    const eventPath = process.env.GITHUB_EVENT_PATH;
+    const eventPath = process.env.GITHUB_EVENT_PATH || process.env.GITEA_EVENT_PATH;
     if (!eventPath) {
       return undefined;
     }

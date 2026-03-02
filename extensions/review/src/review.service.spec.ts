@@ -528,13 +528,14 @@ describe("ReviewService", () => {
       process.env = originalEnv;
     });
 
-    it("should return undefined if GITHUB_EVENT_PATH is not set", async () => {
+    it("should return undefined if GITHUB_EVENT_PATH and GITEA_EVENT_PATH are not set", async () => {
       delete process.env.GITHUB_EVENT_PATH;
+      delete process.env.GITEA_EVENT_PATH;
       const prNumber = await (service as any).getPrNumberFromEvent();
       expect(prNumber).toBeUndefined();
     });
 
-    it("should parse prNumber from event file", async () => {
+    it("should parse prNumber from GITHUB_EVENT_PATH", async () => {
       const mockEventPath = "/tmp/event.json";
       process.env.GITHUB_EVENT_PATH = mockEventPath;
       const mockEventContent = JSON.stringify({ pull_request: { number: 456 } });
@@ -543,6 +544,18 @@ describe("ReviewService", () => {
 
       const prNumber = await (service as any).getPrNumberFromEvent();
       expect(prNumber).toBe(456);
+    });
+
+    it("should parse prNumber from GITEA_EVENT_PATH when GITHUB_EVENT_PATH is not set", async () => {
+      delete process.env.GITHUB_EVENT_PATH;
+      const mockEventPath = "/tmp/gitea-event.json";
+      process.env.GITEA_EVENT_PATH = mockEventPath;
+      const mockEventContent = JSON.stringify({ pull_request: { number: 789 } });
+
+      (readFile as Mock).mockResolvedValue(mockEventContent);
+
+      const prNumber = await (service as any).getPrNumberFromEvent();
+      expect(prNumber).toBe(789);
     });
   });
 
