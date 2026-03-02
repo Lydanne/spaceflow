@@ -1934,54 +1934,23 @@ ${fileChanges || "无"}`;
       console.warn("⚠️ 发布/更新 AI Review 评论失败:", error);
     }
 
-    // 2. 删除旧的行级评论（逐条删除 PR Review Comment）
-    try {
-      const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
-      const oldLineReviews = reviews.filter((r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER));
-      for (const review of oldLineReviews) {
-        if (review.id) {
-          const reviewComments = await this.gitProvider.listPullReviewComments(
-            owner,
-            repo,
-            prNumber,
-            review.id,
-          );
-          for (const comment of reviewComments) {
-            if (comment.id) {
-              try {
-                await this.gitProvider.deletePullReviewComment(owner, repo, comment.id);
-              } catch {
-                // 删除失败忽略
-              }
-            }
-          }
-          // 评论删除后尝试删除 review 本身
-          try {
-            await this.gitProvider.deletePullReview(owner, repo, prNumber, review.id);
-          } catch {
-            // 已提交的 review 无法删除，忽略
-          }
-        }
-      }
-      if (oldLineReviews.length > 0) {
-        console.log(`🗑️ 已清理 ${oldLineReviews.length} 个旧的行级评论 review`);
-      }
-    } catch (error) {
-      console.warn("⚠️ 清理旧行级评论失败:", error);
-    }
-    // 3. 发布新的行级评论（使用 PR Review API）
+    // 2. 发布本轮新发现的行级评论（使用 PR Review API，不删除旧的 review，保留历史）
     let lineIssues: ReviewIssue[] = [];
     let comments: CreatePullReviewComment[] = [];
     if (reviewConf.lineComments) {
       lineIssues = result.issues.filter(
-        (issue) => !issue.fixed && !issue.resolved && issue.valid !== "false",
+        (issue) =>
+          issue.round === result.round &&
+          !issue.fixed &&
+          !issue.resolved &&
+          issue.valid !== "false",
       );
       comments = lineIssues
         .map((issue) => this.issueToReviewComment(issue))
         .filter((comment): comment is CreatePullReviewComment => comment !== null);
     }
     if (comments.length > 0) {
-      const reviewBody = this.buildLineReviewBody(lineIssues);
+      const reviewBody = this.buildLineReviewBody(lineIssues, result.round, result.issues);
       try {
         await this.gitProvider.createPullReview(owner, repo, prNumber, {
           event: REVIEW_STATE.COMMENT,
@@ -2434,19 +2403,44 @@ ${fileChanges || "无"}`;
   }
 
   /**
-   * 构建行级评论 Review 的 body（marker + 本轮统计信息）
+   * 构建行级评论 Review 的 body（marker + 本轮统计 + 上轮回顾）
    */
-  protected buildLineReviewBody(issues: ReviewIssue[]): string {
+  protected buildLineReviewBody(
+    issues: ReviewIssue[],
+    round: number,
+    allIssues: ReviewIssue[],
+  ): string {
     const errorCount = issues.filter((i) => i.severity === "error").length;
     const warnCount = issues.filter((i) => i.severity === "warn").length;
     const fileCount = new Set(issues.map((i) => i.file)).size;
 
-    const parts: string[] = [REVIEW_LINE_COMMENTS_MARKER];
-    parts.push(`**Spaceflow Review** — ${issues.length} 个问题，涉及 ${fileCount} 个文件`);
     const badges: string[] = [];
-    if (errorCount > 0) badges.push(`🔴 ${errorCount} error`);
-    if (warnCount > 0) badges.push(`🟡 ${warnCount} warn`);
-    if (badges.length > 0) parts.push(badges.join("  "));
+    if (errorCount > 0) badges.push(`🔴 ${errorCount}`);
+    if (warnCount > 0) badges.push(`🟡 ${warnCount}`);
+
+    const parts: string[] = [REVIEW_LINE_COMMENTS_MARKER];
+    parts.push(`### � Spaceflow Review · Round ${round}`);
+    parts.push(`> **${issues.length}** 个新问题 · **${fileCount}** 个文件${badges.length > 0 ? " · " + badges.join(" ") : ""}`);
+
+    // 上轮回顾
+    if (round > 1) {
+      const prevIssues = allIssues.filter((i) => i.round === round - 1);
+      if (prevIssues.length > 0) {
+        const prevFixed = prevIssues.filter((i) => i.fixed).length;
+        const prevResolved = prevIssues.filter((i) => i.resolved && !i.fixed).length;
+        const prevInvalid = prevIssues.filter((i) => i.valid === "false").length;
+        const prevPending = prevIssues.length - prevFixed - prevResolved - prevInvalid;
+        parts.push("");
+        parts.push(`<details><summary>📊 Round ${round - 1} 回顾 (${prevIssues.length} 个问题)</summary>\n`);
+        parts.push(`| 状态 | 数量 |`);
+        parts.push(`|------|------|`);
+        if (prevFixed > 0) parts.push(`| ✅ 已修复 | ${prevFixed} |`);
+        if (prevResolved > 0) parts.push(`| 🟢 已解决 | ${prevResolved} |`);
+        if (prevInvalid > 0) parts.push(`| ❌ 无效 | ${prevInvalid} |`);
+        if (prevPending > 0) parts.push(`| ⚠️ 待处理 | ${prevPending} |`);
+        parts.push(`\n</details>`);
+      }
+    }
 
     return parts.join("\n");
   }

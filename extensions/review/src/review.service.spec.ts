@@ -1822,6 +1822,7 @@ describe("ReviewService", () => {
             specFile: "s.md",
             reason: "r",
             severity: "error",
+            round: 1,
           },
         ],
         summary: [],
