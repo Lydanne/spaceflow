@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.56.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.55.0...@spaceflow/review@0.56.0) (2026-03-02)
+
+### 新特性
+
+* **review:** 新增 MCP 工具支持从目录批量加载代码审查规则 ([289a836](https://github.com/Lydanne/spaceflow/commit/289a83650f1e222482fcbaaa69fb5ea562c5a4c2))
+
 ## [0.55.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.54.0...@spaceflow/review@0.55.0) (2026-03-02)
 
 ### 新特性
