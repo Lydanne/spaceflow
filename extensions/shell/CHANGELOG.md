@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.23.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.22.0...@spaceflow/shell@0.23.0) (2026-03-02)
+
+### 新特性
+
+* **actions:** 增强对 Gitea 平台的环境变量支持 ([21ba3da](https://github.com/Lydanne/spaceflow/commit/21ba3daa182083ecaec0113de91caf2ab1068000))
+* **actions:** 支持 Gitea 作为 Git Provider ([4c88b36](https://github.com/Lydanne/spaceflow/commit/4c88b36d97ab49a322bac571385b0e57029676ff))
+* **core:** 增强对 Gitea 平台的支持并修复类型转换 ([bfbb45c](https://github.com/Lydanne/spaceflow/commit/bfbb45c521035c80f0e81f5572d5aa1b554405f7))
+* **publish:** 支持 Gitea 环境变量作为 CI 配置来源 ([cd1ba77](https://github.com/Lydanne/spaceflow/commit/cd1ba778617731ef85f9851883122175a99d72ac))
+* **review-summary:** 新增 defect-rate 缺陷率评分策略 ([2777f4d](https://github.com/Lydanne/spaceflow/commit/2777f4da6d364cbc801792f4fa7ac6323da5e1bc))
+* **review-summary:** 新增 issue-based 评分策略并更新文档 ([b6d923e](https://github.com/Lydanne/spaceflow/commit/b6d923e060aafd0b298a39d6fdc3e2f76facf1f3))
+* **review:** 支持从 Gitea Actions 事件文件解析 PR 编号 ([09e2e58](https://github.com/Lydanne/spaceflow/commit/09e2e58d84f773b8a3184feb73b90cb110993ebd))
+
+### 文档更新
+
+* **docs:** 更新 review-summary 命令的 CI 配置示例 ([8b2b2c5](https://github.com/Lydanne/spaceflow/commit/8b2b2c55ed497619cbb91bd4fd2e5124b6f5ac37))
+* **docs:** 更新 review-summary 命令的 CI 集成示例 ([60c5b70](https://github.com/Lydanne/spaceflow/commit/60c5b70695aa6a4c9cae1e3936670b34d5486792))
+* **docs:** 更新环境变量参考文档，增加 GitLab 支持并优化 Gitea 说明 ([a02f8e0](https://github.com/Lydanne/spaceflow/commit/a02f8e0309368334bc77a331f65338435657eddb))
+* **review-summary:** 更新错误信息以支持 Gitea 环境变量 ([cd02818](https://github.com/Lydanne/spaceflow/commit/cd028183fe7e14d993566e8dc49849b07d2540d9))
+* **scripts:** 更新错误信息以支持 Gitea 环境变量 ([9a9d7f2](https://github.com/Lydanne/spaceflow/commit/9a9d7f20a63bea4cc13d284ed41bc9c4f4aa6595))
+* **shell:** 更新错误信息以支持 Gitea 环境变量 ([72c51d7](https://github.com/Lydanne/spaceflow/commit/72c51d792c140d44d8aa3cb05666de72d170a185))
+* 修复 GitHub Actions 配置示例的 Markdown 渲染问题 ([01daec5](https://github.com/Lydanne/spaceflow/commit/01daec551f2e23ab70357f88b7789897922064a7))
+
+### 测试用例
+
+* **core:** 修复测试用例中的导入和模拟函数实现 ([0137d4b](https://github.com/Lydanne/spaceflow/commit/0137d4b400f272ce7f7ba74fc5b37fcc453ed717))
+
+### 其他修改
+
+* **core:** released version 0.21.0 [no ci] ([7fa4381](https://github.com/Lydanne/spaceflow/commit/7fa438124cc27316ad5f37d5cbacc848ebd3b9df))
+* **publish:** released version 0.45.0 [no ci] ([9bd3bbe](https://github.com/Lydanne/spaceflow/commit/9bd3bbe725a3362f762a1407c6a92a993359dfe5))
+* **review-summary:** released version 0.22.0 [no ci] ([e0fde59](https://github.com/Lydanne/spaceflow/commit/e0fde59b23109f8323bd247ab2c1f553812284e1))
+* **review:** released version 0.58.0 [no ci] ([790dc5f](https://github.com/Lydanne/spaceflow/commit/790dc5f4b38eba28df6f6e4414dd9c536d5a6377))
+* **scripts:** released version 0.23.0 [no ci] ([2f18d22](https://github.com/Lydanne/spaceflow/commit/2f18d2274e83b65ce006dceed47a985942c8dd1d))
+
 ## [0.22.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.21.0...@spaceflow/shell@0.22.0) (2026-03-02)
 
 ### 新特性
