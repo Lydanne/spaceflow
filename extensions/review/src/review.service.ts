@@ -903,7 +903,7 @@ export class ReviewService {
     const resolved = issues.filter((i) => i.resolved && !i.fixed).length;
     const invalid = issues.filter((i) => i.valid === "false").length;
     const pending = total - fixed - resolved - invalid;
-    const fixRate = total > 0 ? Math.round(((fixed + resolved) / total) * 100 * 10) / 10 : 0;
+    const fixRate = total > 0 ? Math.round((fixed / total) * 100 * 10) / 10 : 0;
     return { total, fixed, resolved, invalid, pending, fixRate };
   }
 
@@ -2549,8 +2549,8 @@ ${fileChanges || "无"}`;
       // 将变更文件的历史 issue 标记为无效
       let invalidatedCount = 0;
       const updatedIssues = issues.map((issue) => {
-        // 如果 issue 已修复、已解决或已无效，不需要处理
-        if (issue.fixed || issue.resolved || issue.valid === "false") {
+        // 如果 issue 已修复或已无效，不需要处理
+        if (issue.fixed || issue.valid === "false") {
           return issue;
         }
 
@@ -2596,8 +2596,8 @@ ${fileChanges || "无"}`;
     let updatedCount = 0;
     let invalidatedCount = 0;
     const updatedIssues = issues.map((issue) => {
-      // 如果 issue 已修复、已解决或无效，不需要更新行号
-      if (issue.fixed || issue.resolved || issue.valid === "false") {
+      // 如果 issue 已修复或无效，不需要更新行号
+      if (issue.fixed || issue.valid === "false") {
         return issue;
       }
 

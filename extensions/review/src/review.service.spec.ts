@@ -1251,7 +1251,7 @@ describe("ReviewService", () => {
       expect(stats.resolved).toBe(1);
       expect(stats.invalid).toBe(1);
       expect(stats.pending).toBe(2);
-      expect(stats.fixRate).toBe(50);
+      expect(stats.fixRate).toBe(33.3);
     });
   });
 

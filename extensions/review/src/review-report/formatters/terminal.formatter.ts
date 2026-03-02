@@ -31,7 +31,7 @@ export class TerminalFormatter implements ReviewReportFormatter {
     const issuesByFile = new Map<string, { resolved: number; unresolved: number }>();
     for (const issue of issues) {
       const stats = issuesByFile.get(issue.file) || { resolved: 0, unresolved: 0 };
-      if (issue.fixed || issue.resolved) {
+      if (issue.fixed) {
         stats.resolved++;
       } else {
         stats.unresolved++;

@@ -134,7 +134,7 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
     for (const issue of issues) {
       if (issue.valid === "false") continue;
       const stats = issuesByFile.get(issue.file) || { resolved: 0, unresolved: 0 };
-      if (issue.fixed || issue.resolved) {
+      if (issue.fixed) {
         stats.resolved++;
       } else {
         stats.unresolved++;
