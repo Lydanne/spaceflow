@@ -64,7 +64,7 @@ export class PeriodSummaryService {
       const ciConf = this.config.get<CiConfig>("ci");
       const repository = ciConf?.repository;
       if (!repository) {
-        throw new Error("缺少仓库配置，请通过 --repository 参数或环境变量 GITHUB_REPOSITORY 指定");
+        throw new Error("缺少仓库配置，请通过 --repository 参数或环境变量 GITHUB_REPOSITORY / GITEA_REPOSITORY 指定");
       }
       const parts = repository.split("/");
       owner = parts[0];
