@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.26.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.25.0...@spaceflow/review-summary@0.26.0) (2026-03-02)
+
+### 修复BUG
+
+* **actions:** 修正 GitHub Actions 路径并优化命令行选项 ([50a9946](https://github.com/Lydanne/spaceflow/commit/50a99464633afe234ef56d4a081c6d04686b3e57))
+
 ## [0.25.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.24.0...@spaceflow/review-summary@0.25.0) (2026-03-02)
 
 ### 新特性
