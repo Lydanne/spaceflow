@@ -66,7 +66,7 @@ export interface McpExportItem {
  * 插件配置类型
  */
 export type PluginConfig = Record<
-  "flows" | "commands" | "extensions",
+  "flows" | "commands" | "skills",
   Array<{ name: string; entry: string }>
 > & {
   mcps: McpExportItem[];
@@ -97,10 +97,10 @@ export class InstallService {
 
   /**
    * 将插件关联到各个编辑器的目录
-   * pluginConfig 包含 flows/commands/extensions/mcps 四种类型
+   * pluginConfig 包含 flows/commands/skills/mcps 四种类型
    * - flows: CLI 子命令，不需要复制到编辑器目录
    * - commands: 编辑器命令，复制到 .claude/commands/ 等目录
-   * - extensions: 扩展包，复制到 .claude/skills/ 等目录
+   * - skills: 技能文件，复制到 .claude/skills/ 等目录
    * - mcps: MCP Server，注册到编辑器的 mcp.json 配置
    */
   protected async linkPluginToEditors(options: {
@@ -120,19 +120,19 @@ export class InstallService {
       const editorDirName = getEditorDirName(editor);
       const editorRoot = isGlobal ? join(home, editorDirName) : join(workingDir, editorDirName);
 
-      // 处理 extensions
-      if (pluginConfig.extensions.length > 0) {
-        const editorExtensionsDir = join(editorRoot, "skills");
-        await this.ensureDir(editorExtensionsDir, verbose);
+      // 处理 skills
+      if (pluginConfig.skills.length > 0) {
+        const editorSkillsDir = join(editorRoot, "skills");
+        await this.ensureDir(editorSkillsDir, verbose);
 
-        for (const ext of pluginConfig.extensions) {
-          const extPath = ext.entry === "." ? depPath : join(depPath, ext.entry);
-          const installName = ext.name || name;
-          const targetPath = join(editorExtensionsDir, installName);
+        for (const skill of pluginConfig.skills) {
+          const skillPath = skill.entry === "." ? depPath : join(depPath, skill.entry);
+          const installName = skill.name || name;
+          const targetPath = join(editorSkillsDir, installName);
 
-          await this.copyExtensionToTarget(extPath, targetPath, installName);
+          await this.copyExtensionToTarget(skillPath, targetPath, installName);
 
-          // 将生成的扩展加入编辑器目录的 .gitignore
+          // 将生成的技能文件加入编辑器目录的 .gitignore
           await ensureEditorGitignore(editorRoot, "skills", installName);
         }
       }
@@ -676,7 +676,7 @@ export class InstallService {
       console.warn(t("install:pmInstallFailed", { pm }));
     }
 
-    // 3. 处理每个依赖的 extensions/commands 关联
+    // 3. 处理每个依赖的 skills/commands 关联
     for (const [name, config] of Object.entries(dependencies)) {
       const { source } = this.parseExtensionConfig(config);
       const sourceType = getSourceType(source);
@@ -1030,19 +1030,19 @@ export class InstallService {
 
   /**
    * 从 package.json 读取插件配置
-   * 返回 { flows: [], commands: [], extensions: [], mcps: [] } 格式的导出映射
+   * 返回 { flows: [], commands: [], skills: [], mcps: [] } 格式的导出映射
    */
   protected async getPluginConfigFromPackageJson(extPath: string): Promise<PluginConfig> {
     const createEmptyConfig = (): PluginConfig => ({
       flows: [],
       commands: [],
-      extensions: [],
+      skills: [],
       mcps: [],
     });
-    const createDefaultExtension = (name = ""): PluginConfig => ({
+    const createDefaultSkill = (name = ""): PluginConfig => ({
       flows: [],
       commands: [],
-      extensions: [{ name, entry: "." }],
+      skills: [{ name, entry: "." }],
       mcps: [],
     });
 
@@ -1055,13 +1055,13 @@ export class InstallService {
     ) => {
       if (type === "flow") config.flows.push({ name, entry });
       else if (type === "command") config.commands.push({ name, entry });
-      else if (type === "extension") config.extensions.push({ name, entry });
+      else if (type === "skill") config.skills.push({ name, entry });
       else if (type === "mcp") config.mcps.push({ name, entry, mcp });
     };
 
     const pkgJsonPath = join(extPath, "package.json");
     if (!existsSync(pkgJsonPath)) {
-      return createDefaultExtension();
+      return createDefaultSkill();
     }
 
     try {
@@ -1070,7 +1070,7 @@ export class InstallService {
       const spaceflowConfig = pkg.spaceflow;
 
       if (!spaceflowConfig) {
-        return createDefaultExtension(pkg.name);
+        return createDefaultSkill(pkg.name);
       }
 
       const config = createEmptyConfig();
@@ -1100,9 +1100,9 @@ export class InstallService {
         return config;
       }
 
-      return createDefaultExtension(pkg.name);
+      return createDefaultSkill(pkg.name);
     } catch {
-      return createDefaultExtension();
+      return createDefaultSkill();
     }
   }
 
