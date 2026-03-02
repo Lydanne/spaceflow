@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.24.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.23.0...@spaceflow/review-summary@0.24.0) (2026-03-02)
+
+### 新特性
+
+* **review-summary:** 新增文件过滤功能并优化缺陷率计算 ([9655f82](https://github.com/Lydanne/spaceflow/commit/9655f828cec77c4a7db29ae1cda59fd3ea10ceab))
+
 ## [0.23.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.22.0...@spaceflow/review-summary@0.23.0) (2026-03-02)
 
 ### 新特性
