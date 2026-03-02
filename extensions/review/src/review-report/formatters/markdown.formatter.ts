@@ -130,30 +130,32 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
       return "没有需要审查的文件";
     }
 
-    const issuesByFile = new Map<string, { resolved: number; unresolved: number }>();
+    const issuesByFile = new Map<string, { resolved: number; errors: number; warns: number }>();
     for (const issue of issues) {
       if (issue.valid === "false") continue;
-      const stats = issuesByFile.get(issue.file) || { resolved: 0, unresolved: 0 };
+      const stats = issuesByFile.get(issue.file) || { resolved: 0, errors: 0, warns: 0 };
       if (issue.fixed) {
         stats.resolved++;
+      } else if (issue.severity === "error") {
+        stats.errors++;
       } else {
-        stats.unresolved++;
+        stats.warns++;
       }
       issuesByFile.set(issue.file, stats);
     }
 
     const lines: string[] = [];
-    lines.push("| 文件 | 🟢 | 🔴 | 总结 |");
-    lines.push("|------|----|----|------|");
+    lines.push("| 文件 | 🟢 | 🔴 | 🟡 | 总结 |");
+    lines.push("|------|----|----|----|----|");
 
     for (const fileSummary of summaries) {
-      const stats = issuesByFile.get(fileSummary.file) || { resolved: 0, unresolved: 0 };
+      const stats = issuesByFile.get(fileSummary.file) || { resolved: 0, errors: 0, warns: 0 };
       const summaryText = fileSummary.summary
         .split("\n")
         .filter((line) => line.trim())
         .join("<br>");
       lines.push(
-        `| \`${fileSummary.file}\` | ${stats.resolved} | ${stats.unresolved} | ${summaryText} |`,
+        `| \`${fileSummary.file}\` | ${stats.resolved} | ${stats.errors} | ${stats.warns} | ${summaryText} |`,
       );
     }
 

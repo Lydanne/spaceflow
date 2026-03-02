@@ -1949,37 +1949,52 @@ ${fileChanges || "无"}`;
         .map((issue) => this.issueToReviewComment(issue))
         .filter((comment): comment is CreatePullReviewComment => comment !== null);
     }
-    if (comments.length > 0) {
+    if (reviewConf.lineComments) {
       const reviewBody = this.buildLineReviewBody(lineIssues, result.round, result.issues);
-      try {
-        await this.gitProvider.createPullReview(owner, repo, prNumber, {
-          event: REVIEW_STATE.COMMENT,
-          body: reviewBody,
-          comments,
-          commit_id: commitId,
-        });
-        console.log(`✅ 已发布 ${comments.length} 条行级评论`);
-      } catch {
-        // 批量失败时逐条发布，跳过无法定位的评论
-        console.warn("⚠️ 批量发布行级评论失败，尝试逐条发布...");
-        let successCount = 0;
-        for (const comment of comments) {
-          try {
-            await this.gitProvider.createPullReview(owner, repo, prNumber, {
-              event: REVIEW_STATE.COMMENT,
-              body: successCount === 0 ? reviewBody : undefined,
-              comments: [comment],
-              commit_id: commitId,
-            });
-            successCount++;
-          } catch {
-            console.warn(`⚠️ 跳过无法定位的评论: ${comment.path}:${comment.new_position}`);
+      if (comments.length > 0) {
+        try {
+          await this.gitProvider.createPullReview(owner, repo, prNumber, {
+            event: REVIEW_STATE.COMMENT,
+            body: reviewBody,
+            comments,
+            commit_id: commitId,
+          });
+          console.log(`✅ 已发布 ${comments.length} 条行级评论`);
+        } catch {
+          // 批量失败时逐条发布，跳过无法定位的评论
+          console.warn("⚠️ 批量发布行级评论失败，尝试逐条发布...");
+          let successCount = 0;
+          for (const comment of comments) {
+            try {
+              await this.gitProvider.createPullReview(owner, repo, prNumber, {
+                event: REVIEW_STATE.COMMENT,
+                body: successCount === 0 ? reviewBody : undefined,
+                comments: [comment],
+                commit_id: commitId,
+              });
+              successCount++;
+            } catch {
+              console.warn(`⚠️ 跳过无法定位的评论: ${comment.path}:${comment.new_position}`);
+            }
+          }
+          if (successCount > 0) {
+            console.log(`✅ 逐条发布成功 ${successCount}/${comments.length} 条行级评论`);
+          } else {
+            console.warn("⚠️ 所有行级评论均无法定位，已跳过");
           }
         }
-        if (successCount > 0) {
-          console.log(`✅ 逐条发布成功 ${successCount}/${comments.length} 条行级评论`);
-        } else {
-          console.warn("⚠️ 所有行级评论均无法定位，已跳过");
+      } else {
+        // 本轮无新问题，仍发布 Round 状态（含上轮回顾）
+        try {
+          await this.gitProvider.createPullReview(owner, repo, prNumber, {
+            event: REVIEW_STATE.COMMENT,
+            body: reviewBody,
+            comments: [],
+            commit_id: commitId,
+          });
+          console.log(`✅ 已发布 Round ${result.round} 审查状态（无新问题）`);
+        } catch (error) {
+          console.warn("⚠️ 发布审查状态失败:", error);
         }
       }
     }
@@ -2420,7 +2435,11 @@ ${fileChanges || "无"}`;
 
     const parts: string[] = [REVIEW_LINE_COMMENTS_MARKER];
     parts.push(`### 🚀 Spaceflow Review · Round ${round}`);
-    parts.push(`> **${issues.length}** 个新问题 · **${fileCount}** 个文件${badges.length > 0 ? " · " + badges.join(" ") : ""}`);
+    if (issues.length === 0) {
+      parts.push(`> ✅ 未发现新问题`);
+    } else {
+      parts.push(`> **${issues.length}** 个新问题 · **${fileCount}** 个文件${badges.length > 0 ? " · " + badges.join(" ") : ""}`);
+    }
 
     // 上轮回顾
     if (round > 1) {
