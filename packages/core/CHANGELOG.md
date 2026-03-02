@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.19.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@0.18.0...@spaceflow/core@0.19.0) (2026-03-02)
+
+### 修复BUG
+
+* **core:** 重构配置 Schema 生成逻辑，使用 SpaceflowConfigSchema 作为基础 ([c73eb1c](https://github.com/Lydanne/spaceflow/commit/c73eb1ce5b6f212b8a932a15224db7e63822f8d0))
+
+### 测试用例
+
+* **review:** 增强 AI 评论识别和过滤功能的测试覆盖 ([bda706b](https://github.com/Lydanne/spaceflow/commit/bda706b99aab113521afe6bcd386a590811e20a6))
+
+### 其他修改
+
+* **publish:** released version 0.42.0 [no ci] ([61ac6b2](https://github.com/Lydanne/spaceflow/commit/61ac6b233564550d35e84759eff60a9e04181c46))
+* **review-summary:** released version 0.20.0 [no ci] ([bb3f815](https://github.com/Lydanne/spaceflow/commit/bb3f81567bf6946964a19b9207b8b9beff690b8a))
+* **review:** released version 0.50.0 [no ci] ([cff42fa](https://github.com/Lydanne/spaceflow/commit/cff42fafcc588d0c497d9e0e4750620262adcfec))
+* **review:** released version 0.51.0 [no ci] ([c93be78](https://github.com/Lydanne/spaceflow/commit/c93be78f6f1df9cb5e3515cee58cda65cad1b00f))
+* **review:** released version 0.52.0 [no ci] ([c86406f](https://github.com/Lydanne/spaceflow/commit/c86406f6934d5de4f198eadff66ee6c3f7cfbe0d))
+* **review:** 移除 .spaceflow 目录及其配置文件 ([64b310d](https://github.com/Lydanne/spaceflow/commit/64b310d8a77614a259a8d7588a09169626efb3ae))
+* **scripts:** released version 0.20.0 [no ci] ([e1fac49](https://github.com/Lydanne/spaceflow/commit/e1fac49257bf4a5902c5884ec0e054384a7859d6))
+* **shell:** released version 0.20.0 [no ci] ([8b69b53](https://github.com/Lydanne/spaceflow/commit/8b69b5340fe99973add2bea3e7d53f2082d0da54))
+
 ## [0.18.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@0.17.0...@spaceflow/core@0.18.0) (2026-02-27)
 
 ### 新特性
