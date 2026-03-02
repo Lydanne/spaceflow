@@ -409,30 +409,7 @@ export class ReviewService {
       return this.executeCollectOnly(context);
     }
 
-    if (shouldLog(verbose, 1)) {
-      console.log(`📂 解析规则来源: ${specSources.length} 个`);
-    }
-    const specDirs = await this.reviewSpecService.resolveSpecSources(specSources);
-    if (shouldLog(verbose, 2)) {
-      console.log(`   解析到 ${specDirs.length} 个规则目录`, specDirs);
-    }
-
-    let specs: ReviewSpec[] = [];
-    for (const specDir of specDirs) {
-      const dirSpecs = await this.reviewSpecService.loadReviewSpecs(specDir);
-      specs.push(...dirSpecs);
-    }
-    if (shouldLog(verbose, 1)) {
-      console.log(`   找到 ${specs.length} 个规则文件`);
-    }
-
-    // 去重规则：后加载的覆盖先加载的
-    const beforeDedup = specs.reduce((sum, s) => sum + s.rules.length, 0);
-    specs = this.reviewSpecService.deduplicateSpecs(specs);
-    const afterDedup = specs.reduce((sum, s) => sum + s.rules.length, 0);
-    if (beforeDedup !== afterDedup && shouldLog(verbose, 1)) {
-      console.log(`   去重规则: ${beforeDedup} -> ${afterDedup} 条`);
-    }
+    const specs = await this.loadSpecs(specSources, verbose);
 
     let pr: PullRequest | undefined;
     let commits: PullRequestCommit[] = [];
@@ -719,19 +696,12 @@ export class ReviewService {
 
         // 验证历史问题是否已修复
         if (context.verifyFixes) {
-          const unfixedExistingIssues = existingIssues.filter(
-            (i) => i.valid !== "false" && !i.fixed,
+          existingIssues = await this.verifyAndUpdateIssues(
+            context,
+            existingIssues,
+            commits,
+            { specs, fileContents },
           );
-          if (unfixedExistingIssues.length > 0 && llmMode) {
-            existingIssues = await this.issueVerifyService.verifyIssueFixes(
-              existingIssues,
-              fileContents,
-              specs,
-              llmMode,
-              verbose,
-              context.verifyConcurrency,
-            );
-          }
         } else {
           if (shouldLog(verbose, 1)) {
             console.log(`   ⏭️  跳过历史问题验证 (verifyFixes=false)`);
@@ -873,14 +843,25 @@ export class ReviewService {
     // 4. 同步评论 reactions（👍/👎）
     await this.syncReactionsToIssues(owner, repo, prNumber, existingResult, verbose);
 
-    // 5. 统计问题状态并设置到 result
+    // 5. LLM 验证历史问题是否已修复
+    try {
+      existingResult.issues = await this.verifyAndUpdateIssues(
+        context,
+        existingResult.issues,
+        commits,
+      );
+    } catch (error) {
+      console.warn("⚠️ LLM 验证修复状态失败，跳过:", error);
+    }
+
+    // 6. 统计问题状态并设置到 result
     const stats = this.calculateIssueStats(existingResult.issues);
     existingResult.stats = stats;
 
-    // 6. 输出统计信息
+    // 7. 输出统计信息
     console.log(this.reviewReportService.formatStatsTerminal(stats, prNumber));
 
-    // 7. 更新 PR 评论（如果不是 dry-run）
+    // 8. 更新 PR 评论（如果不是 dry-run）
     if (ci && !dryRun) {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 更新 PR 评论...`);
@@ -892,6 +873,106 @@ export class ReviewService {
     }
 
     return existingResult;
+  }
+
+  /**
+   * 加载并去重审查规则
+   */
+  protected async loadSpecs(specSources: string[], verbose?: VerboseLevel): Promise<ReviewSpec[]> {
+    if (shouldLog(verbose, 1)) {
+      console.log(`📂 解析规则来源: ${specSources.length} 个`);
+    }
+    const specDirs = await this.reviewSpecService.resolveSpecSources(specSources);
+    if (shouldLog(verbose, 2)) {
+      console.log(`   解析到 ${specDirs.length} 个规则目录`, specDirs);
+    }
+
+    let specs: ReviewSpec[] = [];
+    for (const specDir of specDirs) {
+      const dirSpecs = await this.reviewSpecService.loadReviewSpecs(specDir);
+      specs.push(...dirSpecs);
+    }
+    if (shouldLog(verbose, 1)) {
+      console.log(`   找到 ${specs.length} 个规则文件`);
+    }
+
+    const beforeDedup = specs.reduce((sum, s) => sum + s.rules.length, 0);
+    specs = this.reviewSpecService.deduplicateSpecs(specs);
+    const afterDedup = specs.reduce((sum, s) => sum + s.rules.length, 0);
+    if (beforeDedup !== afterDedup && shouldLog(verbose, 1)) {
+      console.log(`   去重规则: ${beforeDedup} -> ${afterDedup} 条`);
+    }
+
+    return specs;
+  }
+
+  /**
+   * LLM 验证历史问题是否已修复
+   * 如果传入 preloaded（specs/fileContents），直接使用；否则从 PR 获取
+   */
+  protected async verifyAndUpdateIssues(
+    context: ReviewContext,
+    issues: ReviewIssue[],
+    commits: PullRequestCommit[],
+    preloaded?: { specs: ReviewSpec[]; fileContents: FileContentsMap },
+  ): Promise<ReviewIssue[]> {
+    const { owner, repo, prNumber, llmMode, specSources, verbose } = context;
+    const unfixedIssues = issues.filter(
+      (i) => i.valid !== "false" && !i.fixed,
+    );
+
+    if (unfixedIssues.length === 0) {
+      return issues;
+    }
+
+    if (!llmMode) {
+      if (shouldLog(verbose, 1)) {
+        console.log(`   ⏭️  跳过 LLM 验证（缺少 llmMode）`);
+      }
+      return issues;
+    }
+
+    if (!preloaded && (!specSources?.length || !prNumber)) {
+      if (shouldLog(verbose, 1)) {
+        console.log(`   ⏭️  跳过 LLM 验证（缺少 specSources 或 prNumber）`);
+      }
+      return issues;
+    }
+
+    if (shouldLog(verbose, 1)) {
+      console.log(`\n🔍 开始 LLM 验证 ${unfixedIssues.length} 个未修复问题...`);
+    }
+
+    let specs: ReviewSpec[];
+    let fileContents: FileContentsMap;
+
+    if (preloaded) {
+      specs = preloaded.specs;
+      fileContents = preloaded.fileContents;
+    } else {
+      const pr = await this.gitProvider.getPullRequest(owner, repo, prNumber!);
+      const changedFiles = await this.gitProvider.getPullRequestFiles(owner, repo, prNumber!);
+      const headSha = pr?.head?.sha || "HEAD";
+      specs = await this.loadSpecs(specSources, verbose);
+      fileContents = await this.getFileContents(
+        owner,
+        repo,
+        changedFiles,
+        commits,
+        headSha,
+        prNumber!,
+        verbose,
+      );
+    }
+
+    return this.issueVerifyService.verifyIssueFixes(
+      issues,
+      fileContents,
+      specs,
+      llmMode,
+      verbose,
+      context.verifyConcurrency,
+    );
   }
 
   /**
