@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.20.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@0.19.0...@spaceflow/core@0.20.0) (2026-03-02)
+
+### 新特性
+
+* **core:** Gitea适配器支持通过标签名称创建Issue ([cf10eda](https://github.com/Lydanne/spaceflow/commit/cf10eda5d025c560cc0d8e3826dad40716020d5c))
+* **review-summary:** commit-based 评分新增修复问题加分机制，支持从 review 模块精确提取问题统计 ([304bf81](https://github.com/Lydanne/spaceflow/commit/304bf81ab475b280ab5f4011159bc697861bddf6))
+* **review-summary:** 支持为周期统计报告 Issue 配置自定义标签 ([df1cc61](https://github.com/Lydanne/spaceflow/commit/df1cc61167851ff7106104914319f43f73ba8902))
+* **review-summary:** 支持通过配置文件自定义评分权重 ([53e1a37](https://github.com/Lydanne/spaceflow/commit/53e1a371288aea6ceac63b03fda99eea1739be4b))
+* **review-summary:** 新增 commit-based 评分策略，支持按有效 commit 累计计分 ([111c0d6](https://github.com/Lydanne/spaceflow/commit/111c0d6b9d87d12096e0edb69a11eceff55b79c1))
+* **review:** 为行级评论 Review 添加统计信息摘要 ([58d5b37](https://github.com/Lydanne/spaceflow/commit/58d5b37ba54daa24bd2f8396318fedc87f388c74))
+* **review:** 优化问题统计展示，按 severity 分级显示 error/warn 数量 ([bcb2608](https://github.com/Lydanne/spaceflow/commit/bcb26086589a67e815db075f3001209904572926))
+* **review:** 保留历史行级评论，为每轮 Review 生成独立评论并添加上轮回顾 ([de431a0](https://github.com/Lydanne/spaceflow/commit/de431a09b4e3b5e1ada9ee5f1ee65786d22b6ff9))
+* **review:** 支持用户手动 resolve 评论并在报告中区分 AI 修复与手动解决 ([c968b65](https://github.com/Lydanne/spaceflow/commit/c968b65c850bc68de3f4409aa3b5294e5a0311ff))
+* **review:** 新增 MCP 工具支持从目录批量加载代码审查规则 ([289a836](https://github.com/Lydanne/spaceflow/commit/289a83650f1e222482fcbaaa69fb5ea562c5a4c2))
+* **review:** 新增解决率统计指标，区分修复率和解决率的计算维度 ([436541f](https://github.com/Lydanne/spaceflow/commit/436541fce605319da562445a81242a8feb257df9))
+
+### 修复BUG
+
+* **review:** 修复率计算仅统计 AI 修复的问题，排除手动解决的问题 ([12b3415](https://github.com/Lydanne/spaceflow/commit/12b3415749c9d8523e8b23365fbb39fc7657ff1d))
+* **review:** 修正 PR 评论标题中的 emoji 显示问题 ([bcdc946](https://github.com/Lydanne/spaceflow/commit/bcdc9467bf7970c9acd3ea00303bcae5eaff131f))
+
+### 代码重构
+
+* **review:** 抽取规则加载和问题验证逻辑为独立方法，优化代码复用性 ([7ea02ba](https://github.com/Lydanne/spaceflow/commit/7ea02ba86e369bc130c69c561195634072cc060a))
+
+### 文档更新
+
+* **docs:** 为 review-summary 命令文档补充 Issue 输出配置说明 ([196fa94](https://github.com/Lydanne/spaceflow/commit/196fa94ad1ed2dbadbdcb332ef26cf1fe7fcd8d7))
+* **review-summary:** 完善文档，新增时间预设、评分算法及输出示例说明 ([fb04685](https://github.com/Lydanne/spaceflow/commit/fb04685dde4157f0a1a2f8edaf1fb3c125280e27))
+* **review:** 完善 review 命令文档，新增审查流程、多轮审查、问题生命周期等核心机制说明 ([d6b2a20](https://github.com/Lydanne/spaceflow/commit/d6b2a20802ab98e5ddb01937c0fe8b268c403c6f))
+
+### 其他修改
+
+* **publish:** released version 0.43.0 [no ci] ([1074b9c](https://github.com/Lydanne/spaceflow/commit/1074b9c5fb21a447093ef23300c451d790710b33))
+* **review-summary:** released version 0.21.0 [no ci] ([11379c4](https://github.com/Lydanne/spaceflow/commit/11379c478859a12dd0340a78b1578487d9a24b31))
+* **review:** released version 0.53.0 [no ci] ([5a6af03](https://github.com/Lydanne/spaceflow/commit/5a6af03c260060ac1b1901bb7273f501ca0037c7))
+* **review:** released version 0.54.0 [no ci] ([252269a](https://github.com/Lydanne/spaceflow/commit/252269a299f9e580b858e04814e7d9a13fed7736))
+* **review:** released version 0.55.0 [no ci] ([0245743](https://github.com/Lydanne/spaceflow/commit/02457439788dd70925b91118f7d5936a61d0e0de))
+* **review:** released version 0.56.0 [no ci] ([2481dec](https://github.com/Lydanne/spaceflow/commit/2481dec141b0d5f444b5815ab9598378ac3e0b12))
+* **scripts:** released version 0.21.0 [no ci] ([1f0a213](https://github.com/Lydanne/spaceflow/commit/1f0a2139d155807451dc968de8213bafe2e4edb8))
+* **shell:** released version 0.21.0 [no ci] ([b619af7](https://github.com/Lydanne/spaceflow/commit/b619af741e16053868a2eedd41f56d50134954d8))
+
 ## [0.19.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@0.18.0...@spaceflow/core@0.19.0) (2026-03-02)
 
 ### 修复BUG
