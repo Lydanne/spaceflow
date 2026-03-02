@@ -361,7 +361,7 @@ warn 扣分:       2 × 1            = -2.0
 
 ## CI 集成
 
-在 Gitea/GitHub Actions 中定期生成统计报告：
+在 GitHub / Gitea Actions 中定期生成统计报告：
 
 ```yaml
 name: Weekly Review Summary
@@ -373,8 +373,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npx @spaceflow/cli review-summary -p last-week -o issue -c
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+      - uses: Lydanne/spaceflow@main
+        with:
+          command: review-summary
+          args: "-p last-week -o issue -c"
+          provider-token: ${{ secrets.GITHUB_TOKEN }}
 ```
