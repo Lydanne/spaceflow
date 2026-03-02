@@ -27,12 +27,12 @@ Spaceflow 支持将 Extension 的资源自动关联到多个 AI 编程工具的�
 
 Extension 在 `package.json` 的 `spaceflow` 字段中声明导出类型，Spaceflow 根据类型执行不同的关联操作：
 
-| 类型        | 说明                     | 关联行为                                           |
-| ----------- | ------------------------ | -------------------------------------------------- |
-| `flow`      | CLI 子命令（默认）       | 不关联到编辑器目录，仅注册为 `spaceflow <command>` |
-| `extension` | 技能文件（`.md` 规范等） | **复制**到编辑器的 `skills/` 目录                  |
-| `command`   | 编辑器命令               | **生成** `.md` 文件到编辑器的 `commands/` 目录     |
-| `mcp`       | MCP 工具                 | 注册到编辑器的 `mcp.json` 配置                     |
+| 类型      | 说明                     | 关联行为                                           |
+| --------- | ------------------------ | -------------------------------------------------- |
+| `flow`    | CLI 子命令（默认）       | 不关联到编辑器目录，仅注册为 `spaceflow <command>` |
+| `skill`   | 技能文件（`.md` 规范等） | **复制**到编辑器的 `skills/` 目录                  |
+| `command` | 编辑器命令               | **生成** `.md` 文件到编辑器的 `commands/` 目录     |
+| `mcp`     | MCP 工具                 | 注册到编辑器的 `mcp.json` 配置                     |
 
 ### 在 package.json 中声明
 
@@ -41,7 +41,7 @@ Extension 在 `package.json` 的 `spaceflow` 字段中声明导出类型，Space
 ```json
 {
   "spaceflow": {
-    "type": "extension",
+    "type": "skill",
     "entry": "."
   }
 }
@@ -54,14 +54,14 @@ Extension 在 `package.json` 的 `spaceflow` 字段中声明导出类型，Space
   "spaceflow": {
     "exports": {
       "my-flow": { "type": "flow", "entry": "." },
-      "my-skills": { "type": "extension", "entry": "./skills" },
+      "my-skills": { "type": "skill", "entry": "./skills" },
       "my-cmd": { "type": "command", "entry": "./commands" }
     }
   }
 }
 ```
 
-未声明 `spaceflow` 字段时，默认作为 `extension` 类型处理（整个包复制到 `skills/` 目录）。
+未声明 `spaceflow` 字段时，默认作为 `skill` 类型处理（整个包复制到 `skills/` 目录）。
 
 ## 自动关联逻辑
 
@@ -72,7 +72,7 @@ Extension 在 `package.json` 的 `spaceflow` 字段中声明导出类型，Space
 1. 通过包管理器将 Extension 安装到 `.spaceflow/node_modules/`
 2. 读取 Extension 的 `package.json` 中的 `spaceflow` 配置
 3. 根据 `support` 配置，将资源关联到对应编辑器目录：
-   - **extension** — 将文件**复制**到 `.claude/skills/`、`.windsurf/skills/` 等目录
+   - **skill** — 将文件**复制**到 `.claude/skills/`、`.windsurf/skills/` 等目录
    - **command** — 生成 `.md` 命令文件到 `.claude/commands/` 等目录
    - **mcp** — 将 MCP Server 配置写入 `.claude/mcp.json` 等文件
 4. 自动更新编辑器目录的 `.gitignore`，避免生成文件被提交
@@ -89,13 +89,13 @@ Extension 在 `package.json` 的 `spaceflow` 字段中声明导出类型，Space
 
 ## 目录结构示例
 
-配置 `support: ["claudeCode", "windsurf"]` 后，安装一个包含 `extension` 和 `command` 导出的 Extension 会生成如下结构：
+配置 `support: ["claudeCode", "windsurf"]` 后，安装一个包含 `skill` 和 `command` 导出的 Extension 会生成如下结构：
 
 ```text
 project/
 ├── .claude/
 │   ├── skills/
-│   │   └── review-spec/          # extension 类型：从 .spaceflow/node_modules/ 复制
+│   │   └── review-spec/          # skill 类型：从 .spaceflow/node_modules/ 复制
 │   │       ├── js&ts.nest.md
 │   │       └── vue.base.md
 │   └── commands/
@@ -129,7 +129,7 @@ Spaceflow 采用 [Meta-tool 代理架构](/guide/commands/mcp)，所有 Extensio
 ```
 
 ::: tip
-对于声明了 `mcp` 导出类型的 Extension（`package.json` 中 `spaceflow.type: "mcp"`），`spaceflow install` 仍会将其 MCP Server 配置写入编辑器的 `mcp.json`。但推荐使用上述 Meta-tool 统一入口，无需为每个 Extension 单独配置。
+对于声明了 `mcp` 导出类型的 Extension（`package.json` 中 `spaceflow.type: "mcp"` 或 `exports` 中含 `"type": "mcp"`），`spaceflow install` 仍会将其 MCP Server 配置写入编辑器的 `mcp.json`。但推荐使用上述 Meta-tool 统一入口，无需为每个 Extension 单独配置。
 :::
 
 各编辑器的详细 MCP 配置方式参见 [MCP 服务](/guide/commands/mcp#在编辑器中配置)。

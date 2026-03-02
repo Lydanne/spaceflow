@@ -260,7 +260,7 @@ export default defineExtension({
   "spaceflow": {
     "exports": {
       "hello": { "type": "flow", "entry": "." },
-      "hello-skills": { "type": "extension", "entry": "./skills" },
+      "hello-skills": { "type": "skill", "entry": "./skills" },
       "hello-mcp": { "type": "mcp", "entry": "." }
     }
   }
