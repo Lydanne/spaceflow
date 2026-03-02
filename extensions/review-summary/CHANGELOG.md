@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.27.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.26.0...@spaceflow/review-summary@0.27.0) (2026-03-02)
+
+### 代码重构
+
+* **core:** 统一插件配置中的 'extensions' 为 'skills' ([50646a0](https://github.com/Lydanne/spaceflow/commit/50646a061f66ec6935c66199d78915b9d7896bd3))
+
+### 文档更新
+
+* **docs:** 统一扩展类型命名：extension 改为 skill ([96db479](https://github.com/Lydanne/spaceflow/commit/96db47948981c0c2b5860c2835f86dec77736cf0))
+* 更新 MCP 架构为 Meta-tool 代理模式并统一导出类型命名 ([f60c53b](https://github.com/Lydanne/spaceflow/commit/f60c53b103f24e8a4123e4c4ec850885cb40f7d7))
+* 简化 MCP 工具声明方式并完善扩展系统文档 ([9cdcab9](https://github.com/Lydanne/spaceflow/commit/9cdcab986559bd34c75e48b6c380c74516adb05c))
+
+### 其他修改
+
+* **core:** released version 0.22.0 [no ci] ([68aa47d](https://github.com/Lydanne/spaceflow/commit/68aa47df425eb9d1ceac1237fee3cc1b29de668f))
+* **publish:** released version 0.46.0 [no ci] ([68ebfc3](https://github.com/Lydanne/spaceflow/commit/68ebfc32bfb5b39354947f08b73306b5f8512fdf))
+* **review:** released version 0.59.0 [no ci] ([afb7e5c](https://github.com/Lydanne/spaceflow/commit/afb7e5c469820cb201e7f24ab47abfd33300668a))
+* **scripts:** released version 0.24.0 [no ci] ([717de65](https://github.com/Lydanne/spaceflow/commit/717de6571faa2cb24f04b7493e7fd6d8404f2bd5))
+* **shell:** released version 0.24.0 [no ci] ([5694d19](https://github.com/Lydanne/spaceflow/commit/5694d193f9207e41e840d9ebaa5a43e3527e6af8))
+
 ## [0.26.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.25.0...@spaceflow/review-summary@0.26.0) (2026-03-02)
 
 ### 修复BUG
