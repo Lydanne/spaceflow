@@ -99,6 +99,28 @@ export interface UserStats {
   prs: PrStats[];
 }
 
+/** 评分权重配置 */
+export interface ScoreWeights {
+  /** 每个 PR 的基础分，默认 10 */
+  prBase?: number;
+  /** 每 100 行新增代码的分数，默认 2 */
+  additionsPer100?: number;
+  /** 每 100 行删除代码的分数，默认 1 */
+  deletionsPer100?: number;
+  /** 每个变更文件的分数，默认 0.5 */
+  changedFile?: number;
+  /** 每个未修复问题的扣分，默认 3 */
+  issueDeduction?: number;
+  /** 每个已修复问题的加分，默认 1 */
+  fixedBonus?: number;
+}
+
+/** review-summary 扩展配置 */
+export interface ReviewSummaryConfig {
+  /** 评分权重配置，可部分覆盖默认值 */
+  scoreWeights?: ScoreWeights;
+}
+
 /** 周期统计结果 */
 export interface PeriodSummaryResult {
   /** 统计周期 */

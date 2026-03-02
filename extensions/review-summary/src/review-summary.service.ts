@@ -11,21 +11,17 @@ import type {
   UserStats,
   OutputTarget,
   TimePreset,
+  ScoreWeights,
+  ReviewSummaryConfig,
 } from "./types";
 
-/** 分数权重配置 */
-const SCORE_WEIGHTS = {
-  /** 每个 PR 的基础分 */
+/** 默认分数权重 */
+const DEFAULT_SCORE_WEIGHTS: Required<ScoreWeights> = {
   prBase: 10,
-  /** 每 100 行新增代码的分数 */
   additionsPer100: 2,
-  /** 每 100 行删除代码的分数 */
   deletionsPer100: 1,
-  /** 每个变更文件的分数 */
   changedFile: 0.5,
-  /** 每个未修复问题的扣分 */
   issueDeduction: 3,
-  /** 每个已修复问题的加分 */
   fixedBonus: 1,
 };
 
@@ -233,23 +229,39 @@ export class PeriodSummaryService {
       }
       userStats.prs.push(pr);
     }
+    const weights = this.resolveScoreWeights();
     for (const userStats of userMap.values()) {
-      userStats.score = this.calculateScore(userStats);
+      userStats.score = this.calculateScore(userStats, weights);
     }
     return userMap;
   }
 
   /**
+   * 从配置中解析评分权重，与默认值合并
+   */
+  protected resolveScoreWeights(): Required<ScoreWeights> {
+    try {
+      const summaryConfig = this.config.get<ReviewSummaryConfig>("review-summary");
+      if (summaryConfig?.scoreWeights) {
+        return { ...DEFAULT_SCORE_WEIGHTS, ...summaryConfig.scoreWeights };
+      }
+    } catch {
+      // 配置读取失败，使用默认值
+    }
+    return DEFAULT_SCORE_WEIGHTS;
+  }
+
+  /**
    * 计算用户综合分数
    */
-  protected calculateScore(stats: UserStats): number {
-    const prScore = stats.prCount * SCORE_WEIGHTS.prBase;
-    const additionsScore = (stats.totalAdditions / 100) * SCORE_WEIGHTS.additionsPer100;
-    const deletionsScore = (stats.totalDeletions / 100) * SCORE_WEIGHTS.deletionsPer100;
-    const filesScore = stats.totalChangedFiles * SCORE_WEIGHTS.changedFile;
+  protected calculateScore(stats: UserStats, weights: Required<ScoreWeights>): number {
+    const prScore = stats.prCount * weights.prBase;
+    const additionsScore = (stats.totalAdditions / 100) * weights.additionsPer100;
+    const deletionsScore = (stats.totalDeletions / 100) * weights.deletionsPer100;
+    const filesScore = stats.totalChangedFiles * weights.changedFile;
     const unfixedIssues = stats.totalIssues - stats.totalFixed;
-    const issueDeduction = unfixedIssues * SCORE_WEIGHTS.issueDeduction;
-    const fixedBonus = stats.totalFixed * SCORE_WEIGHTS.fixedBonus;
+    const issueDeduction = unfixedIssues * weights.issueDeduction;
+    const fixedBonus = stats.totalFixed * weights.fixedBonus;
     const totalScore =
       prScore + additionsScore + deletionsScore + filesScore - issueDeduction + fixedBonus;
     return Math.max(0, Math.round(totalScore * 10) / 10);

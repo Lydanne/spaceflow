@@ -81,6 +81,36 @@ spaceflow review-summary -p this-month -o file --output-file report.md
 
 > **公式**: `分数 = PR基础分 + 新增代码分 + 删除代码分 + 文件分 - 未修复扣分 + 已修复加分`（最低 0 分）
 
+### 自定义权重
+
+在 `.spaceflowrc` 中通过 `scoreWeights` 配置部分或全部权重，未指定的维度使用默认值：
+
+```json
+{
+  "review-summary": {
+    "scoreWeights": {
+      "prBase": 15,
+      "additionsPer100": 3,
+      "deletionsPer100": 1.5,
+      "changedFile": 1,
+      "issueDeduction": 5,
+      "fixedBonus": 2
+    }
+  }
+}
+```
+
+| 配置项            | 类型   | 默认值 | 说明                    |
+| ----------------- | ------ | ------ | ----------------------- |
+| `prBase`          | number | 10     | 每个 PR 的基础分        |
+| `additionsPer100` | number | 2      | 每 100 行新增代码的分数 |
+| `deletionsPer100` | number | 1      | 每 100 行删除代码的分数 |
+| `changedFile`     | number | 0.5    | 每个变更文件的分数      |
+| `issueDeduction`  | number | 3      | 每个未修复问题的扣分    |
+| `fixedBonus`      | number | 1      | 每个已修复问题的加分    |
+
+> 只需配置要修改的字段即可，例如只想加大问题扣分力度：`{ "scoreWeights": { "issueDeduction": 10 } }`
+
 ## 输出示例
 
 ### 控制台表格格式（默认）
