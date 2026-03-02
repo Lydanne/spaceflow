@@ -176,6 +176,20 @@ spaceflow review-summary -p this-month -o file --output-file report.md
 
 > **注意**：commit-based 模式需要逐 commit 调用 API 获取行数信息，PR 较多时执行时间会较长。
 
+## Issue 输出
+
+当 `--output issue` 时，统计报告会创建为一个 Issue，并自动添加标签（默认 `report`）。标签名称可通过配置自定义：
+
+```json
+{
+  "review-summary": {
+    "issueLabel": "report"
+  }
+}
+```
+
+> **注意**：GitHub / GitLab 支持自动按名称匹配或创建标签；Gitea 需要提前在仓库中创建对应标签。
+
 ## 输出示例
 
 ### 控制台表格格式（默认）
