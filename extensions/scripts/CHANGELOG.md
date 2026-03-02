@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.24.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@0.23.0...@spaceflow/scripts@0.24.0) (2026-03-02)
+
+### 新特性
+
+* **review-summary:** 实现 review-summary 命令核心功能 ([5964eec](https://github.com/Lydanne/spaceflow/commit/5964eec0e2ee4ac46f74808466429b0edc0cbaa1))
+* **review-summary:** 新增文件过滤功能并优化缺陷率计算 ([9655f82](https://github.com/Lydanne/spaceflow/commit/9655f828cec77c4a7db29ae1cda59fd3ea10ceab))
+
+### 修复BUG
+
+* **actions:** 修正 GitHub Actions 路径并优化命令行选项 ([50a9946](https://github.com/Lydanne/spaceflow/commit/50a99464633afe234ef56d4a081c6d04686b3e57))
+
+### 代码重构
+
+* **core:** 统一插件配置中的 'extensions' 为 'skills' ([50646a0](https://github.com/Lydanne/spaceflow/commit/50646a061f66ec6935c66199d78915b9d7896bd3))
+
+### 文档更新
+
+* **docs:** 统一扩展类型命名：extension 改为 skill ([96db479](https://github.com/Lydanne/spaceflow/commit/96db47948981c0c2b5860c2835f86dec77736cf0))
+* 更新 MCP 架构为 Meta-tool 代理模式并统一导出类型命名 ([f60c53b](https://github.com/Lydanne/spaceflow/commit/f60c53b103f24e8a4123e4c4ec850885cb40f7d7))
+* 简化 MCP 工具声明方式并完善扩展系统文档 ([9cdcab9](https://github.com/Lydanne/spaceflow/commit/9cdcab986559bd34c75e48b6c380c74516adb05c))
+
+### 其他修改
+
+* **core:** released version 0.22.0 [no ci] ([68aa47d](https://github.com/Lydanne/spaceflow/commit/68aa47df425eb9d1ceac1237fee3cc1b29de668f))
+* **publish:** released version 0.46.0 [no ci] ([68ebfc3](https://github.com/Lydanne/spaceflow/commit/68ebfc32bfb5b39354947f08b73306b5f8512fdf))
+* **review-summary:** released version 0.23.0 [no ci] ([f6681ec](https://github.com/Lydanne/spaceflow/commit/f6681ecdcd8f8036da3c4ac7778e5cc75af59c9f))
+* **review-summary:** released version 0.24.0 [no ci] ([690e9ed](https://github.com/Lydanne/spaceflow/commit/690e9ed64b197f50e201afe73dc55e866867a7fd))
+* **review-summary:** released version 0.25.0 [no ci] ([4eaca03](https://github.com/Lydanne/spaceflow/commit/4eaca0397411585112697e6800b66484bd73ffde))
+* **review-summary:** released version 0.26.0 [no ci] ([5e8dedf](https://github.com/Lydanne/spaceflow/commit/5e8dedf10cb7104dcc15550d7f5ba05f10cae7d3))
+* **review:** released version 0.59.0 [no ci] ([afb7e5c](https://github.com/Lydanne/spaceflow/commit/afb7e5c469820cb201e7f24ab47abfd33300668a))
+* **shell:** released version 0.23.0 [no ci] ([0668aa9](https://github.com/Lydanne/spaceflow/commit/0668aa97671ca235509bef547503c301237324f9))
+
 ## [0.23.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@0.22.0...@spaceflow/scripts@0.23.0) (2026-03-02)
 
 ### 新特性
