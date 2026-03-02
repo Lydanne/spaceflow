@@ -1,6 +1,6 @@
 {
   "name": "@spaceflow/publish",
-  "version": "0.43.0",
+  "version": "0.44.0",
   "description": "Spaceflow CI 发布插件，用于在发布流程中锁定/解锁分支",
   "license": "MIT",
   "author": "Lydanne",
