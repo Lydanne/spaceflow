@@ -131,7 +131,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: nicepkg/spaceflow/actions@main
+      - uses: Lydanne/spaceflow@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           command: review

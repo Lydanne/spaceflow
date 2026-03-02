@@ -7,7 +7,7 @@ Spaceflow 提供预配置的 GitHub Actions，可以在 CI 中自动执行各种
 ### 基本用法
 
 ```yaml
-- uses: nicepkg/spaceflow/actions@main
+- uses: Lydanne/spaceflow@main
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     command: review
@@ -46,7 +46,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: nicepkg/spaceflow/actions@main
+      - uses: Lydanne/spaceflow@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           command: review
@@ -80,7 +80,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: nicepkg/spaceflow/actions@main
+      - uses: Lydanne/spaceflow@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           command: review
@@ -118,7 +118,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - uses: nicepkg/spaceflow/actions@main
+      - uses: Lydanne/spaceflow@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           command: publish
@@ -145,7 +145,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: nicepkg/spaceflow/actions@main
+      - uses: Lydanne/spaceflow@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           command: ${{ github.event.inputs.command }}
