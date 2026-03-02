@@ -2419,7 +2419,7 @@ ${fileChanges || "无"}`;
     if (warnCount > 0) badges.push(`🟡 ${warnCount}`);
 
     const parts: string[] = [REVIEW_LINE_COMMENTS_MARKER];
-    parts.push(`### � Spaceflow Review · Round ${round}`);
+    parts.push(`### 🚀 Spaceflow Review · Round ${round}`);
     parts.push(`> **${issues.length}** 个新问题 · **${fileCount}** 个文件${badges.length > 0 ? " · " + badges.join(" ") : ""}`);
 
     // 上轮回顾
