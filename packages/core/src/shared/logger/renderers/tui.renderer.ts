@@ -137,7 +137,9 @@ export class TuiRenderer implements LogRenderer {
         const result = await enabledItems[i].task(ctx, control);
         if (skipped) {
           statuses[i] = "skipped";
-          messages[i] = skipReason ? `${enabledItems[i].title} (${skipReason})` : enabledItems[i].title;
+          messages[i] = skipReason
+            ? `${enabledItems[i].title} (${skipReason})`
+            : enabledItems[i].title;
         } else {
           statuses[i] = "success";
           messages[i] = enabledItems[i].title;

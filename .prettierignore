@@ -2,3 +2,6 @@
 templates/
 dist/
 .spaceflowrc
+*.md
+*.json
+*.js

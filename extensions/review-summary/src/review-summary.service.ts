@@ -85,7 +85,9 @@ export class PeriodSummaryService {
       const ciConf = this.config.get<CiConfig>("ci");
       const repository = ciConf?.repository;
       if (!repository) {
-        throw new Error("缺少仓库配置，请通过 --repository 参数或环境变量 GITHUB_REPOSITORY / GITEA_REPOSITORY 指定");
+        throw new Error(
+          "缺少仓库配置，请通过 --repository 参数或环境变量 GITHUB_REPOSITORY / GITEA_REPOSITORY 指定",
+        );
       }
       const parts = repository.split("/");
       owner = parts[0];
@@ -165,7 +167,9 @@ export class PeriodSummaryService {
       const allFiles = await this.gitProvider.getPullRequestFiles(owner, repo, pr.number!);
       const files =
         includes.length > 0
-          ? allFiles.filter((f) => micromatch.isMatch(f.filename ?? "", includes, { matchBase: true }))
+          ? allFiles.filter((f) =>
+              micromatch.isMatch(f.filename ?? "", includes, { matchBase: true }),
+            )
           : allFiles;
       changedFiles = files.length;
       for (const file of files) {
@@ -206,7 +210,14 @@ export class PeriodSummaryService {
     fixedErrors: number;
     fixedWarns: number;
   }> {
-    const empty = { issueCount: 0, fixedCount: 0, errorCount: 0, warnCount: 0, fixedErrors: 0, fixedWarns: 0 };
+    const empty = {
+      issueCount: 0,
+      fixedCount: 0,
+      errorCount: 0,
+      warnCount: 0,
+      fixedErrors: 0,
+      fixedWarns: 0,
+    };
     try {
       const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
       // 优先从 review 模块嵌入的结构化数据中精确提取
@@ -253,9 +264,7 @@ export class PeriodSummaryService {
   /**
    * 回退：从评论文本正则提取问题统计（兼容无结构化数据的旧评论）
    */
-  protected extractIssueStatsFromText(
-    comments: { body?: string }[],
-  ): {
+  protected extractIssueStatsFromText(comments: { body?: string }[]): {
     issueCount: number;
     fixedCount: number;
     errorCount: number;
@@ -291,9 +300,14 @@ export class PeriodSummaryService {
   /**
    * 统计 PR 中有效 commit 数量（逐 commit 获取行数判断）
    */
-  protected async countValidCommits(owner: string, repo: string, prNumber: number): Promise<number> {
+  protected async countValidCommits(
+    owner: string,
+    repo: string,
+    prNumber: number,
+  ): Promise<number> {
     const config = this.getStrategyConfig();
-    const minLines = config.commitBasedWeights?.minCommitLines ?? DEFAULT_COMMIT_BASED_WEIGHTS.minCommitLines;
+    const minLines =
+      config.commitBasedWeights?.minCommitLines ?? DEFAULT_COMMIT_BASED_WEIGHTS.minCommitLines;
     try {
       const commits = await this.gitProvider.getPullRequestCommits(owner, repo, prNumber);
       let validCount = 0;
@@ -531,9 +545,7 @@ export class PeriodSummaryService {
   protected sortUserStats(userMap: Map<string, UserStats>): UserStats[] {
     const config = this.getStrategyConfig();
     if (config.strategy === "defect-rate") {
-      return Array.from(userMap.values()).sort(
-        (a, b) => (a.defectRate ?? 0) - (b.defectRate ?? 0),
-      );
+      return Array.from(userMap.values()).sort((a, b) => (a.defectRate ?? 0) - (b.defectRate ?? 0));
     }
     return Array.from(userMap.values()).sort((a, b) => b.score - a.score);
   }
