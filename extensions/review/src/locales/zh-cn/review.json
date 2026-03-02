@@ -28,5 +28,7 @@
   "mcp.dto.cwd": "项目根目录路径，默认为当前工作目录",
   "mcp.dto.filePath": "文件路径，可以是相对路径或绝对路径",
   "mcp.dto.includeExamples": "是否包含规则示例代码，默认 false",
-  "mcp.dto.ruleId": "规则 ID，如 JsTs.Naming.FileName"
+  "mcp.dto.ruleId": "规则 ID，如 JsTs.Naming.FileName",
+  "mcp.getRulesFromDir": "从指定目录加载代码审查规则。读取目录下所有 .md 文件，解析为规则并按规则 ID 去重（后加载的覆盖先加载的）",
+  "mcp.dto.dirPath": "包含规则 .md 文件的目录路径，可以是相对路径或绝对路径"
 }

@@ -28,5 +28,7 @@
   "mcp.dto.cwd": "Project root directory path, defaults to current working directory",
   "mcp.dto.filePath": "File path, can be relative or absolute",
   "mcp.dto.includeExamples": "Whether to include rule example code, defaults to false",
-  "mcp.dto.ruleId": "Rule ID, e.g. JsTs.Naming.FileName"
+  "mcp.dto.ruleId": "Rule ID, e.g. JsTs.Naming.FileName",
+  "mcp.getRulesFromDir": "Load code review rules from a specific directory. Reads all .md files in the directory, parses them into rules, and deduplicates by rule ID (later rules override earlier ones)",
+  "mcp.dto.dirPath": "Directory path containing rule .md files, can be relative or absolute"
 }

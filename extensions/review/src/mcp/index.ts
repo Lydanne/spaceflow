@@ -16,6 +16,11 @@ export const getRuleDetailInputSchema = z.object({
   ruleId: z.string().describe(t("review:mcp.dto.ruleId")),
 });
 
+export const getRulesFromDirInputSchema = z.object({
+  dirPath: z.string().describe(t("review:mcp.dto.dirPath")),
+  includeExamples: z.boolean().optional().describe(t("review:mcp.dto.includeExamples")),
+});
+
 /**
  * 获取 GitProviderService（可选）
  */
@@ -162,6 +167,55 @@ export const tools = [
           lang: ex.lang,
           code: ex.code,
         })),
+      };
+    },
+  },
+  {
+    name: "get_rules_from_dir",
+    description: t("review:mcp.getRulesFromDir"),
+    inputSchema: getRulesFromDirInputSchema,
+    handler: async (input, ctx) => {
+      const { dirPath, includeExamples } = input as z.infer<typeof getRulesFromDirInputSchema>;
+      const workDir = ctx.cwd;
+      const resolvedDir = dirPath.startsWith("/") ? dirPath : join(workDir, dirPath);
+
+      if (!existsSync(resolvedDir)) {
+        return { error: `Directory not found: ${resolvedDir}` };
+      }
+
+      const gitProvider = getGitProvider(ctx);
+      const specService = new ReviewSpecService(gitProvider);
+      const specs = await specService.loadReviewSpecs(resolvedDir);
+      const dedupedSpecs = specService.deduplicateSpecs(specs);
+
+      const rules = dedupedSpecs.flatMap((spec) =>
+        spec.rules.map((rule) => ({
+          id: rule.id,
+          title: rule.title,
+          description: includeExamples
+            ? rule.description
+            : rule.description.slice(0, 200) + (rule.description.length > 200 ? "..." : ""),
+          severity: rule.severity || spec.severity,
+          extensions: spec.extensions,
+          specFile: spec.filename,
+          includes: spec.includes,
+          ...(includeExamples && rule.examples.length > 0
+            ? {
+                examples: rule.examples.map((ex) => ({
+                  type: ex.type,
+                  lang: ex.lang,
+                  code: ex.code,
+                })),
+              }
+            : { hasExamples: rule.examples.length > 0 }),
+        })),
+      );
+
+      return {
+        dir: resolvedDir,
+        specFiles: dedupedSpecs.length,
+        total: rules.length,
+        rules,
       };
     },
   },
