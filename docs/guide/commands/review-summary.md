@@ -344,13 +344,13 @@ warn 扣分:       2 × 1            = -2.0
 
 统计数据通过 Git Provider API 获取：
 
-| 数据        | 来源                                                         |
-| ----------- | ------------------------------------------------------------ |
-| PR 列表     | `listAllPullRequests` — 筛选时间范围内已合并的 PR            |
-| 代码行数    | `getPullRequestFiles` — 统计每个文件的 additions/deletions   |
-| 问题统计    | `listIssueComments` — 从 AI 审查评论中正则提取 error/warn 数 |
-| 有效 commit | `getPullRequestCommits` + `getCommit` — 逐 commit 判断行数   |
-| 功能描述    | PR 标题 — 自动去除 `[Tag]` 前缀                              |
+| 数据        | 来源                                                                                            |
+| ----------- | ----------------------------------------------------------------------------------------------- |
+| PR 列表     | `listAllPullRequests` — 筛选时间范围内已合并的 PR                                               |
+| 代码行数    | `getPullRequestFiles` — 统计每个文件的 additions/deletions                                      |
+| 问题统计    | `listIssueComments` — 从 AI 审查评论中解析结构化数据，精确提取每个问题的 severity 和 fixed 状态 |
+| 有效 commit | `getPullRequestCommits` + `getCommit` — 逐 commit 判断行数                                      |
+| 功能描述    | PR 标题 — 自动去除 `[Tag]` 前缀                                                                 |
 
 ## 环境变量
 
