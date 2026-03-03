@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.63.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.62.0...@spaceflow/review@0.63.0) (2026-03-03)
+
+### 代码重构
+
+* **review:** 为文件总结标题添加 💡 图标,增强视觉识别度 ([69cecf0](https://github.com/Lydanne/spaceflow/commit/69cecf0a6deadf1935db060800f8f110ae4b9889))
+
+### 其他修改
+
+* **review-summary:** released version 0.30.0 [no ci] ([3902c7b](https://github.com/Lydanne/spaceflow/commit/3902c7be16ceb6ab7ff2abe52e434634de12a664))
+
 ## [0.62.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.61.0...@spaceflow/review@0.62.0) (2026-03-03)
 
 ### 代码重构
