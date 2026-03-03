@@ -75,6 +75,7 @@ describe("ReviewService", () => {
       updateIssueComment: vi.fn().mockResolvedValue({}),
       deleteIssueComment: vi.fn().mockResolvedValue(undefined),
       updatePullReview: vi.fn().mockResolvedValue({}),
+      getTeamMembers: vi.fn().mockResolvedValue([]),
     };
 
     configService = {
@@ -1556,6 +1557,19 @@ describe("ReviewService", () => {
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
+
+    it("should log error when deleting comment fails", async () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listIssueComments.mockResolvedValue([
+        { id: 10, body: "<!-- spaceflow-review --> old comment" },
+      ] as any);
+      gitProvider.deleteIssueComment.mockRejectedValue(new Error("delete failed"));
+
+      await (service as any).deleteExistingAiReviews("o", "r", 1);
+      expect(consoleSpy).toHaveBeenCalledWith("⚠️ 删除评论 10 失败:", expect.any(Error));
+      consoleSpy.mockRestore();
+    });
   });
 
   describe("ReviewService.invalidateIssuesForChangedFiles", () => {
@@ -2382,8 +2396,45 @@ describe("ReviewService", () => {
         { content: "-1", user: { login: "random-user" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", valid: "true", reactions: [] }] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
       expect(result.issues[0].valid).toBe("true");
+    });
+  });
+
+  describe("ReviewService.buildLineReviewBody", () => {
+    it("should include previous round summary when round > 1", () => {
+      const issues = [
+        { round: 2, fixed: "2024-01-01", resolved: undefined, valid: undefined },
+        { round: 2, resolved: "2024-01-02", fixed: undefined, valid: undefined },
+        { round: 2, valid: "false", fixed: undefined, resolved: undefined },
+        { round: 2, fixed: undefined, resolved: undefined, valid: undefined },
+      ];
+      const allIssues = [
+        ...issues,
+        { round: 1, fixed: "2024-01-01" },
+        { round: 1, resolved: "2024-01-02" },
+        { round: 1, valid: "false" },
+        { round: 1 },
+      ];
+      const result = (service as any).buildLineReviewBody(issues, 2, allIssues);
+      expect(result).toContain("Round 1 回顾");
+      expect(result).toContain("🟢 已修复 | 1");
+      expect(result).toContain("⚪ 已解决 | 1");
+      expect(result).toContain("❌ 无效 | 1");
+      expect(result).toContain("⚠️ 待处理 | 1");
+    });
+
+    it("should not include previous round summary when round <= 1", () => {
+      const issues = [{ round: 1 }];
+      const allIssues = [{ round: 1 }];
+      const result = (service as any).buildLineReviewBody(issues, 1, allIssues);
+      expect(result).not.toContain("Round 1 回顾");
+    });
+
+    it("should show no issues message when issues array is empty", () => {
+      const issues = [];
+      const allIssues = [];
+      const result = (service as any).buildLineReviewBody(issues, 1, allIssues);
+      expect(result).toContain("✅ 未发现新问题");
     });
   });
 
@@ -3374,15 +3425,124 @@ describe("ReviewService", () => {
       expect(result[0].originalLine).toBe("1");
     });
 
-    it("should return issue unchanged when line range is empty", () => {
-      const filePatchMap = new Map([["test.ts", "@@ -1,1 +1,1 @@\n-old1\n+new1"]]);
-      const issues = [{ file: "test.ts", line: "abc", ruleId: "R1" }];
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-      expect(result).toEqual(issues);
+    it("should log when line is deleted and marked invalid", () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const filePatchMap = new Map([["test.ts", "@@ -1,1 +1,0 @@\n-old1"]]);
+      const issues = [{ file: "test.ts", line: "1", ruleId: "R1" }];
+      (service as any).updateIssueLineNumbers(issues, filePatchMap, 1);
+      expect(consoleSpy).toHaveBeenCalledWith("📍 Issue test.ts:1 对应的代码已被删除，标记为无效");
+      consoleSpy.mockRestore();
+    });
+
+    it("should log when line range is collapsed to single line", () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const filePatchMap = new Map([["test.ts", "@@ -1,2 +1,1 @@\n-old1\n-old2\n+new1"]]);
+      const issues = [{ file: "test.ts", line: "1-2", ruleId: "R1" }];
+      (service as any).updateIssueLineNumbers(issues, filePatchMap, 1);
+      expect(consoleSpy).toHaveBeenCalledWith("📍 Issue 行号更新: test.ts:1-2 -> test.ts:1");
+      consoleSpy.mockRestore();
     });
   });
 
-  describe("ReviewService.filterIssuesByValidCommits", () => {
+  describe("ReviewService.findExistingAiComments", () => {
+    it("should log comments when verbose level >= 2", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const mockComments = [
+        { id: 1, body: "test comment 1" },
+        { id: 2, body: "test comment 2<!-- spaceflow-review -->" },
+      ] as any;
+      gitProvider.listIssueComments.mockResolvedValue(mockComments);
+
+      await (service as any).findExistingAiComments("o", "r", 1, 2);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[findExistingAiComments] listIssueComments returned 2 comments",
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[findExistingAiComments] comment id=1, body starts with: test comment 1",
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should log error when API fails", async () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      gitProvider.listIssueComments.mockRejectedValue(new Error("API error"));
+
+      const result = await (service as any).findExistingAiComments("o", "r", 1);
+      expect(result).toEqual([]);
+      expect(consoleSpy).toHaveBeenCalledWith("[findExistingAiComments] error:", expect.any(Error));
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("ReviewService.syncReactionsToIssues", () => {
+    it("should log when no AI review found", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
+
+      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
+      expect(consoleSpy).toHaveBeenCalledWith("[syncReactionsToIssues] No AI review found");
+      consoleSpy.mockRestore();
+    });
+
+    it("should log reviewers from reviews", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const mockReviews = [
+        { user: { login: "user1" }, body: "normal review" },
+        { user: { login: "bot" }, body: "<!-- spaceflow-review-lines --> AI review", id: 123 },
+      ] as any;
+      gitProvider.listPullReviews.mockResolvedValue(mockReviews);
+      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
+
+      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[syncReactionsToIssues] reviewers from reviews: user1",
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should log requested reviewers and teams", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const mockReviews = [
+        { user: { login: "bot" }, body: "<!-- spaceflow-review-lines --> AI review", id: 123 },
+      ] as any;
+      const mockPr = {
+        requested_reviewers: [{ login: "reviewer1" }],
+        requested_reviewers_teams: [{ name: "team1", id: 123 }],
+      } as any;
+      gitProvider.listPullReviews.mockResolvedValue(mockReviews);
+      gitProvider.getPullRequest.mockResolvedValue(mockPr);
+      gitProvider.getTeamMembers.mockResolvedValue([{ login: "teamuser1" }]);
+      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
+
+      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[syncReactionsToIssues] requested_reviewers: reviewer1",
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[syncReactionsToIssues] requested_reviewers_teams: [{"name":"team1","id":123}]',
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[syncReactionsToIssues] team team1(123) members: teamuser1",
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should log final reviewers", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const mockReviews = [
+        { user: { login: "bot" }, body: "<!-- spaceflow-review-lines --> AI review", id: 123 },
+      ] as any;
+      gitProvider.listPullReviews.mockResolvedValue(mockReviews);
+      gitProvider.getPullRequest.mockRejectedValue(new Error("PR not found"));
+      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
+
+      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
+      expect(consoleSpy).toHaveBeenCalledWith("[syncReactionsToIssues] final reviewers: ");
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("ReviewService.deleteExistingAiReviews", () => {
     beforeEach(() => {
       mockReviewSpecService.parseLineRange = vi.fn().mockImplementation((lineStr: string) => {
         const lines: number[] = [];
@@ -3479,7 +3639,29 @@ describe("ReviewService", () => {
       expect(result).toHaveLength(1); // 只要范围内有一行匹配就保留
     });
 
-    it("should log detailed information at verbose level 3", () => {
+    it("should log when file not in fileContents at verbose level 3", () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const commits = [{ sha: "abc1234567890" }];
+      const fileContents = new Map();
+      const issues = [{ file: "missing.ts", line: "1", ruleId: "R1" }];
+      (service as any).filterIssuesByValidCommits(issues, commits, fileContents, 3);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "   ✅ Issue missing.ts:1 - 文件不在 fileContents 中，保留",
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should log when line range cannot be parsed at verbose level 3", () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const commits = [{ sha: "abc1234567890" }];
+      const fileContents = new Map([["test.ts", [["-------", "line1"]]]]);
+      const issues = [{ file: "test.ts", line: "abc", ruleId: "R1" }];
+      (service as any).filterIssuesByValidCommits(issues, commits, fileContents, 3);
+      expect(consoleSpy).toHaveBeenCalledWith("   ✅ Issue test.ts:abc - 无法解析行号，保留");
+      consoleSpy.mockRestore();
+    });
+
+    it("should log detailed hash matching at verbose level 3", () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const commits = [{ sha: "abc1234567890" }];
       const fileContents = new Map([
@@ -3491,10 +3673,12 @@ describe("ReviewService", () => {
           ],
         ],
       ]);
-      const issues = [{ file: "test.ts", line: "1", ruleId: "R1" }];
+      const issues = [{ file: "test.ts", line: "2", ruleId: "R1" }];
       (service as any).filterIssuesByValidCommits(issues, commits, fileContents, 3);
       expect(consoleSpy).toHaveBeenCalledWith("   🔍 有效 commit hashes: abc1234");
-      expect(consoleSpy).toHaveBeenCalledWith("   ❌ Issue test.ts:1 - 行号 hash: 1:-------");
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "   ✅ Issue test.ts:2 - 行 2 hash=abc1234 匹配，保留",
+      );
       consoleSpy.mockRestore();
     });
   });
