@@ -187,7 +187,7 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
 
       // 收集问题总结用于折叠块展示
       if (fileSummary.summary.trim()) {
-        fileSummaryLines.push(`### \`${fileSummary.file}\``);
+        fileSummaryLines.push(`### 💡 \`${fileSummary.file}\``);
         fileSummaryLines.push(`${fileSummary.summary.trim()}`);
         fileSummaryLines.push("");
       }
