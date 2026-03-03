@@ -2,7 +2,13 @@ import "./locales";
 export * from "./review-spec";
 export * from "./review-report";
 import { defineExtension, t } from "@spaceflow/core";
-import type { GitProviderService, LlmProxyService, GitSdkService, LLMMode } from "@spaceflow/core";
+import type {
+  GitProviderService,
+  LlmProxyService,
+  GitSdkService,
+  LLMMode,
+  LocalReviewMode,
+} from "@spaceflow/core";
 import { parseVerbose } from "@spaceflow/core";
 import { reviewSchema, type AnalyzeDeletionsMode } from "./review.config";
 import { ReviewService } from "./review.service";
@@ -46,6 +52,8 @@ export const extension = defineExtension({
         { flags: "--show-all", description: t("review:options.showAll") },
         { flags: "--flush", description: t("review:options.flush") },
         { flags: "--event-action <action>", description: t("review:options.eventAction") },
+        { flags: "--local [mode]", description: t("review:options.local") },
+        { flags: "--no-local", description: t("review:options.noLocal") },
       ],
       run: async (_args, options, ctx) => {
         const isFlush = !!options?.flush;
@@ -104,7 +112,15 @@ export const extension = defineExtension({
           showAll: !!options?.showAll,
           flush: isFlush,
           eventAction: options?.eventAction as string,
+          local: parseLocalOption(options?.local),
         };
+
+        function parseLocalOption(value: unknown): LocalReviewMode | undefined {
+          if (value === false) return false;
+          if (value === true || value === undefined || value === "") return undefined;
+          if (value === "staged" || value === "uncommitted") return value;
+          return undefined;
+        }
 
         try {
           const context = await reviewService.getContextFromEnv(reviewOptions);

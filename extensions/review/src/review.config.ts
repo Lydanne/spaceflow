@@ -1,5 +1,5 @@
 import { z } from "@spaceflow/core";
-import type { LLMMode, VerboseLevel } from "@spaceflow/core";
+import type { LLMMode, VerboseLevel, LocalReviewMode } from "@spaceflow/core";
 import type { ReportFormat } from "./review-report";
 
 /** LLM 模式 schema（与 core 中的 LLMMode 保持一致） */
@@ -71,6 +71,14 @@ export interface ReviewOptions {
   timeout?: number;
   retries?: number;
   retryDelay?: number;
+  /**
+   * 本地代码审查模式
+   * - 'uncommitted': 审查所有未提交的代码（暂存区 + 工作区）
+   * - 'staged': 仅审查暂存区的代码
+   * - false: 禁用本地模式
+   * 在非 CI 和非 PR 模式下默认为 'uncommitted'
+   */
+  local?: LocalReviewMode;
 }
 
 /** review 命令配置 schema（LLM 敏感配置由系统 llm.config.ts 管理） */

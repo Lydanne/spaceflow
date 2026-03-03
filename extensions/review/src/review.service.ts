@@ -22,7 +22,7 @@ import {
   parseHunksFromPatch,
   calculateNewLineNumber,
 } from "@spaceflow/core";
-import type { IConfigReader } from "@spaceflow/core";
+import type { IConfigReader, LocalReviewMode } from "@spaceflow/core";
 import { type AnalyzeDeletionsMode, type ReviewConfig } from "./review.config";
 import {
   ReviewSpecService,
@@ -73,6 +73,13 @@ export interface ReviewContext extends ReviewOptions {
   showAll?: boolean;
   /** PR 事件类型（opened, synchronize, closed 等） */
   eventAction?: string;
+  /**
+   * 本地代码审查模式（已解析）
+   * - 'uncommitted': 审查所有未提交的代码（暂存区 + 工作区）
+   * - 'staged': 仅审查暂存区的代码
+   * - false: 禁用本地模式
+   */
+  localMode?: LocalReviewMode;
 }
 
 export interface FileReviewPrompt {
@@ -239,10 +246,17 @@ export class ReviewService {
       specSources.push(...reviewConf.references);
     }
 
-    // 当没有 PR 且没有指定 base/head 时，自动获取默认值
+    // 解析本地模式：非 CI、非 PR、无 base/head 时默认启用 uncommitted 模式
+    const localMode = this.resolveLocalMode(options, {
+      ci: options.ci,
+      hasPrNumber: !!prNumber,
+      hasBaseHead: !!(options.base || options.head),
+    });
+
+    // 当没有 PR 且没有指定 base/head 且不是本地模式时，自动获取默认值
     let baseRef = options.base;
     let headRef = options.head;
-    if (!prNumber && !baseRef && !headRef) {
+    if (!prNumber && !baseRef && !headRef && !localMode) {
       headRef = this.gitSdk.getCurrentBranch() ?? "HEAD";
       baseRef = this.gitSdk.getDefaultBranch();
       if (shouldLog(options.verbose, 1)) {
@@ -291,7 +305,38 @@ export class ReviewService {
       showAll: options.showAll ?? false,
       flush: options.flush ?? false,
       eventAction: options.eventAction,
+      localMode,
     };
+  }
+
+  /**
+   * 解析本地代码审查模式
+   * - 显式指定 --local [mode] 时使用指定值
+   * - 显式指定 --no-local 时禁用
+   * - 非 CI、非 PR、无 base/head 时默认启用 uncommitted 模式
+   */
+  protected resolveLocalMode(
+    options: ReviewOptions,
+    env: { ci: boolean; hasPrNumber: boolean; hasBaseHead: boolean },
+  ): "uncommitted" | "staged" | false {
+    // 显式指定了 --no-local
+    if (options.local === false) {
+      return false;
+    }
+    // 显式指定了 --local [mode]
+    if (options.local === "staged" || options.local === "uncommitted") {
+      return options.local;
+    }
+    // CI 或 PR 模式下不启用本地模式
+    if (env.ci || env.hasPrNumber) {
+      return false;
+    }
+    // 指定了 base/head 时不启用本地模式
+    if (env.hasBaseHead) {
+      return false;
+    }
+    // 默认启用 uncommitted 模式
+    return "uncommitted";
   }
 
   /**
@@ -387,15 +432,21 @@ export class ReviewService {
       files,
       commits: filterCommits,
       deletionOnly,
+      localMode,
     } = context;
 
     // 直接审查文件模式：指定了 -f 文件且 base=head
     const isDirectFileMode = files && files.length > 0 && baseRef === headRef;
+    // 本地模式：审查未提交的代码
+    const isLocalMode = !!localMode;
 
     if (shouldLog(verbose, 1)) {
       console.log(`🔍 Review 启动`);
       console.log(`   DRY-RUN mode: ${dryRun ? "enabled" : "disabled"}`);
       console.log(`   CI mode: ${ci ? "enabled" : "disabled"}`);
+      if (isLocalMode) {
+        console.log(`   Local mode: ${localMode}`);
+      }
       console.log(`   Verbose: ${verbose}`);
     }
 
@@ -415,7 +466,40 @@ export class ReviewService {
     let commits: PullRequestCommit[] = [];
     let changedFiles: ChangedFile[] = [];
 
-    if (prNumber) {
+    if (isLocalMode) {
+      // 本地模式：从 git 获取未提交/暂存区的变更
+      if (shouldLog(verbose, 1)) {
+        console.log(`📥 本地模式: 获取${localMode === "staged" ? "暂存区" : "未提交"}的代码变更`);
+      }
+      const localFiles =
+        localMode === "staged" ? this.gitSdk.getStagedFiles() : this.gitSdk.getUncommittedFiles();
+
+      if (localFiles.length === 0) {
+        console.log(`ℹ️  没有${localMode === "staged" ? "暂存区" : "未提交"}的代码变更`);
+        return {
+          success: true,
+          description: "",
+          issues: [],
+          summary: [],
+          round: 1,
+        };
+      }
+
+      // 一次性获取所有 diff，避免每个文件调用一次 git 命令
+      const localDiffs =
+        localMode === "staged" ? this.gitSdk.getStagedDiff() : this.gitSdk.getUncommittedDiff();
+      const diffMap = new Map(localDiffs.map((d) => [d.filename, d.patch]));
+
+      changedFiles = localFiles.map((f) => ({
+        filename: f.filename,
+        status: f.status as ChangedFile["status"],
+        patch: diffMap.get(f.filename),
+      }));
+
+      if (shouldLog(verbose, 1)) {
+        console.log(`   Changed files: ${changedFiles.length}`);
+      }
+    } else if (prNumber) {
       if (shouldLog(verbose, 1)) {
         console.log(`📥 获取 PR #${prNumber} 信息 (owner: ${owner}, repo: ${repo})`);
       }
@@ -560,6 +644,7 @@ export class ReviewService {
       headSha,
       prNumber,
       verbose,
+      isLocalMode,
     );
     if (!llmMode) {
       throw new Error("必须指定 LLM 类型");
@@ -1130,9 +1215,10 @@ export class ReviewService {
     ref: string,
     prNumber?: number,
     verbose?: VerboseLevel,
+    isLocalMode?: boolean,
   ): Promise<FileContentsMap> {
     const contents: FileContentsMap = new Map();
-    const latestCommitHash = commits[commits.length - 1]?.sha?.slice(0, 7) || "-------";
+    const latestCommitHash = commits[commits.length - 1]?.sha?.slice(0, 7) || "+local+";
 
     // 优先使用 changedFiles 中的 patch 字段（来自 PR 的整体 diff base...head）
     // 这样行号是相对于最终文件的，而不是每个 commit 的父 commit
@@ -1145,7 +1231,10 @@ export class ReviewService {
       if (file.filename && file.status !== "deleted") {
         try {
           let rawContent: string;
-          if (prNumber) {
+          if (isLocalMode) {
+            // 本地模式：读取工作区文件的当前内容
+            rawContent = this.gitSdk.getWorkingFileContent(file.filename);
+          } else if (prNumber) {
             rawContent = await this.gitProvider.getFileContent(owner, repo, file.filename, ref);
           } else {
             rawContent = await this.gitSdk.getFileContent(ref, file.filename);
