@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.26.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.25.0...@spaceflow/shell@0.26.0) (2026-03-03)
+
+### 新特性
+
+* **core:** 新增 Git SDK 本地变更管理能力 ([b96d05a](https://github.com/Lydanne/spaceflow/commit/b96d05a93729635020f317ffc2f0343fc1be8be1))
+* **review:** 新增本地代码审查模式，支持审查未提交代码 ([b80614a](https://github.com/Lydanne/spaceflow/commit/b80614a7dff570a078e7709a70628752e35ec9e8))
+* **review:** 本地模式无变更时自动回退到分支比较模式 ([820ff8d](https://github.com/Lydanne/spaceflow/commit/820ff8d04f5af84340d861e03ccbf66d57fc2c1c))
+
+### 代码重构
+
+* **review:** 为文件总结标题添加 💡 图标,增强视觉识别度 ([69cecf0](https://github.com/Lydanne/spaceflow/commit/69cecf0a6deadf1935db060800f8f110ae4b9889))
+* **review:** 优化无效问题统计逻辑,排除已修复和已解决的问题 ([1de7b2a](https://github.com/Lydanne/spaceflow/commit/1de7b2a23fcc3ff73f679fc219342e111d96acf7))
+* **review:** 优化问题统计展示,统一状态图标并新增汇总行 ([c764625](https://github.com/Lydanne/spaceflow/commit/c76462548a299ee51af98553c73ba4f705031cd3))
+* **review:** 优化问题统计表格布局,将总结内容移至折叠块展示 ([629e96f](https://github.com/Lydanne/spaceflow/commit/629e96f5960167b689c724a4fb4df4fb29088002))
+
+### 测试用例
+
+* **review:** 新增 deleteExistingAiReviews、buildLineReviewBody、findExistingAiComments、syncReactionsToIssues 和 filterIssuesByValidCommits 方法的详细日志测试 ([0619e9c](https://github.com/Lydanne/spaceflow/commit/0619e9cc1e5a81d24703e2e574026a249d87f236))
+* **review:** 新增 invalidateIssuesForChangedFiles、updateIssueLineNumbers、filterIssuesByValidCommits 和 ensureClaudeCli 方法的单元测试 ([876f827](https://github.com/Lydanne/spaceflow/commit/876f82746331cf2e353b0a537b8691395e2a1084))
+
+### 其他修改
+
+* **core:** released version 0.24.0 [no ci] ([c1d77e4](https://github.com/Lydanne/spaceflow/commit/c1d77e4c8e612e7b64a70c5d9d4384452a3ccbc1))
+* **publish:** released version 0.48.0 [no ci] ([da4065f](https://github.com/Lydanne/spaceflow/commit/da4065fdbc9c193ebca207c371ed0ea17a13c0db))
+* **review-summary:** released version 0.28.0 [no ci] ([e131ed8](https://github.com/Lydanne/spaceflow/commit/e131ed83528ef8b45b3e3edaac5dab3389812323))
+* **review-summary:** released version 0.29.0 [no ci] ([ef6209c](https://github.com/Lydanne/spaceflow/commit/ef6209cf15114fa9ece2e7e11a9131081d92d443))
+* **review-summary:** released version 0.30.0 [no ci] ([3902c7b](https://github.com/Lydanne/spaceflow/commit/3902c7be16ceb6ab7ff2abe52e434634de12a664))
+* **review-summary:** released version 0.31.0 [no ci] ([9b028ce](https://github.com/Lydanne/spaceflow/commit/9b028cedd03d8c60f8c1db58b189cd022ea562cf))
+* **review-summary:** released version 0.32.0 [no ci] ([b6e083d](https://github.com/Lydanne/spaceflow/commit/b6e083d0f6187c6cfb9be86cf58544653cded2bd))
+* **review:** released version 0.61.0 [no ci] ([f48fa24](https://github.com/Lydanne/spaceflow/commit/f48fa24b378fef0efe95972ef32c0a256a569a7f))
+* **review:** released version 0.62.0 [no ci] ([9f535e1](https://github.com/Lydanne/spaceflow/commit/9f535e149ffd7063407e3f865418be35b2eb417b))
+* **review:** released version 0.63.0 [no ci] ([7f6b75c](https://github.com/Lydanne/spaceflow/commit/7f6b75cc1f9d594ff596a742e44869884f07d08e))
+* **review:** released version 0.64.0 [no ci] ([55de549](https://github.com/Lydanne/spaceflow/commit/55de54963608d0f8c5410d435fdad184fd902af0))
+* **review:** released version 0.65.0 [no ci] ([8de84ba](https://github.com/Lydanne/spaceflow/commit/8de84ba1ca6f2254299de199827a3940beff76a0))
+* **scripts:** released version 0.26.0 [no ci] ([e757eba](https://github.com/Lydanne/spaceflow/commit/e757eba5ae1cdbea428d4cc1c6de6e7e68e546ff))
+
 ## [0.25.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.24.0...@spaceflow/shell@0.25.0) (2026-03-02)
 
 ### 代码重构
