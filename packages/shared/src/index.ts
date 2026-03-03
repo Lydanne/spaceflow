@@ -54,6 +54,7 @@ export {
   writeConfigSync,
   getSupportedEditors,
   getDependencies,
+  getExtensionDependencies,
   findConfigFileWithField,
   updateDependency,
   removeDependency,
