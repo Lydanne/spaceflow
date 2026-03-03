@@ -22,7 +22,7 @@ import {
   SchemaGeneratorService,
   findConfigFileWithField,
   getSupportedEditors,
-  getDependencies,
+  getExtensionDependencies,
   updateDependency,
   SPACEFLOW_DIR,
 } from "@spaceflow/core";
@@ -813,7 +813,7 @@ export class InstallService {
    * 从配置文件解析扩展
    */
   protected parseExtensionsFromConfig(cwd?: string): Record<string, ExtensionConfig> {
-    return getDependencies(cwd);
+    return getExtensionDependencies(cwd);
   }
 
   /**

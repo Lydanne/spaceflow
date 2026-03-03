@@ -7,7 +7,7 @@ import {
   getEditorDirName,
   getSourceType,
   normalizeSource,
-  getDependencies,
+  getExtensionDependencies,
   getSupportedEditors,
   t,
 } from "@spaceflow/core";
@@ -30,7 +30,7 @@ export class ListService {
     const cwd = process.cwd();
 
     // 读取合并后的 dependencies（支持 .spaceflowrc、.spaceflow/spaceflow.json 等所有配置源）
-    const dependencies = getDependencies(cwd);
+    const dependencies = getExtensionDependencies(cwd);
 
     if (Object.keys(dependencies).length === 0) {
       if (shouldLog(verbose, 1)) {
