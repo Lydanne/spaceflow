@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.62.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.61.0...@spaceflow/review@0.62.0) (2026-03-03)
+
+### 代码重构
+
+* **review:** 优化问题统计展示,统一状态图标并新增汇总行 ([c764625](https://github.com/Lydanne/spaceflow/commit/c76462548a299ee51af98553c73ba4f705031cd3))
+* **review:** 优化问题统计表格布局,将总结内容移至折叠块展示 ([629e96f](https://github.com/Lydanne/spaceflow/commit/629e96f5960167b689c724a4fb4df4fb29088002))
+
+### 其他修改
+
+* **review-summary:** released version 0.29.0 [no ci] ([ef6209c](https://github.com/Lydanne/spaceflow/commit/ef6209cf15114fa9ece2e7e11a9131081d92d443))
+
 ## [0.61.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.60.0...@spaceflow/review@0.61.0) (2026-03-03)
 
 ### 代码重构
