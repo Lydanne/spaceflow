@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.27.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.26.0...@spaceflow/shell@0.27.0) (2026-03-03)
+
+### 新特性
+
+* **core:** 在安装过程中记录并提示 @spaceflow/core 版本变更 ([1992129](https://github.com/Lydanne/spaceflow/commit/19921299bf77b98b150ba6522c1b37ac872f431e))
+* **shared:** 优化获取 core 版本逻辑，支持 .spaceflowrc 显式指定 ([916a87d](https://github.com/Lydanne/spaceflow/commit/916a87d5b7a7fc8c8dba3f959f3379fee26e0017))
+
+### 其他修改
+
+* **cli:** released version 0.39.0 [no ci] ([9de7c35](https://github.com/Lydanne/spaceflow/commit/9de7c35db100e482baa78059ecd3176c7942e16b))
+* **core:** released version 0.25.0 [no ci] ([28d6b6d](https://github.com/Lydanne/spaceflow/commit/28d6b6dcfbaf0dfa7b986f8c880b47bd4962eac8))
+* **publish:** released version 0.49.0 [no ci] ([5e66528](https://github.com/Lydanne/spaceflow/commit/5e66528ae3833a3da66178cc45aaf3a2e8e12fc9))
+* **review-summary:** released version 0.33.0 [no ci] ([ca07fa3](https://github.com/Lydanne/spaceflow/commit/ca07fa33f9418147a6a511d0a2699159d01b892c))
+* **review:** released version 0.66.0 [no ci] ([620fb75](https://github.com/Lydanne/spaceflow/commit/620fb75c39297eba80ee3923fedbaa40bf352997))
+* **scripts:** released version 0.27.0 [no ci] ([8c4111a](https://github.com/Lydanne/spaceflow/commit/8c4111a73c472fab084030d547656ba5784e05b2))
+* **shared:** released version 0.7.0 [no ci] ([e9ade7e](https://github.com/Lydanne/spaceflow/commit/e9ade7e8caefd9f5ee4603b52b3a350ae604dfea))
+
 ## [0.26.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.25.0...@spaceflow/shell@0.26.0) (2026-03-03)
 
 ### 新特性
