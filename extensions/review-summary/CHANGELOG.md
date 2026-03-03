@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.29.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.28.0...@spaceflow/review-summary@0.29.0) (2026-03-03)
+
+### 代码重构
+
+* **review:** 优化无效问题统计逻辑,排除已修复和已解决的问题 ([1de7b2a](https://github.com/Lydanne/spaceflow/commit/1de7b2a23fcc3ff73f679fc219342e111d96acf7))
+
+### 其他修改
+
+* **review:** released version 0.61.0 [no ci] ([f48fa24](https://github.com/Lydanne/spaceflow/commit/f48fa24b378fef0efe95972ef32c0a256a569a7f))
+
 ## [0.28.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.27.0...@spaceflow/review-summary@0.28.0) (2026-03-02)
 
 ### 代码重构
