@@ -678,6 +678,9 @@ export class ReviewService {
           console.log(`📋 已有评论中存在 ${existingIssues.length} 个问题`);
         }
 
+        // 先同步最新的 resolved 状态，确保后续 invalidate/verify 能正确跳过已解决的问题
+        await this.syncResolvedComments(owner, repo, prNumber, existingResult);
+
         // 如果文件有变更，将该文件的历史问题标记为无效
         // 简化策略：避免复杂的行号更新逻辑
         const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
@@ -978,7 +981,7 @@ export class ReviewService {
     const total = issues.length;
     const fixed = issues.filter((i) => i.fixed).length;
     const resolved = issues.filter((i) => i.resolved && !i.fixed).length;
-    const invalid = issues.filter((i) => i.valid === "false").length;
+    const invalid = issues.filter((i) => i.valid === "false" && !i.fixed && !i.resolved).length;
     const pending = total - fixed - resolved - invalid;
     const fixRate = total > 0 ? Math.round((fixed / total) * 100 * 10) / 10 : 0;
     const resolveRate = total > 0 ? Math.round(((fixed + resolved) / total) * 100 * 10) / 10 : 0;
@@ -1953,7 +1956,7 @@ ${fileChanges || "无"}`;
       }
     }
 
-    // 获取已解决的评论，同步 fixed 状态（在更新 review 之前）
+    // 获取已解决的评论，同步 resolve 状态（在更新 review 之前）
     await this.syncResolvedComments(owner, repo, prNumber, result);
 
     // 获取评论的 reactions，同步 valid 状态（👎 标记为无效）
@@ -2527,7 +2530,9 @@ ${fileChanges || "无"}`;
       if (prevIssues.length > 0) {
         const prevFixed = prevIssues.filter((i) => i.fixed).length;
         const prevResolved = prevIssues.filter((i) => i.resolved && !i.fixed).length;
-        const prevInvalid = prevIssues.filter((i) => i.valid === "false").length;
+        const prevInvalid = prevIssues.filter(
+          (i) => i.valid === "false" && !i.fixed && !i.resolved,
+        ).length;
         const prevPending = prevIssues.length - prevFixed - prevResolved - prevInvalid;
         parts.push("");
         parts.push(
