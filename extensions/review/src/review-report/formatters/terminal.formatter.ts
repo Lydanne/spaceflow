@@ -28,32 +28,80 @@ export class TerminalFormatter implements ReviewReportFormatter {
       return "没有需要审查的文件";
     }
 
-    const issuesByFile = new Map<string, { resolved: number; errors: number; warns: number }>();
+    // 🟢 已修复 | 🔴 待处理error | 🟡 待处理warn | ⚪ 已解决(非代码修复)
+    const issuesByFile = new Map<
+      string,
+      { fixed: number; pendingErrors: number; pendingWarns: number; resolved: number }
+    >();
     for (const issue of issues) {
-      const stats = issuesByFile.get(issue.file) || { resolved: 0, errors: 0, warns: 0 };
+      if (issue.valid === "false") continue;
+      const stats = issuesByFile.get(issue.file) || {
+        fixed: 0,
+        pendingErrors: 0,
+        pendingWarns: 0,
+        resolved: 0,
+      };
       if (issue.fixed) {
+        stats.fixed++;
+      } else if (issue.resolved) {
         stats.resolved++;
       } else if (issue.severity === "error") {
-        stats.errors++;
+        stats.pendingErrors++;
       } else {
-        stats.warns++;
+        stats.pendingWarns++;
       }
       issuesByFile.set(issue.file, stats);
     }
 
+    // 汇总统计
+    let totalAll = 0;
+    let totalFixed = 0;
+    let totalPendingErrors = 0;
+    let totalPendingWarns = 0;
+    let totalResolved = 0;
+
     const lines: string[] = [];
     for (const fileSummary of summaries) {
-      const stats = issuesByFile.get(fileSummary.file) || { resolved: 0, errors: 0, warns: 0 };
-      const resolvedText = stats.resolved > 0 ? `${GREEN}✅ ${stats.resolved} 已解决${RESET}` : "";
-      const errorText = stats.errors > 0 ? `${RED}🔴 ${stats.errors} error${RESET}` : "";
-      const warnText = stats.warns > 0 ? `${YELLOW}🟡 ${stats.warns} warn${RESET}` : "";
-      const statsText = [resolvedText, errorText, warnText].filter(Boolean).join(" / ");
+      const stats = issuesByFile.get(fileSummary.file) || {
+        fixed: 0,
+        pendingErrors: 0,
+        pendingWarns: 0,
+        resolved: 0,
+      };
+      const fileTotal = stats.fixed + stats.pendingErrors + stats.pendingWarns + stats.resolved;
+      totalAll += fileTotal;
+      totalFixed += stats.fixed;
+      totalPendingErrors += stats.pendingErrors;
+      totalPendingWarns += stats.pendingWarns;
+      totalResolved += stats.resolved;
+
+      const totalText = fileTotal > 0 ? `${BOLD}${fileTotal} 问题${RESET}` : "";
+      const fixedText = stats.fixed > 0 ? `${GREEN}🟢 ${stats.fixed} 已修复${RESET}` : "";
+      const errorText =
+        stats.pendingErrors > 0 ? `${RED}🔴 ${stats.pendingErrors} error${RESET}` : "";
+      const warnText =
+        stats.pendingWarns > 0 ? `${YELLOW}🟡 ${stats.pendingWarns} warn${RESET}` : "";
+      const resolvedText = stats.resolved > 0 ? `⚪ ${stats.resolved} 已解决` : "";
+      const statsText = [totalText, fixedText, errorText, warnText, resolvedText]
+        .filter(Boolean)
+        .join(" / ");
 
       if (statsText) {
         lines.push(`${BOLD}${fileSummary.file}${RESET} (${statsText}): ${fileSummary.summary}`);
       } else {
         lines.push(`${BOLD}${fileSummary.file}${RESET}: ${fileSummary.summary}`);
       }
+    }
+
+    // 添加汇总行
+    if (summaries.length > 1) {
+      lines.push("");
+      const summaryParts = [`${BOLD}总计: ${totalAll} 问题${RESET}`];
+      if (totalFixed > 0) summaryParts.push(`${GREEN}🟢 ${totalFixed} 已修复${RESET}`);
+      if (totalPendingErrors > 0) summaryParts.push(`${RED}🔴 ${totalPendingErrors} error${RESET}`);
+      if (totalPendingWarns > 0) summaryParts.push(`${YELLOW}🟡 ${totalPendingWarns} warn${RESET}`);
+      if (totalResolved > 0) summaryParts.push(`⚪ ${totalResolved} 已解决`);
+      lines.push(summaryParts.join(" / "));
     }
 
     return lines.join("\n");
@@ -123,8 +171,8 @@ export class TerminalFormatter implements ReviewReportFormatter {
     const title = prNumber ? `PR #${prNumber} Review 状态统计` : "Review 状态统计";
     const lines = [`\n${BOLD}${CYAN}📊 ${title}:${RESET}`];
     lines.push(`   总问题数: ${stats.total}`);
-    lines.push(`   ${GREEN}✅ 已修复: ${stats.fixed}${RESET}`);
-    lines.push(`   ${GREEN}🟢 已解决: ${stats.resolved}${RESET}`);
+    lines.push(`   ${GREEN}🟢 已修复: ${stats.fixed}${RESET}`);
+    lines.push(`   ⚪ 已解决: ${stats.resolved}`);
     lines.push(`   ${RED}❌ 无效: ${stats.invalid}${RESET}`);
     lines.push(`   ${YELLOW}⚠️  待处理: ${stats.pending}${RESET}`);
     lines.push(`   修复率: ${stats.fixRate}%`);

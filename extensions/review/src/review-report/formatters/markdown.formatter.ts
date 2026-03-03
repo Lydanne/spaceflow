@@ -130,32 +130,69 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
       return "没有需要审查的文件";
     }
 
-    const issuesByFile = new Map<string, { resolved: number; errors: number; warns: number }>();
+    // 🟢 已修复 | 🔴 待处理error | 🟡 待处理warn | ⚪ 已解决(非代码修复)
+    const issuesByFile = new Map<
+      string,
+      { fixed: number; pendingErrors: number; pendingWarns: number; resolved: number }
+    >();
     for (const issue of issues) {
       if (issue.valid === "false") continue;
-      const stats = issuesByFile.get(issue.file) || { resolved: 0, errors: 0, warns: 0 };
+      const stats = issuesByFile.get(issue.file) || {
+        fixed: 0,
+        pendingErrors: 0,
+        pendingWarns: 0,
+        resolved: 0,
+      };
       if (issue.fixed) {
+        stats.fixed++;
+      } else if (issue.resolved) {
         stats.resolved++;
       } else if (issue.severity === "error") {
-        stats.errors++;
+        stats.pendingErrors++;
       } else {
-        stats.warns++;
+        stats.pendingWarns++;
       }
       issuesByFile.set(issue.file, stats);
     }
 
     const lines: string[] = [];
-    lines.push("| 文件 | 🟢 | 🔴 | 🟡 | 总结 |");
-    lines.push("|------|----|----|----|----|");
+    lines.push("| 文件 | 总数 | 🟢 | 🔴 | 🟡 | ⚪ | 总结 |");
+    lines.push("|------|------|----|----|----|----|----|");
+
+    // 汇总统计
+    let totalAll = 0;
+    let totalFixed = 0;
+    let totalPendingErrors = 0;
+    let totalPendingWarns = 0;
+    let totalResolved = 0;
 
     for (const fileSummary of summaries) {
-      const stats = issuesByFile.get(fileSummary.file) || { resolved: 0, errors: 0, warns: 0 };
+      const stats = issuesByFile.get(fileSummary.file) || {
+        fixed: 0,
+        pendingErrors: 0,
+        pendingWarns: 0,
+        resolved: 0,
+      };
+      const fileTotal = stats.fixed + stats.pendingErrors + stats.pendingWarns + stats.resolved;
+      totalAll += fileTotal;
+      totalFixed += stats.fixed;
+      totalPendingErrors += stats.pendingErrors;
+      totalPendingWarns += stats.pendingWarns;
+      totalResolved += stats.resolved;
+
       const summaryText = fileSummary.summary
         .split("\n")
         .filter((line) => line.trim())
         .join("<br>");
       lines.push(
-        `| \`${fileSummary.file}\` | ${stats.resolved} | ${stats.errors} | ${stats.warns} | ${summaryText} |`,
+        `| \`${fileSummary.file}\` | ${fileTotal} | ${stats.fixed} | ${stats.pendingErrors} | ${stats.pendingWarns} | ${stats.resolved} | ${summaryText} |`,
+      );
+    }
+
+    // 添加汇总行
+    if (summaries.length > 1) {
+      lines.push(
+        `| **总计** | **${totalAll}** | **${totalFixed}** | **${totalPendingErrors}** | **${totalPendingWarns}** | **${totalResolved}** | |`,
       );
     }
 
@@ -289,8 +326,8 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
     const title = prNumber ? `PR #${prNumber} Review 状态统计` : "Review 状态统计";
     const lines = [`## 📊 ${title}\n`, `| 指标 | 数量 |`, `|------|------|`];
     lines.push(`| 总问题数 | ${stats.total} |`);
-    lines.push(`| ✅ 已修复 | ${stats.fixed} |`);
-    lines.push(`| 🟢 已解决 | ${stats.resolved} |`);
+    lines.push(`| 🟢 已修复 | ${stats.fixed} |`);
+    lines.push(`| ⚪ 已解决 | ${stats.resolved} |`);
     lines.push(`| ❌ 无效 | ${stats.invalid} |`);
     lines.push(`| ⚠️ 待处理 | ${stats.pending} |`);
     lines.push(`| 修复率 | ${stats.fixRate}% |`);

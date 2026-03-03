@@ -2506,13 +2506,17 @@ ${fileChanges || "无"}`;
     round: number,
     allIssues: ReviewIssue[],
   ): string {
-    const errorCount = issues.filter((i) => i.severity === "error").length;
-    const warnCount = issues.filter((i) => i.severity === "warn").length;
+    // 只统计待处理的问题（未修复且未解决）
+    const pendingIssues = issues.filter((i) => !i.fixed && !i.resolved && i.valid !== "false");
+    const pendingErrors = pendingIssues.filter((i) => i.severity === "error").length;
+    const pendingWarns = pendingIssues.filter((i) => i.severity === "warn").length;
     const fileCount = new Set(issues.map((i) => i.file)).size;
 
+    const totalPending = pendingErrors + pendingWarns;
     const badges: string[] = [];
-    if (errorCount > 0) badges.push(`🔴 ${errorCount}`);
-    if (warnCount > 0) badges.push(`🟡 ${warnCount}`);
+    if (totalPending > 0) badges.push(`⚠️ ${totalPending}`);
+    if (pendingErrors > 0) badges.push(`🔴 ${pendingErrors}`);
+    if (pendingWarns > 0) badges.push(`🟡 ${pendingWarns}`);
 
     const parts: string[] = [REVIEW_LINE_COMMENTS_MARKER];
     parts.push(`### 🚀 Spaceflow Review · Round ${round}`);
@@ -2540,8 +2544,8 @@ ${fileChanges || "无"}`;
         );
         parts.push(`| 状态 | 数量 |`);
         parts.push(`|------|------|`);
-        if (prevFixed > 0) parts.push(`| ✅ 已修复 | ${prevFixed} |`);
-        if (prevResolved > 0) parts.push(`| 🟢 已解决 | ${prevResolved} |`);
+        if (prevFixed > 0) parts.push(`| 🟢 已修复 | ${prevFixed} |`);
+        if (prevResolved > 0) parts.push(`| ⚪ 已解决 | ${prevResolved} |`);
         if (prevInvalid > 0) parts.push(`| ❌ 无效 | ${prevInvalid} |`);
         if (prevPending > 0) parts.push(`| ⚠️ 待处理 | ${prevPending} |`);
         parts.push(`\n</details>`);
