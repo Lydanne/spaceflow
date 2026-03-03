@@ -156,8 +156,8 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
     }
 
     const lines: string[] = [];
-    lines.push("| 文件 | 总数 | 🟢 | 🔴 | 🟡 | ⚪ | 总结 |");
-    lines.push("|------|------|----|----|----|----|----|");
+    lines.push("| 文件 | 总数 | 🟢 | 🔴 | 🟡 | ⚪ |");
+    lines.push("|------|------|----|----|----|-----|");
 
     // 汇总统计
     let totalAll = 0;
@@ -166,6 +166,7 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
     let totalPendingWarns = 0;
     let totalResolved = 0;
 
+    const fileSummaryLines: string[] = [];
     for (const fileSummary of summaries) {
       const stats = issuesByFile.get(fileSummary.file) || {
         fixed: 0,
@@ -180,20 +181,32 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
       totalPendingWarns += stats.pendingWarns;
       totalResolved += stats.resolved;
 
-      const summaryText = fileSummary.summary
-        .split("\n")
-        .filter((line) => line.trim())
-        .join("<br>");
       lines.push(
-        `| \`${fileSummary.file}\` | ${fileTotal} | ${stats.fixed} | ${stats.pendingErrors} | ${stats.pendingWarns} | ${stats.resolved} | ${summaryText} |`,
+        `| \`${fileSummary.file}\` | ${fileTotal} | ${stats.fixed} | ${stats.pendingErrors} | ${stats.pendingWarns} | ${stats.resolved} |`,
       );
+
+      // 收集问题总结用于折叠块展示
+      if (fileSummary.summary.trim()) {
+        fileSummaryLines.push(`### \`${fileSummary.file}\``);
+        fileSummaryLines.push(`${fileSummary.summary.trim()}`);
+        fileSummaryLines.push("");
+      }
     }
 
     // 添加汇总行
     if (summaries.length > 1) {
       lines.push(
-        `| **总计** | **${totalAll}** | **${totalFixed}** | **${totalPendingErrors}** | **${totalPendingWarns}** | **${totalResolved}** | |`,
+        `| **总计** | **${totalAll}** | **${totalFixed}** | **${totalPendingErrors}** | **${totalPendingWarns}** | **${totalResolved}** |`,
       );
+    }
+
+    // 问题总结放到折叠块中
+    if (fileSummaryLines.length > 0) {
+      lines.push("");
+      lines.push("<details>");
+      lines.push("<summary>📝 问题总结</summary>\n");
+      lines.push(...fileSummaryLines);
+      lines.push("</details>");
     }
 
     return lines.join("\n");
