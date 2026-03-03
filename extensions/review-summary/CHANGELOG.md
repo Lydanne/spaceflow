@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.33.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.32.0...@spaceflow/review-summary@0.33.0) (2026-03-03)
+
+### 新特性
+
+* **core:** 新增 Git SDK 本地变更管理能力 ([b96d05a](https://github.com/Lydanne/spaceflow/commit/b96d05a93729635020f317ffc2f0343fc1be8be1))
+* **review:** 新增本地代码审查模式，支持审查未提交代码 ([b80614a](https://github.com/Lydanne/spaceflow/commit/b80614a7dff570a078e7709a70628752e35ec9e8))
+* **review:** 本地模式无变更时自动回退到分支比较模式 ([820ff8d](https://github.com/Lydanne/spaceflow/commit/820ff8d04f5af84340d861e03ccbf66d57fc2c1c))
+
+### 其他修改
+
+* **core:** released version 0.24.0 [no ci] ([c1d77e4](https://github.com/Lydanne/spaceflow/commit/c1d77e4c8e612e7b64a70c5d9d4384452a3ccbc1))
+* **publish:** released version 0.48.0 [no ci] ([da4065f](https://github.com/Lydanne/spaceflow/commit/da4065fdbc9c193ebca207c371ed0ea17a13c0db))
+* **review:** released version 0.65.0 [no ci] ([8de84ba](https://github.com/Lydanne/spaceflow/commit/8de84ba1ca6f2254299de199827a3940beff76a0))
+* **scripts:** released version 0.26.0 [no ci] ([e757eba](https://github.com/Lydanne/spaceflow/commit/e757eba5ae1cdbea428d4cc1c6de6e7e68e546ff))
+* **shell:** released version 0.26.0 [no ci] ([753cf30](https://github.com/Lydanne/spaceflow/commit/753cf3044ee7d09ea3f1f9150bf045395703c712))
+
 ## [0.32.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.31.0...@spaceflow/review-summary@0.32.0) (2026-03-03)
 
 ### 测试用例
