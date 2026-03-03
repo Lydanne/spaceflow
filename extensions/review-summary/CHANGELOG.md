@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.32.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.31.0...@spaceflow/review-summary@0.32.0) (2026-03-03)
+
+### 测试用例
+
+* **review:** 新增 deleteExistingAiReviews、buildLineReviewBody、findExistingAiComments、syncReactionsToIssues 和 filterIssuesByValidCommits 方法的详细日志测试 ([0619e9c](https://github.com/Lydanne/spaceflow/commit/0619e9cc1e5a81d24703e2e574026a249d87f236))
+* **review:** 新增 invalidateIssuesForChangedFiles、updateIssueLineNumbers、filterIssuesByValidCommits 和 ensureClaudeCli 方法的单元测试 ([876f827](https://github.com/Lydanne/spaceflow/commit/876f82746331cf2e353b0a537b8691395e2a1084))
+
+### 其他修改
+
+* **review:** released version 0.64.0 [no ci] ([55de549](https://github.com/Lydanne/spaceflow/commit/55de54963608d0f8c5410d435fdad184fd902af0))
+
 ## [0.31.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.30.0...@spaceflow/review-summary@0.31.0) (2026-03-03)
 
 ### 代码重构
