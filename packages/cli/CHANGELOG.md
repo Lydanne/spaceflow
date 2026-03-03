@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.40.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@0.39.0...@spaceflow/cli@0.40.0) (2026-03-03)
+
+### 新特性
+
+* **shared:** 新增获取扩展依赖函数，过滤内部包 ([86f4864](https://github.com/Lydanne/spaceflow/commit/86f48646c790285797b53c63a463d5134f7ac6b6))
+
+### 代码重构
+
+* **cli:** 重构外部扩展包读取逻辑，使用专用函数 ([d15054d](https://github.com/Lydanne/spaceflow/commit/d15054d81335a3b0c55db1acd169a2d9edf32a94))
+* **core:** 统一依赖获取函数命名，将 getDependencies 重命名为 getExtensionDependencies ([ff78202](https://github.com/Lydanne/spaceflow/commit/ff78202be9975ce6721e4ecbbd6b1e02f8a57b70))
+
+### 其他修改
+
+* **core:** released version 0.25.0 [no ci] ([28d6b6d](https://github.com/Lydanne/spaceflow/commit/28d6b6dcfbaf0dfa7b986f8c880b47bd4962eac8))
+* **publish:** released version 0.49.0 [no ci] ([5e66528](https://github.com/Lydanne/spaceflow/commit/5e66528ae3833a3da66178cc45aaf3a2e8e12fc9))
+* **review-summary:** released version 0.34.0 [no ci] ([3565bc4](https://github.com/Lydanne/spaceflow/commit/3565bc426469fa8215d70fb3bbd2a9ee9c128916))
+* **review:** released version 0.66.0 [no ci] ([620fb75](https://github.com/Lydanne/spaceflow/commit/620fb75c39297eba80ee3923fedbaa40bf352997))
+* **scripts:** released version 0.27.0 [no ci] ([8c4111a](https://github.com/Lydanne/spaceflow/commit/8c4111a73c472fab084030d547656ba5784e05b2))
+* **shared:** released version 0.8.0 [no ci] ([c3fe353](https://github.com/Lydanne/spaceflow/commit/c3fe3536ba0adca45f610fa2e8697bfccf842efe))
+* **shell:** released version 0.27.0 [no ci] ([c4501c2](https://github.com/Lydanne/spaceflow/commit/c4501c284de780c97a5a1cfc5b413ae8393acb91))
+
 ## [0.39.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@0.38.0...@spaceflow/cli@0.39.0) (2026-03-03)
 
 ### 新特性
