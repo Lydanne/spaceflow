@@ -437,8 +437,11 @@ export class ReviewService {
 
     // 直接审查文件模式：指定了 -f 文件且 base=head
     const isDirectFileMode = files && files.length > 0 && baseRef === headRef;
-    // 本地模式：审查未提交的代码
-    const isLocalMode = !!localMode;
+    // 本地模式：审查未提交的代码（可能回退到分支比较）
+    let isLocalMode = !!localMode;
+    // 用于回退时动态计算的 base/head
+    let effectiveBaseRef = baseRef;
+    let effectiveHeadRef = headRef;
 
     if (shouldLog(verbose, 1)) {
       console.log(`🔍 Review 启动`);
@@ -475,31 +478,49 @@ export class ReviewService {
         localMode === "staged" ? this.gitSdk.getStagedFiles() : this.gitSdk.getUncommittedFiles();
 
       if (localFiles.length === 0) {
-        console.log(`ℹ️  没有${localMode === "staged" ? "暂存区" : "未提交"}的代码变更`);
-        return {
-          success: true,
-          description: "",
-          issues: [],
-          summary: [],
-          round: 1,
-        };
+        // 本地无变更，回退到分支比较模式
+        if (shouldLog(verbose, 1)) {
+          console.log(
+            `ℹ️  没有${localMode === "staged" ? "暂存区" : "未提交"}的代码变更，回退到分支比较模式`,
+          );
+        }
+        isLocalMode = false;
+        effectiveHeadRef = this.gitSdk.getCurrentBranch() ?? "HEAD";
+        effectiveBaseRef = this.gitSdk.getDefaultBranch();
+        if (shouldLog(verbose, 1)) {
+          console.log(`📌 自动检测分支: base=${effectiveBaseRef}, head=${effectiveHeadRef}`);
+        }
+        // 同分支无法比较，提前返回
+        if (effectiveBaseRef === effectiveHeadRef) {
+          console.log(`ℹ️  当前分支 ${effectiveHeadRef} 与默认分支相同，没有可审查的代码变更`);
+          return {
+            success: true,
+            description: "",
+            issues: [],
+            summary: [],
+            round: 1,
+          };
+        }
+      } else {
+        // 一次性获取所有 diff，避免每个文件调用一次 git 命令
+        const localDiffs =
+          localMode === "staged" ? this.gitSdk.getStagedDiff() : this.gitSdk.getUncommittedDiff();
+        const diffMap = new Map(localDiffs.map((d) => [d.filename, d.patch]));
+
+        changedFiles = localFiles.map((f) => ({
+          filename: f.filename,
+          status: f.status as ChangedFile["status"],
+          patch: diffMap.get(f.filename),
+        }));
+
+        if (shouldLog(verbose, 1)) {
+          console.log(`   Changed files: ${changedFiles.length}`);
+        }
       }
+    }
 
-      // 一次性获取所有 diff，避免每个文件调用一次 git 命令
-      const localDiffs =
-        localMode === "staged" ? this.gitSdk.getStagedDiff() : this.gitSdk.getUncommittedDiff();
-      const diffMap = new Map(localDiffs.map((d) => [d.filename, d.patch]));
-
-      changedFiles = localFiles.map((f) => ({
-        filename: f.filename,
-        status: f.status as ChangedFile["status"],
-        patch: diffMap.get(f.filename),
-      }));
-
-      if (shouldLog(verbose, 1)) {
-        console.log(`   Changed files: ${changedFiles.length}`);
-      }
-    } else if (prNumber) {
+    // PR 模式、分支比较模式、或本地模式回退后的分支比较
+    if (prNumber) {
       if (shouldLog(verbose, 1)) {
         console.log(`📥 获取 PR #${prNumber} 信息 (owner: ${owner}, repo: ${repo})`);
       }
@@ -511,25 +532,34 @@ export class ReviewService {
         console.log(`   Commits: ${commits.length}`);
         console.log(`   Changed files: ${changedFiles.length}`);
       }
-    } else if (baseRef && headRef) {
+    } else if (effectiveBaseRef && effectiveHeadRef) {
       // 如果指定了 -f 文件且 base=head（无差异模式），直接审查指定文件
-      if (files && files.length > 0 && baseRef === headRef) {
+      if (files && files.length > 0 && effectiveBaseRef === effectiveHeadRef) {
         if (shouldLog(verbose, 1)) {
           console.log(`📥 直接审查指定文件模式 (${files.length} 个文件)`);
         }
         changedFiles = files.map((f) => ({ filename: f, status: "modified" as const }));
-      } else {
+      } else if (changedFiles.length === 0) {
+        // 仅当 changedFiles 为空时才获取（避免与回退逻辑重复）
         if (shouldLog(verbose, 1)) {
-          console.log(`📥 获取 ${baseRef}...${headRef} 的差异 (owner: ${owner}, repo: ${repo})`);
+          console.log(
+            `📥 获取 ${effectiveBaseRef}...${effectiveHeadRef} 的差异 (owner: ${owner}, repo: ${repo})`,
+          );
         }
-        changedFiles = await this.getChangedFilesBetweenRefs(owner, repo, baseRef, headRef);
-        commits = await this.getCommitsBetweenRefs(baseRef, headRef);
+        changedFiles = await this.getChangedFilesBetweenRefs(
+          owner,
+          repo,
+          effectiveBaseRef,
+          effectiveHeadRef,
+        );
+        commits = await this.getCommitsBetweenRefs(effectiveBaseRef, effectiveHeadRef);
         if (shouldLog(verbose, 1)) {
           console.log(`   Changed files: ${changedFiles.length}`);
           console.log(`   Commits: ${commits.length}`);
         }
       }
-    } else {
+    } else if (!isLocalMode) {
+      // 非本地模式且无有效的 base/head
       if (shouldLog(verbose, 1)) {
         console.log(`❌ 错误: 缺少 prNumber 或 baseRef/headRef`, { prNumber, baseRef, headRef });
       }
