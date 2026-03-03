@@ -1246,6 +1246,7 @@ describe("ReviewService", () => {
         invalid: 0,
         pending: 0,
         fixRate: 0,
+        resolveRate: 0,
       });
     });
 
@@ -3224,6 +3225,319 @@ describe("ReviewService", () => {
       const result = await (service as any).buildLineCommitMap("o", "r", commits);
       expect(mockGitSdkService.getCommitDiff).toHaveBeenCalledWith("abc1234567890");
       expect(result.size).toBe(0);
+    });
+  });
+
+  describe("ReviewService.invalidateIssuesForChangedFiles", () => {
+    it("should return issues unchanged when no headSha", async () => {
+      const issues = [{ file: "test.ts" }];
+      const result = await (service as any).invalidateIssuesForChangedFiles(
+        issues,
+        undefined,
+        "o",
+        "r",
+      );
+      expect(result).toBe(issues);
+    });
+
+    it("should log warning when no headSha", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const issues = [{ file: "test.ts" }];
+      await (service as any).invalidateIssuesForChangedFiles(issues, undefined, "o", "r", 1);
+      expect(consoleSpy).toHaveBeenCalledWith("   ⚠️ 无法获取 PR head SHA，跳过变更文件检查");
+      consoleSpy.mockRestore();
+    });
+
+    it("should invalidate issues for changed files", async () => {
+      gitProvider.getCommitDiff = vi
+        .fn()
+        .mockResolvedValue(
+          "diff --git a/changed.ts b/changed.ts\n--- a/changed.ts\n+++ b/changed.ts\n@@ -1,1 +1,2 @@\n line1\n+new",
+        ) as any;
+      const issues = [
+        { file: "changed.ts", line: "1", ruleId: "R1" },
+        { file: "unchanged.ts", line: "2", ruleId: "R2" },
+        { file: "changed.ts", line: "3", ruleId: "R3", fixed: "2024-01-01" },
+      ];
+      const result = await (service as any).invalidateIssuesForChangedFiles(
+        issues,
+        "abc123",
+        "o",
+        "r",
+        1,
+      );
+      expect(result).toHaveLength(3);
+      expect(result[0].valid).toBe("false");
+      expect(result[1].valid).toBeUndefined();
+      expect(result[2].fixed).toBe("2024-01-01");
+    });
+
+    it("should log when files are invalidated", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      gitProvider.getCommitDiff = vi
+        .fn()
+        .mockResolvedValue(
+          "diff --git a/changed.ts b/changed.ts\n--- a/changed.ts\n+++ b/changed.ts\n@@ -1,1 +1,2 @@\n line1\n+new",
+        ) as any;
+      const issues = [{ file: "changed.ts", line: "1", ruleId: "R1" }];
+      await (service as any).invalidateIssuesForChangedFiles(issues, "abc123", "o", "r", 1);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "   🗑️ Issue changed.ts:1 所在文件有变更，标记为无效",
+      );
+      expect(consoleSpy).toHaveBeenCalledWith("   📊 共标记 1 个历史问题为无效（文件有变更）");
+      consoleSpy.mockRestore();
+    });
+
+    it("should return issues unchanged when no diff files", async () => {
+      gitProvider.getCommitDiff = vi.fn().mockResolvedValue("") as any;
+      const issues = [{ file: "test.ts", line: "1" }];
+      const result = await (service as any).invalidateIssuesForChangedFiles(
+        issues,
+        "abc123",
+        "o",
+        "r",
+        1,
+      );
+      expect(result).toBe(issues);
+    });
+
+    it("should log when no diff files", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      gitProvider.getCommitDiff = vi.fn().mockResolvedValue("") as any;
+      const issues = [{ file: "test.ts", line: "1" }];
+      await (service as any).invalidateIssuesForChangedFiles(issues, "abc123", "o", "r", 1);
+      expect(consoleSpy).toHaveBeenCalledWith("   ⏭️ 最新 commit 无文件变更");
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle API error gracefully", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      gitProvider.getCommitDiff = vi.fn().mockRejectedValue(new Error("fail")) as any;
+      const issues = [{ file: "test.ts", line: "1" }];
+      const result = await (service as any).invalidateIssuesForChangedFiles(
+        issues,
+        "abc123",
+        "o",
+        "r",
+        1,
+      );
+      expect(result).toBe(issues);
+      expect(consoleSpy).toHaveBeenCalledWith("   ⚠️ 获取最新 commit 变更文件失败: Error: fail");
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("ReviewService.updateIssueLineNumbers", () => {
+    beforeEach(() => {
+      mockReviewSpecService.parseLineRange = vi.fn().mockImplementation((lineStr: string) => {
+        const lines: number[] = [];
+        const rangeMatch = lineStr.match(/^(\d+)-(\d+)$/);
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = parseInt(rangeMatch[2], 10);
+          for (let i = start; i <= end; i++) {
+            lines.push(i);
+          }
+        } else {
+          const line = parseInt(lineStr, 10);
+          if (!isNaN(line)) {
+            lines.push(line);
+          }
+        }
+        return lines;
+      });
+    });
+
+    it("should return issues unchanged when no patch for file", () => {
+      const issues = [{ file: "test.ts", line: "5", ruleId: "R1" }];
+      const filePatchMap = new Map([["other.ts", "@@ -1,1 +1,2 @@\n-old1\n+new1\n+new2"]]);
+      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
+      expect(result).toEqual(issues);
+    });
+
+    it("should skip issues that are already fixed/resolved/invalid", () => {
+      const issues = [
+        { file: "test.ts", line: "5", ruleId: "R1", fixed: "2024-01-01" },
+        { file: "test.ts", line: "6", ruleId: "R2", resolved: "2024-01-02" },
+        { file: "test.ts", line: "7", ruleId: "R3", valid: "false" },
+      ];
+      const filePatchMap = new Map([["test.ts", "@@ -1,1 +1,2 @@\n-old1\n+new1\n+new2"]]);
+      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
+      expect(result).toEqual(issues);
+    });
+
+    it("should mark issue as invalid when line is deleted", () => {
+      const filePatchMap = new Map([["test.ts", "@@ -1,1 +1,0 @@\n-old1"]]);
+      const issues = [{ file: "test.ts", line: "1", ruleId: "R1" }];
+      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
+      expect(result[0].valid).toBe("false");
+      expect(result[0].originalLine).toBe("1");
+    });
+
+    it("should return issue unchanged when line range is empty", () => {
+      const filePatchMap = new Map([["test.ts", "@@ -1,1 +1,1 @@\n-old1\n+new1"]]);
+      const issues = [{ file: "test.ts", line: "abc", ruleId: "R1" }];
+      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
+      expect(result).toEqual(issues);
+    });
+  });
+
+  describe("ReviewService.filterIssuesByValidCommits", () => {
+    beforeEach(() => {
+      mockReviewSpecService.parseLineRange = vi.fn().mockImplementation((lineStr: string) => {
+        const lines: number[] = [];
+        const rangeMatch = lineStr.match(/^(\d+)-(\d+)$/);
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = parseInt(rangeMatch[2], 10);
+          for (let i = start; i <= end; i++) {
+            lines.push(i);
+          }
+        } else {
+          const line = parseInt(lineStr, 10);
+          if (!isNaN(line)) {
+            lines.push(line);
+          }
+        }
+        return lines;
+      });
+    });
+
+    it("should filter issues by valid commit hashes", () => {
+      const commits = [{ sha: "abc1234567890" }];
+      const fileContents = new Map([
+        [
+          "test.ts",
+          [
+            ["-------", "line1"],
+            ["abc1234", "line2"],
+            ["-------", "line3"],
+          ],
+        ],
+      ]);
+      const issues = [
+        { file: "test.ts", line: "2", ruleId: "R1" }, // 应该保留，hash匹配
+        { file: "test.ts", line: "1", ruleId: "R2" }, // 应该过滤，hash不匹配
+        { file: "test.ts", line: "3", ruleId: "R3" }, // 应该过滤，hash不匹配
+      ];
+      const result = (service as any).filterIssuesByValidCommits(issues, commits, fileContents, 2);
+      expect(result).toHaveLength(1);
+      expect(result[0].ruleId).toBe("R1");
+    });
+
+    it("should log filtering summary", () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const commits = [{ sha: "abc1234567890" }];
+      const fileContents = new Map([
+        [
+          "test.ts",
+          [
+            ["-------", "line1"],
+            ["abc1234", "line2"],
+          ],
+        ],
+      ]);
+      const issues = [
+        { file: "test.ts", line: "1", ruleId: "R1" },
+        { file: "test.ts", line: "2", ruleId: "R2" },
+      ];
+      (service as any).filterIssuesByValidCommits(issues, commits, fileContents, 1);
+      expect(consoleSpy).toHaveBeenCalledWith("   过滤非本次 PR commits 问题后: 2 -> 1 个问题");
+      consoleSpy.mockRestore();
+    });
+
+    it("should keep issues when file not in fileContents", () => {
+      const commits = [{ sha: "abc1234567890" }];
+      const fileContents = new Map();
+      const issues = [{ file: "missing.ts", line: "1", ruleId: "R1" }];
+      const result = (service as any).filterIssuesByValidCommits(issues, commits, fileContents);
+      expect(result).toEqual(issues);
+    });
+
+    it("should keep issues when line range cannot be parsed", () => {
+      const commits = [{ sha: "abc1234567890" }];
+      const fileContents = new Map([["test.ts", [["-------", "line1"]]]]);
+      const issues = [{ file: "test.ts", line: "abc", ruleId: "R1" }];
+      const result = (service as any).filterIssuesByValidCommits(issues, commits, fileContents);
+      expect(result).toEqual(issues);
+    });
+
+    it("should handle range line numbers", () => {
+      const commits = [{ sha: "abc1234567890" }];
+      const fileContents = new Map([
+        [
+          "test.ts",
+          [
+            ["-------", "line1"],
+            ["abc1234", "line2"],
+            ["-------", "line3"],
+          ],
+        ],
+      ]);
+      const issues = [{ file: "test.ts", line: "1-3", ruleId: "R1" }];
+      const result = (service as any).filterIssuesByValidCommits(issues, commits, fileContents);
+      expect(result).toHaveLength(1); // 只要范围内有一行匹配就保留
+    });
+
+    it("should log detailed information at verbose level 3", () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const commits = [{ sha: "abc1234567890" }];
+      const fileContents = new Map([
+        [
+          "test.ts",
+          [
+            ["-------", "line1"],
+            ["abc1234", "line2"],
+          ],
+        ],
+      ]);
+      const issues = [{ file: "test.ts", line: "1", ruleId: "R1" }];
+      (service as any).filterIssuesByValidCommits(issues, commits, fileContents, 3);
+      expect(consoleSpy).toHaveBeenCalledWith("   🔍 有效 commit hashes: abc1234");
+      expect(consoleSpy).toHaveBeenCalledWith("   ❌ Issue test.ts:1 - 行号 hash: 1:-------");
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("ReviewService.ensureClaudeCli", () => {
+    it("should do nothing when claude is already installed", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      // execSync is already mocked globally
+
+      await (service as any).ensureClaudeCli();
+      expect(consoleSpy).not.toHaveBeenCalledWith("🔧 Claude CLI 未安装，正在安装...");
+      consoleSpy.mockRestore();
+    });
+
+    it("should install claude when not found", async () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      // Mock execSync to throw then succeed
+      const execSyncMock = vi.mocked(await import("child_process"));
+      execSyncMock.execSync
+        .mockImplementationOnce(() => {
+          throw new Error("command not found");
+        })
+        .mockImplementationOnce(() => Buffer.from(""));
+
+      await (service as any).ensureClaudeCli();
+      expect(consoleSpy).toHaveBeenCalledWith("🔧 Claude CLI 未安装，正在安装...");
+      expect(consoleSpy).toHaveBeenCalledWith("✅ Claude CLI 安装完成");
+      consoleSpy.mockRestore();
+    });
+
+    it("should throw error when installation fails", async () => {
+      const execSyncMock = vi.mocked(await import("child_process"));
+      execSyncMock.execSync
+        .mockImplementationOnce(() => {
+          throw new Error("command not found");
+        })
+        .mockImplementationOnce(() => {
+          throw new Error("install failed");
+        });
+
+      await expect((service as any).ensureClaudeCli()).rejects.toThrow(
+        "Claude CLI 安装失败: install failed",
+      );
     });
   });
 });
