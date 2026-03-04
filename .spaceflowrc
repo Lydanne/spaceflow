@@ -21,7 +21,8 @@
     "@spaceflow/shell": "workspace:*",
     "@spaceflow/scripts": "workspace:*",
     "@spaceflow/review": "workspace:*",
-    "@spaceflow/publish": "workspace:*"
+    "@spaceflow/publish": "workspace:*",
+    "@spaceflow/teax": "workspace:*"
   },
   "support": ["claudeCode"],
   "publish": {

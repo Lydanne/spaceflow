@@ -5,7 +5,11 @@
   "[typescript]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
-  "cSpell.words": ["Gitea", "spaceflow"],
+  "cSpell.words": [
+    "Gitea",
+    "spaceflow",
+    "teax"
+  ],
   "typescript.preferences.preferTypeOnlyAutoImports": true,
   "i18n-ally-next.sourceLanguage": "zh-cn",
   "i18n-ally-next.displayLanguage": "zh-cn",
