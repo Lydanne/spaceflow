@@ -1079,7 +1079,7 @@ export class ReviewService {
       );
     }
 
-    return this.issueVerifyService.verifyIssueFixes(
+    return await this.issueVerifyService.verifyIssueFixes(
       issues,
       fileContents,
       specs,
@@ -1094,12 +1094,14 @@ export class ReviewService {
    */
   protected calculateIssueStats(issues: ReviewIssue[]): ReviewStats {
     const total = issues.length;
-    const fixed = issues.filter((i) => i.fixed).length;
-    const resolved = issues.filter((i) => i.resolved && !i.fixed).length;
-    const invalid = issues.filter((i) => i.valid === "false" && !i.fixed && !i.resolved).length;
-    const pending = total - fixed - resolved - invalid;
-    const fixRate = total > 0 ? Math.round((fixed / total) * 100 * 10) / 10 : 0;
-    const resolveRate = total > 0 ? Math.round(((fixed + resolved) / total) * 100 * 10) / 10 : 0;
+    const validIssue = issues.filter((i) => i.valid !== "false");
+    const validTotal = validIssue.length;
+    const fixed = validIssue.filter((i) => i.fixed).length;
+    const resolved = validIssue.filter((i) => i.resolved).length;
+    const invalid = total - validTotal;
+    const pending = validTotal - fixed;
+    const fixRate = validTotal > 0 ? Math.round((fixed / validTotal) * 100 * 10) / 10 : 0;
+    const resolveRate = validTotal > 0 ? Math.round((resolved / validTotal) * 100 * 10) / 10 : 0;
     return { total, fixed, resolved, invalid, pending, fixRate, resolveRate };
   }
 

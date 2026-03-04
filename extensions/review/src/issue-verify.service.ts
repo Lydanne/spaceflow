@@ -107,6 +107,7 @@ export class IssueVerifyService {
         }
         verifiedIssues.push({
           ...issue,
+          resolved: new Date().toISOString(),
           fixed: new Date().toISOString(),
           valid: FALSE,
           reason: "文件已删除",
@@ -209,6 +210,7 @@ export class IssueVerifyService {
             console.log(`      ✅ 已修复: ${result.reason}`);
           }
           updatedIssue.fixed = new Date().toISOString();
+          updatedIssue.resolved = new Date().toISOString();
         } else if (!result.valid) {
           if (shouldLog(verbose, 1)) {
             console.log(`      ❌ 无效问题: ${result.reason}`);

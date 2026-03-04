@@ -130,27 +130,37 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
       return "没有需要审查的文件";
     }
 
-    // 🟢 已修复 | 🔴 待处理error | 🟡 待处理warn | ⚪ 已解决(非代码修复)
+    // 🟢 已修复 | 🔴 error数量 | 🟡 warn数量 | ⚪ 已解决(非代码修复)
     const issuesByFile = new Map<
       string,
-      { fixed: number; pendingErrors: number; pendingWarns: number; resolved: number }
+      {
+        fixed: number;
+        errorCount: number;
+        warnCount: number;
+        resolved: number;
+        total: number;
+      }
     >();
     for (const issue of issues) {
       if (issue.valid === "false") continue;
       const stats = issuesByFile.get(issue.file) || {
+        total: 0,
         fixed: 0,
-        pendingErrors: 0,
-        pendingWarns: 0,
+        errorCount: 0,
+        warnCount: 0,
         resolved: 0,
       };
+      stats.total++;
       if (issue.fixed) {
         stats.fixed++;
-      } else if (issue.resolved) {
+      }
+      if (issue.resolved) {
         stats.resolved++;
-      } else if (issue.severity === "error") {
-        stats.pendingErrors++;
+      }
+      if (issue.severity === "error") {
+        stats.errorCount++;
       } else {
-        stats.pendingWarns++;
+        stats.warnCount++;
       }
       issuesByFile.set(issue.file, stats);
     }
@@ -169,20 +179,20 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
     const fileSummaryLines: string[] = [];
     for (const fileSummary of summaries) {
       const stats = issuesByFile.get(fileSummary.file) || {
+        total: 0,
         fixed: 0,
-        pendingErrors: 0,
-        pendingWarns: 0,
+        errorCount: 0,
+        warnCount: 0,
         resolved: 0,
       };
-      const fileTotal = stats.fixed + stats.pendingErrors + stats.pendingWarns + stats.resolved;
-      totalAll += fileTotal;
+      totalAll += stats.total;
       totalFixed += stats.fixed;
-      totalPendingErrors += stats.pendingErrors;
-      totalPendingWarns += stats.pendingWarns;
+      totalPendingErrors += stats.errorCount;
+      totalPendingWarns += stats.warnCount;
       totalResolved += stats.resolved;
 
       lines.push(
-        `| \`${fileSummary.file}\` | ${fileTotal} | ${stats.fixed} | ${stats.pendingErrors} | ${stats.pendingWarns} | ${stats.resolved} |`,
+        `| \`${fileSummary.file}\` | ${stats.total} | ${stats.fixed} | ${stats.errorCount} | ${stats.warnCount} | ${stats.resolved} |`,
       );
 
       // 收集问题总结用于折叠块展示
