@@ -125,9 +125,9 @@ export interface ReviewStats {
   invalid: number;
   /** 待处理数 */
   pending: number;
-  /** 修复率 (0-100)，仅计算代码修复：fixed / total */
+  /** 修复率 (0-100)，仅计算代码修复：fixed / validTotal */
   fixRate: number;
-  /** 解决率 (0-100)，计算修复+解决：(fixed + resolved) / total */
+  /** 解决率 (0-100)，计算已解决：resolved / validTotal */
   resolveRate: number;
 }
 

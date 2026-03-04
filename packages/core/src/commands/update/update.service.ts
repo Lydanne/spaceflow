@@ -3,7 +3,7 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 import { shouldLog, type VerboseLevel, t } from "@spaceflow/core";
-import { getDependencies } from "@spaceflow/core";
+import { getExtensionDependencies } from "@spaceflow/core";
 import type { ExtensionConfig } from "../install/install.service";
 
 export interface UpdateOptions {
@@ -305,7 +305,7 @@ export class UpdateService {
 
   async updateDependency(name: string, verbose: VerboseLevel = 1): Promise<boolean> {
     const cwd = process.cwd();
-    const dependencies = getDependencies(cwd);
+    const dependencies = getExtensionDependencies(cwd);
 
     if (!dependencies[name]) {
       if (shouldLog(verbose, 1)) console.log(t("update:depNotFound", { name }));
@@ -330,7 +330,7 @@ export class UpdateService {
 
   async updateAll(verbose: VerboseLevel = 1): Promise<void> {
     const cwd = process.cwd();
-    const dependencies = getDependencies(cwd);
+    const dependencies = getExtensionDependencies(cwd);
 
     if (Object.keys(dependencies).length === 0) {
       if (shouldLog(verbose, 1)) console.log(t("update:noDeps"));

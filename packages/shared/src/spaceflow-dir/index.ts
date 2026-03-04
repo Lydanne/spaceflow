@@ -48,12 +48,22 @@ bin/
 
 /**
  * 获取 @spaceflow/core 的版本号
- * 1. 读取当前目录 package.json，若 @spaceflow/cli 为 workspace:* 则为开发模式，返回 workspace:*
- * 2. 否则从 process.argv[1]（cli 入口）向上找 @spaceflow/cli 的 package.json
+ * 优先级：
+ * 1. .spaceflowrc 的 dependencies 中显式指定的 @spaceflow/core 版本
+ * 2. 当前目录 package.json 中 @spaceflow/cli 为 workspace:* 则为开发模式，返回 workspace:*
+ * 3. 从 process.argv[1]（cli 入口）向上找 @spaceflow/cli 的 package.json
  *    读取其中声明的 @spaceflow/core 依赖版本，保证 cli 和 core 版本一致
+ * 4. 兜底返回 "latest"
  */
 export function getSpaceflowCoreVersion(): string {
-  // 读取当前目录 package.json，如果 @spaceflow/cli 是 workspace:* 则为开发模式
+  // 1. 从 .spaceflowrc 的 dependencies 中读取用户显式指定的 @spaceflow/core 版本
+  const configDeps = getDependencies(undefined, { local: true });
+  const configCoreVersion = configDeps["@spaceflow/core"];
+  if (configCoreVersion) {
+    return configCoreVersion;
+  }
+
+  // 2. 读取当前目录 package.json，如果 @spaceflow/cli 是 workspace:* 则为开发模式
   const rootPkgPath = join(process.cwd(), PACKAGE_JSON);
   if (existsSync(rootPkgPath)) {
     try {
@@ -68,6 +78,7 @@ export function getSpaceflowCoreVersion(): string {
     }
   }
 
+  // 3. 从 cli 入口推导 core 版本
   const cliEntryPath = process.argv[1];
   if (cliEntryPath) {
     // cli 入口: .../node_modules/@spaceflow/cli/dist/cli.js → 往上两级是包根目录

@@ -1,5 +1,90 @@
 # Changelog
 
+## [0.69.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.68.0...@spaceflow/review@0.69.0) (2026-03-04)
+
+### 代码重构
+
+* **review:** 优化问题统计逻辑，区分 fixed 和 resolved 状态 ([c4dda30](https://github.com/Lydanne/spaceflow/commit/c4dda30fed17ce020fcce9af8874dfa89ccca20b))
+
+### 其他修改
+
+* **review-summary:** released version 0.36.0 [no ci] ([95c3d5c](https://github.com/Lydanne/spaceflow/commit/95c3d5cbac67c1ffa4c821faaffb476c502fe2c7))
+
+## [0.68.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.67.0...@spaceflow/review@0.68.0) (2026-03-04)
+
+### 代码重构
+
+* **review:** 区分 ☹️ 和 👎 reaction 的语义，☹️ 标记无效，👎 标记未解决 ([f1419fe](https://github.com/Lydanne/spaceflow/commit/f1419fe47448a80f373ffac082ac3a2e9320d200))
+
+### 其他修改
+
+* **review-summary:** released version 0.35.0 [no ci] ([4f2607d](https://github.com/Lydanne/spaceflow/commit/4f2607def2725946f32eccc4aa4e687a3cdd9bab))
+* **scripts:** released version 0.28.0 [no ci] ([55db5cf](https://github.com/Lydanne/spaceflow/commit/55db5cfa1dc0a1e318085caa0cfd9f91b06dcb21))
+* **shell:** released version 0.28.0 [no ci] ([01f180f](https://github.com/Lydanne/spaceflow/commit/01f180f2508e75524a33e66fea580a738adc689f))
+
+## [0.67.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.66.0...@spaceflow/review@0.67.0) (2026-03-03)
+
+### 新特性
+
+* **shared:** 新增获取扩展依赖函数，过滤内部包 ([86f4864](https://github.com/Lydanne/spaceflow/commit/86f48646c790285797b53c63a463d5134f7ac6b6))
+
+### 代码重构
+
+* **cli:** 重构外部扩展包读取逻辑，使用专用函数 ([d15054d](https://github.com/Lydanne/spaceflow/commit/d15054d81335a3b0c55db1acd169a2d9edf32a94))
+* **core:** 统一依赖获取函数命名，将 getDependencies 重命名为 getExtensionDependencies ([ff78202](https://github.com/Lydanne/spaceflow/commit/ff78202be9975ce6721e4ecbbd6b1e02f8a57b70))
+
+### 其他修改
+
+* **cli:** released version 0.40.0 [no ci] ([bec5724](https://github.com/Lydanne/spaceflow/commit/bec5724745e8d33a06a00be452ec647bd82be934))
+* **core:** released version 0.26.0 [no ci] ([cc597b0](https://github.com/Lydanne/spaceflow/commit/cc597b000bae00885de32eb2ad4287805de7ce5a))
+* **publish:** released version 0.50.0 [no ci] ([8020040](https://github.com/Lydanne/spaceflow/commit/802004073c276705868ffbef4d5daae6a0068d39))
+* **review-summary:** released version 0.34.0 [no ci] ([3565bc4](https://github.com/Lydanne/spaceflow/commit/3565bc426469fa8215d70fb3bbd2a9ee9c128916))
+* **scripts:** released version 0.27.0 [no ci] ([8c4111a](https://github.com/Lydanne/spaceflow/commit/8c4111a73c472fab084030d547656ba5784e05b2))
+* **shared:** released version 0.8.0 [no ci] ([c3fe353](https://github.com/Lydanne/spaceflow/commit/c3fe3536ba0adca45f610fa2e8697bfccf842efe))
+* **shell:** released version 0.27.0 [no ci] ([c4501c2](https://github.com/Lydanne/spaceflow/commit/c4501c284de780c97a5a1cfc5b413ae8393acb91))
+
+## [0.66.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.65.0...@spaceflow/review@0.66.0) (2026-03-03)
+
+### 新特性
+
+* **core:** 在安装过程中记录并提示 @spaceflow/core 版本变更 ([1992129](https://github.com/Lydanne/spaceflow/commit/19921299bf77b98b150ba6522c1b37ac872f431e))
+* **shared:** 优化获取 core 版本逻辑，支持 .spaceflowrc 显式指定 ([916a87d](https://github.com/Lydanne/spaceflow/commit/916a87d5b7a7fc8c8dba3f959f3379fee26e0017))
+
+### 其他修改
+
+* **cli:** released version 0.39.0 [no ci] ([9de7c35](https://github.com/Lydanne/spaceflow/commit/9de7c35db100e482baa78059ecd3176c7942e16b))
+* **core:** released version 0.25.0 [no ci] ([28d6b6d](https://github.com/Lydanne/spaceflow/commit/28d6b6dcfbaf0dfa7b986f8c880b47bd4962eac8))
+* **publish:** released version 0.49.0 [no ci] ([5e66528](https://github.com/Lydanne/spaceflow/commit/5e66528ae3833a3da66178cc45aaf3a2e8e12fc9))
+* **review-summary:** released version 0.33.0 [no ci] ([ca07fa3](https://github.com/Lydanne/spaceflow/commit/ca07fa33f9418147a6a511d0a2699159d01b892c))
+* **scripts:** released version 0.26.0 [no ci] ([e757eba](https://github.com/Lydanne/spaceflow/commit/e757eba5ae1cdbea428d4cc1c6de6e7e68e546ff))
+* **shared:** released version 0.7.0 [no ci] ([e9ade7e](https://github.com/Lydanne/spaceflow/commit/e9ade7e8caefd9f5ee4603b52b3a350ae604dfea))
+* **shell:** released version 0.26.0 [no ci] ([753cf30](https://github.com/Lydanne/spaceflow/commit/753cf3044ee7d09ea3f1f9150bf045395703c712))
+
+## [0.65.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.64.0...@spaceflow/review@0.65.0) (2026-03-03)
+
+### 新特性
+
+* **core:** 新增 Git SDK 本地变更管理能力 ([b96d05a](https://github.com/Lydanne/spaceflow/commit/b96d05a93729635020f317ffc2f0343fc1be8be1))
+* **review:** 新增本地代码审查模式，支持审查未提交代码 ([b80614a](https://github.com/Lydanne/spaceflow/commit/b80614a7dff570a078e7709a70628752e35ec9e8))
+* **review:** 本地模式无变更时自动回退到分支比较模式 ([820ff8d](https://github.com/Lydanne/spaceflow/commit/820ff8d04f5af84340d861e03ccbf66d57fc2c1c))
+
+### 其他修改
+
+* **core:** released version 0.24.0 [no ci] ([c1d77e4](https://github.com/Lydanne/spaceflow/commit/c1d77e4c8e612e7b64a70c5d9d4384452a3ccbc1))
+* **publish:** released version 0.48.0 [no ci] ([da4065f](https://github.com/Lydanne/spaceflow/commit/da4065fdbc9c193ebca207c371ed0ea17a13c0db))
+* **review-summary:** released version 0.32.0 [no ci] ([b6e083d](https://github.com/Lydanne/spaceflow/commit/b6e083d0f6187c6cfb9be86cf58544653cded2bd))
+
+## [0.64.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.63.0...@spaceflow/review@0.64.0) (2026-03-03)
+
+### 测试用例
+
+* **review:** 新增 deleteExistingAiReviews、buildLineReviewBody、findExistingAiComments、syncReactionsToIssues 和 filterIssuesByValidCommits 方法的详细日志测试 ([0619e9c](https://github.com/Lydanne/spaceflow/commit/0619e9cc1e5a81d24703e2e574026a249d87f236))
+* **review:** 新增 invalidateIssuesForChangedFiles、updateIssueLineNumbers、filterIssuesByValidCommits 和 ensureClaudeCli 方法的单元测试 ([876f827](https://github.com/Lydanne/spaceflow/commit/876f82746331cf2e353b0a537b8691395e2a1084))
+
+### 其他修改
+
+* **review-summary:** released version 0.31.0 [no ci] ([9b028ce](https://github.com/Lydanne/spaceflow/commit/9b028cedd03d8c60f8c1db58b189cd022ea562cf))
+
 ## [0.63.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.62.0...@spaceflow/review@0.63.0) (2026-03-03)
 
 ### 代码重构

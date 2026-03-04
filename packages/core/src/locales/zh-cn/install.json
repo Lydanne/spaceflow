@@ -36,6 +36,7 @@
   "updatingAll": "🔄 更新所有依赖...",
   "noDeps": "   配置文件中没有 dependencies",
   "foundDeps": "   找到 {{count}} 个依赖",
+  "coreVersionChanged": "📦 @spaceflow/core 版本变更: {{prev}} → {{current}}",
   "installingDeps": "\n📦 安装依赖...",
   "pmInstallFailed": "   警告: {{pm}} install 失败",
   "depNotInstalled": "   ⚠️ {{name}} 未安装成功，跳过",

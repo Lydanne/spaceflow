@@ -31,24 +31,34 @@ export class TerminalFormatter implements ReviewReportFormatter {
     // 🟢 已修复 | 🔴 待处理error | 🟡 待处理warn | ⚪ 已解决(非代码修复)
     const issuesByFile = new Map<
       string,
-      { fixed: number; pendingErrors: number; pendingWarns: number; resolved: number }
+      {
+        fixed: number;
+        errorCount: number;
+        warnCount: number;
+        resolved: number;
+        total: number;
+      }
     >();
     for (const issue of issues) {
       if (issue.valid === "false") continue;
       const stats = issuesByFile.get(issue.file) || {
+        total: 0,
         fixed: 0,
-        pendingErrors: 0,
-        pendingWarns: 0,
+        errorCount: 0,
+        warnCount: 0,
         resolved: 0,
       };
+      stats.total++;
       if (issue.fixed) {
         stats.fixed++;
-      } else if (issue.resolved) {
+      }
+      if (issue.resolved) {
         stats.resolved++;
-      } else if (issue.severity === "error") {
-        stats.pendingErrors++;
+      }
+      if (issue.severity === "error") {
+        stats.errorCount++;
       } else {
-        stats.pendingWarns++;
+        stats.warnCount++;
       }
       issuesByFile.set(issue.file, stats);
     }
@@ -63,24 +73,22 @@ export class TerminalFormatter implements ReviewReportFormatter {
     const lines: string[] = [];
     for (const fileSummary of summaries) {
       const stats = issuesByFile.get(fileSummary.file) || {
+        total: 0,
         fixed: 0,
-        pendingErrors: 0,
-        pendingWarns: 0,
+        errorCount: 0,
+        warnCount: 0,
         resolved: 0,
       };
-      const fileTotal = stats.fixed + stats.pendingErrors + stats.pendingWarns + stats.resolved;
-      totalAll += fileTotal;
+      totalAll += stats.total;
       totalFixed += stats.fixed;
-      totalPendingErrors += stats.pendingErrors;
-      totalPendingWarns += stats.pendingWarns;
+      totalPendingErrors += stats.errorCount;
+      totalPendingWarns += stats.warnCount;
       totalResolved += stats.resolved;
 
-      const totalText = fileTotal > 0 ? `${BOLD}${fileTotal} 问题${RESET}` : "";
+      const totalText = stats.total > 0 ? `${BOLD}${stats.total} 问题${RESET}` : "";
       const fixedText = stats.fixed > 0 ? `${GREEN}🟢 ${stats.fixed} 已修复${RESET}` : "";
-      const errorText =
-        stats.pendingErrors > 0 ? `${RED}🔴 ${stats.pendingErrors} error${RESET}` : "";
-      const warnText =
-        stats.pendingWarns > 0 ? `${YELLOW}🟡 ${stats.pendingWarns} warn${RESET}` : "";
+      const errorText = stats.errorCount > 0 ? `${RED}🔴 ${stats.errorCount} error${RESET}` : "";
+      const warnText = stats.warnCount > 0 ? `${YELLOW}🟡 ${stats.warnCount} warn${RESET}` : "";
       const resolvedText = stats.resolved > 0 ? `⚪ ${stats.resolved} 已解决` : "";
       const statsText = [totalText, fixedText, errorText, warnText, resolvedText]
         .filter(Boolean)

@@ -19,6 +19,8 @@
   "options.showAll": "Show all issues found, including those on unchanged lines",
   "options.flush": "Only sync status (reactions, resolved conversations, replies), skip LLM review",
   "options.eventAction": "PR event type (opened, synchronize, closed, etc.), closed only collects stats without AI review",
+  "options.local": "Review local uncommitted code. Mode: 'uncommitted' (default, staged + working) or 'staged' (only staged)",
+  "options.noLocal": "Disable local mode, use branch comparison instead",
   "extensionDescription": "Code review command using LLM for automated PR review",
   "mcp.serverDescription": "Code review rules query service",
   "mcp.listRules": "List all code review rules for the current project, returning rule list with ID, title, description, applicable file extensions, etc.",

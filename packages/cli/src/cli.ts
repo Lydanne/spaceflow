@@ -9,7 +9,7 @@ import {
   findProjectRoot,
   ensureSpaceflowPackageJson,
   ensureDependencies,
-  getDependencies,
+  getExtensionDependencies,
   loadEnvFiles,
   getEnvFilePaths,
 } from "@spaceflow/shared";
@@ -43,7 +43,7 @@ function getEffectiveCwd(): string {
  * 从 spaceflow.json / .spaceflowrc 读取外部扩展包名列表
  */
 function readExternalExtensions(cwd: string): string[] {
-  const deps = getDependencies(cwd, { local: true });
+  const deps = getExtensionDependencies(cwd, { local: true });
   return Object.keys(deps);
 }
 

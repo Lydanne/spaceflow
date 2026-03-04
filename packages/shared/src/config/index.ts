@@ -243,6 +243,9 @@ export function getSupportedEditors(cwd?: string): string[] {
   return (config.support as string[]) || [DEFAULT_SUPPORT_EDITOR];
 }
 
+/** 内部包名，不应被视为扩展 */
+const INTERNAL_PACKAGES = ["@spaceflow/core", "@spaceflow/cli", "@spaceflow/shared"];
+
 /**
  * 获取 dependencies
  * @param cwd 工作目录，默认为 process.cwd()
@@ -253,6 +256,25 @@ export function getDependencies(
 ): Record<string, string> {
   const config = readConfigSync(cwd, options);
   return (config.dependencies as Record<string, string>) || {};
+}
+
+/**
+ * 获取扩展 dependencies（过滤掉内部包如 @spaceflow/core）
+ * 用于将 dependencies 当作扩展列表处理的场景
+ * @param cwd 工作目录，默认为 process.cwd()
+ */
+export function getExtensionDependencies(
+  cwd?: string,
+  options?: { local?: boolean },
+): Record<string, string> {
+  const deps = getDependencies(cwd, options);
+  const result: Record<string, string> = {};
+  for (const [name, value] of Object.entries(deps)) {
+    if (!INTERNAL_PACKAGES.includes(name)) {
+      result[name] = value;
+    }
+  }
+  return result;
 }
 
 /**

@@ -22,7 +22,7 @@ import {
   parseHunksFromPatch,
   calculateNewLineNumber,
 } from "@spaceflow/core";
-import type { IConfigReader } from "@spaceflow/core";
+import type { IConfigReader, LocalReviewMode } from "@spaceflow/core";
 import { type AnalyzeDeletionsMode, type ReviewConfig } from "./review.config";
 import {
   ReviewSpecService,
@@ -73,6 +73,13 @@ export interface ReviewContext extends ReviewOptions {
   showAll?: boolean;
   /** PR 事件类型（opened, synchronize, closed 等） */
   eventAction?: string;
+  /**
+   * 本地代码审查模式（已解析）
+   * - 'uncommitted': 审查所有未提交的代码（暂存区 + 工作区）
+   * - 'staged': 仅审查暂存区的代码
+   * - false: 禁用本地模式
+   */
+  localMode?: LocalReviewMode;
 }
 
 export interface FileReviewPrompt {
@@ -239,10 +246,17 @@ export class ReviewService {
       specSources.push(...reviewConf.references);
     }
 
-    // 当没有 PR 且没有指定 base/head 时，自动获取默认值
+    // 解析本地模式：非 CI、非 PR、无 base/head 时默认启用 uncommitted 模式
+    const localMode = this.resolveLocalMode(options, {
+      ci: options.ci,
+      hasPrNumber: !!prNumber,
+      hasBaseHead: !!(options.base || options.head),
+    });
+
+    // 当没有 PR 且没有指定 base/head 且不是本地模式时，自动获取默认值
     let baseRef = options.base;
     let headRef = options.head;
-    if (!prNumber && !baseRef && !headRef) {
+    if (!prNumber && !baseRef && !headRef && !localMode) {
       headRef = this.gitSdk.getCurrentBranch() ?? "HEAD";
       baseRef = this.gitSdk.getDefaultBranch();
       if (shouldLog(options.verbose, 1)) {
@@ -291,7 +305,38 @@ export class ReviewService {
       showAll: options.showAll ?? false,
       flush: options.flush ?? false,
       eventAction: options.eventAction,
+      localMode,
     };
+  }
+
+  /**
+   * 解析本地代码审查模式
+   * - 显式指定 --local [mode] 时使用指定值
+   * - 显式指定 --no-local 时禁用
+   * - 非 CI、非 PR、无 base/head 时默认启用 uncommitted 模式
+   */
+  protected resolveLocalMode(
+    options: ReviewOptions,
+    env: { ci: boolean; hasPrNumber: boolean; hasBaseHead: boolean },
+  ): "uncommitted" | "staged" | false {
+    // 显式指定了 --no-local
+    if (options.local === false) {
+      return false;
+    }
+    // 显式指定了 --local [mode]
+    if (options.local === "staged" || options.local === "uncommitted") {
+      return options.local;
+    }
+    // CI 或 PR 模式下不启用本地模式
+    if (env.ci || env.hasPrNumber) {
+      return false;
+    }
+    // 指定了 base/head 时不启用本地模式
+    if (env.hasBaseHead) {
+      return false;
+    }
+    // 默认启用 uncommitted 模式
+    return "uncommitted";
   }
 
   /**
@@ -387,15 +432,24 @@ export class ReviewService {
       files,
       commits: filterCommits,
       deletionOnly,
+      localMode,
     } = context;
 
     // 直接审查文件模式：指定了 -f 文件且 base=head
     const isDirectFileMode = files && files.length > 0 && baseRef === headRef;
+    // 本地模式：审查未提交的代码（可能回退到分支比较）
+    let isLocalMode = !!localMode;
+    // 用于回退时动态计算的 base/head
+    let effectiveBaseRef = baseRef;
+    let effectiveHeadRef = headRef;
 
     if (shouldLog(verbose, 1)) {
       console.log(`🔍 Review 启动`);
       console.log(`   DRY-RUN mode: ${dryRun ? "enabled" : "disabled"}`);
       console.log(`   CI mode: ${ci ? "enabled" : "disabled"}`);
+      if (isLocalMode) {
+        console.log(`   Local mode: ${localMode}`);
+      }
       console.log(`   Verbose: ${verbose}`);
     }
 
@@ -415,6 +469,57 @@ export class ReviewService {
     let commits: PullRequestCommit[] = [];
     let changedFiles: ChangedFile[] = [];
 
+    if (isLocalMode) {
+      // 本地模式：从 git 获取未提交/暂存区的变更
+      if (shouldLog(verbose, 1)) {
+        console.log(`📥 本地模式: 获取${localMode === "staged" ? "暂存区" : "未提交"}的代码变更`);
+      }
+      const localFiles =
+        localMode === "staged" ? this.gitSdk.getStagedFiles() : this.gitSdk.getUncommittedFiles();
+
+      if (localFiles.length === 0) {
+        // 本地无变更，回退到分支比较模式
+        if (shouldLog(verbose, 1)) {
+          console.log(
+            `ℹ️  没有${localMode === "staged" ? "暂存区" : "未提交"}的代码变更，回退到分支比较模式`,
+          );
+        }
+        isLocalMode = false;
+        effectiveHeadRef = this.gitSdk.getCurrentBranch() ?? "HEAD";
+        effectiveBaseRef = this.gitSdk.getDefaultBranch();
+        if (shouldLog(verbose, 1)) {
+          console.log(`📌 自动检测分支: base=${effectiveBaseRef}, head=${effectiveHeadRef}`);
+        }
+        // 同分支无法比较，提前返回
+        if (effectiveBaseRef === effectiveHeadRef) {
+          console.log(`ℹ️  当前分支 ${effectiveHeadRef} 与默认分支相同，没有可审查的代码变更`);
+          return {
+            success: true,
+            description: "",
+            issues: [],
+            summary: [],
+            round: 1,
+          };
+        }
+      } else {
+        // 一次性获取所有 diff，避免每个文件调用一次 git 命令
+        const localDiffs =
+          localMode === "staged" ? this.gitSdk.getStagedDiff() : this.gitSdk.getUncommittedDiff();
+        const diffMap = new Map(localDiffs.map((d) => [d.filename, d.patch]));
+
+        changedFiles = localFiles.map((f) => ({
+          filename: f.filename,
+          status: f.status as ChangedFile["status"],
+          patch: diffMap.get(f.filename),
+        }));
+
+        if (shouldLog(verbose, 1)) {
+          console.log(`   Changed files: ${changedFiles.length}`);
+        }
+      }
+    }
+
+    // PR 模式、分支比较模式、或本地模式回退后的分支比较
     if (prNumber) {
       if (shouldLog(verbose, 1)) {
         console.log(`📥 获取 PR #${prNumber} 信息 (owner: ${owner}, repo: ${repo})`);
@@ -427,25 +532,34 @@ export class ReviewService {
         console.log(`   Commits: ${commits.length}`);
         console.log(`   Changed files: ${changedFiles.length}`);
       }
-    } else if (baseRef && headRef) {
+    } else if (effectiveBaseRef && effectiveHeadRef) {
       // 如果指定了 -f 文件且 base=head（无差异模式），直接审查指定文件
-      if (files && files.length > 0 && baseRef === headRef) {
+      if (files && files.length > 0 && effectiveBaseRef === effectiveHeadRef) {
         if (shouldLog(verbose, 1)) {
           console.log(`📥 直接审查指定文件模式 (${files.length} 个文件)`);
         }
         changedFiles = files.map((f) => ({ filename: f, status: "modified" as const }));
-      } else {
+      } else if (changedFiles.length === 0) {
+        // 仅当 changedFiles 为空时才获取（避免与回退逻辑重复）
         if (shouldLog(verbose, 1)) {
-          console.log(`📥 获取 ${baseRef}...${headRef} 的差异 (owner: ${owner}, repo: ${repo})`);
+          console.log(
+            `📥 获取 ${effectiveBaseRef}...${effectiveHeadRef} 的差异 (owner: ${owner}, repo: ${repo})`,
+          );
         }
-        changedFiles = await this.getChangedFilesBetweenRefs(owner, repo, baseRef, headRef);
-        commits = await this.getCommitsBetweenRefs(baseRef, headRef);
+        changedFiles = await this.getChangedFilesBetweenRefs(
+          owner,
+          repo,
+          effectiveBaseRef,
+          effectiveHeadRef,
+        );
+        commits = await this.getCommitsBetweenRefs(effectiveBaseRef, effectiveHeadRef);
         if (shouldLog(verbose, 1)) {
           console.log(`   Changed files: ${changedFiles.length}`);
           console.log(`   Commits: ${commits.length}`);
         }
       }
-    } else {
+    } else if (!isLocalMode) {
+      // 非本地模式且无有效的 base/head
       if (shouldLog(verbose, 1)) {
         console.log(`❌ 错误: 缺少 prNumber 或 baseRef/headRef`, { prNumber, baseRef, headRef });
       }
@@ -560,6 +674,7 @@ export class ReviewService {
       headSha,
       prNumber,
       verbose,
+      isLocalMode,
     );
     if (!llmMode) {
       throw new Error("必须指定 LLM 类型");
@@ -841,7 +956,7 @@ export class ReviewService {
     // 3. 同步已解决的评论状态
     await this.syncResolvedComments(owner, repo, prNumber, existingResult);
 
-    // 4. 同步评论 reactions（👍/👎）
+    // 4. 同步评论 reactions（👍/👎/☹️）
     await this.syncReactionsToIssues(owner, repo, prNumber, existingResult, verbose);
 
     // 5. LLM 验证历史问题是否已修复
@@ -964,7 +1079,7 @@ export class ReviewService {
       );
     }
 
-    return this.issueVerifyService.verifyIssueFixes(
+    return await this.issueVerifyService.verifyIssueFixes(
       issues,
       fileContents,
       specs,
@@ -979,12 +1094,14 @@ export class ReviewService {
    */
   protected calculateIssueStats(issues: ReviewIssue[]): ReviewStats {
     const total = issues.length;
-    const fixed = issues.filter((i) => i.fixed).length;
-    const resolved = issues.filter((i) => i.resolved && !i.fixed).length;
-    const invalid = issues.filter((i) => i.valid === "false" && !i.fixed && !i.resolved).length;
-    const pending = total - fixed - resolved - invalid;
-    const fixRate = total > 0 ? Math.round((fixed / total) * 100 * 10) / 10 : 0;
-    const resolveRate = total > 0 ? Math.round(((fixed + resolved) / total) * 100 * 10) / 10 : 0;
+    const validIssue = issues.filter((i) => i.valid !== "false");
+    const validTotal = validIssue.length;
+    const fixed = validIssue.filter((i) => i.fixed).length;
+    const resolved = validIssue.filter((i) => i.resolved).length;
+    const invalid = total - validTotal;
+    const pending = validTotal - fixed;
+    const fixRate = validTotal > 0 ? Math.round((fixed / validTotal) * 100 * 10) / 10 : 0;
+    const resolveRate = validTotal > 0 ? Math.round((resolved / validTotal) * 100 * 10) / 10 : 0;
     return { total, fixed, resolved, invalid, pending, fixRate, resolveRate };
   }
 
@@ -1130,9 +1247,10 @@ export class ReviewService {
     ref: string,
     prNumber?: number,
     verbose?: VerboseLevel,
+    isLocalMode?: boolean,
   ): Promise<FileContentsMap> {
     const contents: FileContentsMap = new Map();
-    const latestCommitHash = commits[commits.length - 1]?.sha?.slice(0, 7) || "-------";
+    const latestCommitHash = commits[commits.length - 1]?.sha?.slice(0, 7) || "+local+";
 
     // 优先使用 changedFiles 中的 patch 字段（来自 PR 的整体 diff base...head）
     // 这样行号是相对于最终文件的，而不是每个 commit 的父 commit
@@ -1145,7 +1263,10 @@ export class ReviewService {
       if (file.filename && file.status !== "deleted") {
         try {
           let rawContent: string;
-          if (prNumber) {
+          if (isLocalMode) {
+            // 本地模式：读取工作区文件的当前内容
+            rawContent = this.gitSdk.getWorkingFileContent(file.filename);
+          } else if (prNumber) {
             rawContent = await this.gitProvider.getFileContent(owner, repo, file.filename, ref);
           } else {
             rawContent = await this.gitSdk.getFileContent(ref, file.filename);
@@ -1959,7 +2080,7 @@ ${fileChanges || "无"}`;
     // 获取已解决的评论，同步 resolve 状态（在更新 review 之前）
     await this.syncResolvedComments(owner, repo, prNumber, result);
 
-    // 获取评论的 reactions，同步 valid 状态（👎 标记为无效）
+    // 获取评论的 reactions，同步状态（☹️ 标记无效，👎 标记未解决）
     await this.syncReactionsToIssues(owner, repo, prNumber, result, verbose);
 
     // 查找已有的 AI 评论（Issue Comment），可能存在多个重复评论
@@ -2188,7 +2309,8 @@ ${fileChanges || "无"}`;
    * 从旧的 AI review 评论中获取 reactions 和回复，同步到 result.issues
    * - 存储所有 reactions 到 issue.reactions 字段
    * - 存储评论回复到 issue.replies 字段
-   * - 如果评论有 👎 (-1) reaction，将对应的问题标记为无效
+   * - 如果评论有 ☹️ (confused) reaction，将对应的问题标记为无效
+   * - 如果评论有 👎 (-1) reaction，将对应的问题标记为未解决
    */
   protected async syncReactionsToIssues(
     owner: string,
@@ -2310,13 +2432,25 @@ ${fileChanges || "无"}`;
             content,
             users,
           }));
-          // 检查是否有评审人的 👎 (-1) reaction，标记为无效
-          const thumbsDownUsers = reactionMap.get("-1") || [];
-          const reviewerThumbsDown = thumbsDownUsers.filter((u) => reviewers.has(u));
-          if (reviewerThumbsDown.length > 0 && matchedIssue.valid !== "false") {
+          // 检查是否有评审人的 ☹️ (confused) reaction，标记为无效
+          const confusedUsers = reactionMap.get("confused") || [];
+          const reviewerConfused = confusedUsers.filter((u) => reviewers.has(u));
+          if (reviewerConfused.length > 0 && matchedIssue.valid !== "false") {
             matchedIssue.valid = "false";
             console.log(
-              `👎 问题已标记为无效: ${matchedIssue.file}:${matchedIssue.line} (by 评审人: ${reviewerThumbsDown.join(", ")})`,
+              `☹️ 问题已标记为无效: ${matchedIssue.file}:${matchedIssue.line} (by 评审人: ${reviewerConfused.join(", ")})`,
+            );
+          }
+          // 检查是否有评审人的 👎 (-1) reaction，标记为未解决
+          const thumbsDownUsers = reactionMap.get("-1") || [];
+          const reviewerThumbsDown = thumbsDownUsers.filter((u) => reviewers.has(u));
+          if (reviewerThumbsDown.length > 0 && (matchedIssue.resolved || matchedIssue.fixed)) {
+            matchedIssue.resolved = undefined;
+            matchedIssue.resolvedBy = undefined;
+            matchedIssue.fixed = undefined;
+            matchedIssue.fixedBy = undefined;
+            console.log(
+              `👎 问题已标记为未解决: ${matchedIssue.file}:${matchedIssue.line} (by 评审人: ${reviewerThumbsDown.join(", ")})`,
             );
           }
         } catch {

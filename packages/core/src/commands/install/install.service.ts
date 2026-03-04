@@ -16,12 +16,13 @@ import {
   getPackageManager,
   detectPackageManager,
   getSpaceflowDir,
+  getSpaceflowCoreVersion,
   ensureSpaceflowPackageJson,
   ensureEditorGitignore,
   SchemaGeneratorService,
   findConfigFileWithField,
   getSupportedEditors,
-  getDependencies,
+  getExtensionDependencies,
   updateDependency,
   SPACEFLOW_DIR,
 } from "@spaceflow/core";
@@ -664,10 +665,32 @@ export class InstallService {
     if (shouldLog(verbose, 1))
       console.log(t("install:foundDeps", { count: Object.keys(dependencies).length }));
 
-    // 1. 先更新 .spaceflow/package.json 中的所有依赖
+    // 1. 记录更新前的 @spaceflow/core 版本
+    const spaceflowPkgPath = join(spaceflowDir, "package.json");
+    let prevCoreVersion: string | undefined;
+    if (existsSync(spaceflowPkgPath)) {
+      try {
+        const prevPkg = JSON.parse(await readFile(spaceflowPkgPath, "utf-8"));
+        prevCoreVersion = prevPkg.dependencies?.["@spaceflow/core"];
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. 更新 .spaceflow/package.json 中的所有依赖
     await this.updateSpaceflowPackageJson(dependencies, spaceflowDir, verbose);
 
-    // 2. 一次性安装所有依赖
+    // 3. 版本变更提示
+    const currentCoreVersion = getSpaceflowCoreVersion();
+    if (prevCoreVersion && prevCoreVersion !== currentCoreVersion) {
+      if (shouldLog(verbose, 1)) {
+        console.log(
+          t("install:coreVersionChanged", { prev: prevCoreVersion, current: currentCoreVersion }),
+        );
+      }
+    }
+
+    // 4. 安装所有依赖
     if (shouldLog(verbose, 1)) console.log(t("install:installingDeps"));
     const pm = detectPackageManager(spaceflowDir);
     try {
@@ -676,7 +699,7 @@ export class InstallService {
       console.warn(t("install:pmInstallFailed", { pm }));
     }
 
-    // 3. 处理每个依赖的 skills/commands 关联
+    // 5. 处理每个依赖的 skills/commands 关联
     for (const [name, config] of Object.entries(dependencies)) {
       const { source } = this.parseExtensionConfig(config);
       const sourceType = getSourceType(source);
@@ -790,7 +813,7 @@ export class InstallService {
    * 从配置文件解析扩展
    */
   protected parseExtensionsFromConfig(cwd?: string): Record<string, ExtensionConfig> {
-    return getDependencies(cwd);
+    return getExtensionDependencies(cwd);
   }
 
   /**

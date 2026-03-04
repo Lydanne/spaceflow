@@ -19,6 +19,8 @@
   "options.showAll": "显示所有发现的问题，不过滤非变更行的问题",
   "options.flush": "仅刷新状态（同步 reactions、resolved conversations、replies），不执行 LLM 审查",
   "options.eventAction": "PR 事件类型（opened, synchronize, closed 等），closed 时仅收集统计不进行 AI 审查",
+  "options.local": "审查本地未提交的代码。模式: 'uncommitted'（默认，暂存区+工作区）或 'staged'（仅暂存区）",
+  "options.noLocal": "禁用本地模式，使用分支比较",
   "extensionDescription": "代码审查命令，使用 LLM 对 PR 代码进行自动审查",
   "mcp.serverDescription": "代码审查规则查询服务",
   "mcp.listRules": "获取当前项目的所有代码审查规则，返回规则列表包含 ID、标题、描述、适用的文件扩展名等信息",

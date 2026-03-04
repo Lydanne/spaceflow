@@ -36,6 +36,7 @@
   "updatingAll": "🔄 Updating all dependencies...",
   "noDeps": "   No dependencies in config file",
   "foundDeps": "   Found {{count}} dependencies",
+  "coreVersionChanged": "📦 @spaceflow/core version changed: {{prev}} → {{current}}",
   "installingDeps": "\n📦 Installing dependencies...",
   "pmInstallFailed": "   Warning: {{pm}} install failed",
   "depNotInstalled": "   ⚠️ {{name}} not installed successfully, skipping",
