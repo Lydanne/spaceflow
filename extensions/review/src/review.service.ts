@@ -956,7 +956,7 @@ export class ReviewService {
     // 3. 同步已解决的评论状态
     await this.syncResolvedComments(owner, repo, prNumber, existingResult);
 
-    // 4. 同步评论 reactions（👍/👎）
+    // 4. 同步评论 reactions（👍/👎/☹️）
     await this.syncReactionsToIssues(owner, repo, prNumber, existingResult, verbose);
 
     // 5. LLM 验证历史问题是否已修复
@@ -2078,7 +2078,7 @@ ${fileChanges || "无"}`;
     // 获取已解决的评论，同步 resolve 状态（在更新 review 之前）
     await this.syncResolvedComments(owner, repo, prNumber, result);
 
-    // 获取评论的 reactions，同步 valid 状态（👎 标记为无效）
+    // 获取评论的 reactions，同步状态（☹️ 标记无效，👎 标记未解决）
     await this.syncReactionsToIssues(owner, repo, prNumber, result, verbose);
 
     // 查找已有的 AI 评论（Issue Comment），可能存在多个重复评论
@@ -2307,7 +2307,8 @@ ${fileChanges || "无"}`;
    * 从旧的 AI review 评论中获取 reactions 和回复，同步到 result.issues
    * - 存储所有 reactions 到 issue.reactions 字段
    * - 存储评论回复到 issue.replies 字段
-   * - 如果评论有 👎 (-1) reaction，将对应的问题标记为无效
+   * - 如果评论有 ☹️ (confused) reaction，将对应的问题标记为无效
+   * - 如果评论有 👎 (-1) reaction，将对应的问题标记为未解决
    */
   protected async syncReactionsToIssues(
     owner: string,
@@ -2429,13 +2430,25 @@ ${fileChanges || "无"}`;
             content,
             users,
           }));
-          // 检查是否有评审人的 👎 (-1) reaction，标记为无效
-          const thumbsDownUsers = reactionMap.get("-1") || [];
-          const reviewerThumbsDown = thumbsDownUsers.filter((u) => reviewers.has(u));
-          if (reviewerThumbsDown.length > 0 && matchedIssue.valid !== "false") {
+          // 检查是否有评审人的 ☹️ (confused) reaction，标记为无效
+          const confusedUsers = reactionMap.get("confused") || [];
+          const reviewerConfused = confusedUsers.filter((u) => reviewers.has(u));
+          if (reviewerConfused.length > 0 && matchedIssue.valid !== "false") {
             matchedIssue.valid = "false";
             console.log(
-              `👎 问题已标记为无效: ${matchedIssue.file}:${matchedIssue.line} (by 评审人: ${reviewerThumbsDown.join(", ")})`,
+              `☹️ 问题已标记为无效: ${matchedIssue.file}:${matchedIssue.line} (by 评审人: ${reviewerConfused.join(", ")})`,
+            );
+          }
+          // 检查是否有评审人的 👎 (-1) reaction，标记为未解决
+          const thumbsDownUsers = reactionMap.get("-1") || [];
+          const reviewerThumbsDown = thumbsDownUsers.filter((u) => reviewers.has(u));
+          if (reviewerThumbsDown.length > 0 && (matchedIssue.resolved || matchedIssue.fixed)) {
+            matchedIssue.resolved = undefined;
+            matchedIssue.resolvedBy = undefined;
+            matchedIssue.fixed = undefined;
+            matchedIssue.fixedBy = undefined;
+            console.log(
+              `👎 问题已标记为未解决: ${matchedIssue.file}:${matchedIssue.line} (by 评审人: ${reviewerThumbsDown.join(", ")})`,
             );
           }
         } catch {
