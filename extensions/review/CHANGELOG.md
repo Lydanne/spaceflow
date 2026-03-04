@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.68.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.67.0...@spaceflow/review@0.68.0) (2026-03-04)
+
+### 代码重构
+
+* **review:** 区分 ☹️ 和 👎 reaction 的语义，☹️ 标记无效，👎 标记未解决 ([f1419fe](https://github.com/Lydanne/spaceflow/commit/f1419fe47448a80f373ffac082ac3a2e9320d200))
+
+### 其他修改
+
+* **review-summary:** released version 0.35.0 [no ci] ([4f2607d](https://github.com/Lydanne/spaceflow/commit/4f2607def2725946f32eccc4aa4e687a3cdd9bab))
+* **scripts:** released version 0.28.0 [no ci] ([55db5cf](https://github.com/Lydanne/spaceflow/commit/55db5cfa1dc0a1e318085caa0cfd9f91b06dcb21))
+* **shell:** released version 0.28.0 [no ci] ([01f180f](https://github.com/Lydanne/spaceflow/commit/01f180f2508e75524a33e66fea580a738adc689f))
+
 ## [0.67.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.66.0...@spaceflow/review@0.67.0) (2026-03-03)
 
 ### 新特性
