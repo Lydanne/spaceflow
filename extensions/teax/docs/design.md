@@ -1,0 +1,1347 @@
+# Teax 设计文档
+
+> Gitea 功能扩展平台 + 飞书控制与消息交互
+
+## 概述
+
+Teax 是 **Gitea 的功能扩展平台**，通过 Web UI 为 Gitea 提供增强能力，并通过 **飞书** 实现控制指令和消息交互。
+
+### 核心定位
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│                        Teax                             │
+│  ┌─────────────────┐           ┌─────────────────────┐  │
+│  │     Gitea       │◀─────────▶│       飞书          │  │
+│  │   功能扩展       │           │   控制 & 消息交互   │  │
+│  └─────────────────┘           └─────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
+```
+
+- **Gitea 侧**：扩展 CI/CD、Pages 托管、小程序管理、Agent 运行时等功能
+- **飞书侧**：消息通知、机器人指令、审批流程、状态查询
+
+### 平台依赖
+
+| 平台 | 角色 | 用途 |
+| ---- | ---- | ---- |
+| **Gitea** | 核心 | Git 仓库托管、代码版本管理、Webhook 触发、扩展功能宿主 |
+| **飞书** | 交互（可选） | 消息通知、机器人控制、审批流程、团队协作 |
+
+### 用户体系
+
+系统以 **Gitea 用户** 为核心，飞书绑定为可选：
+
+```text
+┌──────────────────────────────────────┐
+│            Teax 用户                 │
+│  ┌────────────────────────────────┐  │
+│  │     Gitea 账号 (必需)          │  │
+│  │     ─────────────────          │  │
+│  │     用户名、邮箱、权限          │  │
+│  └────────────────────────────────┘  │
+│                 │                    │
+│                 ▼ 可选绑定           │
+│  ┌────────────────────────────────┐  │
+│  │     飞书账号 (可选)            │  │
+│  │     ─────────────────          │  │
+│  │     接收通知、机器人交互        │  │
+│  └────────────────────────────────┘  │
+└──────────────────────────────────────┘
+```
+
+- **Gitea 账号**：必需，作为系统主账号，用于仓库访问和权限控制
+- **飞书绑定**：可选，绑定后可接收消息通知、使用飞书机器人交互
+
+#### 账号与团队管理
+
+团队数据从 **Gitea 同步**，权限通过 **权限组** 分配：
+
+```text
+┌─────────────────────────────────────────────────────┐
+│                    Gitea                            │
+│  ┌───────────────┐    ┌───────────────┐            │
+│  │  Organization │    │     Team      │            │
+│  └───────┬───────┘    └───────┬───────┘            │
+└──────────┼────────────────────┼─────────────────────┘
+           │ 同步               │ 同步
+           ▼                    ▼
+┌─────────────────────────────────────────────────────┐
+│                    Teax                             │
+│  ┌───────────────┐    ┌───────────────┐            │
+│  │  Organization │    │     Team      │            │
+│  └───────┬───────┘    └───────┬───────┘            │
+│          │                    │                    │
+│          └────────┬───────────┘                    │
+│                   ▼                                │
+│          ┌───────────────┐                         │
+│          │   权限组       │                         │
+│          │ Permission    │                         │
+│          │   Group       │                         │
+│          └───────────────┘                         │
+└─────────────────────────────────────────────────────┘
+```
+
+| 功能 | 说明 |
+| ---- | ---- |
+| **团队同步** | 从 Gitea 同步 Organization 和 Team 结构 |
+| **账号管理** | 用户账号与 Gitea 账号关联，支持飞书绑定 |
+| **权限组** | 创建权限组，分配功能权限（如发布、审批等） |
+| **团队权限** | 将权限组分配给 Gitea Team，团队成员自动继承 |
+
+#### 登录方式
+
+| 方式 | 说明 |
+| ---- | ---- |
+| **Gitea OAuth** | 使用 Gitea 账号登录（主要方式） |
+| **飞书 OAuth** | 使用飞书账号登录，首次登录需关联 Gitea 账号 |
+
+> 无论使用哪种方式登录，最终都需要关联到 Gitea 账号，因为系统核心功能依赖 Gitea。
+
+## 核心功能模块
+
+### 1. 项目管理
+
+#### 1.1 创建项目
+
+- **关联 Gitea 仓库**：绑定 Gitea 平台的 Git 仓库
+- **仓库地址输入**：格式如 `org/repo`（例：`xg/nodecloud`）
+- **创建确认**：验证仓库可访问性后创建项目
+
+#### 1.2 分支选择
+
+- **分支列表**：拉取远程仓库的分支列表
+- **默认分支**：默认选择 `master` 或 `main`
+- **拉取操作**：将选定分支代码同步到本地
+
+### 2. 项目工作台
+
+项目创建后进入工作台视图，包含以下 Tab 页：
+
+| Tab | 功能描述 |
+|-----|---------|
+| **Actions** | CI/CD 流水线管理，查看构建/部署状态 |
+| **Agents** | Agent 实例管理，Session 运行状态监控 |
+| **Pages** | 静态页面托管配置 |
+| **小程序开发码管理** | 小程序预览码、体验码管理 |
+| **...** | 更多扩展功能 |
+
+### 3. 发布系统
+
+#### 3.1 发布流程
+
+```text
+代码提交 → 触发构建 → 运行测试 → 部署发布 → 飞书通知
+```
+
+#### 3.2 发布状态
+
+- **Publish** 卡片显示当前发布任务
+- 状态指示：`运行中` / `成功` / `失败`
+- 实时日志查看
+
+### 4. Agent Session 管理
+
+#### 4.1 Session 概念
+
+- 每个 Agent 运行实例对应一个 Session
+- Session 包含运行状态、日志、资源占用等信息
+
+#### 4.2 Session 状态
+
+- **运行中**：Agent 正在执行任务
+- **已完成**：任务执行完毕
+- **已停止**：手动或异常停止
+
+## 页面设计
+
+### 路由结构
+
+```text
+/                                    # 首页/仪表盘
+├── /auth
+│   ├── /login                       # 登录页
+│   └── /callback                    # OAuth 回调
+│       ├── /gitea                   # Gitea OAuth 回调
+│       └── /feishu                  # 飞书 OAuth 回调
+│
+├── /orgs                            # 组织列表
+│   └── /:orgId                      # 组织详情
+│       ├── /projects                # 项目列表
+│       │   ├── /new                 # 创建项目
+│       │   └── /:projectId          # 项目工作台
+│       │       ├── /actions         # Actions Tab
+│       │       │   └── /:actionId   # Action 详情/日志
+│       │       ├── /agents          # Agents Tab
+│       │       │   └── /:sessionId  # Session 详情
+│       │       ├── /pages           # Pages Tab
+│       │       ├── /miniapp         # 小程序管理 Tab
+│       │       └── /settings        # 项目设置
+│       │
+│       ├── /teams                   # 团队管理
+│       │   └── /:teamId             # 团队详情
+│       │
+│       ├── /permissions             # 权限组管理
+│       │   └── /:groupId            # 权限组详情
+│       │
+│       └── /settings                # 组织设置
+│
+├── /account                         # 个人账号
+│   ├── /profile                     # 个人信息
+│   ├── /feishu                      # 飞书绑定
+│   └── /notifications               # 通知设置
+│
+└── /admin                           # 系统管理（管理员）
+    ├── /users                       # 用户管理
+    ├── /orgs                        # 组织管理
+    └── /settings                    # 系统设置
+```
+
+---
+
+### 页面布局
+
+#### 整体布局
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  Header                                                     │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │ Logo    OrgSwitcher    Search         User  Notify  ◐  ││
+│  └─────────────────────────────────────────────────────────┘│
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────┐  ┌─────────────────────────────────────────┐  │
+│  │         │  │                                         │  │
+│  │ Sidebar │  │              Main Content               │  │
+│  │         │  │                                         │  │
+│  │ - 项目   │  │                                         │  │
+│  │ - 团队   │  │                                         │  │
+│  │ - 权限   │  │                                         │  │
+│  │ - 设置   │  │                                         │  │
+│  │         │  │                                         │  │
+│  └─────────┘  └─────────────────────────────────────────┘  │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│  Footer                                                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 核心页面设计
+
+#### 1. 登录页 `/auth/login`
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│                        ┌─────────────┐                      │
+│                        │    Logo     │                      │
+│                        │    Teax     │                      │
+│                        └─────────────┘                      │
+│                                                             │
+│                   ┌─────────────────────┐                   │
+│                   │                     │                   │
+│                   │  ┌───────────────┐  │                   │
+│                   │  │ 使用 Gitea 登录 │  │                   │
+│                   │  └───────────────┘  │                   │
+│                   │                     │                   │
+│                   │  ┌───────────────┐  │                   │
+│                   │  │ 使用飞书登录   │  │                   │
+│                   │  └───────────────┘  │                   │
+│                   │                     │                   │
+│                   └─────────────────────┘                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 2. 首页/仪表盘 `/`
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  欢迎回来, username                                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │ 项目总数     │  │ 运行中任务   │  │ 今日发布     │         │
+│  │    12       │  │     3       │  │     5       │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+│                                                             │
+│  最近项目                                        [查看全部]  │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ xg/nodecloud     master    ● 运行中    2分钟前       │   │
+│  │ xg/webapp        main      ✓ 成功      1小时前       │   │
+│  │ xg/api-server    develop   ✗ 失败      3小时前       │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  最近活动                                                   │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 🚀 张三 发布了 xg/nodecloud v1.2.0                   │   │
+│  │ ✅ 李四 审批通过了 xg/webapp 的发布请求               │   │
+│  │ 🤖 Agent "code-review" 完成了 xg/api-server 的审查   │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 3. 创建项目 `/orgs/:orgId/projects/new`
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  创建项目                                                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  关联 Gitea 仓库                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 🔍 搜索仓库...                                       │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  或直接输入仓库地址                                          │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ org/repo                                            │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  可用仓库                                                   │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ ○ xg/nodecloud      Node.js 云服务项目               │   │
+│  │ ○ xg/webapp         前端 Web 应用                    │   │
+│  │ ○ xg/api-server     API 服务端                       │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│                                          [取消]  [创建]     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 4. 项目工作台 `/orgs/:orgId/projects/:projectId`
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  xg/nodecloud                                    [设置] ⚙   │
+│  Node.js 云服务项目                                          │
+├─────────────────────────────────────────────────────────────┤
+│  ┌────────┬────────┬────────┬──────────────┬────────┐      │
+│  │Actions │ Agents │ Pages  │ 小程序管理    │ 设置   │      │
+│  └────────┴────────┴────────┴──────────────┴────────┘      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  发布                                            [新建发布]  │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ ┌──────────────────────────────────────────────┐    │   │
+│  │ │  #42  v1.2.0                          ● 运行中 │    │   │
+│  │ │  master  abc1234  "feat: add new feature"     │    │   │
+│  │ │  张三 · 2分钟前                      [查看日志] │    │   │
+│  │ └──────────────────────────────────────────────┘    │   │
+│  │                                                     │   │
+│  │ ┌──────────────────────────────────────────────┐    │   │
+│  │ │  #41  v1.1.9                          ✓ 成功  │    │   │
+│  │ │  master  def5678  "fix: bug fix"              │    │   │
+│  │ │  李四 · 1小时前                               │    │   │
+│  │ └──────────────────────────────────────────────┘    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 5. Agents Tab
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  Agents                                        [启动 Agent]  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  运行中的 Session                                            │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ ┌──────────────────────────────────────────────┐    │   │
+│  │ │  code-review                          ● 运行中 │    │   │
+│  │ │  Session #s-001                               │    │   │
+│  │ │  已运行 5分钟                        [停止] [日志]│    │   │
+│  │ └──────────────────────────────────────────────┘    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  历史 Session                                               │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  Session ID    Agent        状态    耗时    时间     │   │
+│  │  s-001         code-review  运行中  5m      刚刚     │   │
+│  │  s-000         deploy-bot   完成    2m      1小时前  │   │
+│  │  s-999         test-runner  失败    10s     昨天     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 6. 团队管理 `/orgs/:orgId/teams`
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  团队管理                                        [同步团队]  │
+│  从 Gitea 同步的团队列表                                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  团队名称          成员数    权限组        操作      │   │
+│  │  ─────────────────────────────────────────────────  │   │
+│  │  Owners            3        管理员        [编辑]    │   │
+│  │  Developers        8        开发者        [编辑]    │   │
+│  │  QA                4        测试人员      [编辑]    │   │
+│  │  Viewers           12       只读          [编辑]    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  最后同步: 2026-03-04 15:30:00                              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 7. 权限组管理 `/orgs/:orgId/permissions`
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  权限组管理                                      [新建权限组] │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  ┌──────────────────────────────────────────────┐   │   │
+│  │  │  管理员                                       │   │   │
+│  │  │  拥有所有权限                                  │   │   │
+│  │  │  权限: project:* publish:* agent:* ...       │   │   │
+│  │  │                                    [编辑]     │   │   │
+│  │  └──────────────────────────────────────────────┘   │   │
+│  │                                                     │   │
+│  │  ┌──────────────────────────────────────────────┐   │   │
+│  │  │  开发者                                       │   │   │
+│  │  │  可以触发发布和启动 Agent                      │   │   │
+│  │  │  权限: publish:trigger agent:start agent:stop │   │   │
+│  │  │                                    [编辑]     │   │   │
+│  │  └──────────────────────────────────────────────┘   │   │
+│  │                                                     │   │
+│  │  ┌──────────────────────────────────────────────┐   │   │
+│  │  │  只读                                         │   │   │
+│  │  │  只能查看项目和日志                            │   │   │
+│  │  │  权限: (无)                                   │   │   │
+│  │  │                                    [编辑]     │   │   │
+│  │  └──────────────────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 8. 个人账号 - 飞书绑定 `/account/feishu`
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  飞书账号绑定                                                │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  当前状态: ✓ 已绑定                                          │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  飞书账号信息                                        │   │
+│  │  ─────────────────────────────────────────────────  │   │
+│  │  显示名: 张三                                        │   │
+│  │  Open ID: ou_xxxxxxxxxxxx                           │   │
+│  │  绑定时间: 2026-03-01 10:00:00                       │   │
+│  │                                                     │   │
+│  │                                        [解除绑定]    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  通知设置                                                   │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  ☑ 接收发布通知                                      │   │
+│  │  ☑ 接收审批请求                                      │   │
+│  │  ☑ 接收 Agent 运行结果                               │   │
+│  │  ☐ 接收系统通知                                      │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 组件设计
+
+#### 通用组件
+
+| 组件 | 说明 |
+| ---- | ---- |
+| `AppHeader` | 顶部导航栏，包含 Logo、组织切换、搜索、用户菜单 |
+| `AppSidebar` | 侧边栏导航，根据当前组织显示菜单 |
+| `OrgSwitcher` | 组织切换下拉框 |
+| `UserMenu` | 用户头像下拉菜单 |
+| `NotificationBell` | 通知铃铛，显示未读通知数 |
+
+#### 业务组件
+
+| 组件 | 说明 |
+| ---- | ---- |
+| `ProjectCard` | 项目卡片，显示项目名称、状态、最近活动 |
+| `PublishTaskCard` | 发布任务卡片，显示状态、分支、提交信息 |
+| `SessionCard` | Agent Session 卡片，显示运行状态、耗时 |
+| `TeamTable` | 团队列表表格 |
+| `PermissionGroupCard` | 权限组卡片 |
+| `LogViewer` | 日志查看器，支持实时日志流 |
+| `StatusBadge` | 状态徽章（运行中/成功/失败等） |
+| `BranchSelector` | 分支选择器 |
+| `RepoSearch` | 仓库搜索组件 |
+
+## 数据模型
+
+### 实体关系图
+
+```text
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│    User     │────▶│  UserFeishu │     │PermissionGrp│
+└──────┬──────┘     └─────────────┘     └──────┬──────┘
+       │                                       │
+       │ belongs_to                            │ has_many
+       ▼                                       ▼
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│Organization │────▶│    Team     │────▶│TeamPermission│
+└──────┬──────┘     └─────────────┘     └─────────────┘
+       │
+       │ has_many
+       ▼
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Project   │────▶│ PublishTask │     │   Action    │
+└──────┬──────┘     └─────────────┘     └─────────────┘
+       │
+       │ has_many
+       ▼
+┌─────────────┐     ┌─────────────┐
+│AgentSession │     │    Page     │
+└─────────────┘     └─────────────┘
+```
+
+---
+
+### 用户与权限
+
+#### User（用户）
+
+```typescript
+interface User {
+  id: string;
+  giteaId: number;              // Gitea 用户 ID
+  giteaUsername: string;        // Gitea 用户名
+  email: string;
+  avatarUrl?: string;
+  isAdmin: boolean;             // 系统管理员
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+#### UserFeishu（飞书绑定）
+
+```typescript
+interface UserFeishu {
+  id: string;
+  userId: string;               // 关联 User.id
+  feishuOpenId: string;         // 飞书 open_id
+  feishuUnionId?: string;       // 飞书 union_id
+  feishuName: string;           // 飞书显示名
+  feishuAvatar?: string;
+  notifyEnabled: boolean;       // 是否接收通知
+  createdAt: Date;
+}
+```
+
+#### Organization（组织）
+
+```typescript
+interface Organization {
+  id: string;
+  giteaOrgId: number;           // Gitea Organization ID
+  name: string;                 // 组织名称
+  displayName?: string;
+  avatarUrl?: string;
+  syncedAt: Date;               // 最后同步时间
+  createdAt: Date;
+}
+```
+
+#### Team（团队）
+
+```typescript
+interface Team {
+  id: string;
+  organizationId: string;       // 关联 Organization.id
+  giteaTeamId: number;          // Gitea Team ID
+  name: string;
+  description?: string;
+  syncedAt: Date;
+  createdAt: Date;
+}
+```
+
+#### TeamMember（团队成员）
+
+```typescript
+interface TeamMember {
+  id: string;
+  teamId: string;               // 关联 Team.id
+  userId: string;               // 关联 User.id
+  role: 'owner' | 'member';     // 团队角色
+  joinedAt: Date;
+}
+```
+
+#### PermissionGroup（权限组）
+
+```typescript
+interface PermissionGroup {
+  id: string;
+  organizationId: string;       // 所属组织
+  name: string;                 // 权限组名称
+  description?: string;
+  permissions: Permission[];    // 权限列表
+  createdAt: Date;
+}
+
+type Permission =
+  | 'project:create'
+  | 'project:delete'
+  | 'project:settings'
+  | 'publish:trigger'
+  | 'publish:approve'
+  | 'publish:rollback'
+  | 'agent:start'
+  | 'agent:stop'
+  | 'page:deploy'
+  | 'miniapp:manage'
+  | 'team:manage'
+  | 'settings:manage';
+```
+
+#### TeamPermission（团队权限分配）
+
+```typescript
+interface TeamPermission {
+  id: string;
+  teamId: string;               // 关联 Team.id
+  permissionGroupId: string;    // 关联 PermissionGroup.id
+  createdAt: Date;
+}
+```
+
+---
+
+### 项目相关
+
+#### Project（项目）
+
+```typescript
+interface Project {
+  id: string;
+  organizationId: string;       // 所属组织
+  giteaRepoId: number;          // Gitea 仓库 ID
+  name: string;                 // 项目名称 (org/repo)
+  fullName: string;             // 完整名称
+  description?: string;
+  defaultBranch: string;        // 默认分支
+  cloneUrl: string;             // Git clone 地址
+  webhookId?: number;           // Gitea Webhook ID
+  settings: ProjectSettings;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface ProjectSettings {
+  autoDeploy: boolean;          // 自动部署
+  deployBranches: string[];     // 触发部署的分支
+  notifyOnSuccess: boolean;     // 成功时通知
+  notifyOnFailure: boolean;     // 失败时通知
+  approvalRequired: boolean;    // 需要审批
+}
+```
+
+#### PublishTask（发布任务）
+
+```typescript
+interface PublishTask {
+  id: string;
+  projectId: string;
+  branch: string;               // 发布分支
+  commitSha: string;            // 提交 SHA
+  commitMessage?: string;
+  triggeredBy: string;          // 触发者 User.id
+  triggerType: 'manual' | 'webhook' | 'feishu';
+  status: 'pending' | 'approved' | 'running' | 'success' | 'failed' | 'cancelled';
+  approvedBy?: string;          // 审批者 User.id
+  approvedAt?: Date;
+  startedAt?: Date;
+  finishedAt?: Date;
+  duration?: number;            // 耗时（秒）
+  logs: PublishLog[];
+  createdAt: Date;
+}
+
+interface PublishLog {
+  timestamp: Date;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+  step?: string;                // 当前步骤
+}
+```
+
+#### Action（CI/CD 流水线）
+
+```typescript
+interface Action {
+  id: string;
+  projectId: string;
+  name: string;                 // 流水线名称
+  trigger: ActionTrigger;
+  steps: ActionStep[];
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface ActionTrigger {
+  type: 'push' | 'pull_request' | 'tag' | 'manual';
+  branches?: string[];          // 触发分支
+  paths?: string[];             // 触发路径
+}
+
+interface ActionStep {
+  name: string;
+  command: string;
+  env?: Record<string, string>;
+  timeout?: number;             // 超时（秒）
+}
+```
+
+---
+
+### Agent 相关
+
+#### AgentSession（Agent 会话）
+
+```typescript
+interface AgentSession {
+  id: string;
+  projectId: string;
+  agentId: string;              // Agent 定义 ID
+  agentName: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'stopped';
+  triggeredBy: string;          // 触发者 User.id
+  triggerType: 'manual' | 'action' | 'feishu';
+  input?: Record<string, unknown>;   // 输入参数
+  output?: Record<string, unknown>;  // 输出结果
+  startedAt?: Date;
+  endedAt?: Date;
+  duration?: number;
+  logs: SessionLog[];
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+}
+
+interface SessionLog {
+  timestamp: Date;
+  type: 'stdout' | 'stderr' | 'system';
+  content: string;
+}
+```
+
+---
+
+### Pages 与小程序
+
+#### Page（静态页面）
+
+```typescript
+interface Page {
+  id: string;
+  projectId: string;
+  name: string;                 // 页面名称
+  domain?: string;              // 自定义域名
+  subdomain: string;            // 子域名
+  branch: string;               // 部署分支
+  buildCommand?: string;        // 构建命令
+  outputDir: string;            // 输出目录
+  status: 'active' | 'building' | 'failed' | 'disabled';
+  lastDeployedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+#### MiniAppCode（小程序开发码）
+
+```typescript
+interface MiniAppCode {
+  id: string;
+  projectId: string;
+  type: 'preview' | 'experience' | 'release';
+  version: string;
+  qrcodeUrl: string;            // 二维码图片 URL
+  expiredAt?: Date;             // 过期时间
+  createdBy: string;            // 创建者 User.id
+  createdAt: Date;
+}
+```
+
+---
+
+### 飞书相关
+
+#### FeishuNotification（飞书通知记录）
+
+```typescript
+interface FeishuNotification {
+  id: string;
+  type: 'publish' | 'approval' | 'agent' | 'system';
+  targetType: 'user' | 'group';
+  targetId: string;             // 飞书 open_id 或 chat_id
+  messageId?: string;           // 飞书消息 ID
+  content: Record<string, unknown>;
+  status: 'pending' | 'sent' | 'failed';
+  sentAt?: Date;
+  createdAt: Date;
+}
+```
+
+#### FeishuApproval（飞书审批）
+
+```typescript
+interface FeishuApproval {
+  id: string;
+  publishTaskId: string;        // 关联发布任务
+  approvalCode: string;         // 飞书审批定义 code
+  instanceCode: string;         // 飞书审批实例 code
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  approverOpenId?: string;
+  approvedAt?: Date;
+  comment?: string;
+  createdAt: Date;
+}
+```
+
+## 技术架构
+
+### 整体架构
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                            客户端                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                 │
+│  │   浏览器     │  │  飞书客户端  │  │  Gitea      │                 │
+│  │   (Web UI)  │  │  (机器人)    │  │  (Webhook)  │                 │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘                 │
+└─────────┼────────────────┼────────────────┼─────────────────────────┘
+          │                │                │
+          ▼                ▼                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Teax Server                                  │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                      Nuxt 4 (SSR)                            │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │   │
+│  │  │   Pages     │  │   API       │  │  WebSocket  │          │   │
+│  │  │   (Vue 3)   │  │   Routes    │  │   Server    │          │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘          │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                              │                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                     Service Layer                            │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │   │
+│  │  │ Auth     │ │ Project  │ │ Publish  │ │ Agent    │        │   │
+│  │  │ Service  │ │ Service  │ │ Service  │ │ Service  │        │   │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐        │   │
+│  │  │ Gitea    │ │ Feishu   │ │ Team     │ │ Page     │        │   │
+│  │  │ Service  │ │ Service  │ │ Service  │ │ Service  │        │   │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘        │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+          │                │                │
+          ▼                ▼                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                          外部服务                                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                 │
+│  │   Gitea     │  │   飞书      │  │  PostgreSQL │                 │
+│  │   Server    │  │   Open API  │  │   Database  │                 │
+│  └─────────────┘  └─────────────┘  └─────────────┘                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                 │
+│  │   Redis     │  │ 火山 TOS   │  │   Docker    │                 │
+│  │   (Cache)   │  │   (S3)     │  │   (Runner)  │                 │
+│  └─────────────┘  └─────────────┘  └─────────────┘                 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 前端技术栈
+
+| 类别 | 技术 | 版本 | 说明 |
+| ---- | ---- | ---- | ---- |
+| **框架** | Nuxt | 4.x | Vue 3 全栈框架，支持 SSR/SSG |
+| **UI 库** | Nuxt UI | 4.x | 基于 Tailwind 的组件库 |
+| **样式** | Tailwind CSS | 4.x | 原子化 CSS 框架 |
+| **图标** | Lucide Icons | - | 开源图标库 |
+| **状态管理** | Pinia | 2.x | Vue 官方状态管理 |
+| **请求** | ofetch | - | Nuxt 内置 HTTP 客户端 |
+| **WebSocket** | Socket.io-client | 4.x | 实时通信 |
+| **表单验证** | Zod | 3.x | TypeScript 优先的 Schema 验证 |
+| **日期处理** | date-fns | 3.x | 轻量日期库 |
+| **代码高亮** | Shiki | 1.x | 语法高亮（日志展示） |
+
+#### 前端目录结构
+
+```text
+app/
+├── assets/                    # 静态资源
+│   └── css/
+│       └── main.css
+├── components/                # 组件
+│   ├── app/                   # 应用级组件
+│   │   ├── AppHeader.vue
+│   │   ├── AppSidebar.vue
+│   │   └── AppFooter.vue
+│   ├── project/               # 项目相关组件
+│   │   ├── ProjectCard.vue
+│   │   └── PublishTaskCard.vue
+│   ├── agent/                 # Agent 相关组件
+│   │   └── SessionCard.vue
+│   └── common/                # 通用组件
+│       ├── StatusBadge.vue
+│       └── LogViewer.vue
+├── composables/               # 组合式函数
+│   ├── useAuth.ts
+│   ├── useProject.ts
+│   └── useWebSocket.ts
+├── layouts/                   # 布局
+│   ├── default.vue
+│   ├── auth.vue
+│   └── admin.vue
+├── middleware/                # 中间件
+│   ├── auth.ts
+│   └── permission.ts
+├── pages/                     # 页面
+│   ├── index.vue
+│   ├── auth/
+│   │   ├── login.vue
+│   │   └── callback/
+│   ├── orgs/
+│   │   └── [orgId]/
+│   ├── account/
+│   └── admin/
+├── plugins/                   # 插件
+│   └── socket.client.ts
+├── stores/                    # Pinia stores
+│   ├── auth.ts
+│   ├── org.ts
+│   └── project.ts
+├── types/                     # 类型定义
+│   ├── user.ts
+│   ├── project.ts
+│   └── api.ts
+└── utils/                     # 工具函数
+    ├── format.ts
+    └── permission.ts
+```
+
+---
+
+### 后端技术栈
+
+| 类别 | 技术 | 版本 | 说明 |
+| ---- | ---- | ---- | ---- |
+| **运行时** | Nuxt Server (Nitro) | - | 基于 H3 的服务端 |
+| **ORM** | Drizzle ORM | 0.30+ | TypeScript ORM，轻量高性能 |
+| **数据库** | PostgreSQL | 16.x | 主数据库 |
+| **缓存** | Redis | 7.x | Session、缓存、消息队列 |
+| **对象存储** | S3 兼容存储 | - | 火山引擎 TOS，日志、构建产物存储 |
+| **任务队列** | BullMQ | 5.x | 基于 Redis 的任务队列 |
+| **WebSocket** | Socket.io | 4.x | 实时日志推送 |
+| **认证** | nuxt-auth-utils | - | OAuth2 认证 |
+
+#### 后端目录结构
+
+```text
+server/
+├── api/                       # API 路由
+│   ├── auth/
+│   │   ├── login.post.ts
+│   │   ├── logout.post.ts
+│   │   └── callback/
+│   │       ├── gitea.get.ts
+│   │       └── feishu.get.ts
+│   ├── orgs/
+│   │   └── [orgId]/
+│   │       ├── index.get.ts
+│   │       ├── projects/
+│   │       ├── teams/
+│   │       └── permissions/
+│   ├── projects/
+│   │   └── [projectId]/
+│   │       ├── index.get.ts
+│   │       ├── publish.post.ts
+│   │       ├── actions/
+│   │       └── agents/
+│   └── webhooks/
+│       ├── gitea.post.ts
+│       └── feishu.post.ts
+├── middleware/                # 服务端中间件
+│   └── auth.ts
+├── plugins/                   # 服务端插件
+│   ├── database.ts
+│   ├── redis.ts
+│   └── socket.ts
+├── services/                  # 业务服务
+│   ├── auth.service.ts
+│   ├── gitea.service.ts
+│   ├── feishu.service.ts
+│   ├── project.service.ts
+│   ├── publish.service.ts
+│   ├── agent.service.ts
+│   ├── team.service.ts
+│   └── permission.service.ts
+├── db/                        # 数据库
+│   ├── schema/                # Drizzle Schema
+│   │   ├── user.ts
+│   │   ├── organization.ts
+│   │   ├── project.ts
+│   │   └── index.ts
+│   ├── migrations/            # 迁移文件
+│   └── index.ts               # 数据库连接
+├── jobs/                      # 后台任务
+│   ├── publish.job.ts
+│   ├── sync-team.job.ts
+│   └── notify.job.ts
+└── utils/                     # 工具函数
+    ├── gitea-api.ts
+    ├── feishu-api.ts
+    └── logger.ts
+```
+
+---
+
+### 数据库设计
+
+#### PostgreSQL 表结构
+
+```sql
+-- 用户表
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  gitea_id INTEGER UNIQUE NOT NULL,
+  gitea_username VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  avatar_url TEXT,
+  is_admin BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 飞书绑定表
+CREATE TABLE user_feishu (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  feishu_open_id VARCHAR(255) UNIQUE NOT NULL,
+  feishu_union_id VARCHAR(255),
+  feishu_name VARCHAR(255) NOT NULL,
+  feishu_avatar TEXT,
+  notify_enabled BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 组织表
+CREATE TABLE organizations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  gitea_org_id INTEGER UNIQUE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  display_name VARCHAR(255),
+  avatar_url TEXT,
+  synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 团队表
+CREATE TABLE teams (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  gitea_team_id INTEGER NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(organization_id, gitea_team_id)
+);
+
+-- 权限组表
+CREATE TABLE permission_groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  permissions JSONB DEFAULT '[]',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 项目表
+CREATE TABLE projects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  gitea_repo_id INTEGER NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  full_name VARCHAR(255) NOT NULL,
+  description TEXT,
+  default_branch VARCHAR(255) DEFAULT 'main',
+  clone_url TEXT NOT NULL,
+  webhook_id INTEGER,
+  settings JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(organization_id, gitea_repo_id)
+);
+
+-- 发布任务表
+CREATE TABLE publish_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  branch VARCHAR(255) NOT NULL,
+  commit_sha VARCHAR(40) NOT NULL,
+  commit_message TEXT,
+  triggered_by UUID REFERENCES users(id),
+  trigger_type VARCHAR(50) NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending',
+  approved_by UUID REFERENCES users(id),
+  approved_at TIMESTAMPTZ,
+  started_at TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ,
+  duration INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 索引
+CREATE INDEX idx_projects_org ON projects(organization_id);
+CREATE INDEX idx_publish_tasks_project ON publish_tasks(project_id);
+CREATE INDEX idx_publish_tasks_status ON publish_tasks(status);
+```
+
+---
+
+### 第三方 API 集成
+
+#### Gitea API
+
+| API | 用途 |
+| --- | ---- |
+| `GET /api/v1/user` | 获取当前用户信息 |
+| `GET /api/v1/user/orgs` | 获取用户所属组织 |
+| `GET /api/v1/orgs/{org}/teams` | 获取组织团队列表 |
+| `GET /api/v1/repos/{owner}/{repo}` | 获取仓库信息 |
+| `GET /api/v1/repos/{owner}/{repo}/branches` | 获取分支列表 |
+| `POST /api/v1/repos/{owner}/{repo}/hooks` | 创建 Webhook |
+| `GET /api/v1/repos/{owner}/{repo}/commits` | 获取提交记录 |
+
+#### 飞书 Open API
+
+| API | 用途 |
+| --- | ---- |
+| `POST /open-apis/auth/v3/tenant_access_token/internal` | 获取 tenant_access_token |
+| `GET /open-apis/authen/v1/user_info` | 获取用户信息（OAuth） |
+| `POST /open-apis/im/v1/messages` | 发送消息 |
+| `POST /open-apis/approval/v4/instances` | 创建审批实例 |
+| `GET /open-apis/approval/v4/instances/{instance_id}` | 查询审批状态 |
+| `POST /open-apis/bot/v2/hook/{hook_id}` | 机器人 Webhook |
+
+---
+
+### 部署架构
+
+#### Docker Compose（开发/小规模）
+
+```yaml
+version: '3.8'
+services:
+  teax:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/teax
+      - REDIS_URL=redis://redis:6379
+      - GITEA_URL=https://gitea.example.com
+      - FEISHU_APP_ID=xxx
+      - FEISHU_APP_SECRET=xxx
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=teax
+      - POSTGRES_PASSWORD=password
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+
+  # 对象存储使用火山引擎 TOS（S3 兼容），无需本地容器
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+#### Kubernetes（生产环境）
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                      Kubernetes Cluster                      │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                    Ingress (Nginx)                   │   │
+│  └───────────────────────┬─────────────────────────────┘   │
+│                          │                                  │
+│  ┌───────────────────────┼─────────────────────────────┐   │
+│  │                       ▼                              │   │
+│  │  ┌─────────────────────────────────────────────┐    │   │
+│  │  │           Teax Deployment (3 replicas)       │    │   │
+│  │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐        │    │   │
+│  │  │  │  Pod 1  │ │  Pod 2  │ │  Pod 3  │        │    │   │
+│  │  │  └─────────┘ └─────────┘ └─────────┘        │    │   │
+│  │  └─────────────────────────────────────────────┘    │   │
+│  │                                                      │   │
+│  │  ┌─────────────────────────────────────────────┐    │   │
+│  │  │           Worker Deployment (2 replicas)     │    │   │
+│  │  │  ┌─────────┐ ┌─────────┐                    │    │   │
+│  │  │  │ Worker1 │ │ Worker2 │  (BullMQ Jobs)     │    │   │
+│  │  │  └─────────┘ └─────────┘                    │    │   │
+│  │  └─────────────────────────────────────────────┘    │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐                              │
+│  │ PostgreSQL  │  │    Redis    │    火山引擎 TOS (外部 S3)    │
+│  │ (StatefulSet)│  │(StatefulSet)│                              │
+│  └─────────────┘  └─────────────┘                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 环境变量配置
+
+```bash
+# 基础配置
+NUXT_PUBLIC_APP_NAME=Teax
+NUXT_PUBLIC_APP_URL=https://teax.example.com
+
+# 数据库
+DATABASE_URL=postgresql://user:password@localhost:5432/teax
+
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# Gitea
+GITEA_URL=https://gitea.example.com
+GITEA_CLIENT_ID=xxx
+GITEA_CLIENT_SECRET=xxx
+
+# 飞书
+FEISHU_APP_ID=xxx
+FEISHU_APP_SECRET=xxx
+FEISHU_ENCRYPT_KEY=xxx
+FEISHU_VERIFICATION_TOKEN=xxx
+
+# S3 兼容存储（火山引擎 TOS）
+S3_ENDPOINT=tos-cn-beijing.volces.com
+S3_REGION=cn-beijing
+S3_ACCESS_KEY=xxx
+S3_SECRET_KEY=xxx
+S3_BUCKET=teax
+
+# Session
+NUXT_SESSION_SECRET=xxx
+
+# 可选：Sentry 错误监控
+SENTRY_DSN=xxx
+```
+
+---
+
+### Gitea 功能扩展
+
+Teax 为 Gitea 提供以下扩展能力：
+
+| 扩展功能 | 说明 |
+| -------- | ---- |
+| **CI/CD Actions** | 基于 Gitea Webhook 的构建/部署流水线 |
+| **Pages 托管** | 静态站点自动部署和托管 |
+| **小程序管理** | 预览码、体验码生成和管理 |
+| **Agent 运行时** | AI Agent Session 管理和监控 |
+
+### 飞书控制与消息
+
+飞书作为控制面和消息通道：
+
+| 功能 | 说明 |
+| ---- | ---- |
+| **消息通知** | 发布成功/失败、构建状态推送到群组 |
+| **机器人指令** | 通过飞书机器人触发部署、回滚等操作 |
+| **审批流程** | 生产环境发布需飞书审批通过 |
+| **状态查询** | 在飞书中查询项目/Session 运行状态 |
+| **用户同步** | 飞书组织架构同步到权限系统 |
+
+## UI 流程图
+
+```text
+┌─────────────────┐     ┌─────────────────┐
+│   创建项目       │     │   选择分支       │
+│                 │     │                 │
+│ 关联Gitea仓库:   │     │ 分支:           │
+│ ┌─────────────┐ │     │ ┌─────────────┐ │
+│ │xg/nodecloud │ │     │ │   master    │ │
+│ └─────────────┘ │     │ └─────────────┘ │
+│                 │     │                 │
+│    [创建]       │────▶│    [拉取]       │
+└─────────────────┘     └────────┬────────┘
+                                 │
+                                 ▼
+┌────────────────────────────────────────────────────┐
+│ 项目列表                                            │
+│ ┌────────────────────────────────────────────────┐ │
+│ │ xg/nodecloud                                   │ │
+│ └────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌────────────────────────────────────────────────────┐
+│ xg/nodecloud                                       │
+│ ┌────────┬────────┬────────┬──────────────┬───┐   │
+│ │Actions │ Agents │ Pages  │小程序开发码管理│...│   │
+│ └────────┴────────┴────────┴──────────────┴───┘   │
+│ ┌────────────────────────────────────────────────┐ │
+│ │ ┌──────────────┐                               │ │
+│ │ │   Publish    │ ◉                             │ │
+│ │ │ 状态: 运行中  │                               │ │
+│ │ └──────────────┘                               │ │
+│ └────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────┘
+                                 │
+                                 ▼ (切换到 Agents Tab)
+┌────────────────────────────────────────────────────┐
+│ xg/nodecloud                                       │
+│ ┌────────┬────────┬────────┬──────────────┬───┐   │
+│ │Actions │[Agents]│ Pages  │小程序开发码管理│...│   │
+│ └────────┴────────┴────────┴──────────────┴───┘   │
+│ ┌────────────────────────────────────────────────┐ │
+│ │ ┌──────────────┐                               │ │
+│ │ │   Session    │ ◉                             │ │
+│ │ │ 状态: 运行中  │                               │ │
+│ │ └──────────────┘                               │ │
+│ └────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────┘
+```
+
+## 下一步计划
+
+1. **Phase 1**：实现项目创建和 Git 仓库关联
+2. **Phase 2**：实现分支选择和代码拉取
+3. **Phase 3**：实现项目工作台 Tab 页框架
+4. **Phase 4**：实现发布流程可视化
+5. **Phase 5**：实现 Agent Session 管理
