@@ -43,33 +43,37 @@ export class GiteaService {
     this.accessToken = accessToken
   }
 
-  private async fetch<T>(path: string, options?: RequestInit): Promise<T> {
+  private async fetch(
+    path: string,
+    method: string = 'GET',
+    body?: Record<string, unknown>
+  ): Promise<unknown> {
     const url = `${this.baseUrl}/api/v1${path}`
-    const response = await $fetch<T>(url, {
-      ...options,
+    const result = await $fetch(url, {
+      method: method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
       headers: {
         'Authorization': `token ${this.accessToken}`,
-        'Content-Type': 'application/json',
-        ...options?.headers
-      }
+        'Content-Type': 'application/json'
+      },
+      ...(body ? { body } : {})
     })
-    return response
+    return result
   }
 
   async getCurrentUser(): Promise<GiteaUser> {
-    return this.fetch<GiteaUser>('/user')
+    return this.fetch('/user') as Promise<GiteaUser>
   }
 
   async getUserOrgs(): Promise<GiteaOrganization[]> {
-    return this.fetch<GiteaOrganization[]>('/user/orgs?limit=50')
+    return this.fetch('/user/orgs?limit=50') as Promise<GiteaOrganization[]>
   }
 
   async getOrgTeams(orgName: string): Promise<GiteaTeam[]> {
-    return this.fetch<GiteaTeam[]>(`/orgs/${orgName}/teams?limit=50`)
+    return this.fetch(`/orgs/${orgName}/teams?limit=50`) as Promise<GiteaTeam[]>
   }
 
   async getTeamMembers(teamId: number): Promise<GiteaTeamMember[]> {
-    return this.fetch<GiteaTeamMember[]>(`/teams/${teamId}/members?limit=50`)
+    return this.fetch(`/teams/${teamId}/members?limit=50`) as Promise<GiteaTeamMember[]>
   }
 }
 
@@ -96,7 +100,7 @@ export async function exchangeGiteaCode(code: string): Promise<GiteaOAuthTokenRe
         client_secret: config.giteaClientSecret,
         code,
         grant_type: 'authorization_code',
-        redirect_uri: `${config.public.appUrl}/auth/callback/gitea`
+        redirect_uri: `${config.public.appUrl}/api/auth/callback/gitea`
       }
     }
   )
