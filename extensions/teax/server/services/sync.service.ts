@@ -1,12 +1,12 @@
-import { eq } from 'drizzle-orm'
-import { useDB, schema } from '../db'
-import { createGiteaService } from '../utils/gitea'
+import { eq } from "drizzle-orm";
+import { useDB, schema } from "../db";
+import { createGiteaService } from "../utils/gitea";
 
 export async function syncUserOrgsAndTeams(accessToken: string, _userId: string) {
-  const gitea = createGiteaService(accessToken)
-  const db = useDB()
+  const gitea = createGiteaService(accessToken);
+  const db = useDB();
 
-  const orgs = await gitea.getUserOrgs()
+  const orgs = await gitea.getUserOrgs();
 
   for (const org of orgs) {
     const [dbOrg] = await db
@@ -16,7 +16,7 @@ export async function syncUserOrgsAndTeams(accessToken: string, _userId: string)
         name: org.name,
         displayName: org.full_name || org.name,
         avatarUrl: org.avatar_url,
-        syncedAt: new Date()
+        syncedAt: new Date(),
       })
       .onConflictDoUpdate({
         target: schema.organizations.giteaOrgId,
@@ -24,12 +24,12 @@ export async function syncUserOrgsAndTeams(accessToken: string, _userId: string)
           name: org.name,
           displayName: org.full_name || org.name,
           avatarUrl: org.avatar_url,
-          syncedAt: new Date()
-        }
+          syncedAt: new Date(),
+        },
       })
-      .returning()
+      .returning();
 
-    const teams = await gitea.getOrgTeams(org.name)
+    const teams = await gitea.getOrgTeams(org.name);
 
     for (const team of teams) {
       const [dbTeam] = await db
@@ -39,26 +39,26 @@ export async function syncUserOrgsAndTeams(accessToken: string, _userId: string)
           giteaTeamId: team.id,
           name: team.name,
           description: team.description,
-          syncedAt: new Date()
+          syncedAt: new Date(),
         })
         .onConflictDoUpdate({
           target: [schema.teams.organizationId, schema.teams.giteaTeamId],
           set: {
             name: team.name,
             description: team.description,
-            syncedAt: new Date()
-          }
+            syncedAt: new Date(),
+          },
         })
-        .returning()
+        .returning();
 
-      const members = await gitea.getTeamMembers(team.id)
+      const members = await gitea.getTeamMembers(team.id);
 
       for (const member of members) {
         const [memberUser] = await db
           .select()
           .from(schema.users)
           .where(eq(schema.users.giteaId, member.id))
-          .limit(1)
+          .limit(1);
 
         if (memberUser) {
           await db
@@ -66,9 +66,9 @@ export async function syncUserOrgsAndTeams(accessToken: string, _userId: string)
             .values({
               teamId: dbTeam.id,
               userId: memberUser.id,
-              role: 'member'
+              role: "member",
             })
-            .onConflictDoNothing()
+            .onConflictDoNothing();
         }
       }
     }

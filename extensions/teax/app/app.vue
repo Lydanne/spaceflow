@@ -1,23 +1,23 @@
 <script setup lang="ts">
-const config = useRuntimeConfig()
-const { loggedIn, user, clear } = useUserSession()
+const config = useRuntimeConfig();
+const { loggedIn, user, clear } = useUserSession();
 
 useHead({
-  meta: [{ name: 'viewport', content: 'width=device-width, initial-scale=1' }],
-  link: [{ rel: 'icon', href: '/favicon.ico' }],
+  meta: [{ name: "viewport", content: "width=device-width, initial-scale=1" }],
+  link: [{ rel: "icon", href: "/favicon.ico" }],
   htmlAttrs: {
-    lang: 'zh-CN'
-  }
-})
+    lang: "zh-CN",
+  },
+});
 
 useSeoMeta({
   title: config.public.appName,
-  description: 'Gitea 功能扩展平台'
-})
+  description: "Gitea 功能扩展平台",
+});
 
 async function logout() {
-  await clear()
-  navigateTo('/auth/login')
+  await clear();
+  navigateTo("/auth/login");
 }
 </script>
 
@@ -45,16 +45,16 @@ async function logout() {
             [
               {
                 label: user?.username || '',
-                type: 'label' as const
-              }
+                type: 'label' as const,
+              },
             ],
             [
               {
                 label: '退出登录',
                 icon: 'i-lucide-log-out',
-                onSelect: logout
-              }
-            ]
+                onSelect: logout,
+              },
+            ],
           ]"
         >
           <UButton

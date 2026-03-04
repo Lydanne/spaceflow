@@ -1,12 +1,12 @@
 <script setup lang="ts">
 definePageMeta({
-  layout: false
-})
+  layout: false,
+});
 
-const config = useRuntimeConfig()
+const config = useRuntimeConfig();
 
 function loginWithGitea() {
-  navigateTo('/api/auth/gitea', { external: true })
+  navigateTo("/api/auth/gitea", { external: true });
 }
 </script>
 
