@@ -66,10 +66,10 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 
 ### 交付物
 
-- [x] 可运行的 Nuxt 4 项目
-- [x] Gitea OAuth 登录功能
-- [x] 用户/组织/团队数据同步
-- [x] 基础数据库表结构
+- [ ] 可运行的 Nuxt 4 项目
+- [ ] Gitea OAuth 登录功能
+- [ ] 用户/组织/团队数据同步
+- [ ] 基础数据库表结构
 
 ### 验收标准
 
@@ -94,7 +94,7 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 | 项目列表页面 | P0 | 4h | ⬜ |
 | 创建项目（关联 Gitea 仓库） | P0 | 6h | ⬜ |
 | Gitea Webhook 注册 | P0 | 4h | ⬜ |
-| Webhook 接收处理 | P0 | 6h | ⬜ |
+| Webhook 接收处理（含 HMAC-SHA256 签名验证） | P0 | 6h | ⬜ |
 | 项目详情页面框架（Tab 布局） | P0 | 4h | ⬜ |
 | 分支选择器组件 | P1 | 3h | ⬜ |
 
@@ -102,27 +102,30 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 
 | 任务 | 优先级 | 预估 | 状态 |
 | ---- | ------ | ---- | ---- |
-| 发布任务数据模型 | P0 | 2h | ⬜ |
+| 发布任务数据模型（含 publish_task_logs 独立表） | P0 | 2h | ⬜ |
 | 手动触发发布 | P0 | 6h | ⬜ |
 | Webhook 触发发布 | P0 | 4h | ⬜ |
-| 发布任务队列（BullMQ） | P0 | 6h | ⬜ |
-| 发布状态实时推送（WebSocket） | P0 | 6h | ⬜ |
+| 发布任务队列（BullMQ，含重试/死信策略） | P0 | 6h | ⬜ |
+| 发布状态实时推送（WebSocket + Redis Adapter） | P0 | 6h | ⬜ |
 | 发布日志查看 | P0 | 4h | ⬜ |
-| 发布历史列表 | P1 | 3h | ⬜ |
+| 发布历史列表（分页） | P1 | 3h | ⬜ |
+| 权限校验中间件（基础版：认证 + 组织访问控制） | P0 | 4h | ⬜ |
 
 ### 交付物
 
-- [x] 项目 CRUD 功能
-- [x] Gitea Webhook 集成
-- [x] 基础发布流程
-- [x] 实时日志推送
+- [ ] 项目 CRUD 功能
+- [ ] Gitea Webhook 集成（含签名验证）
+- [ ] 基础发布流程
+- [ ] 实时日志推送
+- [ ] 基础权限中间件
 
 ### 验收标准
 
 1. 可创建项目并关联 Gitea 仓库
-2. 代码 push 自动触发发布
+2. 代码 push 自动触发发布（伪造 Webhook 被拒绝）
 3. 发布日志实时显示
 4. 发布状态正确流转
+5. 未授权用户访问 API 返回 403
 
 ---
 
@@ -134,16 +137,20 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 
 ### 任务清单
 
-#### Week 5: Agent 运行时
+#### Week 5: Agent 运行时（open-code 集成）
 
 | 任务 | 优先级 | 预估 | 状态 |
 | ---- | ------ | ---- | ---- |
-| Agent Session 数据模型 | P0 | 2h | ⬜ |
-| Agent 启动/停止 API | P0 | 6h | ⬜ |
-| Session 状态管理 | P0 | 4h | ⬜ |
-| Session 日志实时推送 | P0 | 4h | ⬜ |
-| Agents Tab 页面 | P0 | 6h | ⬜ |
-| Session 详情页面 | P1 | 4h | ⬜ |
+| Agent 定义数据模型（systemPrompt + llmConfig + toolConfig） | P0 | 3h | ⬜ |
+| AgentSecret 密钒管理（AES-256-GCM 加密存储 LLM API Key） | P0 | 4h | ⬜ |
+| Agent Session 数据模型（含 oc_session_id / steps / cost） | P0 | 2h | ⬜ |
+| AgentService 集成 @opencode-ai/sdk：createOpencode + session 流程 | P0 | 10h | ⬜ |
+| open-code 流式事件映射到 session_logs（text/tool_use/reasoning/step） | P0 | 4h | ⬜ |
+| 工具隔离：agent-runner Docker 镜像（限网络 + 非 root） | P0 | 6h | ⬜ |
+| Session 实时日志推送（WebSocket） | P0 | 3h | ⬜ |
+| 工作区管理：仓库 clone/checkout，完成后可创建 PR | P1 | 4h | ⬜ |
+| Agents Tab 页面（含步骤进度、token/cost 展示） | P0 | 6h | ⬜ |
+| Session 详情页面（tool 调用、reasoning 可折叠展示） | P1 | 4h | ⬜ |
 
 #### Week 6: Pages 托管
 
@@ -158,16 +165,20 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 
 ### 交付物
 
-- [x] Agent Session 管理功能
-- [x] Pages 静态托管功能
-- [x] 实时日志系统
+- [ ] Agent 定义管理（open-code 配置）
+- [ ] Agent 密钒管理
+- [ ] Agent Session 管理（open-code 隔离执行）
+- [ ] Pages 静态托管功能
+- [ ] 实时日志系统（含工具调用、reasoning 展示）
 
 ### 验收标准
 
-1. 可启动/停止 Agent Session
-2. Session 日志实时显示
-3. 可配置 Pages 并自动部署
-4. Pages 可通过子域名访问
+1. 可创建 Agent（配置 systemPrompt + LLM）并手动触发 Session
+2. Session 日志实时显示（含 tool_use、reasoning 可折叠）
+3. LLM API Key 以密文存储，明文不可通过 API 读取
+4. bash 工具在隔离容器中执行，不影响宿主机
+5. 可配置 Pages 并自动部署
+6. Pages 可通过子域名访问
 
 ---
 
@@ -203,9 +214,9 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 
 ### 交付物
 
-- [x] 飞书消息通知
-- [x] 飞书机器人交互
-- [x] 飞书审批流程（可选）
+- [ ] 飞书消息通知
+- [ ] 飞书机器人交互（含操作权限校验）
+- [ ] 飞书审批流程（可选）
 
 ### 验收标准
 
@@ -223,15 +234,16 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 
 ### 任务清单
 
-#### Week 9: 权限 + 小程序
+#### Week 9: 权限完善 + 小程序
 
 | 任务 | 优先级 | 预估 | 状态 |
 | ---- | ------ | ---- | ---- |
 | 权限组管理页面 | P0 | 6h | ⬜ |
-| 团队权限分配 | P0 | 4h | ⬜ |
-| 权限校验中间件 | P0 | 4h | ⬜ |
+| 团队权限分配 UI | P0 | 4h | ⬜ |
+| 细粒度权限校验完善（Project 级别） | P0 | 4h | ⬜ |
+| 操作审计日志查看页面 | P1 | 4h | ⬜ |
 | 小程序开发码管理 | P1 | 8h | ⬜ |
-| 小程序二维码生成 | P1 | 4h | ⬜ |
+| 小程序二维码生成（调用微信开放平台 API） | P1 | 4h | ⬜ |
 
 #### Week 10: 部署上线
 
@@ -246,10 +258,10 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 
 ### 交付物
 
-- [x] 完整的权限系统
-- [x] 生产环境部署
-- [x] 监控告警
-- [x] 用户文档
+- [ ] 完整的权限系统（基础版 Week 4，完整版 Week 9）
+- [ ] 生产环境部署
+- [ ] 监控告警
+- [ ] 用户文档
 
 ### 验收标准
 
@@ -280,15 +292,18 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 | Gitea 实例 | 仓库托管 | 运维 | ⬜ |
 | PostgreSQL 16 | 主数据库 | 运维 | ⬜ |
 | Redis 7 | 缓存/队列 | 运维 | ⬜ |
+| Docker Engine | Agent 隔离运行环境 | 运维 | ⬜ |
 | S3 兼容存储 | 对象存储（火山引擎 TOS） | 运维 | ⬜ |
 | 飞书应用 | 消息/审批 | 产品 | ⬜ |
-| 域名/SSL | Pages 托管 | 运维 | ⬜ |
+| 微信开放平台账号 | 小程序码生成 | 产品 | ⬜ |
+| 域名/SSL（含通配符证书） | Pages 子域名托管 | 运维 | ⬜ |
 
 ### 内部依赖
 
 | 依赖 | 用途 | 状态 |
 | ---- | ---- | ---- |
 | Gitea OAuth 应用 | 用户认证 | ⬜ |
+| @opencode-ai/sdk | Agent 执行引擎 | ⬜ |
 | 飞书企业应用 | 消息通知 | ⬜ |
 | 飞书机器人 | 指令交互 | ⬜ |
 
