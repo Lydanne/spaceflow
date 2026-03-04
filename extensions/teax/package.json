@@ -11,20 +11,30 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@spaceflow/core": "workspace:*",
     "@iconify-json/lucide": "^1.2.90",
     "@iconify-json/simple-icons": "^1.2.70",
     "@nuxt/ui": "^4.4.0",
+    "@spaceflow/core": "workspace:*",
+    "drizzle-orm": "^0.45.1",
+    "ioredis": "^5.10.0",
     "nuxt": "^4.3.1",
+    "nuxt-auth-utils": "^0.5.29",
+    "postgres": "^3.4.8",
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
-    "@spaceflow/cli": "workspace:*",
     "@nuxt/eslint": "^1.15.1",
+    "@spaceflow/cli": "workspace:*",
     "@types/node": "catalog:",
+    "@types/pg": "^8.18.0",
+    "drizzle-kit": "^0.31.9",
     "eslint": "^10.0.0",
     "typescript": "^5.9.3",
     "vue-tsc": "^3.2.4"
