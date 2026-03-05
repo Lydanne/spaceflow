@@ -14,6 +14,17 @@ export default defineEventHandler(async (event) => {
   const session = await requireOrgOwnerOrAdmin(event, orgId);
   const db = useDB();
 
+  // 禁止删除默认权限组
+  const [target] = await db
+    .select({ type: schema.permissionGroups.type })
+    .from(schema.permissionGroups)
+    .where(and(eq(schema.permissionGroups.id, groupId), eq(schema.permissionGroups.organizationId, orgId)))
+    .limit(1);
+
+  if (target?.type === "default") {
+    throw createError({ statusCode: 403, message: "默认权限组不允许删除" });
+  }
+
   const [deleted] = await db
     .delete(schema.permissionGroups)
     .where(

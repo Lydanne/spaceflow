@@ -5,12 +5,12 @@ import {
   varchar,
   text,
   jsonb,
-  timestamp,
   unique,
   index,
 } from "drizzle-orm/pg-core";
 import { organizations } from "./organization";
 import { users } from "./user";
+import { baseColumns } from "./base";
 
 export const projects = pgTable(
   "projects",
@@ -29,8 +29,7 @@ export const projects = pgTable(
     webhookSecret: varchar("webhook_secret", { length: 255 }),
     settings: jsonb("settings").default({}),
     createdBy: uuid("created_by").references(() => users.id),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+    ...baseColumns(),
   },
   (table) => [
     unique("projects_org_repo").on(table.organizationId, table.giteaRepoId),

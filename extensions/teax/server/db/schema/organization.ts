@@ -1,5 +1,6 @@
 import { pgTable, uuid, integer, varchar, text, timestamp, unique } from "drizzle-orm/pg-core";
 import { users } from "./user";
+import { baseColumns } from "./base";
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -8,7 +9,7 @@ export const organizations = pgTable("organizations", {
   displayName: varchar("display_name", { length: 255 }),
   avatarUrl: text("avatar_url"),
   syncedAt: timestamp("synced_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  ...baseColumns(),
 });
 
 export const teams = pgTable("teams", {
@@ -18,7 +19,7 @@ export const teams = pgTable("teams", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   syncedAt: timestamp("synced_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  ...baseColumns(),
 }, (table) => [
   unique("teams_org_gitea_team").on(table.organizationId, table.giteaTeamId),
 ]);
@@ -29,6 +30,7 @@ export const teamMembers = pgTable("team_members", {
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   role: varchar("role", { length: 50 }).default("member"),
   joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow(),
+  ...baseColumns(),
 }, (table) => [
   unique("team_members_team_user").on(table.teamId, table.userId),
 ]);

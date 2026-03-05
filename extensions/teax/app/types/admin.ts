@@ -23,6 +23,7 @@ export interface MemberItem {
 
 export interface PermissionGroup {
   id: string;
+  type: "default" | "custom";
   name: string;
   description: string | null;
   permissions: string[];

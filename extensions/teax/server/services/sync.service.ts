@@ -1,9 +1,13 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "../db";
 import { createServiceGiteaClient } from "../utils/gitea";
-import { PERMISSION_DEFINITIONS } from "../shared/permissions";
 
 const DEFAULT_GROUP_NAME = "默认权限";
+
+const DEFAULT_PERMISSIONS = [
+  "project:view",
+  "actions:view",
+];
 
 export async function syncUserOrgsAndTeams(username: string) {
   const gitea = await createServiceGiteaClient();
@@ -112,15 +116,14 @@ async function ensureDefaultPermissionGroup(db: ReturnType<typeof useDB>, orgId:
 
   if (existing) return existing;
 
-  const allPermissionKeys = PERMISSION_DEFINITIONS.map((d) => d.key);
-
   const [created] = await db
     .insert(schema.permissionGroups)
     .values({
       organizationId: orgId,
+      type: "default",
       name: DEFAULT_GROUP_NAME,
-      description: "默认权限组，包含所有权限，对全部项目可见",
-      permissions: allPermissionKeys,
+      description: "默认权限组，仅含查看权限，对全部项目可见",
+      permissions: DEFAULT_PERMISSIONS,
       projectIds: null,
     })
     .returning();

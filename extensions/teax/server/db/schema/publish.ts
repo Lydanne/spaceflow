@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { projects } from "./project";
 import { users } from "./user";
+import { baseColumns } from "./base";
 
 export const publishTasks = pgTable(
   "publish_tasks",
@@ -30,7 +31,7 @@ export const publishTasks = pgTable(
     finishedAt: timestamp("finished_at", { withTimezone: true }),
     duration: integer("duration"),
     logUrl: text("log_url"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    ...baseColumns(),
   },
   (table) => [
     index("idx_publish_tasks_project").on(table.projectId),
@@ -47,6 +48,7 @@ export const publishTaskLogs = pgTable(
     level: varchar("level", { length: 10 }).notNull(),
     step: varchar("step", { length: 100 }),
     message: text("message").notNull(),
+    ...baseColumns(),
   },
   (table) => [index("idx_publish_task_logs_task").on(table.taskId)],
 );

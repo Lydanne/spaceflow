@@ -74,6 +74,48 @@ function toggleProject(id: string) {
   }
 }
 
+const permissionGroupDefs: { key: string; label: string }[] = [
+  { key: "project", label: "项目" },
+  { key: "actions", label: "Actions" },
+  { key: "publish", label: "发布" },
+  { key: "agent", label: "Agent" },
+  { key: "page", label: "Pages" },
+  { key: "miniapp", label: "小程序" },
+  { key: "team", label: "团队" },
+  { key: "settings", label: "设置" },
+];
+
+const groupedPermissions = computed(() => {
+  return permissionGroupDefs
+    .map((g) => ({
+      ...g,
+      permissions: props.availablePermissions.filter((p) => p.group === g.key),
+    }))
+    .filter((g) => g.permissions.length > 0);
+});
+
+function isGroupAllSelected(groupKey: string) {
+  const keys = props.availablePermissions
+    .filter((p) => p.group === groupKey)
+    .map((p) => p.key);
+  return keys.length > 0 && keys.every((k) => formPermissions.value.includes(k));
+}
+
+function toggleGroupAll(groupKey: string) {
+  const keys = props.availablePermissions
+    .filter((p) => p.group === groupKey)
+    .map((p) => p.key);
+  if (isGroupAllSelected(groupKey)) {
+    formPermissions.value = formPermissions.value.filter((k) => !keys.includes(k));
+  } else {
+    for (const k of keys) {
+      if (!formPermissions.value.includes(k)) {
+        formPermissions.value.push(k);
+      }
+    }
+  }
+}
+
 async function saveGroup() {
   if (!formName.value.trim()) {
     toast.add({ title: "名称不能为空", color: "error" });
@@ -169,34 +211,26 @@ function getPermissionLabel(key: string) {
             >
               {{ group.description }}
             </p>
-            <div class="flex flex-wrap gap-1.5 mt-3">
-              <UBadge
-                v-if="group.projectIds === null"
-                color="neutral"
-                variant="subtle"
-                size="sm"
-              >
-                全部项目
-              </UBadge>
-              <UBadge
-                v-else
-                color="warning"
-                variant="subtle"
-                size="sm"
-              >
-                {{ group.projectIds.length }} 个项目
-              </UBadge>
+            <div class="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <UIcon
+                name="i-lucide-folder"
+                class="w-3.5 h-3.5"
+              />
+              <span v-if="group.projectIds === null">全部项目</span>
+              <span v-else>{{ group.projectIds.length }} 个项目</span>
+              <span class="mx-1">·</span>
+              <span>{{ (group.permissions || []).length }} 项权限</span>
             </div>
             <div
               v-if="group.permissions && group.permissions.length > 0"
-              class="flex flex-wrap gap-1.5 mt-2"
+              class="flex flex-wrap gap-1 mt-2"
             >
               <UBadge
                 v-for="perm in group.permissions"
                 :key="perm"
                 color="primary"
                 variant="subtle"
-                size="sm"
+                size="xs"
               >
                 {{ getPermissionLabel(perm) }}
               </UBadge>
@@ -219,6 +253,7 @@ function getPermissionLabel(key: string) {
               编辑
             </UButton>
             <UButton
+              v-if="group.type !== 'default'"
               size="xs"
               color="error"
               variant="soft"
@@ -328,29 +363,46 @@ function getPermissionLabel(key: string) {
 
             <div>
               <label class="block text-sm font-medium mb-2">权限</label>
-              <div class="grid grid-cols-2 gap-2">
-                <button
-                  v-for="perm in availablePermissions"
-                  :key="perm.key"
-                  type="button"
-                  class="flex items-center gap-2 p-2 rounded-lg border text-sm text-left transition-colors"
-                  :class="
-                    formPermissions.includes(perm.key)
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300'
-                      : 'border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900'
-                  "
-                  @click="togglePermission(perm.key)"
+              <div class="space-y-3 max-h-64 overflow-y-auto">
+                <div
+                  v-for="group in groupedPermissions"
+                  :key="group.key"
                 >
-                  <UIcon
-                    :name="
-                      formPermissions.includes(perm.key)
-                        ? 'i-lucide-check-square'
-                        : 'i-lucide-square'
-                    "
-                    class="w-4 h-4 shrink-0"
-                  />
-                  {{ perm.label }}
-                </button>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{{ group.label }}</span>
+                    <button
+                      type="button"
+                      class="text-xs text-primary-500 hover:text-primary-600 dark:hover:text-primary-400"
+                      @click="toggleGroupAll(group.key)"
+                    >
+                      {{ isGroupAllSelected(group.key) ? "取消全选" : "全选" }}
+                    </button>
+                  </div>
+                  <div class="grid grid-cols-2 gap-1.5">
+                    <button
+                      v-for="perm in group.permissions"
+                      :key="perm.key"
+                      type="button"
+                      class="flex items-center gap-2 px-2 py-1.5 rounded-md border text-sm text-left transition-colors"
+                      :class="
+                        formPermissions.includes(perm.key)
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300'
+                          : 'border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900'
+                      "
+                      @click="togglePermission(perm.key)"
+                    >
+                      <UIcon
+                        :name="
+                          formPermissions.includes(perm.key)
+                            ? 'i-lucide-check-square'
+                            : 'i-lucide-square'
+                        "
+                        class="w-4 h-4 shrink-0"
+                      />
+                      {{ perm.label }}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { pgTable, uuid, integer, varchar, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { baseColumns } from "./base";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -7,8 +8,7 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull(),
   avatarUrl: text("avatar_url"),
   isAdmin: boolean("is_admin").default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  ...baseColumns(),
 });
 
 export const userFeishu = pgTable("user_feishu", {
@@ -24,5 +24,5 @@ export const userFeishu = pgTable("user_feishu", {
   notifyApproval: boolean("notify_approval").default(true),
   notifyAgent: boolean("notify_agent").default(true),
   notifySystem: boolean("notify_system").default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  ...baseColumns(),
 });

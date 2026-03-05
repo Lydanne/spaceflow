@@ -1,6 +1,7 @@
-import { pgTable, uuid, varchar, text, inet, jsonb, bigserial, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, inet, jsonb, bigserial, index } from "drizzle-orm/pg-core";
 import { users } from "./user";
 import { organizations } from "./organization";
+import { baseColumns } from "./base";
 
 export const auditLogs = pgTable("audit_logs", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -12,7 +13,7 @@ export const auditLogs = pgTable("audit_logs", {
   ipAddress: inet("ip_address"),
   userAgent: text("user_agent"),
   detail: jsonb("detail").default({}),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  ...baseColumns(),
 }, (table) => [
   index("idx_audit_logs_user").on(table.userId),
   index("idx_audit_logs_org").on(table.organizationId),
