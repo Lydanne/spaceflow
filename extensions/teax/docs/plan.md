@@ -46,30 +46,30 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 
 | 任务 | 优先级 | 预估 | 状态 |
 | ---- | ------ | ---- | ---- |
-| 初始化 Nuxt 4 项目结构 | P0 | 2h | ⬜ |
-| 配置 Drizzle ORM + PostgreSQL | P0 | 4h | ⬜ |
-| 配置 Redis 连接 | P0 | 2h | ⬜ |
-| 创建数据库 Schema（users, organizations, teams） | P0 | 4h | ⬜ |
-| 配置 Docker Compose 开发环境 | P0 | 2h | ⬜ |
-| 配置 ESLint + TypeScript | P1 | 2h | ⬜ |
+| 初始化 Nuxt 4 项目结构 | P0 | 2h | ✅ |
+| 配置 Drizzle ORM + PostgreSQL | P0 | 4h | ✅ |
+| 配置 Redis 连接 | P0 | 2h | ✅ |
+| 创建数据库 Schema（users, organizations, teams） | P0 | 4h | ✅ |
+| 配置 Docker Compose 开发环境 | P0 | 2h | ✅ |
+| 配置 ESLint + TypeScript | P1 | 2h | ✅ |
 
 #### Week 2: 认证系统
 
 | 任务 | 优先级 | 预估 | 状态 |
 | ---- | ------ | ---- | ---- |
-| 实现 Gitea OAuth 登录 | P0 | 8h | ⬜ |
-| 实现飞书 OAuth 登录 | P1 | 6h | ⬜ |
-| 用户信息同步（Gitea → Teax） | P0 | 4h | ⬜ |
-| 组织/团队同步（Gitea → Teax） | P0 | 6h | ⬜ |
-| Session 管理（Redis） | P0 | 4h | ⬜ |
-| 登录页面 UI | P0 | 4h | ⬜ |
+| 实现 Gitea OAuth 登录 | P0 | 8h | ✅ |
+| 实现飞书 OAuth 登录 | P1 | 6h | ✅ |
+| 用户信息同步（Gitea → Teax） | P0 | 4h | ✅ |
+| 组织/团队同步（Gitea → Teax） | P0 | 6h | ✅ |
+| Session 管理（Redis） | P0 | 4h | ✅ |
+| 登录页面 UI | P0 | 4h | ✅ |
 
 ### 交付物
 
-- [ ] 可运行的 Nuxt 4 项目
-- [ ] Gitea OAuth 登录功能
-- [ ] 用户/组织/团队数据同步
-- [ ] 基础数据库表结构
+- [x] 可运行的 Nuxt 4 项目
+- [x] Gitea OAuth 登录功能
+- [x] 用户/组织/团队数据同步
+- [x] 基础数据库表结构
 
 ### 验收标准
 

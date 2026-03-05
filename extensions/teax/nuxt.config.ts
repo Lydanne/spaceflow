@@ -14,6 +14,8 @@ export default defineNuxtConfig({
     giteaUrl: process.env.GITEA_URL || "",
     giteaClientId: process.env.GITEA_CLIENT_ID || "",
     giteaClientSecret: process.env.GITEA_CLIENT_SECRET || "",
+    feishuAppId: process.env.FEISHU_APP_ID || "",
+    feishuAppSecret: process.env.FEISHU_APP_SECRET || "",
     session: {
       password: process.env.NUXT_SESSION_PASSWORD || "",
     },

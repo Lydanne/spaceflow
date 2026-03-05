@@ -4,17 +4,34 @@ definePageMeta({
 });
 
 const config = useRuntimeConfig();
+const route = useRoute();
+
+const error = computed(() => {
+  const err = route.query.error as string | undefined;
+  if (err === "feishu_not_bound") {
+    return "飞书账号未绑定 Gitea 账号，请先使用 Gitea 登录后在设置中绑定飞书";
+  }
+  return null;
+});
 
 function loginWithGitea() {
   navigateTo("/api/auth/gitea", { external: true });
 }
+
+function loginWithFeishu() {
+  navigateTo("/api/auth/feishu", { external: true });
+}
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+  <div
+    class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950"
+  >
     <div class="w-full max-w-sm mx-auto">
       <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-500 text-white mb-4">
+        <div
+          class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-500 text-white mb-4"
+        >
           <UIcon
             name="i-lucide-box"
             class="w-8 h-8"
@@ -27,6 +44,14 @@ function loginWithGitea() {
           Gitea 功能扩展平台
         </p>
       </div>
+
+      <UAlert
+        v-if="error"
+        color="error"
+        icon="i-lucide-alert-circle"
+        :description="error"
+        class="mb-4"
+      />
 
       <UCard>
         <div class="space-y-4">
@@ -48,7 +73,7 @@ function loginWithGitea() {
             icon="i-lucide-message-square"
             color="neutral"
             variant="outline"
-            disabled
+            @click="loginWithFeishu"
           >
             使用飞书登录
           </UButton>

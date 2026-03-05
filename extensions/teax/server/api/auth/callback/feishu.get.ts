@@ -1,6 +1,5 @@
-import { exchangeGiteaCode, createGiteaService } from "../../../utils/gitea";
-import { upsertUser } from "../../../services/auth.service";
-import { syncUserOrgsAndTeams } from "../../../services/sync.service";
+import { exchangeFeishuCode, getFeishuUserInfo } from "../../../utils/feishu";
+import { findUserByFeishuOpenId, bindFeishuToUser } from "../../../services/feishu.service";
 import { generateSessionId, registerSession } from "../../../utils/session";
 
 export default defineEventHandler(async (event) => {
@@ -15,24 +14,28 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const tokenResponse = await exchangeGiteaCode(code);
-    const gitea = createGiteaService(tokenResponse.access_token);
-    const giteaUser = await gitea.getCurrentUser();
+    const tokenData = await exchangeFeishuCode(code);
+    const feishuUser = await getFeishuUserInfo(tokenData.access_token);
 
-    const user = await upsertUser(giteaUser);
+    // 查找已绑定的 Teax 用户
+    const user = await findUserByFeishuOpenId(feishuUser.open_id);
+
     if (!user) {
-      throw createError({
-        statusCode: 500,
-        message: "Failed to create or update user",
-      });
+      // 未绑定 Gitea 账号，跳转到登录页提示需先绑定
+      return sendRedirect(event, "/auth/login?error=feishu_not_bound");
     }
 
+    // 更新绑定信息
+    const tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+    await bindFeishuToUser(user.id, feishuUser, tokenData.access_token, tokenExpiresAt);
+
+    // 创建 session
     const sessionId = generateSessionId();
     await registerSession(user.id, sessionId, {
       userId: user.id,
       username: user.giteaUsername,
       loginAt: Date.now(),
-      loginProvider: "gitea",
+      loginProvider: "feishu",
       ip: getRequestIP(event) || undefined,
       ua: getRequestHeader(event, "user-agent") || undefined,
     });
@@ -47,20 +50,15 @@ export default defineEventHandler(async (event) => {
         isAdmin: user.isAdmin,
       },
       sessionId,
-      giteaAccessToken: tokenResponse.access_token,
-    });
-
-    // 后台异步同步组织和团队
-    syncUserOrgsAndTeams(tokenResponse.access_token, user.id).catch((err) => {
-      console.error("Failed to sync orgs and teams:", err);
+      giteaAccessToken: "",
     });
 
     return sendRedirect(event, "/");
   } catch (err: unknown) {
-    console.error("Gitea OAuth callback error:", err);
+    console.error("Feishu OAuth callback error:", err);
     throw createError({
       statusCode: 500,
-      message: "Authentication failed",
+      message: "Feishu authentication failed",
     });
   }
 });

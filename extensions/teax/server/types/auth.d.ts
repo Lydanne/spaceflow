@@ -10,6 +10,7 @@ declare module "#auth-utils" {
 
   interface UserSession {
     user: User;
+    sessionId: string;
     giteaAccessToken: string;
   }
 }
