@@ -39,16 +39,31 @@ const { data: teamsData, refresh: refreshTeams } = await useFetch<{
 const teams = computed(() => teamsData.value?.data ?? []);
 
 const selectedTeamId = ref<string | null>(null);
-const { data: membersData, refresh: refreshMembers } = await useFetch<{
-  data: MemberItem[];
-}>(() => `/api/admin/orgs/${orgId}/teams/${selectedTeamId.value}/members`, {
-  watch: [selectedTeamId],
-  immediate: false,
-});
-const members = computed(() => membersData.value?.data ?? []);
+const members = ref<MemberItem[]>([]);
+const membersLoading = ref(false);
 
-function selectTeam(teamId: string) {
+async function fetchMembers() {
+  if (!selectedTeamId.value) return;
+  membersLoading.value = true;
+  try {
+    const res = await $fetch<{ data: MemberItem[] }>(
+      `/api/admin/orgs/${orgId}/teams/${selectedTeamId.value}/members`,
+    );
+    members.value = res.data ?? [];
+  } catch {
+    members.value = [];
+  } finally {
+    membersLoading.value = false;
+  }
+}
+
+async function refreshMembers() {
+  await fetchMembers();
+}
+
+async function selectTeam(teamId: string) {
   selectedTeamId.value = teamId;
+  await fetchMembers();
 }
 
 async function removeMember(member: MemberItem) {
@@ -233,19 +248,13 @@ async function syncOrg() {
               </template>
             </UTable>
 
-            <div
-              v-else
-              class="text-center py-8 text-gray-400"
-            >
+            <div v-else class="text-center py-8 text-gray-400">
               该团队暂无成员
             </div>
           </UCard>
         </template>
 
-        <div
-          v-else
-          class="flex items-center justify-center h-48 text-gray-400"
-        >
+        <div v-else class="flex items-center justify-center h-48 text-gray-400">
           <div class="text-center">
             <UIcon
               name="i-lucide-mouse-pointer-click"

@@ -21,11 +21,11 @@ export default defineEventHandler(async (event) => {
       syncedAt: schema.organizations.syncedAt,
       createdAt: schema.organizations.createdAt,
       teamCount:
-        sql<number>`(SELECT COUNT(*) FROM teams WHERE teams.organization_id = ${schema.organizations.id})`.as(
+        sql<number>`(SELECT COUNT(*) FROM teams WHERE teams.organization_id = "organizations"."id")`.as(
           "team_count",
         ),
       memberCount:
-        sql<number>`(SELECT COUNT(DISTINCT tm.user_id) FROM team_members tm JOIN teams t ON t.id = tm.team_id WHERE t.organization_id = ${schema.organizations.id})`.as(
+        sql<number>`(SELECT COUNT(DISTINCT tm.user_id) FROM team_members tm JOIN teams t ON t.id = tm.team_id WHERE t.organization_id = "organizations"."id")`.as(
           "member_count",
         ),
     })

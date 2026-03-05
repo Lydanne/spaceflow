@@ -55,11 +55,25 @@ export default defineEventHandler(async (event) => {
       const syncedMemberUserIds: string[] = [];
 
       for (const member of members) {
+        // upsert 用户：未登录过的成员自动创建用户记录
         const [memberUser] = await db
-          .select()
-          .from(schema.users)
-          .where(eq(schema.users.giteaId, member.id))
-          .limit(1);
+          .insert(schema.users)
+          .values({
+            giteaId: member.id,
+            giteaUsername: member.login,
+            email: member.email || `${member.login}@placeholder`,
+            avatarUrl: member.avatar_url,
+          })
+          .onConflictDoUpdate({
+            target: schema.users.giteaId,
+            set: {
+              giteaUsername: member.login,
+              avatarUrl: member.avatar_url,
+              ...(member.email ? { email: member.email } : {}),
+              updatedAt: new Date(),
+            },
+          })
+          .returning({ id: schema.users.id });
 
         if (memberUser) {
           await db

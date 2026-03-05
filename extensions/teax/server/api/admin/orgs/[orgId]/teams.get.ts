@@ -20,7 +20,10 @@ export default defineEventHandler(async (event) => {
       description: schema.teams.description,
       syncedAt: schema.teams.syncedAt,
       createdAt: schema.teams.createdAt,
-      memberCount: sql<number>`(SELECT COUNT(*) FROM team_members WHERE team_members.team_id = ${schema.teams.id})`.as("member_count"),
+      memberCount:
+        sql<number>`(SELECT COUNT(*) FROM team_members WHERE team_members.team_id = "teams"."id")`.as(
+          "member_count",
+        ),
     })
     .from(schema.teams)
     .where(eq(schema.teams.organizationId, orgId));
