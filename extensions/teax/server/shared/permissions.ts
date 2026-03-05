@@ -11,7 +11,6 @@ export interface PermissionDefinition {
 
 export const PERMISSION_GROUPS = [
   { key: "project", label: "项目" },
-  { key: "publish", label: "发布" },
   { key: "actions", label: "Actions" },
   { key: "agent", label: "Agent" },
   { key: "page", label: "Pages" },
@@ -27,9 +26,6 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "project:settings", label: "项目设置", group: "project" },
   { key: "actions:view", label: "查看 Actions", group: "actions" },
   { key: "actions:trigger", label: "触发 Workflow", group: "actions" },
-  { key: "publish:trigger", label: "触发发布", group: "publish" },
-  { key: "publish:approve", label: "审批发布", group: "publish" },
-  { key: "publish:rollback", label: "回滚发布", group: "publish" },
   { key: "agent:start", label: "启动 Agent", group: "agent" },
   { key: "agent:stop", label: "停止 Agent", group: "agent" },
   { key: "page:deploy", label: "部署 Pages", group: "page" },

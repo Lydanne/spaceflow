@@ -17,12 +17,6 @@ const orgs = computed(() => orgsData.value?.data ?? []);
 const totalProjects = computed(() =>
   orgs.value.reduce((sum, o) => sum + Number(o.projectCount || 0), 0),
 );
-
-const { data: todayStats } = await useFetch<{ count: number }>(
-  "/api/stats/today-publishes",
-  { key: "home-today-publishes" },
-);
-const todayPublishes = computed(() => todayStats.value?.count ?? 0);
 </script>
 
 <template>
@@ -31,7 +25,7 @@ const todayPublishes = computed(() => todayStats.value?.count ?? 0);
       欢迎回来, {{ user?.username }}
     </h1>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
       <UCard>
         <div class="text-center">
           <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -49,16 +43,6 @@ const todayPublishes = computed(() => todayStats.value?.count ?? 0);
           </p>
           <p class="text-3xl font-bold mt-1">
             {{ totalProjects }}
-          </p>
-        </div>
-      </UCard>
-      <UCard>
-        <div class="text-center">
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            今日构建
-          </p>
-          <p class="text-3xl font-bold mt-1">
-            {{ todayPublishes }}
           </p>
         </div>
       </UCard>

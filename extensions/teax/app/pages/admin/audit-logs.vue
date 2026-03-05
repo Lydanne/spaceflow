@@ -42,7 +42,6 @@ function actionLabel(action: string): string {
     "permission_group.update": "更新权限组",
     "permission_group.delete": "删除权限组",
     "team.sync": "同步团队",
-    "publish.trigger": "触发发布",
   };
   return map[action] || action;
 }

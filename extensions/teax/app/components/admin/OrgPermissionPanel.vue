@@ -77,7 +77,6 @@ function toggleProject(id: string) {
 const permissionGroupDefs: { key: string; label: string }[] = [
   { key: "project", label: "项目" },
   { key: "actions", label: "Actions" },
-  { key: "publish", label: "发布" },
   { key: "agent", label: "Agent" },
   { key: "page", label: "Pages" },
   { key: "miniapp", label: "小程序" },
