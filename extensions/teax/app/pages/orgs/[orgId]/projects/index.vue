@@ -37,22 +37,37 @@ const total = computed(() => data.value?.total ?? 0);
           to="/"
         />
         <div>
-          <h1 class="text-xl font-bold">项目列表</h1>
+          <h1 class="text-xl font-bold">
+            项目列表
+          </h1>
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             共 {{ total }} 个项目
           </p>
         </div>
       </div>
-      <UButton
-        icon="i-lucide-plus"
-        color="primary"
-        :to="`/orgs/${orgId}/projects/new`"
-      >
-        创建项目
-      </UButton>
+      <div class="flex items-center gap-2">
+        <UButton
+          icon="i-lucide-settings"
+          color="neutral"
+          variant="soft"
+          :to="`/orgs/${orgId}/settings`"
+        >
+          组织设置
+        </UButton>
+        <UButton
+          icon="i-lucide-plus"
+          color="primary"
+          :to="`/orgs/${orgId}/projects/new`"
+        >
+          创建项目
+        </UButton>
+      </div>
     </div>
 
-    <div v-if="status === 'pending'" class="flex justify-center py-12">
+    <div
+      v-if="status === 'pending'"
+      class="flex justify-center py-12"
+    >
       <UIcon
         name="i-lucide-loader-2"
         class="w-6 h-6 animate-spin text-gray-400"
@@ -60,7 +75,10 @@ const total = computed(() => data.value?.total ?? 0);
     </div>
 
     <div v-else>
-      <div v-if="projects.length > 0" class="space-y-3">
+      <div
+        v-if="projects.length > 0"
+        class="space-y-3"
+      >
         <NuxtLink
           v-for="project in projects"
           :key="project.id"
@@ -80,8 +98,15 @@ const total = computed(() => data.value?.total ?? 0);
                   {{ project.description }}
                 </p>
                 <div class="flex items-center gap-3 mt-2">
-                  <UBadge color="neutral" variant="subtle" size="sm">
-                    <UIcon name="i-lucide-git-branch" class="w-3 h-3 mr-1" />
+                  <UBadge
+                    color="neutral"
+                    variant="subtle"
+                    size="sm"
+                  >
+                    <UIcon
+                      name="i-lucide-git-branch"
+                      class="w-3 h-3 mr-1"
+                    />
                     {{ project.defaultBranch || "main" }}
                   </UBadge>
                   <span class="text-xs text-gray-400">
@@ -103,14 +128,26 @@ const total = computed(() => data.value?.total ?? 0);
 
       <UCard v-else>
         <div class="text-center py-12 text-gray-400">
-          <UIcon name="i-lucide-folder-open" class="w-12 h-12 mx-auto mb-3" />
+          <UIcon
+            name="i-lucide-folder-open"
+            class="w-12 h-12 mx-auto mb-3"
+          />
           <p>暂无项目</p>
-          <p class="text-sm mt-1">点击右上角「创建项目」关联 Gitea 仓库</p>
+          <p class="text-sm mt-1">
+            点击右上角「创建项目」关联 Gitea 仓库
+          </p>
         </div>
       </UCard>
 
-      <div v-if="total > limit" class="flex justify-center pt-4">
-        <UPagination v-model="page" :total="total" :items-per-page="limit" />
+      <div
+        v-if="total > limit"
+        class="flex justify-center pt-4"
+      >
+        <UPagination
+          v-model="page"
+          :total="total"
+          :items-per-page="limit"
+        />
       </div>
     </div>
   </div>

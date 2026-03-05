@@ -1,21 +1,15 @@
 <script setup lang="ts">
 import type { TeamItem, PermissionGroup, PermissionDef } from "~/types/admin";
 
-definePageMeta({
-  layout: "admin",
-  middleware: "admin",
-});
-
 const route = useRoute();
 const toast = useToast();
 const orgId = route.params.orgId as string;
 
 const activeTab = ref<"teams" | "permissions">("teams");
 
-const { data: org } = await useFetch(`/api/admin/orgs/${orgId}`);
 const { data: teamsData, refresh: refreshTeams } = await useFetch<{
   data: TeamItem[];
-}>(`/api/admin/orgs/${orgId}/teams`);
+}>(`/api/orgs/${orgId}/teams`);
 const { data: groupsData, refresh: refreshGroups } = await useFetch<{
   data: PermissionGroup[];
 }>(`/api/orgs/${orgId}/permissions`);
@@ -45,7 +39,7 @@ async function syncOrg() {
 </script>
 
 <template>
-  <div>
+  <div class="max-w-7xl mx-auto px-4 py-8">
     <!-- 顶部 -->
     <div class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-3">
@@ -54,36 +48,26 @@ async function syncOrg() {
           color="neutral"
           variant="ghost"
           size="sm"
-          to="/admin/orgs"
+          :to="`/orgs/${orgId}/projects`"
         />
         <div>
           <h1 class="text-xl font-bold">
-            {{ (org as any)?.displayName || (org as any)?.name || "组织详情" }}
+            组织设置
           </h1>
           <p class="text-sm text-gray-500 dark:text-gray-400">
             {{ teams.length }} 个团队 · {{ allGroups.length }} 个权限组
           </p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <UButton
-          icon="i-lucide-external-link"
-          color="neutral"
-          variant="soft"
-          :to="`/orgs/${orgId}/settings`"
-        >
-          组织设置页
-        </UButton>
-        <UButton
-          icon="i-lucide-refresh-cw"
-          color="neutral"
-          variant="soft"
-          :loading="syncing"
-          @click="syncOrg"
-        >
-          同步团队
-        </UButton>
-      </div>
+      <UButton
+        icon="i-lucide-refresh-cw"
+        color="neutral"
+        variant="soft"
+        :loading="syncing"
+        @click="syncOrg"
+      >
+        同步团队
+      </UButton>
     </div>
 
     <!-- Tab 切换 -->
@@ -126,6 +110,8 @@ async function syncOrg() {
       :org-id="orgId"
       :teams="teams"
       :all-groups="allGroups"
+      api-prefix="/api/orgs"
+      :show-member-actions="false"
       @refresh-teams="refreshTeams"
     />
 

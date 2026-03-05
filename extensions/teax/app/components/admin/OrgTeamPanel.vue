@@ -6,11 +6,19 @@ import type {
   TeamPermissionAssignment,
 } from "~/types/admin";
 
-const props = defineProps<{
-  orgId: string;
-  teams: TeamItem[];
-  allGroups: PermissionGroup[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    orgId: string;
+    teams: TeamItem[];
+    allGroups: PermissionGroup[];
+    apiPrefix?: string;
+    showMemberActions?: boolean;
+  }>(),
+  {
+    apiPrefix: "/api/admin/orgs",
+    showMemberActions: true,
+  },
+);
 
 const emit = defineEmits<{
   refreshTeams: [];
@@ -29,7 +37,7 @@ async function fetchMembers() {
   membersLoading.value = true;
   try {
     const res = await $fetch<{ data: MemberItem[] }>(
-      `/api/admin/orgs/${props.orgId}/teams/${selectedTeamId.value}/members`,
+      `${props.apiPrefix}/${props.orgId}/teams/${selectedTeamId.value}/members`,
     );
     members.value = res.data ?? [];
   } catch {
@@ -63,7 +71,7 @@ async function removeMember(member: MemberItem) {
   if (!selectedTeamId.value) return;
   try {
     await $fetch(
-      `/api/admin/orgs/${props.orgId}/teams/${selectedTeamId.value}/members/${member.id}`,
+      `${props.apiPrefix}/${props.orgId}/teams/${selectedTeamId.value}/members/${member.id}`,
       { method: "DELETE" },
     );
     toast.add({ title: `已移除 ${member.username}`, color: "success" });
@@ -78,7 +86,7 @@ async function changeRole(member: MemberItem, newRole: string) {
   if (!selectedTeamId.value) return;
   try {
     await $fetch(
-      `/api/admin/orgs/${props.orgId}/teams/${selectedTeamId.value}/members/${member.id}`,
+      `${props.apiPrefix}/${props.orgId}/teams/${selectedTeamId.value}/members/${member.id}`,
       { method: "PATCH", body: { role: newRole } },
     );
     toast.add({
@@ -124,6 +132,18 @@ const unassignedGroups = computed(() => {
     teamPermissions.value.map(tp => tp.permissionGroupId),
   );
   return props.allGroups.filter(g => !assignedIds.has(g.id));
+});
+
+const memberColumns = computed(() => {
+  const cols = [
+    { accessorKey: "username", header: "用户名" },
+    { accessorKey: "email", header: "邮箱" },
+    { accessorKey: "role", header: "角色" },
+  ];
+  if (props.showMemberActions) {
+    cols.push({ accessorKey: "actions", header: "操作" });
+  }
+  return cols;
 });
 </script>
 
@@ -171,12 +191,7 @@ const unassignedGroups = computed(() => {
           <UTable
             v-if="members.length > 0"
             :data="members"
-            :columns="[
-              { accessorKey: 'username', header: '用户名' },
-              { accessorKey: 'email', header: '邮箱' },
-              { accessorKey: 'role', header: '角色' },
-              { accessorKey: 'actions', header: '操作' },
-            ]"
+            :columns="memberColumns"
           >
             <template #username-cell="{ row }">
               <div class="flex items-center gap-2">
@@ -199,7 +214,10 @@ const unassignedGroups = computed(() => {
               </UBadge>
             </template>
 
-            <template #actions-cell="{ row }">
+            <template
+              v-if="showMemberActions"
+              #actions-cell="{ row }"
+            >
               <div class="flex items-center gap-1">
                 <UButton
                   size="xs"
@@ -213,9 +231,7 @@ const unassignedGroups = computed(() => {
                   "
                 >
                   {{
-                    row.original.role === "owner"
-                      ? "设为 Member"
-                      : "设为 Owner"
+                    row.original.role === "owner" ? "设为 Member" : "设为 Owner"
                   }}
                 </UButton>
                 <UButton
@@ -239,7 +255,9 @@ const unassignedGroups = computed(() => {
         </UCard>
 
         <!-- 团队已分配权限组 -->
-        <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 mt-6">
+        <h2
+          class="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 mt-6"
+        >
           已分配权限组
         </h2>
         <UCard>
