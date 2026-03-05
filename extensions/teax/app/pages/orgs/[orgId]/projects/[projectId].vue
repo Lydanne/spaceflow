@@ -100,11 +100,12 @@ const tabs = [
       </div>
 
       <!-- Tab 内容 -->
-      <ProjectActionsTab
-        v-if="activeTab === 'actions'"
-        :org-id="orgId"
-        :project-id="projectId"
-      />
+      <ClientOnly v-if="activeTab === 'actions'">
+        <ProjectActionsTab
+          :org-id="orgId"
+          :project-id="projectId"
+        />
+      </ClientOnly>
 
       <div v-if="activeTab === 'agents'">
         <div class="text-center py-12 text-gray-400">

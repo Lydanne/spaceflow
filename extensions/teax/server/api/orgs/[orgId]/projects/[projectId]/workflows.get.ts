@@ -1,7 +1,32 @@
 import { eq } from "drizzle-orm";
+import { parse as parseYaml } from "yaml";
 import { useDB, schema } from "../../../../../db";
 import { requireOrgAccess } from "../../../../../utils/org-access";
 import { createGiteaService } from "../../../../../utils/gitea";
+
+interface WorkflowInput {
+  description?: string;
+  required?: boolean;
+  default?: string;
+  type?: string;
+  options?: string[];
+}
+
+function extractInputs(yamlContent: string): Record<string, WorkflowInput> | null {
+  try {
+    const doc = parseYaml(yamlContent);
+    if (!doc || typeof doc !== "object") return null;
+    const on = (doc as Record<string, unknown>).on;
+    if (!on || typeof on !== "object") return null;
+    const dispatch = (on as Record<string, unknown>).workflow_dispatch;
+    if (!dispatch || typeof dispatch !== "object") return null;
+    const inputs = (dispatch as Record<string, unknown>).inputs;
+    if (!inputs || typeof inputs !== "object") return null;
+    return inputs as Record<string, WorkflowInput>;
+  } catch {
+    return null;
+  }
+}
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId")!;
@@ -26,14 +51,24 @@ export default defineEventHandler(async (event) => {
 
   try {
     const result = await gitea.getRepoWorkflows(owner, repo);
-    return {
-      data: (result.workflows || []).map(w => ({
-        id: w.id,
-        name: w.name,
-        path: w.path,
-        state: w.state,
-      })),
-    };
+    const workflows = result.workflows || [];
+
+    // 并行获取每个 workflow 的文件内容以解析 inputs
+    const data = await Promise.all(
+      workflows.map(async (w) => {
+        const content = await gitea.getFileContent(owner, repo, w.path);
+        const inputs = content ? extractInputs(content) : null;
+        return {
+          id: w.id,
+          name: w.name,
+          path: w.path,
+          state: w.state,
+          inputs: inputs || {},
+        };
+      }),
+    );
+
+    return { data };
   } catch {
     return { data: [] };
   }

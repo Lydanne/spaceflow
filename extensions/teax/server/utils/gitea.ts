@@ -261,6 +261,27 @@ export class GiteaService {
     ) as Promise<GiteaWorkflowRunsList>;
   }
 
+  async getFileContent(
+    owner: string,
+    repo: string,
+    filepath: string,
+    ref?: string,
+  ): Promise<string | null> {
+    try {
+      const query = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+      const result = (await this.fetch(`/repos/${owner}/${repo}/contents/${filepath}${query}`)) as {
+        content?: string;
+        encoding?: string;
+      };
+      if (result.content && result.encoding === "base64") {
+        return Buffer.from(result.content, "base64").toString("utf-8");
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   async getRepoWorkflows(owner: string, repo: string): Promise<GiteaWorkflowsList> {
     return this.fetch(`/repos/${owner}/${repo}/actions/workflows`) as Promise<GiteaWorkflowsList>;
   }
