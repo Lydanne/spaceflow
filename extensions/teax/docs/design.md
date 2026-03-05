@@ -295,45 +295,36 @@ AgentService 通过 Docker SDK（`dockerode`）管理容器生命周期，容器
 ### 路由结构
 
 ```text
-/                                    # 首页/仪表盘
+/                                    # 首页/仪表盘（组织列表 + 统计卡片）
 ├── /auth
 │   ├── /login                       # 登录页
 │   └── /callback                    # OAuth 回调
 │       ├── /gitea                   # Gitea OAuth 回调
 │       └── /feishu                  # 飞书 OAuth 回调
 │
-├── /orgs                            # 组织列表
-│   └── /:orgId                      # 组织详情
+├── /orgs                            # 组织列表（首页已整合）
+│   └── /:orgId
 │       ├── /projects                # 项目列表
-│       │   ├── /new                 # 创建项目
-│       │   └── /:projectId          # 项目工作台
-│       │       ├── /actions         # Actions Tab
-│       │       │   └── /:actionId   # Action 详情/日志
-│       │       ├── /agents          # Agents Tab
-│       │       │   └── /:sessionId  # Session 详情
-│       │       ├── /pages           # Pages Tab
-│       │       ├── /miniapp         # 小程序管理 Tab
-│       │       └── /settings        # 项目设置
+│       │   ├── /new                 # 创建项目（仓库搜索选择）
+│       │   └── /:projectId          # 项目工作台（Tab 页面）
+│       │       └── /publish/:taskId # 发布详情 + 构建日志
+│       │       # Tab: Actions | Agents（Phase 3）| Pages（Phase 3）| 设置
+│       │       # 设置 Tab: 基本信息 + 发布设置（autoDeploy/分支）+ 删除项目
 │       │
-│       ├── /teams                   # 团队管理
-│       │   └── /:teamId             # 团队详情
-│       │
-│       ├── /permissions             # 权限组管理
-│       │   └── /:groupId            # 权限组详情
-│       │
-│       └── /settings                # 组织设置
+│       └── /settings                # 组织设置（Tab 页面，requireOrgOwnerOrAdmin）
+│           # Tab: 团队管理（含同步/成员/权限分配）| 权限组管理（CRUD + 权限勾选）
 │
-├── /account                         # 个人账号
+├── /account                         # 个人账号（待实现）
 │   ├── /profile                     # 个人信息
 │   ├── /feishu                      # 飞书绑定
 │   └── /notifications               # 通知设置
 │
 └── /admin                           # 系统管理（仅管理员可访问）
-    ├── /users                       # 用户管理（列表/设置管理员/禁用）
+    ├── /users                       # 用户管理（列表/切换管理员）
     ├── /orgs                        # 组织管理（列表/同步状态/详情）
-    │   └── /:orgId
-    │       └── /teams               # 团队管理（成员/角色分配）
-    └── /settings                    # 系统设置
+    │   └── /:orgId                  # 组织详情（团队+成员 + 跳转组织设置页）
+    ├── /audit-logs                  # 审计日志（操作记录查看）
+    └── /settings                    # 系统设置（待实现）
 ```
 
 ---

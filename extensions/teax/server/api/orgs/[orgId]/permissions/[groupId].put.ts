@@ -1,16 +1,17 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "../../../../db";
-import { requireAdmin } from "../../../../utils/auth";
+import { requireOrgOwnerOrAdmin } from "../../../../utils/org-owner";
 
 export default defineEventHandler(async (event) => {
-  await requireAdmin(event);
-  const db = useDB();
   const orgId = getRouterParam(event, "orgId");
   const groupId = getRouterParam(event, "groupId");
 
   if (!orgId || !groupId) {
     throw createError({ statusCode: 400, message: "Missing orgId or groupId" });
   }
+
+  await requireOrgOwnerOrAdmin(event, orgId);
+  const db = useDB();
 
   const body = await readBody<{
     name?: string;

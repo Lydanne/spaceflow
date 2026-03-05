@@ -3,6 +3,7 @@ import { useDB, schema } from "../../../../db";
 import { requirePermission } from "../../../../utils/permission";
 import { createGiteaService } from "../../../../utils/gitea";
 import { generateWebhookSecret } from "../../../../utils/webhook-verify";
+import { writeAuditLog } from "../../../../utils/audit";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
@@ -96,6 +97,15 @@ export default defineEventHandler(async (event) => {
       createdAt: schema.projects.createdAt,
       updatedAt: schema.projects.updatedAt,
     });
+
+  await writeAuditLog(event, {
+    userId: session.user.id,
+    organizationId: orgId,
+    action: "project.create",
+    resourceType: "project",
+    resourceId: project?.id,
+    detail: { fullName: repoFullName },
+  });
 
   return project;
 });

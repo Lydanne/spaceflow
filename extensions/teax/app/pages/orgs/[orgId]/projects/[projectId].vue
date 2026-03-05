@@ -140,6 +140,88 @@ function formatDuration(seconds: number | null): string {
   if (seconds < 60) return `${seconds}s`;
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
+
+// 项目设置
+interface ProjectSettings {
+  autoDeploy: boolean;
+  deployBranches: string[];
+  notifyOnSuccess: boolean;
+  notifyOnFailure: boolean;
+  approvalRequired: boolean;
+}
+
+const settingsForm = reactive<ProjectSettings>({
+  autoDeploy: false,
+  deployBranches: [],
+  notifyOnSuccess: true,
+  notifyOnFailure: true,
+  approvalRequired: false,
+});
+const savingSettings = ref(false);
+const deployBranchInput = ref("");
+
+watch(
+  () => project.value?.settings,
+  (s) => {
+    if (!s) return;
+    const ps = s as unknown as ProjectSettings;
+    settingsForm.autoDeploy = ps.autoDeploy ?? false;
+    settingsForm.deployBranches = ps.deployBranches ?? [];
+    settingsForm.notifyOnSuccess = ps.notifyOnSuccess ?? true;
+    settingsForm.notifyOnFailure = ps.notifyOnFailure ?? true;
+    settingsForm.approvalRequired = ps.approvalRequired ?? false;
+  },
+  { immediate: true },
+);
+
+function addDeployBranch() {
+  const b = deployBranchInput.value.trim();
+  if (b && !settingsForm.deployBranches.includes(b)) {
+    settingsForm.deployBranches.push(b);
+  }
+  deployBranchInput.value = "";
+}
+
+function removeDeployBranch(branch: string) {
+  settingsForm.deployBranches = settingsForm.deployBranches.filter(
+    b => b !== branch,
+  );
+}
+
+async function saveSettings() {
+  savingSettings.value = true;
+  try {
+    await $fetch(`/api/orgs/${orgId}/projects/${projectId}/settings`, {
+      method: "PATCH",
+      body: { ...settingsForm },
+    });
+    toast.add({ title: "设置已保存", color: "success" });
+  } catch {
+    toast.add({ title: "保存失败", color: "error" });
+  } finally {
+    savingSettings.value = false;
+  }
+}
+
+// 删除项目
+const deleting = ref(false);
+const confirmDeleteName = ref("");
+
+async function deleteProject() {
+  if (confirmDeleteName.value !== project.value?.fullName) return;
+  deleting.value = true;
+  try {
+    await $fetch(`/api/orgs/${orgId}/projects/${projectId}`, {
+      method: "DELETE",
+    });
+    toast.add({ title: "项目已删除", color: "success" });
+    navigateTo(`/orgs/${orgId}/projects`);
+  } catch {
+    toast.add({ title: "删除失败", color: "error" });
+  } finally {
+    deleting.value = false;
+  }
+}
 </script>
 
 <template>
@@ -330,36 +412,208 @@ function formatDuration(seconds: number | null): string {
       </div>
 
       <!-- Settings Tab -->
-      <div v-if="activeTab === 'settings'">
+      <div
+        v-if="activeTab === 'settings'"
+        class="space-y-6"
+      >
+        <!-- 基本信息 -->
         <UCard>
-          <div class="space-y-4">
+          <template #header>
+            <h3 class="font-semibold">
+              基本信息
+            </h3>
+          </template>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <label class="block text-sm font-medium mb-1">项目名称</label>
-              <p class="text-gray-600 dark:text-gray-400">
+              <p class="text-gray-500 dark:text-gray-400">
+                项目名称
+              </p>
+              <p class="font-medium mt-0.5">
                 {{ project.fullName }}
               </p>
             </div>
             <div>
-              <label class="block text-sm font-medium mb-1">Clone URL</label>
-              <p class="text-gray-600 dark:text-gray-400 text-sm font-mono">
-                {{ project.cloneUrl }}
+              <p class="text-gray-500 dark:text-gray-400">
+                默认分支
               </p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">默认分支</label>
-              <p class="text-gray-600 dark:text-gray-400">
+              <p class="font-medium mt-0.5">
                 {{ project.defaultBranch }}
               </p>
             </div>
             <div>
-              <label class="block text-sm font-medium mb-1">Webhook</label>
-              <p class="text-gray-600 dark:text-gray-400">
+              <p class="text-gray-500 dark:text-gray-400">
+                Clone URL
+              </p>
+              <p class="font-medium font-mono text-xs mt-0.5 break-all">
+                {{ project.cloneUrl }}
+              </p>
+            </div>
+            <div>
+              <p class="text-gray-500 dark:text-gray-400">
+                Webhook
+              </p>
+              <p class="font-medium mt-0.5">
                 {{
                   project.webhookId
                     ? `已配置 (ID: ${project.webhookId})`
                     : "未配置"
                 }}
               </p>
+            </div>
+          </div>
+        </UCard>
+
+        <!-- 发布设置 -->
+        <UCard>
+          <template #header>
+            <h3 class="font-semibold">
+              发布设置
+            </h3>
+          </template>
+          <div class="space-y-5">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-medium text-sm">
+                  自动部署
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  代码推送到指定分支时自动触发发布
+                </p>
+              </div>
+              <USwitch v-model="settingsForm.autoDeploy" />
+            </div>
+
+            <div v-if="settingsForm.autoDeploy">
+              <p class="font-medium text-sm mb-2">
+                部署分支
+              </p>
+              <div class="flex gap-2 mb-2">
+                <UInput
+                  v-model="deployBranchInput"
+                  placeholder="输入分支名，回车添加"
+                  size="sm"
+                  class="flex-1"
+                  @keydown.enter.prevent="addDeployBranch"
+                />
+                <UButton
+                  size="sm"
+                  color="neutral"
+                  variant="soft"
+                  @click="addDeployBranch"
+                >
+                  添加
+                </UButton>
+              </div>
+              <div
+                v-if="settingsForm.deployBranches.length > 0"
+                class="flex flex-wrap gap-1.5"
+              >
+                <UBadge
+                  v-for="b in settingsForm.deployBranches"
+                  :key="b"
+                  color="primary"
+                  variant="subtle"
+                  class="cursor-pointer"
+                  @click="removeDeployBranch(b)"
+                >
+                  {{ b }}
+                  <UIcon
+                    name="i-lucide-x"
+                    class="w-3 h-3 ml-1"
+                  />
+                </UBadge>
+              </div>
+              <p
+                v-else
+                class="text-xs text-gray-400"
+              >
+                未配置部署分支时，默认使用 {{ project.defaultBranch || "main" }}
+              </p>
+            </div>
+
+            <USeparator />
+
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-medium text-sm">
+                  成功通知
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  发布成功时发送通知
+                </p>
+              </div>
+              <USwitch v-model="settingsForm.notifyOnSuccess" />
+            </div>
+
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-medium text-sm">
+                  失败通知
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  发布失败时发送通知
+                </p>
+              </div>
+              <USwitch v-model="settingsForm.notifyOnFailure" />
+            </div>
+
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-medium text-sm">
+                  发布审批
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  发布前需要审批通过
+                </p>
+              </div>
+              <USwitch v-model="settingsForm.approvalRequired" />
+            </div>
+
+            <div class="flex justify-end pt-2">
+              <UButton
+                color="primary"
+                :loading="savingSettings"
+                @click="saveSettings"
+              >
+                保存设置
+              </UButton>
+            </div>
+          </div>
+        </UCard>
+
+        <!-- 危险操作 -->
+        <UCard>
+          <template #header>
+            <h3 class="font-semibold text-red-600 dark:text-red-400">
+              危险操作
+            </h3>
+          </template>
+          <div class="space-y-4">
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              删除项目将同时移除所有发布记录和 Webhook 配置，此操作不可恢复。
+            </p>
+            <div>
+              <p class="text-sm mb-2">
+                请输入项目名称
+                <strong>{{ project.fullName }}</strong> 以确认删除：
+              </p>
+              <div class="flex gap-2">
+                <UInput
+                  v-model="confirmDeleteName"
+                  :placeholder="project.fullName"
+                  size="sm"
+                  class="flex-1"
+                />
+                <UButton
+                  color="error"
+                  variant="soft"
+                  :loading="deleting"
+                  :disabled="confirmDeleteName !== project.fullName"
+                  @click="deleteProject"
+                >
+                  删除项目
+                </UButton>
+              </div>
             </div>
           </div>
         </UCard>

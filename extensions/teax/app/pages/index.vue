@@ -11,11 +11,18 @@ interface OrgItem {
 
 const { data: orgsData, status } = await useFetch<{ data: OrgItem[] }>(
   "/api/orgs",
+  { key: "home-orgs" },
 );
 const orgs = computed(() => orgsData.value?.data ?? []);
 const totalProjects = computed(() =>
-  orgs.value.reduce((sum, o) => sum + (o.projectCount || 0), 0),
+  orgs.value.reduce((sum, o) => sum + Number(o.projectCount || 0), 0),
 );
+
+const { data: todayStats } = await useFetch<{ count: number }>(
+  "/api/stats/today-publishes",
+  { key: "home-today-publishes" },
+);
+const todayPublishes = computed(() => todayStats.value?.count ?? 0);
 </script>
 
 <template>
@@ -51,7 +58,7 @@ const totalProjects = computed(() =>
             今日发布
           </p>
           <p class="text-3xl font-bold mt-1">
-            0
+            {{ todayPublishes }}
           </p>
         </div>
       </UCard>

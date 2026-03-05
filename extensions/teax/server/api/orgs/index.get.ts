@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
     avatarUrl: schema.organizations.avatarUrl,
     syncedAt: schema.organizations.syncedAt,
     projectCount:
-      sql<number>`(SELECT COUNT(*) FROM projects WHERE projects.organization_id = "organizations"."id")`.as(
+      sql<number>`(SELECT COUNT(*)::int FROM projects WHERE projects.organization_id = "organizations"."id")`.as(
         "project_count",
       ),
   };

@@ -27,7 +27,7 @@ const syncing = ref(false);
 async function syncOrg() {
   syncing.value = true;
   try {
-    await $fetch(`/api/admin/orgs/${orgId}/sync`, { method: "POST" });
+    await $fetch(`/api/orgs/${orgId}/sync`, { method: "POST" });
     toast.add({ title: "同步成功", color: "success" });
     await refreshTeams();
   } catch {
