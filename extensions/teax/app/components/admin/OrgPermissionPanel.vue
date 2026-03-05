@@ -7,11 +7,14 @@ interface ProjectItem {
   fullName: string;
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   orgId: string;
   allGroups: PermissionGroup[];
   availablePermissions: PermissionDef[];
-}>();
+  showProjectScope?: boolean;
+}>(), {
+  showProjectScope: true,
+});
 
 const emit = defineEmits<{
   refreshGroups: [];
@@ -46,7 +49,7 @@ function openEditGroup(group: PermissionGroup) {
   formName.value = group.name;
   formDescription.value = group.description || "";
   formPermissions.value = [...(group.permissions || [])];
-  formScopeAll.value = group.projectIds === null;
+  formScopeAll.value = !props.showProjectScope || group.projectIds === null;
   formProjectIds.value = group.projectIds ? [...group.projectIds] : [];
   showGroupForm.value = true;
 }
@@ -211,13 +214,15 @@ function getPermissionLabel(key: string) {
               {{ group.description }}
             </p>
             <div class="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
-              <UIcon
-                name="i-lucide-folder"
-                class="w-3.5 h-3.5"
-              />
-              <span v-if="group.projectIds === null">全部项目</span>
-              <span v-else>{{ group.projectIds.length }} 个项目</span>
-              <span class="mx-1">·</span>
+              <template v-if="showProjectScope">
+                <UIcon
+                  name="i-lucide-folder"
+                  class="w-3.5 h-3.5"
+                />
+                <span v-if="group.projectIds === null">全部项目</span>
+                <span v-else>{{ group.projectIds.length }} 个项目</span>
+                <span class="mx-1">·</span>
+              </template>
               <span>{{ (group.permissions || []).length }} 项权限</span>
             </div>
             <div
@@ -306,7 +311,7 @@ function getPermissionLabel(key: string) {
               />
             </div>
 
-            <div>
+            <div v-if="showProjectScope">
               <label class="block text-sm font-medium mb-2">项目范围</label>
               <div class="space-y-2">
                 <button

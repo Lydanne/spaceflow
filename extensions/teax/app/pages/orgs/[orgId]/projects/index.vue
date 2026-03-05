@@ -2,6 +2,13 @@
 const route = useRoute();
 const orgId = route.params.orgId as string;
 
+const { data: roleData } = await useFetch<{ role: string }>(
+  `/api/orgs/${orgId}/role`,
+);
+const isOwnerOrAdmin = computed(() =>
+  roleData.value?.role === "admin" || roleData.value?.role === "owner",
+);
+
 interface ProjectItem {
   id: string;
   name: string;
@@ -47,6 +54,7 @@ const total = computed(() => data.value?.total ?? 0);
       </div>
       <div class="flex items-center gap-2">
         <UButton
+          v-if="isOwnerOrAdmin"
           icon="i-lucide-settings"
           color="neutral"
           variant="soft"

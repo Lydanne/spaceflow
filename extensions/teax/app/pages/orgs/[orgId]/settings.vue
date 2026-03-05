@@ -7,6 +7,17 @@ const orgId = route.params.orgId as string;
 
 const activeTab = ref<"teams" | "permissions">("teams");
 
+const { data: roleData } = await useFetch<{ role: string }>(
+  `/api/orgs/${orgId}/role`,
+);
+const isOwnerOrAdmin = computed(() =>
+  roleData.value?.role === "admin" || roleData.value?.role === "owner",
+);
+
+if (!isOwnerOrAdmin.value) {
+  await navigateTo(`/orgs/${orgId}/projects`, { replace: true });
+}
+
 const { data: teamsData, refresh: refreshTeams } = await useFetch<{
   data: TeamItem[];
 }>(`/api/orgs/${orgId}/teams`);
@@ -60,6 +71,7 @@ async function syncOrg() {
         </div>
       </div>
       <UButton
+        v-if="isOwnerOrAdmin"
         icon="i-lucide-refresh-cw"
         color="neutral"
         variant="soft"
@@ -88,6 +100,7 @@ async function syncOrg() {
         团队管理
       </button>
       <button
+        v-if="isOwnerOrAdmin"
         class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
         :class="
           activeTab === 'permissions'
@@ -121,6 +134,7 @@ async function syncOrg() {
       :org-id="orgId"
       :all-groups="allGroups"
       :available-permissions="availablePermissions"
+      :show-project-scope="false"
       @refresh-groups="refreshGroups"
     />
   </div>
