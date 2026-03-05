@@ -27,12 +27,13 @@ const isOwnerOrAdmin = computed(() =>
   roleData.value?.role === "admin" || roleData.value?.role === "owner",
 );
 
-const activeTab = ref("actions");
+const activeTab = ref("readme");
 
 const baseTabs = [
-  { label: "Actions", value: "actions", icon: "i-lucide-rocket" },
-  { label: "Agents", value: "agents", icon: "i-lucide-bot" },
-  { label: "Pages", value: "pages", icon: "i-lucide-globe" },
+  { label: "README", value: "readme", icon: "i-lucide-file-text" },
+  { label: "Actions", value: "actions", icon: "i-lucide-zap" },
+  { label: "Agents", value: "agents", icon: "i-lucide-bot-message-square" },
+  { label: "Pages", value: "pages", icon: "i-lucide-earth" },
 ];
 const tabs = computed(() =>
   isOwnerOrAdmin.value
@@ -111,6 +112,12 @@ const tabs = computed(() =>
       </div>
 
       <!-- Tab 内容 -->
+      <ProjectReadmeTab
+        v-if="activeTab === 'readme'"
+        :org-id="orgId"
+        :project-id="projectId"
+      />
+
       <ClientOnly v-if="activeTab === 'actions'">
         <ProjectActionsTab
           :org-id="orgId"
