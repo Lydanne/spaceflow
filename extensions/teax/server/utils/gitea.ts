@@ -186,6 +186,10 @@ export class GiteaService {
     return this.fetch("/user/orgs?limit=50") as Promise<GiteaOrganization[]>;
   }
 
+  async getUserOrgsByUsername(username: string): Promise<GiteaOrganization[]> {
+    return this.fetch(`/users/${username}/orgs?limit=50`) as Promise<GiteaOrganization[]>;
+  }
+
   async getOrgTeams(orgName: string): Promise<GiteaTeam[]> {
     return this.fetch(`/orgs/${orgName}/teams?limit=50`) as Promise<GiteaTeam[]>;
   }

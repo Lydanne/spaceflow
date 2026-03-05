@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
     });
 
     // 后台异步同步组织和团队
-    syncUserOrgsAndTeams(tokenResponse.access_token, user.id).catch((err) => {
+    syncUserOrgsAndTeams(user.giteaUsername).catch((err) => {
       console.error("Failed to sync orgs and teams:", err);
     });
 

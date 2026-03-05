@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "../db";
-import { createGiteaService } from "../utils/gitea";
+import { createServiceGiteaClient } from "../utils/gitea";
 
-export async function syncUserOrgsAndTeams(accessToken: string, _userId: string) {
-  const gitea = createGiteaService(accessToken);
+export async function syncUserOrgsAndTeams(username: string) {
+  const gitea = await createServiceGiteaClient();
   const db = useDB();
 
-  const orgs = await gitea.getUserOrgs();
+  const orgs = await gitea.getUserOrgsByUsername(username);
 
   for (const org of orgs) {
     const [dbOrg] = await db
