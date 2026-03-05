@@ -1,5 +1,21 @@
 <script setup lang="ts">
 const { user } = useUserSession();
+
+interface OrgItem {
+  id: string;
+  name: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  projectCount: number;
+}
+
+const { data: orgsData, status } = await useFetch<{ data: OrgItem[] }>(
+  "/api/orgs",
+);
+const orgs = computed(() => orgsData.value?.data ?? []);
+const totalProjects = computed(() =>
+  orgs.value.reduce((sum, o) => sum + (o.projectCount || 0), 0),
+);
 </script>
 
 <template>
@@ -12,20 +28,20 @@ const { user } = useUserSession();
       <UCard>
         <div class="text-center">
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            项目总数
+            组织数
           </p>
           <p class="text-3xl font-bold mt-1">
-            0
+            {{ orgs.length }}
           </p>
         </div>
       </UCard>
       <UCard>
         <div class="text-center">
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            运行中任务
+            项目总数
           </p>
           <p class="text-3xl font-bold mt-1">
-            0
+            {{ totalProjects }}
           </p>
         </div>
       </UCard>
@@ -41,25 +57,62 @@ const { user } = useUserSession();
       </UCard>
     </div>
 
-    <UCard>
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">
-            最近项目
-          </h2>
-        </div>
-      </template>
+    <div
+      v-if="status === 'pending'"
+      class="flex justify-center py-12"
+    >
+      <UIcon
+        name="i-lucide-loader-2"
+        class="w-6 h-6 animate-spin text-gray-400"
+      />
+    </div>
 
-      <div class="text-center py-8 text-gray-400">
-        <UIcon
-          name="i-lucide-folder-open"
-          class="w-12 h-12 mx-auto mb-3"
-        />
-        <p>暂无项目</p>
-        <p class="text-sm mt-1">
-          创建项目后将在此展示
-        </p>
+    <div v-else>
+      <h2 class="text-lg font-semibold mb-4">
+        我的组织
+      </h2>
+      <div
+        v-if="orgs.length > 0"
+        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+      >
+        <NuxtLink
+          v-for="org in orgs"
+          :key="org.id"
+          :to="`/orgs/${org.id}/projects`"
+          class="block"
+        >
+          <UCard class="hover:ring-1 hover:ring-primary-500 transition-all">
+            <div class="flex items-center gap-3">
+              <UAvatar
+                :src="org.avatarUrl || undefined"
+                :alt="org.name"
+                size="lg"
+              />
+              <div>
+                <p class="font-semibold">
+                  {{ org.displayName || org.name }}
+                </p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ org.projectCount || 0 }} 个项目
+                </p>
+              </div>
+            </div>
+          </UCard>
+        </NuxtLink>
       </div>
-    </UCard>
+
+      <UCard v-else>
+        <div class="text-center py-8 text-gray-400">
+          <UIcon
+            name="i-lucide-building-2"
+            class="w-12 h-12 mx-auto mb-3"
+          />
+          <p>暂无组织</p>
+          <p class="text-sm mt-1">
+            登录后将自动同步 Gitea 组织
+          </p>
+        </div>
+      </UCard>
+    </div>
   </div>
 </template>
