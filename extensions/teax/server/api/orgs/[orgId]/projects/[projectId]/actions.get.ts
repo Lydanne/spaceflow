@@ -33,6 +33,7 @@ export default defineEventHandler(async (event) => {
       total: result.total_count,
       data: (result.workflow_runs || []).map((run) => ({
         id: run.id,
+        name: run.name,
         runNumber: run.run_number,
         displayTitle: run.display_title,
         status: run.status,

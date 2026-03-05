@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const route = useRoute();
+const router = useRouter();
 const orgId = route.params.orgId as string;
 const projectId = route.params.projectId as string;
 
@@ -22,8 +23,6 @@ const { data: project, status: projectStatus } = await useFetch<ProjectDetail>(
 
 const { isOwnerOrAdmin } = useOrgRole(orgId);
 
-const activeTab = ref("readme");
-
 const baseTabs = [
   { label: "README", value: "readme", icon: "i-lucide-file-text" },
   { label: "Actions", value: "actions", icon: "i-lucide-zap" },
@@ -34,6 +33,25 @@ const tabs = computed(() =>
   isOwnerOrAdmin.value
     ? [...baseTabs, { label: "设置", value: "settings", icon: "i-lucide-settings" }]
     : baseTabs,
+);
+
+const validTabValues = computed(() => tabs.value.map((t) => t.value));
+const initialTab = validTabValues.value.includes(route.query.tab as string)
+  ? (route.query.tab as string)
+  : "readme";
+const activeTab = ref(initialTab);
+
+watch(activeTab, (tab) => {
+  router.replace({ query: { ...route.query, tab } });
+});
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    if (tab && typeof tab === "string" && validTabValues.value.includes(tab)) {
+      activeTab.value = tab;
+    }
+  },
 );
 </script>
 

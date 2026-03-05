@@ -10,6 +10,7 @@ const toast = useToast();
 
 interface WorkflowRunItem {
   id: number;
+  name: string;
   runNumber: number;
   displayTitle: string;
   status: string;
@@ -314,10 +315,6 @@ function cronToReadable(cron: string): string {
 function workflowName(path: string): string {
   return path.replace(/^.*\//, "").replace(/\.(yml|yaml)$/, "");
 }
-
-function workflowFileName(path: string): string {
-  return path.replace(/^.*\//, "");
-}
 </script>
 
 <template>
@@ -617,7 +614,7 @@ function workflowFileName(path: string): string {
                         name="i-lucide-workflow"
                         class="w-3.5 h-3.5"
                       />
-                      {{ workflowFileName(run.path) }}
+                      {{ run.name }}
                     </span>
                     <span class="flex items-center gap-1">
                       <UIcon
