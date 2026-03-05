@@ -20,12 +20,7 @@ const { data: project, status: projectStatus } = await useFetch<ProjectDetail>(
   `/api/orgs/${orgId}/projects/${projectId}`,
 );
 
-const { data: roleData } = await useFetch<{ role: string }>(
-  `/api/orgs/${orgId}/role`,
-);
-const isOwnerOrAdmin = computed(() =>
-  roleData.value?.role === "admin" || roleData.value?.role === "owner",
-);
+const { isOwnerOrAdmin } = useOrgRole(orgId);
 
 const activeTab = ref("readme");
 

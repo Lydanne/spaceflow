@@ -7,12 +7,7 @@ const orgId = route.params.orgId as string;
 
 const activeTab = ref<"teams" | "permissions">("teams");
 
-const { data: roleData } = await useFetch<{ role: string }>(
-  `/api/orgs/${orgId}/role`,
-);
-const isOwnerOrAdmin = computed(() =>
-  roleData.value?.role === "admin" || roleData.value?.role === "owner",
-);
+const { isOwnerOrAdmin } = useOrgRole(orgId);
 
 if (!isOwnerOrAdmin.value) {
   await navigateTo(`/orgs/${orgId}/projects`, { replace: true });

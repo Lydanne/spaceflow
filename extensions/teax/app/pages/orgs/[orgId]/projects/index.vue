@@ -2,12 +2,7 @@
 const route = useRoute();
 const orgId = route.params.orgId as string;
 
-const { data: roleData } = await useFetch<{ role: string }>(
-  `/api/orgs/${orgId}/role`,
-);
-const isOwnerOrAdmin = computed(() =>
-  roleData.value?.role === "admin" || roleData.value?.role === "owner",
-);
+const { isOwnerOrAdmin } = useOrgRole(orgId);
 
 interface ProjectItem {
   id: string;
