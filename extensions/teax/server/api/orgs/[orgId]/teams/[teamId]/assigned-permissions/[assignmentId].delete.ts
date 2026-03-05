@@ -1,0 +1,26 @@
+import { eq } from "drizzle-orm";
+import { useDB, schema } from "../../../../../../db";
+import { requireTeamOwnerOrAdmin } from "../../../../../../utils/team-owner";
+
+export default defineEventHandler(async (event) => {
+  const teamId = getRouterParam(event, "teamId");
+  const assignmentId = getRouterParam(event, "assignmentId");
+
+  if (!teamId || !assignmentId) {
+    throw createError({ statusCode: 400, message: "Missing teamId or assignmentId" });
+  }
+
+  await requireTeamOwnerOrAdmin(event, teamId);
+  const db = useDB();
+
+  const [deleted] = await db
+    .delete(schema.teamPermissions)
+    .where(eq(schema.teamPermissions.id, assignmentId))
+    .returning({ id: schema.teamPermissions.id });
+
+  if (!deleted) {
+    throw createError({ statusCode: 404, message: "Permission assignment not found" });
+  }
+
+  return { success: true };
+});

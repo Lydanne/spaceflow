@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "../../../../db";
-import { requireOrgAccess } from "../../../../utils/org-access";
+import { requirePermission } from "../../../../utils/permission";
 import { createGiteaService } from "../../../../utils/gitea";
 import { generateWebhookSecret } from "../../../../utils/webhook-verify";
 
@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   if (!orgId) {
     throw createError({ statusCode: 400, message: "Missing orgId" });
   }
-  const session = await requireOrgAccess(event, orgId);
+  const session = await requirePermission(event, orgId, "project:create");
   const db = useDB();
 
   const body = await readBody(event);
