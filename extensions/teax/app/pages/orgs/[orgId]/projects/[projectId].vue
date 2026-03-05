@@ -16,24 +16,20 @@ interface ProjectDetail {
   updatedAt: string;
 }
 
-interface PublishTaskItem {
-  id: string;
-  branch: string;
-  commitSha: string;
-  commitMessage: string | null;
-  triggeredBy: string | null;
-  triggerType: string;
-  status: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
-  duration: number | null;
-  createdAt: string;
-  triggeredByUsername: string | null;
-}
-
-interface BranchItem {
-  name: string;
-  commit: { id: string; message: string };
+interface WorkflowRunItem {
+  id: number;
+  runNumber: number;
+  displayTitle: string;
+  status: string;
+  conclusion: string;
+  event: string;
+  headBranch: string;
+  headSha: string;
+  path: string;
+  htmlUrl: string;
+  startedAt: string;
+  completedAt: string | null;
+  actor: { login: string; avatarUrl: string } | null;
 }
 
 const toast = useToast();
@@ -51,17 +47,67 @@ const tabs = [
   { label: "设置", value: "settings", icon: "i-lucide-settings" },
 ];
 
-// 发布任务列表
-const publishPage = ref(1);
-const { data: publishData, refresh: refreshPublish } = await useFetch<{
-  data: PublishTaskItem[];
+// Gitea Actions workflow runs
+const actionsPage = ref(1);
+const { data: actionsData, refresh: refreshActions } = await useFetch<{
+  data: WorkflowRunItem[];
   total: number;
-}>(`/api/orgs/${orgId}/projects/${projectId}/publish`, {
-  query: { page: publishPage, limit: 20 },
+}>(`/api/orgs/${orgId}/projects/${projectId}/actions`, {
+  query: { page: actionsPage, limit: 20 },
 });
-const publishTasks = computed(() => publishData.value?.data ?? []);
+const workflowRuns = computed(() => actionsData.value?.data ?? []);
 
-// 分支列表
+function runStatusColor(status: string, conclusion: string): string {
+  if (status === "running" || status === "waiting") return "warning";
+  if (conclusion === "success") return "success";
+  if (conclusion === "failure") return "error";
+  if (conclusion === "cancelled") return "neutral";
+  return "info";
+}
+
+function runStatusLabel(status: string, conclusion: string): string {
+  if (status === "running") return "运行中";
+  if (status === "waiting") return "等待中";
+  if (conclusion === "success") return "成功";
+  if (conclusion === "failure") return "失败";
+  if (conclusion === "cancelled") return "已取消";
+  if (conclusion === "skipped") return "已跳过";
+  return status || "未知";
+}
+
+function formatDuration(startedAt: string, completedAt: string | null): string {
+  if (!completedAt) return "-";
+  const seconds = Math.round(
+    (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000,
+  );
+  if (seconds < 0) return "-";
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+function workflowName(path: string): string {
+  // .gitea/workflows/deploy.yml or .github/workflows/deploy.yml -> deploy
+  return path.replace(/^.*\//, "").replace(/\.(yml|yaml)$/, "");
+}
+
+// Workflow 列表（用于触发）
+interface WorkflowItem {
+  id: number;
+  name: string;
+  path: string;
+  state: string;
+}
+
+interface BranchItem {
+  name: string;
+  commit: { id: string; message: string };
+}
+
+const { data: workflowsData } = await useFetch<{ data: WorkflowItem[] }>(
+  `/api/orgs/${orgId}/projects/${projectId}/workflows`,
+);
+const workflows = computed(() => workflowsData.value?.data ?? []);
+
 const { data: branchesData } = await useFetch<{
   data: BranchItem[];
   defaultBranch: string | null;
@@ -71,9 +117,11 @@ const defaultBranch = computed(
   () => branchesData.value?.defaultBranch || "main",
 );
 
-// 手动发布
+// 触发 workflow
+const showDispatchModal = ref(false);
+const selectedWorkflow = ref("");
 const selectedBranch = ref("");
-const publishing = ref(false);
+const dispatching = ref(false);
 
 watch(
   defaultBranch,
@@ -83,110 +131,52 @@ watch(
   { immediate: true },
 );
 
-async function triggerPublish() {
-  publishing.value = true;
+async function dispatchWorkflow() {
+  if (!selectedWorkflow.value || !selectedBranch.value) return;
+  dispatching.value = true;
   try {
-    await $fetch(`/api/orgs/${orgId}/projects/${projectId}/publish`, {
+    await $fetch(`/api/orgs/${orgId}/projects/${projectId}/actions`, {
       method: "POST",
-      body: { branch: selectedBranch.value || defaultBranch.value },
+      body: {
+        workflowId: selectedWorkflow.value,
+        ref: selectedBranch.value,
+      },
     });
-    toast.add({ title: "发布任务已创建", color: "success" });
-    await refreshPublish();
+    toast.add({ title: "Workflow 已触发", color: "success" });
+    showDispatchModal.value = false;
+    // 延迟刷新让 Gitea 有时间创建 run
+    setTimeout(() => refreshActions(), 2000);
   } catch (err: unknown) {
     const msg
-      = (err as { data?: { message?: string } })?.data?.message || "发布失败";
+      = (err as { data?: { message?: string } })?.data?.message || "触发失败";
     toast.add({ title: msg, color: "error" });
   } finally {
-    publishing.value = false;
+    dispatching.value = false;
   }
-}
-
-function statusColor(status: string | null): string {
-  switch (status) {
-    case "running":
-      return "warning";
-    case "success":
-      return "success";
-    case "failed":
-      return "error";
-    case "cancelled":
-      return "neutral";
-    default:
-      return "info";
-  }
-}
-
-function statusLabel(status: string | null): string {
-  switch (status) {
-    case "pending":
-      return "等待中";
-    case "approved":
-      return "已批准";
-    case "running":
-      return "运行中";
-    case "success":
-      return "成功";
-    case "failed":
-      return "失败";
-    case "cancelled":
-      return "已取消";
-    default:
-      return status || "未知";
-  }
-}
-
-function formatDuration(seconds: number | null): string {
-  if (!seconds) return "-";
-  if (seconds < 60) return `${seconds}s`;
-  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
 // 项目设置
 interface ProjectSettings {
-  autoDeploy: boolean;
-  deployBranches: string[];
   notifyOnSuccess: boolean;
   notifyOnFailure: boolean;
-  approvalRequired: boolean;
 }
 
 const settingsForm = reactive<ProjectSettings>({
-  autoDeploy: false,
-  deployBranches: [],
   notifyOnSuccess: true,
   notifyOnFailure: true,
-  approvalRequired: false,
 });
 const savingSettings = ref(false);
-const deployBranchInput = ref("");
 
 watch(
   () => project.value?.settings,
   (s) => {
     if (!s) return;
     const ps = s as unknown as ProjectSettings;
-    settingsForm.autoDeploy = ps.autoDeploy ?? false;
-    settingsForm.deployBranches = ps.deployBranches ?? [];
     settingsForm.notifyOnSuccess = ps.notifyOnSuccess ?? true;
     settingsForm.notifyOnFailure = ps.notifyOnFailure ?? true;
-    settingsForm.approvalRequired = ps.approvalRequired ?? false;
   },
   { immediate: true },
 );
-
-function addDeployBranch() {
-  const b = deployBranchInput.value.trim();
-  if (b && !settingsForm.deployBranches.includes(b)) {
-    settingsForm.deployBranches.push(b);
-  }
-  deployBranchInput.value = "";
-}
-
-function removeDeployBranch(branch: string) {
-  settingsForm.deployBranches = settingsForm.deployBranches.filter(
-    b => b !== branch,
-  );
-}
 
 async function saveSettings() {
   savingSettings.value = true;
@@ -295,37 +285,42 @@ async function deleteProject() {
 
       <!-- Actions Tab -->
       <div v-if="activeTab === 'actions'">
-        <!-- 发布控制 -->
-        <UCard class="mb-6">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <label class="text-sm font-medium">分支:</label>
-              <USelectMenu
-                v-model="selectedBranch"
-                :items="branches.map((b) => b.name)"
-                class="w-48"
-              />
-            </div>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-medium text-gray-500 dark:text-gray-400">
+            Gitea Actions Workflow Runs
+          </h2>
+          <div class="flex items-center gap-2">
             <UButton
-              icon="i-lucide-rocket"
-              color="primary"
-              :loading="publishing"
-              @click="triggerPublish"
+              icon="i-lucide-refresh-cw"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              @click="refreshActions()"
             >
-              新建发布
+              刷新
+            </UButton>
+            <UButton
+              v-if="workflows.length > 0"
+              icon="i-lucide-play"
+              color="primary"
+              size="sm"
+              @click="showDispatchModal = true"
+            >
+              触发 Workflow
             </UButton>
           </div>
-        </UCard>
+        </div>
 
-        <!-- 发布任务列表 -->
         <div
-          v-if="publishTasks.length > 0"
+          v-if="workflowRuns.length > 0"
           class="space-y-3"
         >
-          <NuxtLink
-            v-for="task in publishTasks"
-            :key="task.id"
-            :to="`/orgs/${orgId}/projects/${projectId}/publish/${task.id}`"
+          <a
+            v-for="run in workflowRuns"
+            :key="run.id"
+            :href="run.htmlUrl"
+            target="_blank"
+            rel="noopener noreferrer"
             class="block"
           >
             <UCard class="hover:ring-1 hover:ring-primary-500 transition-all">
@@ -333,45 +328,57 @@ async function deleteProject() {
                 <div>
                   <div class="flex items-center gap-2">
                     <UBadge
-                      :color="statusColor(task.status) as any"
+                      :color="runStatusColor(run.status, run.conclusion) as any"
                       variant="subtle"
                       size="sm"
                     >
-                      {{ statusLabel(task.status) }}
+                      {{ runStatusLabel(run.status, run.conclusion) }}
                     </UBadge>
                     <span class="font-medium text-sm">
-                      {{ task.commitSha?.substring(0, 7) }}
+                      {{ run.displayTitle }}
+                    </span>
+                    <span class="text-xs text-gray-400">
+                      #{{ run.runNumber }}
                     </span>
                   </div>
-                  <p
-                    v-if="task.commitMessage"
-                    class="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate max-w-lg"
-                  >
-                    {{ task.commitMessage }}
-                  </p>
                   <div
                     class="flex items-center gap-3 mt-1.5 text-xs text-gray-400"
                   >
-                    <span>{{ task.branch }}</span>
-                    <span>{{ task.triggerType }}</span>
-                    <span v-if="task.triggeredByUsername">
-                      {{ task.triggeredByUsername }}
+                    <span>
+                      {{ workflowName(run.path) }}
                     </span>
-                    <span>{{
-                      new Date(task.createdAt).toLocaleString("zh-CN")
-                    }}</span>
-                    <span v-if="task.duration">
-                      {{ formatDuration(task.duration) }}
+                    <span>
+                      {{ run.headBranch }}
+                    </span>
+                    <span>
+                      {{ run.headSha?.substring(0, 7) }}
+                    </span>
+                    <span>
+                      {{ run.event }}
+                    </span>
+                    <span v-if="run.actor">
+                      {{ run.actor.login }}
+                    </span>
+                    <span
+                      v-if="
+                        run.startedAt
+                          && new Date(run.startedAt).getFullYear() > 1970
+                      "
+                    >
+                      {{ new Date(run.startedAt).toLocaleString("zh-CN") }}
+                    </span>
+                    <span>
+                      {{ formatDuration(run.startedAt, run.completedAt) }}
                     </span>
                   </div>
                 </div>
                 <UIcon
-                  name="i-lucide-chevron-right"
+                  name="i-lucide-external-link"
                   class="w-4 h-4 text-gray-400"
                 />
               </div>
             </UCard>
-          </NuxtLink>
+          </a>
         </div>
 
         <div
@@ -382,9 +389,9 @@ async function deleteProject() {
             name="i-lucide-rocket"
             class="w-12 h-12 mx-auto mb-3"
           />
-          <p>暂无发布任务</p>
+          <p>暂无 Actions 运行记录</p>
           <p class="text-sm mt-1">
-            点击「新建发布」触发构建部署
+            在仓库中添加 .gitea/workflows/ 或 .github/workflows/ 来配置 CI/CD
           </p>
         </div>
       </div>
@@ -463,83 +470,21 @@ async function deleteProject() {
           </div>
         </UCard>
 
-        <!-- 发布设置 -->
+        <!-- 通知设置 -->
         <UCard>
           <template #header>
             <h3 class="font-semibold">
-              发布设置
+              通知设置
             </h3>
           </template>
           <div class="space-y-5">
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-medium text-sm">
-                  自动部署
-                </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  代码推送到指定分支时自动触发发布
-                </p>
-              </div>
-              <USwitch v-model="settingsForm.autoDeploy" />
-            </div>
-
-            <div v-if="settingsForm.autoDeploy">
-              <p class="font-medium text-sm mb-2">
-                部署分支
-              </p>
-              <div class="flex gap-2 mb-2">
-                <UInput
-                  v-model="deployBranchInput"
-                  placeholder="输入分支名，回车添加"
-                  size="sm"
-                  class="flex-1"
-                  @keydown.enter.prevent="addDeployBranch"
-                />
-                <UButton
-                  size="sm"
-                  color="neutral"
-                  variant="soft"
-                  @click="addDeployBranch"
-                >
-                  添加
-                </UButton>
-              </div>
-              <div
-                v-if="settingsForm.deployBranches.length > 0"
-                class="flex flex-wrap gap-1.5"
-              >
-                <UBadge
-                  v-for="b in settingsForm.deployBranches"
-                  :key="b"
-                  color="primary"
-                  variant="subtle"
-                  class="cursor-pointer"
-                  @click="removeDeployBranch(b)"
-                >
-                  {{ b }}
-                  <UIcon
-                    name="i-lucide-x"
-                    class="w-3 h-3 ml-1"
-                  />
-                </UBadge>
-              </div>
-              <p
-                v-else
-                class="text-xs text-gray-400"
-              >
-                未配置部署分支时，默认使用 {{ project.defaultBranch || "main" }}
-              </p>
-            </div>
-
-            <USeparator />
-
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="font-medium text-sm">
                   成功通知
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  发布成功时发送通知
+                  Actions 运行成功时发送飞书通知
                 </p>
               </div>
               <USwitch v-model="settingsForm.notifyOnSuccess" />
@@ -551,22 +496,10 @@ async function deleteProject() {
                   失败通知
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  发布失败时发送通知
+                  Actions 运行失败时发送飞书通知
                 </p>
               </div>
               <USwitch v-model="settingsForm.notifyOnFailure" />
-            </div>
-
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="font-medium text-sm">
-                  发布审批
-                </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  发布前需要审批通过
-                </p>
-              </div>
-              <USwitch v-model="settingsForm.approvalRequired" />
             </div>
 
             <div class="flex justify-end pt-2">
@@ -619,5 +552,56 @@ async function deleteProject() {
         </UCard>
       </div>
     </template>
+
+    <!-- 触发 Workflow Modal -->
+    <UModal v-model:open="showDispatchModal">
+      <template #content>
+        <div class="p-6 space-y-4">
+          <h3 class="text-lg font-semibold">
+            触发 Workflow
+          </h3>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">Workflow</label>
+            <USelectMenu
+              v-model="selectedWorkflow"
+              :items="workflows.map((w) => ({ label: w.name, value: w.path }))"
+              value-key="value"
+              class="w-full"
+              placeholder="选择 Workflow"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">分支</label>
+            <USelectMenu
+              v-model="selectedBranch"
+              :items="branches.map((b) => b.name)"
+              class="w-full"
+              placeholder="选择分支"
+            />
+          </div>
+
+          <div class="flex justify-end gap-2 pt-2">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              @click="showDispatchModal = false"
+            >
+              取消
+            </UButton>
+            <UButton
+              icon="i-lucide-play"
+              color="primary"
+              :loading="dispatching"
+              :disabled="!selectedWorkflow || !selectedBranch"
+              @click="dispatchWorkflow"
+            >
+              触发
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

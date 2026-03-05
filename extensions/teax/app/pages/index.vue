@@ -55,7 +55,7 @@ const todayPublishes = computed(() => todayStats.value?.count ?? 0);
       <UCard>
         <div class="text-center">
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            今日发布
+            今日构建
           </p>
           <p class="text-3xl font-bold mt-1">
             {{ todayPublishes }}

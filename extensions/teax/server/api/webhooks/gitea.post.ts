@@ -67,50 +67,24 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: "Invalid webhook signature" });
   }
 
-  // 处理 push 事件
+  // 处理 push 事件 — CI/CD 由 Gitea Actions 原生处理，这里只做通知
   if (giteaEvent === "push") {
     const branch = payload.ref.replace("refs/heads/", "");
-    const commitSha = payload.after;
-    const commitMessage = payload.commits?.[0]?.message || "";
-
-    // 查找 pusher 对应的用户
-    const [pusherUser] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.giteaId, payload.pusher.id))
-      .limit(1);
-
-    // 检查项目设置是否允许自动部署
-    const settings = (project.settings || {}) as {
-      autoDeploy?: boolean;
-      deployBranches?: string[];
+    const _settings = (project.settings || {}) as {
+      notifyOnSuccess?: boolean;
+      notifyOnFailure?: boolean;
     };
 
-    if (settings.autoDeploy) {
-      const deployBranches = settings.deployBranches || [project.defaultBranch || "main"];
-      if (deployBranches.includes(branch)) {
-        // 创建发布任务
-        const [task] = await db
-          .insert(schema.publishTasks)
-          .values({
-            projectId: project.id,
-            branch,
-            commitSha,
-            commitMessage,
-            triggeredBy: pusherUser?.id ?? null,
-            triggerType: "webhook",
-            status: "pending",
-          })
-          .returning();
-
-        return { received: true, action: "publish_created", taskId: task?.id };
-      }
-    }
+    // TODO: 飞书通知 — push 事件时可发送飞书消息通知团队
+    // if (settings.notifyOnSuccess || settings.notifyOnFailure) {
+    //   await sendFeishuNotification(project, branch, payload);
+    // }
 
     return {
       received: true,
-      action: "ignored",
-      reason: "auto_deploy_disabled_or_branch_not_matched",
+      action: "notified",
+      branch,
+      project: project.fullName,
     };
   }
 

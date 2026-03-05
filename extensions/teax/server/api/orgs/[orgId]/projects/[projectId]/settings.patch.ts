@@ -14,22 +14,14 @@ export default defineEventHandler(async (event) => {
   const db = useDB();
 
   const body = await readBody<{
-    autoDeploy?: boolean;
-    deployBranches?: string[];
     notifyOnSuccess?: boolean;
     notifyOnFailure?: boolean;
-    approvalRequired?: boolean;
   }>(event);
 
   const [project] = await db
     .select({ settings: schema.projects.settings })
     .from(schema.projects)
-    .where(
-      and(
-        eq(schema.projects.id, projectId),
-        eq(schema.projects.organizationId, orgId),
-      ),
-    )
+    .where(and(eq(schema.projects.id, projectId), eq(schema.projects.organizationId, orgId)))
     .limit(1);
 
   if (!project) {
@@ -39,21 +31,13 @@ export default defineEventHandler(async (event) => {
   const currentSettings = (project.settings || {}) as Record<string, unknown>;
   const newSettings = { ...currentSettings };
 
-  if (body.autoDeploy !== undefined) newSettings.autoDeploy = body.autoDeploy;
-  if (body.deployBranches !== undefined) newSettings.deployBranches = body.deployBranches;
   if (body.notifyOnSuccess !== undefined) newSettings.notifyOnSuccess = body.notifyOnSuccess;
   if (body.notifyOnFailure !== undefined) newSettings.notifyOnFailure = body.notifyOnFailure;
-  if (body.approvalRequired !== undefined) newSettings.approvalRequired = body.approvalRequired;
 
   const [updated] = await db
     .update(schema.projects)
     .set({ settings: newSettings, updatedAt: new Date() })
-    .where(
-      and(
-        eq(schema.projects.id, projectId),
-        eq(schema.projects.organizationId, orgId),
-      ),
-    )
+    .where(and(eq(schema.projects.id, projectId), eq(schema.projects.organizationId, orgId)))
     .returning({
       id: schema.projects.id,
       settings: schema.projects.settings,

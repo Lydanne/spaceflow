@@ -89,6 +89,46 @@ export interface GiteaCommit {
   html_url: string;
 }
 
+export interface GiteaWorkflowRunActor {
+  id: number;
+  login: string;
+  avatar_url: string;
+}
+
+export interface GiteaWorkflowRun {
+  id: number;
+  run_number: number;
+  display_title: string;
+  status: string;
+  conclusion: string;
+  event: string;
+  head_branch: string;
+  head_sha: string;
+  path: string;
+  html_url: string;
+  started_at: string;
+  completed_at: string | null;
+  actor: GiteaWorkflowRunActor;
+  trigger_actor: GiteaWorkflowRunActor;
+}
+
+export interface GiteaWorkflowRunsList {
+  total_count: number;
+  workflow_runs: GiteaWorkflowRun[];
+}
+
+export interface GiteaWorkflow {
+  id: number;
+  name: string;
+  path: string;
+  state: string;
+}
+
+export interface GiteaWorkflowsList {
+  total_count: number;
+  workflows: GiteaWorkflow[];
+}
+
 export class GiteaService {
   private baseUrl: string;
   private accessToken: string;
@@ -208,6 +248,34 @@ export class GiteaService {
 
   async deleteWebhook(owner: string, repo: string, hookId: number): Promise<void> {
     await this.fetch(`/repos/${owner}/${repo}/hooks/${hookId}`, "DELETE");
+  }
+
+  async getRepoWorkflowRuns(
+    owner: string,
+    repo: string,
+    page = 1,
+    limit = 20,
+  ): Promise<GiteaWorkflowRunsList> {
+    return this.fetch(
+      `/repos/${owner}/${repo}/actions/runs?page=${page}&limit=${limit}`,
+    ) as Promise<GiteaWorkflowRunsList>;
+  }
+
+  async getRepoWorkflows(owner: string, repo: string): Promise<GiteaWorkflowsList> {
+    return this.fetch(`/repos/${owner}/${repo}/actions/workflows`) as Promise<GiteaWorkflowsList>;
+  }
+
+  async dispatchWorkflow(
+    owner: string,
+    repo: string,
+    workflowId: string,
+    ref: string,
+    inputs?: Record<string, string>,
+  ): Promise<void> {
+    await this.fetch(`/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`, "POST", {
+      ref,
+      inputs: inputs || {},
+    });
   }
 }
 
