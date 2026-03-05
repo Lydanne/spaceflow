@@ -118,12 +118,15 @@ const tabs = computed(() =>
           :org-id="orgId"
           :project-id="projectId"
         />
+        <template #fallback>
+          <ProjectTabSkeleton />
+        </template>
       </ClientOnly>
 
       <div v-if="activeTab === 'agents'">
         <div class="text-center py-12 text-gray-400">
           <UIcon
-            name="i-lucide-bot"
+            name="i-lucide-bot-message-square"
             class="w-12 h-12 mx-auto mb-3"
           />
           <p>Agent 功能将在 Phase 3 实现</p>
@@ -133,7 +136,7 @@ const tabs = computed(() =>
       <div v-if="activeTab === 'pages'">
         <div class="text-center py-12 text-gray-400">
           <UIcon
-            name="i-lucide-globe"
+            name="i-lucide-earth"
             class="w-12 h-12 mx-auto mb-3"
           />
           <p>Pages 功能将在 Phase 3 实现</p>

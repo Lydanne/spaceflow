@@ -17,3 +17,150 @@
   --color-green-900: #0A5331;
   --color-green-950: #052E16;
 }
+
+/* ── VitePress-style prose overrides ── */
+
+.prose h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  border-bottom: 1px solid var(--color-gray-200);
+  padding-bottom: 0.75rem;
+}
+.dark .prose h1 {
+  border-bottom-color: var(--color-gray-800);
+}
+
+.prose h2 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-bottom: 1px solid var(--color-gray-200);
+  padding-bottom: 0.5rem;
+  margin-top: 2rem;
+}
+.dark .prose h2 {
+  border-bottom-color: var(--color-gray-800);
+}
+
+.prose h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+}
+
+.prose a {
+  color: var(--color-primary-500);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.prose a:hover {
+  color: var(--color-primary-600);
+  text-decoration: underline;
+}
+.dark .prose a {
+  color: var(--color-primary-400);
+}
+.dark .prose a:hover {
+  color: var(--color-primary-300);
+}
+
+.prose code:not(pre code) {
+  font-size: 0.875em;
+  font-weight: 500;
+  color: var(--color-primary-600);
+  background: var(--color-primary-50);
+  border-radius: 0.25rem;
+  padding: 0.15em 0.35em;
+}
+.dark .prose code:not(pre code) {
+  color: var(--color-primary-300);
+  background: color-mix(in srgb, var(--color-primary-900) 30%, transparent);
+}
+
+.prose pre {
+  background: var(--color-gray-950) !important;
+  border: 1px solid var(--color-gray-800);
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  font-size: 0.85em;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+.prose pre code {
+  color: var(--color-gray-200);
+  background: transparent !important;
+  padding: 0;
+  font-weight: 400;
+}
+
+.prose blockquote {
+  border-left: 3px solid var(--color-primary-500);
+  background: var(--color-primary-50);
+  color: var(--color-gray-700);
+  padding: 0.75rem 1rem;
+  border-radius: 0 0.375rem 0.375rem 0;
+  font-style: normal;
+}
+.dark .prose blockquote {
+  background: color-mix(in srgb, var(--color-primary-900) 20%, transparent);
+  color: var(--color-gray-300);
+}
+.prose blockquote p {
+  margin: 0;
+}
+
+.prose hr {
+  border-color: var(--color-gray-200);
+  margin: 1.5rem 0;
+}
+.dark .prose hr {
+  border-color: var(--color-gray-800);
+}
+
+.prose table {
+  font-size: 0.875em;
+  border-collapse: collapse;
+  width: 100%;
+}
+.prose thead th {
+  background: var(--color-gray-50);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 2px solid var(--color-gray-200);
+}
+.dark .prose thead th {
+  background: var(--color-gray-900);
+  border-bottom-color: var(--color-gray-700);
+}
+.prose tbody td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-gray-100);
+}
+.dark .prose tbody td {
+  border-bottom-color: var(--color-gray-800);
+}
+.prose tbody tr:hover {
+  background: var(--color-gray-50);
+}
+.dark .prose tbody tr:hover {
+  background: var(--color-gray-900);
+}
+
+.prose img {
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-gray-200);
+}
+.dark .prose img {
+  border-color: var(--color-gray-800);
+}
+
+.prose ul > li::marker {
+  color: var(--color-gray-400);
+}
+.prose ol > li::marker {
+  color: var(--color-gray-500);
+  font-weight: 600;
+}

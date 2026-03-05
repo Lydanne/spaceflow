@@ -53,8 +53,9 @@ const actionsPage = ref(1);
 const {
   data: actionsData,
   error: actionsError,
+  status: actionsStatus,
   refresh: refreshActions,
-} = await useFetch<{
+} = useLazyFetch<{
   data: WorkflowRunItem[];
   total: number;
 }>(`/api/orgs/${props.orgId}/projects/${props.projectId}/actions`, {
@@ -63,19 +64,24 @@ const {
 const workflowRuns = computed(() => actionsData.value?.data ?? []);
 
 // Workflow 列表
-const { data: workflowsData, error: workflowsError } = await useFetch<{
+const { data: workflowsData, error: workflowsError, status: workflowsStatus } = useLazyFetch<{
   data: WorkflowItem[];
 }>(`/api/orgs/${props.orgId}/projects/${props.projectId}/workflows`);
 const workflows = computed(() => workflowsData.value?.data ?? []);
 
 // 分支列表
-const { data: branchesData, error: branchesError } = await useFetch<{
+const { data: branchesData, error: branchesError, status: branchesStatus } = useLazyFetch<{
   data: BranchItem[];
   defaultBranch: string | null;
 }>(`/api/orgs/${props.orgId}/projects/${props.projectId}/branches`);
 const branches = computed(() => branchesData.value?.data ?? []);
 const defaultBranch = computed(
   () => branchesData.value?.defaultBranch || "main",
+);
+
+// 加载状态
+const isLoading = computed(() =>
+  actionsStatus.value === "pending" || workflowsStatus.value === "pending" || branchesStatus.value === "pending",
 );
 
 // 错误处理
@@ -312,9 +318,12 @@ function workflowName(path: string): string {
 
 <template>
   <div>
+    <!-- 加载中 -->
+    <ProjectTabSkeleton v-if="isLoading" />
+
     <!-- 错误提示 -->
     <div
-      v-if="fetchError"
+      v-else-if="fetchError"
       class="mb-4 rounded-lg border px-4 py-3 flex items-center gap-3"
       :class="
         isTokenExpired
@@ -362,7 +371,10 @@ function workflowName(path: string): string {
       </UButton>
     </div>
 
-    <div style="display: flex; gap: 1.5rem">
+    <div
+      v-if="!isLoading && !fetchError"
+      style="display: flex; gap: 1.5rem"
+    >
       <!-- 左侧：Workflow 侧边栏 -->
       <div style="width: 14rem; flex-shrink: 0">
         <div class="flex items-center justify-between mb-3">

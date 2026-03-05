@@ -16,7 +16,7 @@ const props = defineProps<{
   projectId: string;
 }>();
 
-const { data, status } = await useFetch<{
+const { data, status } = useLazyFetch<{
   content: string | null;
   source: string | null;
   repoInfo: RepoInfo | null;
@@ -36,15 +36,7 @@ function formatDate(dateStr: string | null) {
 
 <template>
   <div>
-    <div
-      v-if="status === 'pending'"
-      class="flex justify-center py-12"
-    >
-      <UIcon
-        name="i-lucide-loader-2"
-        class="w-6 h-6 animate-spin text-gray-400"
-      />
-    </div>
+    <ProjectTabSkeleton v-if="status === 'pending'" />
 
     <template v-else-if="data?.content">
       <div class="flex items-center gap-2 mb-4 text-sm text-gray-500 dark:text-gray-400">
