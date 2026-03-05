@@ -10,7 +10,6 @@ const toast = useToast();
 
 interface WorkflowRunItem {
   id: number;
-  name: string;
   runNumber: number;
   displayTitle: string;
   status: string;
@@ -313,7 +312,15 @@ function cronToReadable(cron: string): string {
 }
 
 function workflowName(path: string): string {
-  return path.replace(/^.*\//, "").replace(/\.(yml|yaml)$/, "");
+  // Gitea path 格式: "filename.yml@refs/heads/branch"
+  const atIdx = path.indexOf("@");
+  const file = atIdx > 0 ? path.substring(0, atIdx) : path;
+  return file.replace(/\.(yml|yaml)$/, "");
+}
+
+function workflowFileName(path: string): string {
+  const atIdx = path.indexOf("@");
+  return atIdx > 0 ? path.substring(0, atIdx) : path;
 }
 </script>
 
@@ -614,7 +621,7 @@ function workflowName(path: string): string {
                         name="i-lucide-workflow"
                         class="w-3.5 h-3.5"
                       />
-                      {{ run.name }}
+                      {{ workflowFileName(run.path) }}
                     </span>
                     <span class="flex items-center gap-1">
                       <UIcon

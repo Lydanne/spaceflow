@@ -100,7 +100,6 @@ export interface GiteaWorkflowRunActor {
 
 export interface GiteaWorkflowRun {
   id: number;
-  name: string;
   run_number: number;
   display_title: string;
   status: string;
