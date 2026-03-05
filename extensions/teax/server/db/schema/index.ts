@@ -4,4 +4,3 @@ export * from "./permission";
 export * from "./project";
 export * from "./publish";
 export * from "./audit";
-export * from "./service-token";
