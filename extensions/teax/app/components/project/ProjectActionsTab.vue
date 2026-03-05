@@ -142,7 +142,7 @@ function workflowRunCount(path: string): number {
 // 下拉选项
 const workflowOptions = computed(() =>
   workflows.value.map((w) => ({
-    label: w.description ? `${w.name} — ${w.description}` : w.name,
+    label: w.name,
     value: w.path,
   })),
 );
