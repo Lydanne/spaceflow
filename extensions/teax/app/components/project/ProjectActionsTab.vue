@@ -314,12 +314,16 @@ function cronToReadable(cron: string): string {
 function workflowName(path: string): string {
   return path.replace(/^.*\//, "").replace(/\.(yml|yaml)$/, "");
 }
+
+function workflowFileName(path: string): string {
+  return path.replace(/^.*\//, "");
+}
 </script>
 
 <template>
   <div>
     <!-- 加载中 -->
-    <ProjectTabSkeleton v-if="isLoading" />
+    <ProjectActionsSkeleton v-if="isLoading" />
 
     <!-- 错误提示 -->
     <div
@@ -613,7 +617,7 @@ function workflowName(path: string): string {
                         name="i-lucide-workflow"
                         class="w-3.5 h-3.5"
                       />
-                      {{ workflowName(run.path) }}
+                      {{ workflowFileName(run.path) }}
                     </span>
                     <span class="flex items-center gap-1">
                       <UIcon

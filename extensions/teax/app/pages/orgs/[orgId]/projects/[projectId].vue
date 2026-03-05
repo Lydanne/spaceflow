@@ -119,7 +119,7 @@ const tabs = computed(() =>
           :project-id="projectId"
         />
         <template #fallback>
-          <ProjectTabSkeleton />
+          <ProjectActionsSkeleton />
         </template>
       </ClientOnly>
 
