@@ -45,7 +45,11 @@ interface BranchItem {
 
 // Gitea Actions workflow runs
 const actionsPage = ref(1);
-const { data: actionsData, refresh: refreshActions } = await useFetch<{
+const {
+  data: actionsData,
+  error: actionsError,
+  refresh: refreshActions,
+} = await useFetch<{
   data: WorkflowRunItem[];
   total: number;
 }>(`/api/orgs/${props.orgId}/projects/${props.projectId}/actions`, {
@@ -54,13 +58,13 @@ const { data: actionsData, refresh: refreshActions } = await useFetch<{
 const workflowRuns = computed(() => actionsData.value?.data ?? []);
 
 // Workflow 列表
-const { data: workflowsData } = await useFetch<{ data: WorkflowItem[] }>(
-  `/api/orgs/${props.orgId}/projects/${props.projectId}/workflows`,
-);
+const { data: workflowsData, error: workflowsError } = await useFetch<{
+  data: WorkflowItem[];
+}>(`/api/orgs/${props.orgId}/projects/${props.projectId}/workflows`);
 const workflows = computed(() => workflowsData.value?.data ?? []);
 
 // 分支列表
-const { data: branchesData } = await useFetch<{
+const { data: branchesData, error: branchesError } = await useFetch<{
   data: BranchItem[];
   defaultBranch: string | null;
 }>(`/api/orgs/${props.orgId}/projects/${props.projectId}/branches`);
@@ -68,6 +72,23 @@ const branches = computed(() => branchesData.value?.data ?? []);
 const defaultBranch = computed(
   () => branchesData.value?.defaultBranch || "main",
 );
+
+// 错误处理
+const fetchError = computed(() => {
+  return actionsError.value || workflowsError.value || branchesError.value;
+});
+const isTokenExpired = computed(() => {
+  const err = fetchError.value;
+  if (!err) return false;
+  return (err as { statusCode?: number }).statusCode === 401;
+});
+const errorMessage = computed(() => {
+  if (!fetchError.value) return "";
+  if (isTokenExpired.value) return "Gitea 访问令牌已过期，请重新登录";
+  const msg = (fetchError.value as { data?: { message?: string } })?.data
+    ?.message;
+  return msg || "加载数据失败，请稍后重试";
+});
 
 // 侧边栏选中的 workflow（空 = 全部）
 const activeWorkflowPath = ref("");
@@ -178,8 +199,8 @@ async function dispatchWorkflow() {
     showDispatchModal.value = false;
     setTimeout(() => refreshActions(), 2000);
   } catch (err: unknown) {
-    const msg
-      = (err as { data?: { message?: string } })?.data?.message || "触发失败";
+    const msg =
+      (err as { data?: { message?: string } })?.data?.message || "触发失败";
     toast.add({ title: msg, color: "error" });
   } finally {
     dispatching.value = false;
@@ -220,285 +241,337 @@ function workflowName(path: string): string {
 </script>
 
 <template>
-  <div style="display: flex; gap: 1.5rem">
-    <!-- 左侧：Workflow 侧边栏 -->
-    <div style="width: 14rem; flex-shrink: 0">
-      <div class="flex items-center justify-between mb-3">
-        <h3
-          class="text-xs font-semibold text-gray-400 uppercase tracking-wider"
-        >
-          Workflows
-        </h3>
-      </div>
-      <nav class="space-y-1">
-        <!-- 全部 -->
-        <button
-          class="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors"
-          :class="
-            !activeWorkflowPath
-              ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-medium'
-              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-          "
-          @click="activeWorkflowPath = ''"
-        >
-          <span class="flex items-center gap-2">
-            <UIcon
-              name="i-lucide-list"
-              class="w-4 h-4"
-            />
-            全部
-          </span>
-          <span class="text-xs text-gray-400">
-            {{ workflowRuns.length }}
-          </span>
-        </button>
-
-        <!-- 每个 workflow -->
-        <button
-          v-for="wf in workflows"
-          :key="wf.path"
-          class="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors"
-          :class="
-            activeWorkflowPath === wf.path
-              ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-medium'
-              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-          "
-          @click="activeWorkflowPath = wf.path"
-        >
-          <span class="flex items-center gap-2 truncate">
-            <UIcon
-              name="i-lucide-workflow"
-              class="w-4 h-4 shrink-0"
-            />
-            <span class="truncate">{{ wf.name }}</span>
-          </span>
-          <span class="text-xs text-gray-400 shrink-0 ml-2">
-            {{ workflowRunCount(wf.path) }}
-          </span>
-        </button>
-      </nav>
-    </div>
-
-    <!-- 右侧：Runs 列表 -->
-    <div class="flex-1 min-w-0">
-      <!-- 头部 -->
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-sm font-medium text-gray-500 dark:text-gray-400">
-          {{ activeWorkflowName }}
-        </h2>
-        <div class="flex items-center gap-2">
-          <UButton
-            icon="i-lucide-refresh-cw"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            @click="refreshActions()"
-          >
-            刷新
-          </UButton>
-          <UButton
-            v-if="workflows.length > 0"
-            icon="i-lucide-play"
-            color="primary"
-            size="sm"
-            @click="openDispatchModal"
-          >
-            触发 Workflow
-          </UButton>
-        </div>
-      </div>
-
-      <!-- Runs 列表 -->
-      <div
-        v-if="filteredRuns.length > 0"
-        class="space-y-3"
+  <div>
+    <!-- 错误提示 -->
+    <div
+      v-if="fetchError"
+      class="mb-4 rounded-lg border px-4 py-3 flex items-center gap-3"
+      :class="
+        isTokenExpired
+          ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800'
+          : 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+      "
+    >
+      <UIcon
+        :name="isTokenExpired ? 'i-lucide-key-round' : 'i-lucide-alert-circle'"
+        class="w-5 h-5 shrink-0"
+        :class="
+          isTokenExpired
+            ? 'text-yellow-600 dark:text-yellow-400'
+            : 'text-red-600 dark:text-red-400'
+        "
+      />
+      <span
+        class="text-sm flex-1"
+        :class="
+          isTokenExpired
+            ? 'text-yellow-800 dark:text-yellow-200'
+            : 'text-red-800 dark:text-red-200'
+        "
       >
-        <a
-          v-for="run in filteredRuns"
-          :key="run.id"
-          :href="run.htmlUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="block"
-        >
-          <UCard class="hover:ring-1 hover:ring-primary-500 transition-all">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="flex items-center gap-2">
-                  <UBadge
-                    :color="runStatusColor(run.status, run.conclusion) as any"
-                    variant="subtle"
-                    size="sm"
-                  >
-                    {{ runStatusLabel(run.status, run.conclusion) }}
-                  </UBadge>
-                  <span class="font-medium text-sm">
-                    {{ run.displayTitle }}
-                  </span>
-                  <span class="text-xs text-gray-400">
-                    #{{ run.runNumber }}
-                  </span>
-                </div>
-                <div
-                  class="flex items-center gap-3 mt-1.5 text-xs text-gray-400"
-                >
-                  <span v-if="!activeWorkflowPath">
-                    {{ workflowName(run.path) }}
-                  </span>
-                  <span>{{ run.headBranch }}</span>
-                  <span>{{ run.headSha?.substring(0, 7) }}</span>
-                  <span>{{ run.event }}</span>
-                  <span v-if="run.actor">{{ run.actor.login }}</span>
-                  <span
-                    v-if="
-                      run.startedAt
-                        && new Date(run.startedAt).getFullYear() > 1970
-                    "
-                  >
-                    {{ new Date(run.startedAt).toLocaleString("zh-CN") }}
-                  </span>
-                  <span>{{
-                    formatDuration(run.startedAt, run.completedAt)
-                  }}</span>
-                </div>
-              </div>
-              <UIcon
-                name="i-lucide-external-link"
-                class="w-4 h-4 text-gray-400 shrink-0"
-              />
-            </div>
-          </UCard>
-        </a>
-      </div>
-
-      <!-- 空状态 -->
-      <div
+        {{ errorMessage }}
+      </span>
+      <UButton
+        v-if="isTokenExpired"
+        size="xs"
+        color="warning"
+        variant="soft"
+        to="/api/auth/gitea"
+        external
+      >
+        重新登录
+      </UButton>
+      <UButton
         v-else
-        class="text-center py-12 text-gray-400"
+        size="xs"
+        color="error"
+        variant="soft"
+        @click="refreshActions()"
       >
-        <UIcon
-          name="i-lucide-rocket"
-          class="w-12 h-12 mx-auto mb-3"
-        />
-        <template v-if="activeWorkflowPath">
-          <p>{{ activeWorkflowName }} 暂无运行记录</p>
-          <p class="text-sm mt-1">
-            点击「触发 Workflow」手动运行
-          </p>
-        </template>
-        <template v-else>
-          <p>暂无 Actions 运行记录</p>
-          <p class="text-sm mt-1">
-            在仓库中添加 .gitea/workflows/ 或 .github/workflows/ 来配置 CI/CD
-          </p>
-        </template>
-      </div>
+        重试
+      </UButton>
     </div>
 
-    <!-- 触发 Workflow Modal -->
-    <UModal v-model:open="showDispatchModal">
-      <template #content>
-        <div class="p-6 space-y-4">
-          <h3 class="text-lg font-semibold">
-            触发 Workflow
+    <div style="display: flex; gap: 1.5rem">
+      <!-- 左侧：Workflow 侧边栏 -->
+      <div style="width: 14rem; flex-shrink: 0">
+        <div class="flex items-center justify-between mb-3">
+          <h3
+            class="text-xs font-semibold text-gray-400 uppercase tracking-wider"
+          >
+            Workflows
           </h3>
+        </div>
+        <nav class="space-y-1">
+          <!-- 全部 -->
+          <button
+            class="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors"
+            :class="
+              !activeWorkflowPath
+                ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-medium'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            "
+            @click="activeWorkflowPath = ''"
+          >
+            <span class="flex items-center gap-2">
+              <UIcon
+                name="i-lucide-list"
+                class="w-4 h-4"
+              />
+              全部
+            </span>
+            <span class="text-xs text-gray-400">
+              {{ workflowRuns.length }}
+            </span>
+          </button>
 
-          <div>
-            <label class="block text-sm font-medium mb-1">Workflow</label>
-            <USelect
-              v-model="selectedWorkflow"
-              :items="workflowOptions"
-              value-key="value"
-              class="w-full"
-              placeholder="选择 Workflow"
-            />
-          </div>
+          <!-- 每个 workflow -->
+          <button
+            v-for="wf in workflows"
+            :key="wf.path"
+            class="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md transition-colors"
+            :class="
+              activeWorkflowPath === wf.path
+                ? 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 font-medium'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            "
+            @click="activeWorkflowPath = wf.path"
+          >
+            <span class="flex items-center gap-2 truncate">
+              <UIcon
+                name="i-lucide-workflow"
+                class="w-4 h-4 shrink-0"
+              />
+              <span class="truncate">{{ wf.name }}</span>
+            </span>
+            <span class="text-xs text-gray-400 shrink-0 ml-2">
+              {{ workflowRunCount(wf.path) }}
+            </span>
+          </button>
+        </nav>
+      </div>
 
-          <div>
-            <label class="block text-sm font-medium mb-1">分支</label>
-            <USelect
-              v-model="selectedBranch"
-              :items="branchOptions"
-              value-key="value"
-              class="w-full"
-              placeholder="选择分支"
-            />
-          </div>
-
-          <!-- workflow_dispatch inputs -->
-          <template v-if="Object.keys(currentInputs).length > 0">
-            <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <p
-                class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3"
-              >
-                Workflow Inputs
-              </p>
-              <div class="space-y-3">
-                <div
-                  v-for="(def, key) in currentInputs"
-                  :key="key"
-                >
-                  <label class="block text-sm font-medium mb-1">
-                    {{ key }}
-                    <span
-                      v-if="def.required"
-                      class="text-red-500"
-                    >*</span>
-                  </label>
-                  <p
-                    v-if="def.description"
-                    class="text-xs text-gray-400 mb-1"
-                  >
-                    {{ def.description }}
-                  </p>
-
-                  <USelect
-                    v-if="def.type === 'choice' && def.options"
-                    :model-value="inputValues[key]"
-                    :items="def.options.map((o) => ({ label: o, value: o }))"
-                    value-key="value"
-                    class="w-full"
-                    @update:model-value="inputValues[key] = $event"
-                  />
-                  <USwitch
-                    v-else-if="def.type === 'boolean'"
-                    :model-value="inputValues[key] === 'true'"
-                    @update:model-value="
-                      inputValues[key] = $event ? 'true' : 'false'
-                    "
-                  />
-                  <UInput
-                    v-else
-                    :model-value="inputValues[key]"
-                    :placeholder="def.default || ''"
-                    class="w-full"
-                    @update:model-value="inputValues[key] = $event"
-                  />
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <div class="flex justify-end gap-2 pt-2">
+      <!-- 右侧：Runs 列表 -->
+      <div class="flex-1 min-w-0">
+        <!-- 头部 -->
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-medium text-gray-500 dark:text-gray-400">
+            {{ activeWorkflowName }}
+          </h2>
+          <div class="flex items-center gap-2">
             <UButton
+              icon="i-lucide-refresh-cw"
               color="neutral"
               variant="ghost"
-              @click="showDispatchModal = false"
+              size="sm"
+              @click="refreshActions()"
             >
-              取消
+              刷新
             </UButton>
             <UButton
+              v-if="workflows.length > 0"
               icon="i-lucide-play"
               color="primary"
-              :loading="dispatching"
-              :disabled="!selectedWorkflow || !selectedBranch"
-              @click="dispatchWorkflow"
+              size="sm"
+              @click="openDispatchModal"
             >
-              触发
+              触发 Workflow
             </UButton>
           </div>
         </div>
-      </template>
-    </UModal>
+
+        <!-- Runs 列表 -->
+        <div
+          v-if="filteredRuns.length > 0"
+          class="space-y-3"
+        >
+          <a
+            v-for="run in filteredRuns"
+            :key="run.id"
+            :href="run.htmlUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="block"
+          >
+            <UCard class="hover:ring-1 hover:ring-primary-500 transition-all">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <UBadge
+                      :color="runStatusColor(run.status, run.conclusion) as any"
+                      variant="subtle"
+                      size="sm"
+                    >
+                      {{ runStatusLabel(run.status, run.conclusion) }}
+                    </UBadge>
+                    <span class="font-medium text-sm">
+                      {{ run.displayTitle }}
+                    </span>
+                    <span class="text-xs text-gray-400">
+                      #{{ run.runNumber }}
+                    </span>
+                  </div>
+                  <div
+                    class="flex items-center gap-3 mt-1.5 text-xs text-gray-400"
+                  >
+                    <span v-if="!activeWorkflowPath">
+                      {{ workflowName(run.path) }}
+                    </span>
+                    <span>{{ run.headBranch }}</span>
+                    <span>{{ run.headSha?.substring(0, 7) }}</span>
+                    <span>{{ run.event }}</span>
+                    <span v-if="run.actor">{{ run.actor.login }}</span>
+                    <span
+                      v-if="
+                        run.startedAt
+                          && new Date(run.startedAt).getFullYear() > 1970
+                      "
+                    >
+                      {{ new Date(run.startedAt).toLocaleString("zh-CN") }}
+                    </span>
+                    <span>{{
+                      formatDuration(run.startedAt, run.completedAt)
+                    }}</span>
+                  </div>
+                </div>
+                <UIcon
+                  name="i-lucide-external-link"
+                  class="w-4 h-4 text-gray-400 shrink-0"
+                />
+              </div>
+            </UCard>
+          </a>
+        </div>
+
+        <!-- 空状态 -->
+        <div
+          v-else
+          class="text-center py-12 text-gray-400"
+        >
+          <UIcon
+            name="i-lucide-rocket"
+            class="w-12 h-12 mx-auto mb-3"
+          />
+          <template v-if="activeWorkflowPath">
+            <p>{{ activeWorkflowName }} 暂无运行记录</p>
+            <p class="text-sm mt-1">
+              点击「触发 Workflow」手动运行
+            </p>
+          </template>
+          <template v-else>
+            <p>暂无 Actions 运行记录</p>
+            <p class="text-sm mt-1">
+              在仓库中添加 .gitea/workflows/ 或 .github/workflows/ 来配置 CI/CD
+            </p>
+          </template>
+        </div>
+      </div>
+
+      <!-- 触发 Workflow Modal -->
+      <UModal v-model:open="showDispatchModal">
+        <template #content>
+          <div class="p-6 space-y-4">
+            <h3 class="text-lg font-semibold">
+              触发 Workflow
+            </h3>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">Workflow</label>
+              <USelect
+                v-model="selectedWorkflow"
+                :items="workflowOptions"
+                value-key="value"
+                class="w-full"
+                placeholder="选择 Workflow"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">分支</label>
+              <USelect
+                v-model="selectedBranch"
+                :items="branchOptions"
+                value-key="value"
+                class="w-full"
+                placeholder="选择分支"
+              />
+            </div>
+
+            <!-- workflow_dispatch inputs -->
+            <template v-if="Object.keys(currentInputs).length > 0">
+              <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <p
+                  class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3"
+                >
+                  Workflow Inputs
+                </p>
+                <div class="space-y-3">
+                  <div
+                    v-for="(def, key) in currentInputs"
+                    :key="key"
+                  >
+                    <label class="block text-sm font-medium mb-1">
+                      {{ key }}
+                      <span
+                        v-if="def.required"
+                        class="text-red-500"
+                      >*</span>
+                    </label>
+                    <p
+                      v-if="def.description"
+                      class="text-xs text-gray-400 mb-1"
+                    >
+                      {{ def.description }}
+                    </p>
+
+                    <USelect
+                      v-if="def.type === 'choice' && def.options"
+                      :model-value="inputValues[key]"
+                      :items="def.options.map((o) => ({ label: o, value: o }))"
+                      value-key="value"
+                      class="w-full"
+                      @update:model-value="inputValues[key] = $event"
+                    />
+                    <USwitch
+                      v-else-if="def.type === 'boolean'"
+                      :model-value="inputValues[key] === 'true'"
+                      @update:model-value="
+                        inputValues[key] = $event ? 'true' : 'false'
+                      "
+                    />
+                    <UInput
+                      v-else
+                      :model-value="inputValues[key]"
+                      :placeholder="def.default || ''"
+                      class="w-full"
+                      @update:model-value="inputValues[key] = $event"
+                    />
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <div class="flex justify-end gap-2 pt-2">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                @click="showDispatchModal = false"
+              >
+                取消
+              </UButton>
+              <UButton
+                icon="i-lucide-play"
+                color="primary"
+                :loading="dispatching"
+                :disabled="!selectedWorkflow || !selectedBranch"
+                @click="dispatchWorkflow"
+              >
+                触发
+              </UButton>
+            </div>
+          </div>
+        </template>
+      </UModal>
+    </div>
   </div>
 </template>

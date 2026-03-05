@@ -6,5 +6,6 @@ export default withNuxt({
 }, {
   rules: {
     "@stylistic/quote-props": ["error", "as-needed"],
+    "@stylistic/operator-linebreak": ["error", "after", { overrides: { "?": "before", ":": "before" } }],
   },
 });

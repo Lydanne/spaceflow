@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "../../../../../db";
 import { requirePermission } from "../../../../../utils/permission";
-import { createGiteaService } from "../../../../../utils/gitea";
+import { createGiteaServiceWithRefresh } from "../../../../../utils/auth";
 import { writeAuditLog } from "../../../../../utils/audit";
 
 export default defineEventHandler(async (event) => {
@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
   // 尝试删除 Gitea Webhook
   if (project.webhookId) {
     try {
-      const gitea = createGiteaService(session.giteaAccessToken);
+      const gitea = await createGiteaServiceWithRefresh(event, session);
       const [owner, repo] = project.fullName.split("/");
       if (owner && repo) {
         await gitea.deleteWebhook(owner, repo, project.webhookId);

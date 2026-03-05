@@ -39,8 +39,8 @@ async function syncOrg(org: OrgItem) {
     toast.add({ title: `已同步组织 ${org.name}`, color: "success" });
     await refresh();
   } catch (err: unknown) {
-    const msg
-      = (err as { data?: { message?: string } })?.data?.message || "同步失败";
+    const msg =
+      (err as { data?: { message?: string } })?.data?.message || "同步失败";
     toast.add({ title: msg, color: "error" });
   } finally {
     syncing.value = null;

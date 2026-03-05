@@ -49,8 +49,14 @@ async function logout() {
   <UApp>
     <UHeader v-if="loggedIn">
       <template #left>
-        <NuxtLink to="/" class="flex items-center gap-2">
-          <UIcon name="i-lucide-box" class="w-6 h-6 text-primary-500" />
+        <NuxtLink
+          to="/"
+          class="flex items-center gap-2"
+        >
+          <UIcon
+            name="i-lucide-box"
+            class="w-6 h-6 text-primary-500"
+          />
           <span class="font-bold text-lg">{{ config.public.appName }}</span>
         </NuxtLink>
       </template>

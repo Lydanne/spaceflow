@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "../../../db";
 import { requireOrgAccess } from "../../../utils/org-access";
-import { createGiteaService } from "../../../utils/gitea";
+import { createGiteaServiceWithRefresh } from "../../../utils/auth";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(50, Math.max(1, Number(query.limit) || 20));
 
-  const gitea = createGiteaService(session.giteaAccessToken);
+  const gitea = await createGiteaServiceWithRefresh(event, session);
 
   const repos = search
     ? await gitea.searchRepos(org.name, search, limit)

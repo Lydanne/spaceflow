@@ -43,8 +43,8 @@ async function toggleAdmin(user: UserItem) {
     });
     await refresh();
   } catch (err: unknown) {
-    const msg
-      = (err as { data?: { message?: string } })?.data?.message || "操作失败";
+    const msg =
+      (err as { data?: { message?: string } })?.data?.message || "操作失败";
     toast.add({ title: msg, color: "error" });
   }
 }

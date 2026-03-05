@@ -329,3 +329,20 @@ export async function exchangeGiteaCode(code: string): Promise<GiteaOAuthTokenRe
   );
   return response;
 }
+
+export async function refreshGiteaToken(refreshToken: string): Promise<GiteaOAuthTokenResponse> {
+  const config = useRuntimeConfig();
+  const response = await $fetch<GiteaOAuthTokenResponse>(
+    `${config.giteaUrl}/login/oauth/access_token`,
+    {
+      method: "POST",
+      body: {
+        client_id: config.giteaClientId,
+        client_secret: config.giteaClientSecret,
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      },
+    },
+  );
+  return response;
+}

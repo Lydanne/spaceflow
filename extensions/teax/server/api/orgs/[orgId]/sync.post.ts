@@ -1,7 +1,7 @@
 import { eq, and, notInArray } from "drizzle-orm";
 import { useDB, schema } from "../../../db";
 import { requireOrgOwnerOrAdmin } from "../../../utils/org-owner";
-import { createGiteaService } from "../../../utils/gitea";
+import { createGiteaServiceWithRefresh } from "../../../utils/auth";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Organization not found" });
   }
 
-  const gitea = createGiteaService(session.giteaAccessToken);
+  const gitea = await createGiteaServiceWithRefresh(event, session);
 
   try {
     const teams = await gitea.getOrgTeamsAll(org.name);
@@ -97,9 +97,7 @@ export default defineEventHandler(async (event) => {
             ),
           );
       } else {
-        await db
-          .delete(schema.teamMembers)
-          .where(eq(schema.teamMembers.teamId, dbTeam.id));
+        await db.delete(schema.teamMembers).where(eq(schema.teamMembers.teamId, dbTeam.id));
       }
     }
 
@@ -107,15 +105,10 @@ export default defineEventHandler(async (event) => {
       await db
         .delete(schema.teams)
         .where(
-          and(
-            eq(schema.teams.organizationId, org.id),
-            notInArray(schema.teams.id, syncedTeamIds),
-          ),
+          and(eq(schema.teams.organizationId, org.id), notInArray(schema.teams.id, syncedTeamIds)),
         );
     } else {
-      await db
-        .delete(schema.teams)
-        .where(eq(schema.teams.organizationId, org.id));
+      await db.delete(schema.teams).where(eq(schema.teams.organizationId, org.id));
     }
 
     await db

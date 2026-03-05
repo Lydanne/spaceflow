@@ -50,8 +50,8 @@ async function createProject() {
     });
     router.push(`/orgs/${orgId}/projects/${(project as { id: string }).id}`);
   } catch (err: unknown) {
-    const msg
-      = (err as { data?: { message?: string } })?.data?.message || "创建失败";
+    const msg =
+      (err as { data?: { message?: string } })?.data?.message || "创建失败";
     toast.add({ title: msg, color: "error" });
   } finally {
     creating.value = false;

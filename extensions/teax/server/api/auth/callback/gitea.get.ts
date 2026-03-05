@@ -48,6 +48,7 @@ export default defineEventHandler(async (event) => {
       },
       sessionId,
       giteaAccessToken: tokenResponse.access_token,
+      giteaRefreshToken: tokenResponse.refresh_token,
     });
 
     // 后台异步同步组织和团队

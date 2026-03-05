@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { parse as parseYaml } from "yaml";
 import { useDB, schema } from "../../../../../db";
 import { requireOrgAccess } from "../../../../../utils/org-access";
-import { createGiteaService } from "../../../../../utils/gitea";
+import { createGiteaServiceWithRefresh } from "../../../../../utils/auth";
 
 interface WorkflowInput {
   description?: string;
@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Project not found" });
   }
 
-  const gitea = createGiteaService(session.giteaAccessToken);
+  const gitea = await createGiteaServiceWithRefresh(event, session);
   const parts = project.fullName.split("/");
   const owner = parts[0] ?? "";
   const repo = parts[1] ?? "";

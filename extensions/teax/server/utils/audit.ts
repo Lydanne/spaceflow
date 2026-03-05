@@ -13,9 +13,9 @@ interface AuditLogParams {
 export async function writeAuditLog(event: H3Event, params: AuditLogParams) {
   try {
     const db = useDB();
-    const ipAddress = getRequestHeader(event, "x-forwarded-for")
-      || getRequestHeader(event, "x-real-ip")
-      || "unknown";
+    const ipAddress = getRequestHeader(event, "x-forwarded-for") ||
+      getRequestHeader(event, "x-real-ip") ||
+      "unknown";
     const userAgent = getRequestHeader(event, "user-agent") || "";
 
     await db.insert(schema.auditLogs).values({

@@ -12,6 +12,7 @@ declare module "#auth-utils" {
     user: User;
     sessionId: string;
     giteaAccessToken: string;
+    giteaRefreshToken: string;
   }
 }
 

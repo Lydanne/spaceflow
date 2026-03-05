@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "../../../../../db";
 import { requireOrgAccess } from "../../../../../utils/org-access";
-import { createGiteaService } from "../../../../../utils/gitea";
+import { createGiteaServiceWithRefresh } from "../../../../../utils/auth";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
@@ -22,15 +22,24 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Project not found" });
   }
 
-  const gitea = createGiteaService(session.giteaAccessToken);
+  const gitea = await createGiteaServiceWithRefresh(event, session);
   const parts = project.fullName.split("/");
   if (parts.length < 2 || !parts[0] || !parts[1]) {
     throw createError({ statusCode: 500, message: "Invalid project fullName format" });
   }
-  const branches = await gitea.getRepoBranches(parts[0], parts[1]);
 
-  return {
-    data: branches,
-    defaultBranch: project.defaultBranch,
-  };
+  try {
+    const branches = await gitea.getRepoBranches(parts[0], parts[1]);
+    return {
+      data: branches,
+      defaultBranch: project.defaultBranch,
+    };
+  } catch (err: unknown) {
+    const status =
+      (err as { statusCode?: number })?.statusCode || (err as { status?: number })?.status;
+    if (status === 401) {
+      throw createError({ statusCode: 401, message: "Gitea token 已过期，请重新登录" });
+    }
+    throw createError({ statusCode: 502, message: "获取分支列表失败" });
+  }
 });
