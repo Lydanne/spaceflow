@@ -12,20 +12,33 @@ interface WorkflowInput {
   options?: string[];
 }
 
-function extractInputs(yamlContent: string): Record<string, WorkflowInput> | null {
+function parseWorkflowYaml(yamlContent: string) {
   try {
     const doc = parseYaml(yamlContent);
     if (!doc || typeof doc !== "object") return null;
-    const on = (doc as Record<string, unknown>).on;
-    if (!on || typeof on !== "object") return null;
-    const dispatch = (on as Record<string, unknown>).workflow_dispatch;
-    if (!dispatch || typeof dispatch !== "object") return null;
-    const inputs = (dispatch as Record<string, unknown>).inputs;
-    if (!inputs || typeof inputs !== "object") return null;
-    return inputs as Record<string, WorkflowInput>;
+    return doc as Record<string, unknown>;
   } catch {
     return null;
   }
+}
+
+function extractTriggers(doc: Record<string, unknown>): string[] {
+  const on = doc.on;
+  if (!on) return [];
+  if (typeof on === "string") return [on];
+  if (Array.isArray(on)) return on.filter(v => typeof v === "string");
+  if (typeof on === "object") return Object.keys(on as Record<string, unknown>);
+  return [];
+}
+
+function extractInputs(doc: Record<string, unknown>): Record<string, WorkflowInput> | null {
+  const on = doc.on;
+  if (!on || typeof on !== "object") return null;
+  const dispatch = (on as Record<string, unknown>).workflow_dispatch;
+  if (!dispatch || typeof dispatch !== "object") return null;
+  const inputs = (dispatch as Record<string, unknown>).inputs;
+  if (!inputs || typeof inputs !== "object") return null;
+  return inputs as Record<string, WorkflowInput>;
 }
 
 export default defineEventHandler(async (event) => {
@@ -57,12 +70,17 @@ export default defineEventHandler(async (event) => {
     const data = await Promise.all(
       workflows.map(async (w) => {
         const content = await gitea.getFileContent(owner, repo, w.path);
-        const inputs = content ? extractInputs(content) : null;
+        const doc = content ? parseWorkflowYaml(content) : null;
+        const inputs = doc ? extractInputs(doc) : null;
+        const triggers = doc ? extractTriggers(doc) : [];
+        const description = doc?.["x-description"] as string | undefined;
         return {
           id: w.id,
           name: w.name,
           path: w.path,
           state: w.state,
+          description: description || "",
+          triggers,
           inputs: inputs || {},
         };
       }),

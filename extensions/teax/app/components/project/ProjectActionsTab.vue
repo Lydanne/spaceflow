@@ -35,6 +35,8 @@ interface WorkflowItem {
   name: string;
   path: string;
   state: string;
+  description: string;
+  triggers: string[];
   inputs: Record<string, WorkflowInput>;
 }
 
@@ -110,11 +112,18 @@ const filteredRuns = computed(() => {
   );
 });
 
+// 当前选中 workflow 对象
+const activeWorkflow = computed(() => {
+  if (!activeWorkflowPath.value) return null;
+  return (
+    workflows.value.find(w => w.path === activeWorkflowPath.value) ?? null
+  );
+});
+
 // 当前选中 workflow 的名称
 const activeWorkflowName = computed(() => {
   if (!activeWorkflowPath.value) return "全部 Workflows";
-  const wf = workflows.value.find(w => w.path === activeWorkflowPath.value);
-  return wf?.name ?? workflowName(activeWorkflowPath.value);
+  return activeWorkflow.value?.name ?? workflowName(activeWorkflowPath.value);
 });
 
 // 每个 workflow 的最近运行状态统计
@@ -138,11 +147,14 @@ const selectedBranch = ref("");
 const dispatching = ref(false);
 const inputValues = reactive<Record<string, string>>({});
 
-// 当前选中 workflow 的 inputs 定义（用于 dispatch modal）
-const currentInputs = computed(() => {
-  const wf = workflows.value.find(w => w.path === selectedWorkflow.value);
-  return wf?.inputs ?? {};
-});
+// 当前选中 workflow 的信息（用于 dispatch modal）
+const selectedWorkflowItem = computed(
+  () => workflows.value.find(w => w.path === selectedWorkflow.value) ?? null,
+);
+const currentInputs = computed(() => selectedWorkflowItem.value?.inputs ?? {});
+const currentDescription = computed(
+  () => selectedWorkflowItem.value?.description ?? "",
+);
 
 function clearInputValues() {
   Object.keys(inputValues).forEach((key) => {
@@ -380,6 +392,60 @@ function workflowName(path: string): string {
           </div>
         </div>
 
+        <!-- Workflow 信息卡片 -->
+        <div
+          v-if="activeWorkflow"
+          class="mb-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3"
+        >
+          <p
+            v-if="activeWorkflow.description"
+            class="text-sm text-gray-600 dark:text-gray-300 mb-2"
+          >
+            {{ activeWorkflow.description }}
+          </p>
+          <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+            <!-- 触发方式 -->
+            <div class="flex items-center gap-1.5">
+              <UIcon
+                name="i-lucide-zap"
+                class="w-4 h-4 text-gray-400 shrink-0"
+              />
+              <span
+                v-if="activeWorkflow.triggers.length === 0"
+                class="text-gray-400"
+              >
+                无触发方式
+              </span>
+              <span
+                v-for="trigger in activeWorkflow.triggers"
+                :key="trigger"
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+              >
+                {{ trigger }}
+              </span>
+            </div>
+            <!-- Inputs 数量 -->
+            <div
+              v-if="Object.keys(activeWorkflow.inputs).length > 0"
+              class="flex items-center gap-1.5 text-gray-500 dark:text-gray-400"
+            >
+              <UIcon
+                name="i-lucide-settings-2"
+                class="w-4 h-4 shrink-0"
+              />
+              <span>{{ Object.keys(activeWorkflow.inputs).length }} 个参数</span>
+            </div>
+            <!-- 文件路径 -->
+            <div class="flex items-center gap-1.5 text-gray-400">
+              <UIcon
+                name="i-lucide-file-code"
+                class="w-4 h-4 shrink-0"
+              />
+              <span class="font-mono text-xs">{{ activeWorkflow.path }}</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Runs 列表 -->
         <div
           v-if="filteredRuns.length > 0"
@@ -485,6 +551,13 @@ function workflowName(path: string): string {
                 placeholder="选择 Workflow"
               />
             </div>
+
+            <p
+              v-if="currentDescription"
+              class="text-sm text-gray-500 dark:text-gray-400 -mt-2"
+            >
+              {{ currentDescription }}
+            </p>
 
             <div>
               <label class="block text-sm font-medium mb-1">分支</label>
