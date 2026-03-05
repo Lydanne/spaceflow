@@ -17,6 +17,34 @@ const orgs = computed(() => orgsData.value?.data ?? []);
 const totalProjects = computed(() =>
   orgs.value.reduce((sum, o) => sum + Number(o.projectCount || 0), 0),
 );
+
+interface CommitItem {
+  sha: string;
+  message: string;
+  authorName: string;
+  authorEmail: string;
+  date: string;
+  htmlUrl: string;
+  projectName: string;
+  projectFullName: string;
+}
+
+const { data: commitsData } = await useFetch<{ data: CommitItem[] }>(
+  "/api/stats/recent-commits",
+  { key: "home-recent-commits" },
+);
+const recentCommits = computed(() => commitsData.value?.data ?? []);
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  return `${days} 天前`;
+}
 </script>
 
 <template>
@@ -101,6 +129,57 @@ const totalProjects = computed(() =>
           <p>暂无组织</p>
           <p class="text-sm mt-1">
             登录后将自动同步 Gitea 组织
+          </p>
+        </div>
+      </UCard>
+    </div>
+
+    <div class="mt-8">
+      <h2 class="text-lg font-semibold mb-4">
+        最近提交
+      </h2>
+      <UCard v-if="recentCommits.length > 0">
+        <div class="divide-y divide-gray-200 dark:divide-gray-800">
+          <div
+            v-for="commit in recentCommits"
+            :key="commit.sha"
+            class="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+          >
+            <UIcon
+              name="i-lucide-git-commit-horizontal"
+              class="w-5 h-5 mt-0.5 text-gray-400 shrink-0"
+            />
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <a
+                  :href="commit.htmlUrl"
+                  target="_blank"
+                  class="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline truncate"
+                >
+                  {{ commit.message }}
+                </a>
+              </div>
+              <div class="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                <span class="font-mono">{{ commit.sha.slice(0, 7) }}</span>
+                <span>·</span>
+                <span>{{ commit.projectFullName }}</span>
+                <span>·</span>
+                <span>{{ commit.authorName }}</span>
+                <span>·</span>
+                <span>{{ timeAgo(commit.date) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </UCard>
+      <UCard v-else>
+        <div class="text-center py-6 text-gray-400">
+          <UIcon
+            name="i-lucide-git-commit-horizontal"
+            class="w-10 h-10 mx-auto mb-2"
+          />
+          <p class="text-sm">
+            暂无最近提交
           </p>
         </div>
       </UCard>

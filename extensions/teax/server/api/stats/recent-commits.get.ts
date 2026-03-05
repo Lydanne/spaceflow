@@ -1,6 +1,7 @@
 import { eq, and, inArray } from "drizzle-orm";
 import { useDB, schema } from "../../db";
-import { requireAuth, getGiteaClient } from "../../utils/auth";
+import { requireAuth, createGiteaServiceWithRefresh } from "../../utils/auth";
+import type { GiteaCommit } from "../../utils/gitea";
 import { getVisibleProjectIds } from "../../utils/permission";
 
 interface CommitItem {
@@ -16,7 +17,7 @@ interface CommitItem {
 
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event);
-  const gitea = await getGiteaClient(event, session);
+  const gitea = await createGiteaServiceWithRefresh(event, session);
   const db = useDB();
 
   // 获取用户所有组织
@@ -39,9 +40,9 @@ export default defineEventHandler(async (event) => {
     const where = visibleIds === null
       ? eq(schema.projects.organizationId, org.id)
       : and(
-        eq(schema.projects.organizationId, org.id),
-        inArray(schema.projects.id, visibleIds),
-      );
+          eq(schema.projects.organizationId, org.id),
+          inArray(schema.projects.id, visibleIds),
+        );
 
     const projects = await db
       .select({
@@ -63,7 +64,7 @@ export default defineEventHandler(async (event) => {
       const [owner, repo] = project.fullName.split("/");
       if (!owner || !repo) return [];
       const repoCommits = await gitea.getRepoCommits(owner, repo, undefined, 3);
-      return repoCommits.map((c) => ({
+      return repoCommits.map((c: GiteaCommit) => ({
         sha: c.sha,
         message: c.commit.message.split("\n")[0],
         authorName: c.commit.author.name,
@@ -77,8 +78,8 @@ export default defineEventHandler(async (event) => {
   );
 
   for (const result of results) {
-    if (result.status === "fulfilled" && result.value) {
-      commits.push(...result.value);
+    if (result.status === "fulfilled" && result.value && Array.isArray(result.value)) {
+      commits.push(...(result.value as CommitItem[]));
     }
   }
 
