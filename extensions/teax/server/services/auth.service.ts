@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import { useDB, schema } from "../db";
 import type { GiteaUser } from "../utils/gitea";
 
@@ -18,13 +18,16 @@ export async function upsertUser(giteaUser: GiteaUser) {
         giteaUsername: giteaUser.login,
         email: giteaUser.email,
         avatarUrl: giteaUser.avatar_url,
-        isAdmin: giteaUser.is_admin,
         updatedAt: new Date(),
       })
       .where(eq(schema.users.giteaId, giteaUser.id));
 
     return existing[0];
   }
+
+  // 首次注册用户自动成为管理员
+  const result = await db.select({ value: count() }).from(schema.users);
+  const isFirstUser = !result[0] || result[0].value === 0;
 
   const [user] = await db
     .insert(schema.users)
@@ -33,7 +36,7 @@ export async function upsertUser(giteaUser: GiteaUser) {
       giteaUsername: giteaUser.login,
       email: giteaUser.email,
       avatarUrl: giteaUser.avatar_url,
-      isAdmin: giteaUser.is_admin,
+      isAdmin: isFirstUser || giteaUser.is_admin,
     })
     .returning();
 
