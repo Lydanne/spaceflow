@@ -52,6 +52,9 @@ export interface GiteaRepository {
   fork: boolean;
   archived: boolean;
   updated_at: string;
+  stars_count: number;
+  forks_count: number;
+  language: string;
 }
 
 export interface GiteaBranch {
