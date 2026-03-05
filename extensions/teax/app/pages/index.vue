@@ -18,6 +18,12 @@ const totalProjects = computed(() =>
   orgs.value.reduce((sum, o) => sum + Number(o.projectCount || 0), 0),
 );
 
+const { data: repoCountData } = await useFetch<{ count: number }>(
+  "/api/stats/repo-count",
+  { key: "home-repo-count" },
+);
+const repoCount = computed(() => repoCountData.value?.count ?? 0);
+
 interface CommitItem {
   sha: string;
   message: string;
@@ -53,7 +59,7 @@ function timeAgo(dateStr: string) {
       欢迎回来, {{ user?.username }}
     </h1>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
       <UCard>
         <div class="text-center">
           <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -71,6 +77,16 @@ function timeAgo(dateStr: string) {
           </p>
           <p class="text-3xl font-bold mt-1">
             {{ totalProjects }}
+          </p>
+        </div>
+      </UCard>
+      <UCard>
+        <div class="text-center">
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            仓库总数
+          </p>
+          <p class="text-3xl font-bold mt-1">
+            {{ repoCount }}
           </p>
         </div>
       </UCard>

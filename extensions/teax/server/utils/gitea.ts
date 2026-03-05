@@ -219,6 +219,13 @@ export class GiteaService {
     return result.data || [];
   }
 
+  async getOrgRepoCount(orgName: string): Promise<number> {
+    const result = (await this.fetch(
+      `/repos/search?owner=${orgName}&limit=1`,
+    )) as { data: unknown[]; ok: boolean; total_count?: number };
+    return result.total_count ?? result.data?.length ?? 0;
+  }
+
   async getRepo(owner: string, repo: string): Promise<GiteaRepository> {
     return this.fetch(`/repos/${owner}/${repo}`) as Promise<GiteaRepository>;
   }
