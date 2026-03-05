@@ -129,6 +129,14 @@ export interface GiteaWorkflowsList {
   workflows: GiteaWorkflow[];
 }
 
+export interface GiteaAccessToken {
+  id: number;
+  name: string;
+  sha1: string;
+  token_last_eight: string;
+  scopes: string[];
+}
+
 export class GiteaService {
   private baseUrl: string;
   private accessToken: string;
@@ -298,6 +306,25 @@ export class GiteaService {
       inputs: inputs || {},
     });
   }
+
+  async listAccessTokens(username: string): Promise<GiteaAccessToken[]> {
+    return this.fetch(`/users/${username}/tokens`) as Promise<GiteaAccessToken[]>;
+  }
+
+  async createAccessToken(
+    username: string,
+    name: string,
+    scopes: string[],
+  ): Promise<GiteaAccessToken> {
+    return this.fetch(`/users/${username}/tokens`, "POST", {
+      name,
+      scopes,
+    }) as Promise<GiteaAccessToken>;
+  }
+
+  async deleteAccessToken(username: string, tokenId: number): Promise<void> {
+    await this.fetch(`/users/${username}/tokens/${tokenId}`, "DELETE");
+  }
 }
 
 export function createGiteaService(accessToken: string): GiteaService {
@@ -345,4 +372,31 @@ export async function refreshGiteaToken(refreshToken: string): Promise<GiteaOAut
     },
   );
   return response;
+}
+
+/**
+ * 使用全局 service token 创建 GiteaService。
+ * 优先读取环境变量 SERVICE_TOKEN，未配置则回退到 DB 中自动管理的 token。
+ * 如果两者都没有，抛出 503 错误。
+ */
+export async function createServiceGiteaClient(): Promise<GiteaService> {
+  const config = useRuntimeConfig();
+
+  // 优先使用环境变量注入的 token
+  if (config.serviceToken) {
+    return createGiteaService(config.serviceToken);
+  }
+
+  // 回退到 DB 自动管理的 token
+  const { getServiceToken } = await import("../services/service-token.service");
+  const token = await getServiceToken();
+
+  if (!token) {
+    throw createError({
+      statusCode: 503,
+      message: "Service token not configured. Set SERVICE_TOKEN env or let an admin log in.",
+    });
+  }
+
+  return createGiteaService(token);
 }

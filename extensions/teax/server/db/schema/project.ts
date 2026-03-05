@@ -32,7 +32,7 @@ export const projects = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
-  table => [
+  (table) => [
     unique("projects_org_repo").on(table.organizationId, table.giteaRepoId),
     index("idx_projects_org").on(table.organizationId),
   ],

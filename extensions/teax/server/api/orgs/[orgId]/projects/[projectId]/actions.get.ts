@@ -1,11 +1,11 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "../../../../../db";
 import { requireOrgAccess } from "../../../../../utils/org-access";
-import { createGiteaServiceWithRefresh } from "../../../../../utils/auth";
+import { createServiceGiteaClient } from "../../../../../utils/gitea";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId")!;
-  const session = await requireOrgAccess(event, orgId);
+  await requireOrgAccess(event, orgId);
   const projectId = getRouterParam(event, "projectId")!;
   const query = getQuery(event);
   const page = Number(query.page) || 1;
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Project not found" });
   }
 
-  const gitea = await createGiteaServiceWithRefresh(event, session);
+  const gitea = await createServiceGiteaClient();
   const parts = project.fullName.split("/");
   const owner = parts[0] ?? "";
   const repo = parts[1] ?? "";
@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     const result = await gitea.getRepoWorkflowRuns(owner, repo, page, limit);
     return {
       total: result.total_count,
-      data: (result.workflow_runs || []).map(run => ({
+      data: (result.workflow_runs || []).map((run) => ({
         id: run.id,
         runNumber: run.run_number,
         displayTitle: run.display_title,

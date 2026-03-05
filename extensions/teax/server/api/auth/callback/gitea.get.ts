@@ -1,6 +1,7 @@
 import { exchangeGiteaCode, createGiteaService } from "../../../utils/gitea";
 import { upsertUser } from "../../../services/auth.service";
 import { syncUserOrgsAndTeams } from "../../../services/sync.service";
+import { ensureServiceToken } from "../../../services/service-token.service";
 import { generateSessionId, registerSession } from "../../../utils/session";
 
 export default defineEventHandler(async (event) => {
@@ -55,6 +56,13 @@ export default defineEventHandler(async (event) => {
     syncUserOrgsAndTeams(tokenResponse.access_token, user.id).catch((err) => {
       console.error("Failed to sync orgs and teams:", err);
     });
+
+    // 管理员登录时，异步确保全局 service token 存在
+    if (user.isAdmin) {
+      ensureServiceToken(tokenResponse.access_token, user.id, user.giteaUsername).catch((err) => {
+        console.error("Failed to ensure service token:", err);
+      });
+    }
 
     return sendRedirect(event, "/");
   } catch (err: unknown) {

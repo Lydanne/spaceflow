@@ -129,9 +129,9 @@ async function removePermission(assignmentId: string) {
 
 const unassignedGroups = computed(() => {
   const assignedIds = new Set(
-    teamPermissions.value.map(tp => tp.permissionGroupId),
+    teamPermissions.value.map((tp) => tp.permissionGroupId),
   );
-  return props.allGroups.filter(g => !assignedIds.has(g.id));
+  return props.allGroups.filter((g) => !assignedIds.has(g.id));
 });
 
 const memberColumns = computed(() => {

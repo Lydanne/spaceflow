@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { parse as parseYaml } from "yaml";
 import { useDB, schema } from "../../../../../db";
 import { requireOrgAccess } from "../../../../../utils/org-access";
-import { createGiteaServiceWithRefresh } from "../../../../../utils/auth";
+import { createServiceGiteaClient } from "../../../../../utils/gitea";
 
 interface WorkflowInput {
   description?: string;
@@ -26,7 +26,7 @@ function extractTriggers(doc: Record<string, unknown>): string[] {
   const on = doc.on;
   if (!on) return [];
   if (typeof on === "string") return [on];
-  if (Array.isArray(on)) return on.filter(v => typeof v === "string");
+  if (Array.isArray(on)) return on.filter((v) => typeof v === "string");
   if (typeof on === "object") return Object.keys(on as Record<string, unknown>);
   return [];
 }
@@ -38,7 +38,7 @@ function extractSchedules(doc: Record<string, unknown>): string[] {
   if (!schedule) return [];
   if (!Array.isArray(schedule)) return [];
   return schedule
-    .map(item =>
+    .map((item) =>
       item && typeof item === "object" ? (item as Record<string, string>).cron : null,
     )
     .filter((v): v is string => typeof v === "string");
@@ -56,7 +56,7 @@ function extractInputs(doc: Record<string, unknown>): Record<string, WorkflowInp
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId")!;
-  const session = await requireOrgAccess(event, orgId);
+  await requireOrgAccess(event, orgId);
   const projectId = getRouterParam(event, "projectId")!;
 
   const db = useDB();
@@ -70,7 +70,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Project not found" });
   }
 
-  const gitea = await createGiteaServiceWithRefresh(event, session);
+  const gitea = await createServiceGiteaClient();
   const parts = project.fullName.split("/");
   const owner = parts[0] ?? "";
   const repo = parts[1] ?? "";

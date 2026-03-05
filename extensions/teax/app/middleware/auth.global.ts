@@ -3,7 +3,7 @@ export default defineNuxtRouteMiddleware((to) => {
 
   const publicPaths = ["/auth/login", "/auth/callback/gitea", "/auth/callback/feishu"];
 
-  if (publicPaths.some(p => to.path.startsWith(p))) {
+  if (publicPaths.some((p) => to.path.startsWith(p))) {
     return;
   }
 

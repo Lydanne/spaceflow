@@ -15,6 +15,6 @@ export const teamPermissions = pgTable("team_permissions", {
   teamId: uuid("team_id").references(() => teams.id, { onDelete: "cascade" }),
   permissionGroupId: uuid("permission_group_id").references(() => permissionGroups.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-}, table => [
+}, (table) => [
   unique("team_permissions_team_group").on(table.teamId, table.permissionGroupId),
 ]);

@@ -110,7 +110,7 @@ function runMatchesWorkflow(runPath: string, workflowPath: string): boolean {
 // 按侧边栏选中过滤 runs
 const filteredRuns = computed(() => {
   if (!activeWorkflowPath.value) return workflowRuns.value;
-  return workflowRuns.value.filter(r =>
+  return workflowRuns.value.filter((r) =>
     runMatchesWorkflow(r.path, activeWorkflowPath.value),
   );
 });
@@ -119,7 +119,7 @@ const filteredRuns = computed(() => {
 const activeWorkflow = computed(() => {
   if (!activeWorkflowPath.value) return null;
   return (
-    workflows.value.find(w => w.path === activeWorkflowPath.value) ?? null
+    workflows.value.find((w) => w.path === activeWorkflowPath.value) ?? null
   );
 });
 const showWorkflowDesc = ref(false);
@@ -135,19 +135,19 @@ const activeWorkflowName = computed(() => {
 
 // 每个 workflow 的最近运行状态统计
 function workflowRunCount(path: string): number {
-  return workflowRuns.value.filter(r => runMatchesWorkflow(r.path, path))
+  return workflowRuns.value.filter((r) => runMatchesWorkflow(r.path, path))
     .length;
 }
 
 // 下拉选项
 const workflowOptions = computed(() =>
-  workflows.value.map(w => ({
+  workflows.value.map((w) => ({
     label: w.description ? `${w.name} — ${w.description}` : w.name,
     value: w.path,
   })),
 );
 const branchOptions = computed(() =>
-  branches.value.map(b => ({ label: b.name, value: b.name })),
+  branches.value.map((b) => ({ label: b.name, value: b.name })),
 );
 
 // 触发 workflow
@@ -159,7 +159,7 @@ const inputValues = reactive<Record<string, string>>({});
 
 // 当前选中 workflow 的信息（用于 dispatch modal）
 const selectedWorkflowItem = computed(
-  () => workflows.value.find(w => w.path === selectedWorkflow.value) ?? null,
+  () => workflows.value.find((w) => w.path === selectedWorkflow.value) ?? null,
 );
 const currentInputs = computed(() => selectedWorkflowItem.value?.inputs ?? {});
 const currentDescription = computed(

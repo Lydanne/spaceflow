@@ -108,7 +108,7 @@ async function deleteGroup(group: PermissionGroup) {
 }
 
 function getPermissionLabel(key: string) {
-  return props.availablePermissions.find(p => p.key === key)?.label || key;
+  return props.availablePermissions.find((p) => p.key === key)?.label || key;
 }
 </script>
 

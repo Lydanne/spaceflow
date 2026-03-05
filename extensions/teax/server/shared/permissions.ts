@@ -36,5 +36,5 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
 
 /** 所有合法的权限 key 集合，用于校验 */
 export const VALID_PERMISSION_KEYS = new Set(
-  PERMISSION_DEFINITIONS.map(d => d.key),
+  PERMISSION_DEFINITIONS.map((d) => d.key),
 );

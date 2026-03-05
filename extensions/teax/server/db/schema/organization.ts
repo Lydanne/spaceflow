@@ -19,7 +19,7 @@ export const teams = pgTable("teams", {
   description: text("description"),
   syncedAt: timestamp("synced_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-}, table => [
+}, (table) => [
   unique("teams_org_gitea_team").on(table.organizationId, table.giteaTeamId),
 ]);
 
@@ -29,6 +29,6 @@ export const teamMembers = pgTable("team_members", {
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   role: varchar("role", { length: 50 }).default("member"),
   joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow(),
-}, table => [
+}, (table) => [
   unique("team_members_team_user").on(table.teamId, table.userId),
 ]);

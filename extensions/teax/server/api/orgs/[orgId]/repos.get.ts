@@ -1,14 +1,14 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "../../../db";
 import { requireOrgAccess } from "../../../utils/org-access";
-import { createGiteaServiceWithRefresh } from "../../../utils/auth";
+import { createServiceGiteaClient } from "../../../utils/gitea";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
   if (!orgId) {
     throw createError({ statusCode: 400, message: "Missing orgId" });
   }
-  const session = await requireOrgAccess(event, orgId);
+  await requireOrgAccess(event, orgId);
   const db = useDB();
 
   const [org] = await db
@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(50, Math.max(1, Number(query.limit) || 20));
 
-  const gitea = await createGiteaServiceWithRefresh(event, session);
+  const gitea = await createServiceGiteaClient();
 
   const repos = search
     ? await gitea.searchRepos(org.name, search, limit)

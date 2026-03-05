@@ -13,7 +13,7 @@ export const auditLogs = pgTable("audit_logs", {
   userAgent: text("user_agent"),
   detail: jsonb("detail").default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-}, table => [
+}, (table) => [
   index("idx_audit_logs_user").on(table.userId),
   index("idx_audit_logs_org").on(table.organizationId),
   index("idx_audit_logs_created").on(table.createdAt),

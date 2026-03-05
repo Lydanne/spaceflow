@@ -1,7 +1,7 @@
 import { eq, and, notInArray } from "drizzle-orm";
 import { useDB, schema } from "../../../db";
 import { requireOrgOwnerOrAdmin } from "../../../utils/org-owner";
-import { createGiteaServiceWithRefresh } from "../../../utils/auth";
+import { createServiceGiteaClient } from "../../../utils/gitea";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: "Missing orgId" });
   }
 
-  const session = await requireOrgOwnerOrAdmin(event, orgId);
+  await requireOrgOwnerOrAdmin(event, orgId);
   const db = useDB();
 
   const [org] = await db
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Organization not found" });
   }
 
-  const gitea = await createGiteaServiceWithRefresh(event, session);
+  const gitea = await createServiceGiteaClient();
 
   try {
     const teams = await gitea.getOrgTeamsAll(org.name);

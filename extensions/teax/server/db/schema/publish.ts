@@ -32,7 +32,7 @@ export const publishTasks = pgTable(
     logUrl: text("log_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   },
-  table => [
+  (table) => [
     index("idx_publish_tasks_project").on(table.projectId),
     index("idx_publish_tasks_status").on(table.status),
   ],
@@ -48,5 +48,5 @@ export const publishTaskLogs = pgTable(
     step: varchar("step", { length: 100 }),
     message: text("message").notNull(),
   },
-  table => [index("idx_publish_task_logs_task").on(table.taskId)],
+  (table) => [index("idx_publish_task_logs_task").on(table.taskId)],
 );
