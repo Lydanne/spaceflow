@@ -20,14 +20,25 @@ const { data: project, status: projectStatus } = await useFetch<ProjectDetail>(
   `/api/orgs/${orgId}/projects/${projectId}`,
 );
 
+const { data: roleData } = await useFetch<{ role: string }>(
+  `/api/orgs/${orgId}/role`,
+);
+const isOwnerOrAdmin = computed(() =>
+  roleData.value?.role === "admin" || roleData.value?.role === "owner",
+);
+
 const activeTab = ref("actions");
 
-const tabs = [
+const baseTabs = [
   { label: "Actions", value: "actions", icon: "i-lucide-rocket" },
   { label: "Agents", value: "agents", icon: "i-lucide-bot" },
   { label: "Pages", value: "pages", icon: "i-lucide-globe" },
-  { label: "设置", value: "settings", icon: "i-lucide-settings" },
 ];
+const tabs = computed(() =>
+  isOwnerOrAdmin.value
+    ? [...baseTabs, { label: "设置", value: "settings", icon: "i-lucide-settings" }]
+    : baseTabs,
+);
 </script>
 
 <template>
@@ -128,7 +139,7 @@ const tabs = [
       </div>
 
       <ProjectSettingsTab
-        v-if="activeTab === 'settings'"
+        v-if="activeTab === 'settings' && isOwnerOrAdmin"
         :org-id="orgId"
         :project-id="projectId"
         :project="project"
