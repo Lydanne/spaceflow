@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { parse as parseYaml } from "yaml";
 import { useDB, schema } from "../../../../../db";
-import { requireOrgAccess } from "../../../../../utils/org-access";
+import { requirePermission } from "../../../../../utils/permission";
 import { createServiceGiteaClient } from "../../../../../utils/gitea";
 
 interface WorkflowInput {
@@ -56,8 +56,8 @@ function extractInputs(doc: Record<string, unknown>): Record<string, WorkflowInp
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId")!;
-  await requireOrgAccess(event, orgId);
   const projectId = getRouterParam(event, "projectId")!;
+  await requirePermission(event, orgId, "actions:view", projectId);
 
   const db = useDB();
   const [project] = await db

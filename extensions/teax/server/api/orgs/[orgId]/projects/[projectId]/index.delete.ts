@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: "Missing orgId or projectId" });
   }
 
-  const session = await requirePermission(event, orgId, "project:delete");
+  const session = await requirePermission(event, orgId, "project:delete", projectId);
   const db = useDB();
 
   const [project] = await db

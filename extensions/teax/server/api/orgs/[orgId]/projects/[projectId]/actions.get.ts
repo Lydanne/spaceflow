@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "../../../../../db";
-import { requireOrgAccess } from "../../../../../utils/org-access";
+import { requirePermission } from "../../../../../utils/permission";
 import { createServiceGiteaClient } from "../../../../../utils/gitea";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId")!;
-  await requireOrgAccess(event, orgId);
   const projectId = getRouterParam(event, "projectId")!;
+  await requirePermission(event, orgId, "actions:view", projectId);
   const query = getQuery(event);
   const page = Number(query.page) || 1;
   const limit = Number(query.limit) || 20;

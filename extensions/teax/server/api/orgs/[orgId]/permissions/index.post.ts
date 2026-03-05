@@ -27,6 +27,7 @@ export default defineEventHandler(async (event) => {
     name: string;
     description?: string;
     permissions?: string[];
+    projectIds?: string[] | null;
   }>(event);
 
   if (!body.name?.trim()) {
@@ -40,6 +41,7 @@ export default defineEventHandler(async (event) => {
       name: body.name.trim(),
       description: body.description?.trim() || null,
       permissions: body.permissions || [],
+      projectIds: body.projectIds ?? null,
     })
     .returning();
 

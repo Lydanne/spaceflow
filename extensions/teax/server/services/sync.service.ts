@@ -1,6 +1,9 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "../db";
 import { createServiceGiteaClient } from "../utils/gitea";
+import { PERMISSION_DEFINITIONS } from "../shared/permissions";
+
+const DEFAULT_GROUP_NAME = "默认权限";
 
 export async function syncUserOrgsAndTeams(username: string) {
   const gitea = await createServiceGiteaClient();
@@ -29,6 +32,11 @@ export async function syncUserOrgsAndTeams(username: string) {
       })
       .returning();
 
+    if (!dbOrg) continue;
+
+    // 确保组织有默认权限组（所有权限 + 全部项目可见）
+    const defaultGroup = await ensureDefaultPermissionGroup(db, dbOrg.id);
+
     const teams = await gitea.getOrgTeams(org.name);
 
     for (const team of teams) {
@@ -50,6 +58,17 @@ export async function syncUserOrgsAndTeams(username: string) {
           },
         })
         .returning();
+
+      if (!dbTeam) continue;
+
+      // 将团队关联到默认权限组
+      await db
+        .insert(schema.teamPermissions)
+        .values({
+          teamId: dbTeam.id,
+          permissionGroupId: defaultGroup.id,
+        })
+        .onConflictDoNothing();
 
       const members = await gitea.getTeamMembers(team.id);
 
@@ -73,4 +92,38 @@ export async function syncUserOrgsAndTeams(username: string) {
       }
     }
   }
+}
+
+/**
+ * 确保组织有一个默认权限组。
+ * projectIds=null 表示全部项目可见，permissions 包含所有已定义的权限。
+ */
+async function ensureDefaultPermissionGroup(db: ReturnType<typeof useDB>, orgId: string) {
+  const [existing] = await db
+    .select()
+    .from(schema.permissionGroups)
+    .where(
+      and(
+        eq(schema.permissionGroups.organizationId, orgId),
+        eq(schema.permissionGroups.name, DEFAULT_GROUP_NAME),
+      ),
+    )
+    .limit(1);
+
+  if (existing) return existing;
+
+  const allPermissionKeys = PERMISSION_DEFINITIONS.map((d) => d.key);
+
+  const [created] = await db
+    .insert(schema.permissionGroups)
+    .values({
+      organizationId: orgId,
+      name: DEFAULT_GROUP_NAME,
+      description: "默认权限组，包含所有权限，对全部项目可见",
+      permissions: allPermissionKeys,
+      projectIds: null,
+    })
+    .returning();
+
+  return created!;
 }

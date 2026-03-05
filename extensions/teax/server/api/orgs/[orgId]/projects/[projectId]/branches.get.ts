@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "../../../../../db";
-import { requireOrgAccess } from "../../../../../utils/org-access";
+import { requirePermission } from "../../../../../utils/permission";
 import { createServiceGiteaClient } from "../../../../../utils/gitea";
 
 export default defineEventHandler(async (event) => {
@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   if (!orgId || !projectId) {
     throw createError({ statusCode: 400, message: "Missing orgId or projectId" });
   }
-  await requireOrgAccess(event, orgId);
+  await requirePermission(event, orgId, "project:view", projectId);
   const db = useDB();
 
   const [project] = await db

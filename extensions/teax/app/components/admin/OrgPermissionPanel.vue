@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import type { PermissionGroup, PermissionDef } from "~/types/admin";
 
+interface ProjectItem {
+  id: string;
+  name: string;
+  fullName: string;
+}
+
 const props = defineProps<{
   orgId: string;
   allGroups: PermissionGroup[];
@@ -18,13 +24,20 @@ const editingGroup = ref<PermissionGroup | null>(null);
 const formName = ref("");
 const formDescription = ref("");
 const formPermissions = ref<string[]>([]);
+const formScopeAll = ref(true);
+const formProjectIds = ref<string[]>([]);
 const formLoading = ref(false);
+
+const { data: projectsData } = useFetch<{ data: ProjectItem[] }>(`/api/orgs/${props.orgId}/projects?limit=100`);
+const projectList = computed(() => projectsData.value?.data ?? []);
 
 function openCreateGroup() {
   editingGroup.value = null;
   formName.value = "";
   formDescription.value = "";
   formPermissions.value = [];
+  formScopeAll.value = true;
+  formProjectIds.value = [];
   showGroupForm.value = true;
 }
 
@@ -33,6 +46,8 @@ function openEditGroup(group: PermissionGroup) {
   formName.value = group.name;
   formDescription.value = group.description || "";
   formPermissions.value = [...(group.permissions || [])];
+  formScopeAll.value = group.projectIds === null;
+  formProjectIds.value = group.projectIds ? [...group.projectIds] : [];
   showGroupForm.value = true;
 }
 
@@ -47,6 +62,15 @@ function togglePermission(key: string) {
     formPermissions.value.splice(idx, 1);
   } else {
     formPermissions.value.push(key);
+  }
+}
+
+function toggleProject(id: string) {
+  const idx = formProjectIds.value.indexOf(id);
+  if (idx >= 0) {
+    formProjectIds.value.splice(idx, 1);
+  } else {
+    formProjectIds.value.push(id);
   }
 }
 
@@ -66,6 +90,7 @@ async function saveGroup() {
             name: formName.value,
             description: formDescription.value,
             permissions: formPermissions.value,
+            projectIds: formScopeAll.value ? null : formProjectIds.value,
           },
         },
       );
@@ -77,6 +102,7 @@ async function saveGroup() {
           name: formName.value,
           description: formDescription.value,
           permissions: formPermissions.value,
+          projectIds: formScopeAll.value ? null : formProjectIds.value,
         },
       });
       toast.add({ title: "权限组已创建", color: "success" });
@@ -143,9 +169,27 @@ function getPermissionLabel(key: string) {
             >
               {{ group.description }}
             </p>
+            <div class="flex flex-wrap gap-1.5 mt-3">
+              <UBadge
+                v-if="group.projectIds === null"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              >
+                全部项目
+              </UBadge>
+              <UBadge
+                v-else
+                color="warning"
+                variant="subtle"
+                size="sm"
+              >
+                {{ group.projectIds.length }} 个项目
+              </UBadge>
+            </div>
             <div
               v-if="group.permissions && group.permissions.length > 0"
-              class="flex flex-wrap gap-1.5 mt-3"
+              class="flex flex-wrap gap-1.5 mt-2"
             >
               <UBadge
                 v-for="perm in group.permissions"
@@ -226,6 +270,60 @@ function getPermissionLabel(key: string) {
                 placeholder="权限组用途说明"
                 :rows="2"
               />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-2">项目范围</label>
+              <div class="space-y-2">
+                <button
+                  type="button"
+                  class="flex items-center gap-2 p-2 rounded-lg border text-sm w-full text-left transition-colors"
+                  :class="formScopeAll ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300' : 'border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900'"
+                  @click="formScopeAll = true"
+                >
+                  <UIcon
+                    :name="formScopeAll ? 'i-lucide-circle-dot' : 'i-lucide-circle'"
+                    class="w-4 h-4 shrink-0"
+                  />
+                  全部项目
+                </button>
+                <button
+                  type="button"
+                  class="flex items-center gap-2 p-2 rounded-lg border text-sm w-full text-left transition-colors"
+                  :class="!formScopeAll ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300' : 'border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900'"
+                  @click="formScopeAll = false"
+                >
+                  <UIcon
+                    :name="!formScopeAll ? 'i-lucide-circle-dot' : 'i-lucide-circle'"
+                    class="w-4 h-4 shrink-0"
+                  />
+                  指定项目
+                </button>
+                <div
+                  v-if="!formScopeAll"
+                  class="pl-6 space-y-1 max-h-48 overflow-y-auto"
+                >
+                  <button
+                    v-for="project in projectList"
+                    :key="project.id"
+                    type="button"
+                    class="flex items-center gap-2 p-1.5 rounded text-sm w-full text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-900"
+                    @click="toggleProject(project.id)"
+                  >
+                    <UIcon
+                      :name="formProjectIds.includes(project.id) ? 'i-lucide-check-square' : 'i-lucide-square'"
+                      class="w-4 h-4 shrink-0"
+                    />
+                    {{ project.fullName || project.name }}
+                  </button>
+                  <p
+                    v-if="projectList.length === 0"
+                    class="text-sm text-gray-400"
+                  >
+                    暂无项目
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div>

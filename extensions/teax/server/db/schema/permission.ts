@@ -7,6 +7,7 @@ export const permissionGroups = pgTable("permission_groups", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   permissions: jsonb("permissions").default([]),
+  projectIds: jsonb("project_ids"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 

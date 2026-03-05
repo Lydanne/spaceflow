@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "../../../../../db";
-import { requireOrgAccess } from "../../../../../utils/org-access";
+import { requirePermission } from "../../../../../utils/permission";
 import { createServiceGiteaClient } from "../../../../../utils/gitea";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId")!;
-  await requireOrgAccess(event, orgId);
   const projectId = getRouterParam(event, "projectId")!;
+  await requirePermission(event, orgId, "actions:trigger", projectId);
 
   const body = await readBody<{
     workflowId: string;

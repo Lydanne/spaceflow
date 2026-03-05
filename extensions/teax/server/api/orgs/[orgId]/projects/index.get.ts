@@ -1,19 +1,32 @@
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { useDB, schema } from "../../../../db";
-import { requireOrgAccess } from "../../../../utils/org-access";
+import { requireAuth } from "../../../../utils/auth";
+import { getVisibleProjectIds } from "../../../../utils/permission";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
   if (!orgId) {
     throw createError({ statusCode: 400, message: "Missing orgId" });
   }
-  await requireOrgAccess(event, orgId);
+  const session = await requireAuth(event);
   const db = useDB();
+
+  // 获取可见项目 ID（null=全部可见）
+  const visibleIds = await getVisibleProjectIds(session.user.id, orgId, !!session.user.isAdmin);
+
+  // 用户没有任何 project:view 权限 → 空列表
+  if (visibleIds !== null && visibleIds.length === 0) {
+    return { data: [], total: 0, page: 1, limit: 20, hasMore: false };
+  }
 
   const query = getQuery(event);
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
   const offset = (page - 1) * limit;
+
+  const whereConditions = visibleIds === null
+    ? eq(schema.projects.organizationId, orgId)
+    : and(eq(schema.projects.organizationId, orgId), inArray(schema.projects.id, visibleIds));
 
   const projectList = await db
     .select({
@@ -32,7 +45,7 @@ export default defineEventHandler(async (event) => {
       updatedAt: schema.projects.updatedAt,
     })
     .from(schema.projects)
-    .where(eq(schema.projects.organizationId, orgId))
+    .where(whereConditions)
     .orderBy(desc(schema.projects.updatedAt))
     .limit(limit)
     .offset(offset);
@@ -40,7 +53,7 @@ export default defineEventHandler(async (event) => {
   const totalResult = await db
     .select({ count: sql<number>`COUNT(*)` })
     .from(schema.projects)
-    .where(eq(schema.projects.organizationId, orgId));
+    .where(whereConditions);
 
   const total = Number(totalResult[0]?.count ?? 0);
 

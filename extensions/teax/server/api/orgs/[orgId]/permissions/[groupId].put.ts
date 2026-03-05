@@ -17,6 +17,7 @@ export default defineEventHandler(async (event) => {
     name?: string;
     description?: string;
     permissions?: string[];
+    projectIds?: string[] | null;
   }>(event);
 
   const [updated] = await db
@@ -25,6 +26,7 @@ export default defineEventHandler(async (event) => {
       ...(body.name !== undefined ? { name: body.name.trim() } : {}),
       ...(body.description !== undefined ? { description: body.description.trim() || null } : {}),
       ...(body.permissions !== undefined ? { permissions: body.permissions } : {}),
+      ...(body.projectIds !== undefined ? { projectIds: body.projectIds } : {}),
     })
     .where(
       and(
