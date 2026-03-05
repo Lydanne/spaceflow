@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import cronstrue from "cronstrue/i18n";
+
 const props = defineProps<{
   orgId: string;
   projectId: string;
@@ -37,6 +39,7 @@ interface WorkflowItem {
   state: string;
   description: string;
   triggers: string[];
+  schedules: string[];
   inputs: Record<string, WorkflowInput>;
 }
 
@@ -119,6 +122,10 @@ const activeWorkflow = computed(() => {
     workflows.value.find(w => w.path === activeWorkflowPath.value) ?? null
   );
 });
+const showWorkflowDesc = ref(false);
+watch(activeWorkflowPath, () => {
+  showWorkflowDesc.value = false;
+});
 
 // 当前选中 workflow 的名称
 const activeWorkflowName = computed(() => {
@@ -134,7 +141,10 @@ function workflowRunCount(path: string): number {
 
 // 下拉选项
 const workflowOptions = computed(() =>
-  workflows.value.map(w => ({ label: w.name, value: w.path })),
+  workflows.value.map(w => ({
+    label: w.description ? `${w.name} — ${w.description}` : w.name,
+    value: w.path,
+  })),
 );
 const branchOptions = computed(() =>
   branches.value.map(b => ({ label: b.name, value: b.name })),
@@ -220,7 +230,8 @@ async function dispatchWorkflow() {
 }
 
 function runStatusColor(status: string, conclusion: string): string {
-  if (status === "running" || status === "waiting") return "warning";
+  if (status === "queued" || status === "waiting") return "info";
+  if (status === "running" || status === "in_progress") return "warning";
   if (conclusion === "success") return "success";
   if (conclusion === "failure") return "error";
   if (conclusion === "cancelled") return "neutral";
@@ -228,8 +239,9 @@ function runStatusColor(status: string, conclusion: string): string {
 }
 
 function runStatusLabel(status: string, conclusion: string): string {
-  if (status === "running") return "运行中";
+  if (status === "queued") return "排队中";
   if (status === "waiting") return "等待中";
+  if (status === "running" || status === "in_progress") return "运行中";
   if (conclusion === "success") return "成功";
   if (conclusion === "failure") return "失败";
   if (conclusion === "cancelled") return "已取消";
@@ -237,14 +249,60 @@ function runStatusLabel(status: string, conclusion: string): string {
   return status || "未知";
 }
 
+function runStatusIcon(status: string, conclusion: string): string {
+  if (status === "queued" || status === "waiting") return "i-lucide-clock";
+  if (status === "running" || status === "in_progress")
+    return "i-lucide-loader";
+  if (conclusion === "success") return "i-lucide-check-circle";
+  if (conclusion === "failure") return "i-lucide-x-circle";
+  if (conclusion === "cancelled") return "i-lucide-ban";
+  if (conclusion === "skipped") return "i-lucide-skip-forward";
+  return "i-lucide-circle-dot";
+}
+
 function formatDuration(startedAt: string, completedAt: string | null): string {
-  if (!completedAt) return "-";
+  if (!completedAt) return "";
   const seconds = Math.round(
     (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000,
   );
-  if (seconds < 0) return "-";
+  if (seconds < 0) return "";
   if (seconds < 60) return `${seconds}s`;
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+function relativeTime(dateStr: string): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  if (date.getFullYear() <= 1970) return "";
+  const now = Date.now();
+  const diff = Math.round((now - date.getTime()) / 1000);
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)} 天前`;
+  return date.toLocaleDateString("zh-CN");
+}
+
+function eventLabel(event: string): string {
+  const map: Record<string, string> = {
+    push: "推送",
+    pull_request: "PR",
+    workflow_dispatch: "手动触发",
+    schedule: "定时",
+    release: "发布",
+  };
+  return map[event] || event;
+}
+
+function cronToReadable(cron: string): string {
+  try {
+    return cronstrue.toString(cron, {
+      locale: "zh_CN",
+      use24HourTimeFormat: true,
+    });
+  } catch {
+    return cron;
+  }
 }
 
 function workflowName(path: string): string {
@@ -397,12 +455,6 @@ function workflowName(path: string): string {
           v-if="activeWorkflow"
           class="mb-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3"
         >
-          <p
-            v-if="activeWorkflow.description"
-            class="text-sm text-gray-600 dark:text-gray-300 mb-2"
-          >
-            {{ activeWorkflow.description }}
-          </p>
           <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
             <!-- 触发方式 -->
             <div class="flex items-center gap-1.5">
@@ -435,6 +487,24 @@ function workflowName(path: string): string {
               />
               <span>{{ Object.keys(activeWorkflow.inputs).length }} 个参数</span>
             </div>
+            <!-- 定时调度 -->
+            <div
+              v-if="activeWorkflow.schedules.length > 0"
+              class="flex items-center gap-1.5 text-gray-500 dark:text-gray-400"
+            >
+              <UIcon
+                name="i-lucide-calendar-clock"
+                class="w-4 h-4 shrink-0"
+              />
+              <span
+                v-for="(cron, idx) in activeWorkflow.schedules"
+                :key="idx"
+                class="text-xs"
+                :title="cron"
+              >
+                {{ cronToReadable(cron) }}
+              </span>
+            </div>
             <!-- 文件路径 -->
             <div class="flex items-center gap-1.5 text-gray-400">
               <UIcon
@@ -443,7 +513,32 @@ function workflowName(path: string): string {
               />
               <span class="font-mono text-xs">{{ activeWorkflow.path }}</span>
             </div>
+            <!-- 折叠按钮 -->
+            <button
+              v-if="activeWorkflow.description"
+              class="flex items-center gap-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              @click.prevent="showWorkflowDesc = !showWorkflowDesc"
+            >
+              <UIcon
+                :name="
+                  showWorkflowDesc
+                    ? 'i-lucide-chevron-up'
+                    : 'i-lucide-chevron-down'
+                "
+                class="w-4 h-4"
+              />
+              <span class="text-xs">{{
+                showWorkflowDesc ? "收起" : "详情"
+              }}</span>
+            </button>
           </div>
+          <!-- 描述（可折叠） -->
+          <p
+            v-if="activeWorkflow.description && showWorkflowDesc"
+            class="text-sm text-gray-600 dark:text-gray-300 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700"
+          >
+            {{ activeWorkflow.description }}
+          </p>
         </div>
 
         <!-- Runs 列表 -->
@@ -460,49 +555,107 @@ function workflowName(path: string): string {
             class="block"
           >
             <UCard class="hover:ring-1 hover:ring-primary-500 transition-all">
-              <div class="flex items-center justify-between">
-                <div>
+              <div class="flex items-start gap-3">
+                <!-- 状态图标 -->
+                <UIcon
+                  :name="runStatusIcon(run.status, run.conclusion)"
+                  class="w-5 h-5 mt-0.5 shrink-0"
+                  :class="{
+                    'text-blue-500':
+                      runStatusColor(run.status, run.conclusion) === 'info',
+                    'text-amber-500 animate-spin':
+                      runStatusColor(run.status, run.conclusion) === 'warning',
+                    'text-green-500':
+                      runStatusColor(run.status, run.conclusion) === 'success',
+                    'text-red-500':
+                      runStatusColor(run.status, run.conclusion) === 'error',
+                    'text-gray-400':
+                      runStatusColor(run.status, run.conclusion) === 'neutral',
+                  }"
+                />
+                <!-- 内容 -->
+                <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
+                    <span class="font-medium text-sm truncate">
+                      {{ run.displayTitle }}
+                    </span>
+                    <span class="text-xs text-gray-400 shrink-0">
+                      #{{ run.runNumber }}
+                    </span>
                     <UBadge
                       :color="runStatusColor(run.status, run.conclusion) as any"
                       variant="subtle"
-                      size="sm"
+                      size="xs"
                     >
                       {{ runStatusLabel(run.status, run.conclusion) }}
                     </UBadge>
-                    <span class="font-medium text-sm">
-                      {{ run.displayTitle }}
-                    </span>
-                    <span class="text-xs text-gray-400">
-                      #{{ run.runNumber }}
-                    </span>
                   </div>
                   <div
-                    class="flex items-center gap-3 mt-1.5 text-xs text-gray-400"
+                    class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-400"
                   >
-                    <span v-if="!activeWorkflowPath">
+                    <span
+                      v-if="!activeWorkflowPath"
+                      class="flex items-center gap-1"
+                    >
+                      <UIcon
+                        name="i-lucide-workflow"
+                        class="w-3.5 h-3.5"
+                      />
                       {{ workflowName(run.path) }}
                     </span>
-                    <span>{{ run.headBranch }}</span>
-                    <span>{{ run.headSha?.substring(0, 7) }}</span>
-                    <span>{{ run.event }}</span>
-                    <span v-if="run.actor">{{ run.actor.login }}</span>
-                    <span
-                      v-if="
-                        run.startedAt
-                          && new Date(run.startedAt).getFullYear() > 1970
-                      "
-                    >
-                      {{ new Date(run.startedAt).toLocaleString("zh-CN") }}
+                    <span class="flex items-center gap-1">
+                      <UIcon
+                        name="i-lucide-git-branch"
+                        class="w-3.5 h-3.5"
+                      />
+                      {{ run.headBranch }}
                     </span>
-                    <span>{{
-                      formatDuration(run.startedAt, run.completedAt)
+                    <span class="font-mono">{{
+                      run.headSha?.substring(0, 7)
                     }}</span>
+                    <UBadge
+                      color="neutral"
+                      variant="subtle"
+                      size="xs"
+                    >
+                      {{ eventLabel(run.event) }}
+                    </UBadge>
+                    <span
+                      v-if="run.actor"
+                      class="flex items-center gap-1"
+                    >
+                      <UIcon
+                        name="i-lucide-user"
+                        class="w-3.5 h-3.5"
+                      />
+                      {{ run.actor.login }}
+                    </span>
+                    <span
+                      v-if="relativeTime(run.startedAt)"
+                      class="flex items-center gap-1"
+                    >
+                      <UIcon
+                        name="i-lucide-clock"
+                        class="w-3.5 h-3.5"
+                      />
+                      {{ relativeTime(run.startedAt) }}
+                    </span>
+                    <span
+                      v-if="formatDuration(run.startedAt, run.completedAt)"
+                      class="flex items-center gap-1"
+                    >
+                      <UIcon
+                        name="i-lucide-timer"
+                        class="w-3.5 h-3.5"
+                      />
+                      {{ formatDuration(run.startedAt, run.completedAt) }}
+                    </span>
                   </div>
                 </div>
+                <!-- 外链图标 -->
                 <UIcon
                   name="i-lucide-external-link"
-                  class="w-4 h-4 text-gray-400 shrink-0"
+                  class="w-4 h-4 text-gray-400 shrink-0 mt-0.5"
                 />
               </div>
             </UCard>

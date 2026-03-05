@@ -23,6 +23,7 @@
     "@iconify-json/simple-icons": "^1.2.70",
     "@nuxt/ui": "^4.4.0",
     "@spaceflow/core": "workspace:*",
+    "cronstrue": "^3.13.0",
     "drizzle-orm": "^0.45.1",
     "ioredis": "^5.10.0",
     "nuxt": "^4.3.1",

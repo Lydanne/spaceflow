@@ -245,6 +245,9 @@ importers:
       '@spaceflow/core':
         specifier: workspace:*
         version: link:../../packages/core
+      cronstrue:
+        specifier: ^3.13.0
+        version: 3.13.0
       drizzle-orm:
         specifier: ^0.45.1
         version: 0.45.1(@types/pg@8.18.0)(postgres@3.4.8)
@@ -4841,6 +4844,10 @@ packages:
   croner@9.1.0:
     resolution: {integrity: sha512-p9nwwR4qyT5W996vBZhdvBCnMhicY5ytZkR4D1Xj0wuTDEiMnjwR57Q3RXYY/s0EpX6Ay3vgIcfaR+ewGHsi+g==}
     engines: {node: '>=18.0'}
+
+  cronstrue@3.13.0:
+    resolution: {integrity: sha512-M06cKwRIN46AyuM8BOmF1HUkBTkd3/h7uYImnrH1T3wtRKBGOibVo3jZ42VheEvx8LtgZbG/4GI35vfIxYxMug==}
+    hasBin: true
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -13477,6 +13484,8 @@ snapshots:
   crelt@1.0.6: {}
 
   croner@9.1.0: {}
+
+  cronstrue@3.13.0: {}
 
   cross-spawn@7.0.6:
     dependencies:

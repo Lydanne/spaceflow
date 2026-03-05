@@ -31,6 +31,19 @@ function extractTriggers(doc: Record<string, unknown>): string[] {
   return [];
 }
 
+function extractSchedules(doc: Record<string, unknown>): string[] {
+  const on = doc.on;
+  if (!on || typeof on !== "object") return [];
+  const schedule = (on as Record<string, unknown>).schedule;
+  if (!schedule) return [];
+  if (!Array.isArray(schedule)) return [];
+  return schedule
+    .map(item =>
+      item && typeof item === "object" ? (item as Record<string, string>).cron : null,
+    )
+    .filter((v): v is string => typeof v === "string");
+}
+
 function extractInputs(doc: Record<string, unknown>): Record<string, WorkflowInput> | null {
   const on = doc.on;
   if (!on || typeof on !== "object") return null;
@@ -73,6 +86,7 @@ export default defineEventHandler(async (event) => {
         const doc = content ? parseWorkflowYaml(content) : null;
         const inputs = doc ? extractInputs(doc) : null;
         const triggers = doc ? extractTriggers(doc) : [];
+        const schedules = doc ? extractSchedules(doc) : [];
         const description = doc?.["x-description"] as string | undefined;
         return {
           id: w.id,
@@ -81,6 +95,7 @@ export default defineEventHandler(async (event) => {
           state: w.state,
           description: description || "",
           triggers,
+          schedules,
           inputs: inputs || {},
         };
       }),
