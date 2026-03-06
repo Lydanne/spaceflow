@@ -167,7 +167,7 @@ async function syncOrg() {
         @click="activeTab = 'feishu'"
       >
         <UIcon
-          name="i-simple-icons-lark"
+          name="i-simple-icons-bytedance"
           class="w-4 h-4 mr-1.5 align-text-bottom inline-block"
         />
         飞书配置
@@ -201,7 +201,7 @@ async function syncOrg() {
         <template #header>
           <div class="flex items-center gap-2">
             <UIcon
-              name="i-simple-icons-lark"
+              name="i-simple-icons-bytedance"
               class="w-4 h-4"
             />
             <h3 class="font-semibold">

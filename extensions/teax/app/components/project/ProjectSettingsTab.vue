@@ -177,7 +177,7 @@ async function deleteProject() {
       <template #header>
         <div class="flex items-center gap-2">
           <UIcon
-            name="i-simple-icons-lark"
+            name="i-simple-icons-bytedance"
             class="w-4 h-4"
           />
           <h3 class="font-semibold">
