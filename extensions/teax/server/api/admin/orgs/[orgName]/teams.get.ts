@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
       description: schema.teams.description,
       synced_at: schema.teams.synced_at,
       created_at: schema.teams.created_at,
-      memberCount:
+      member_count:
         sql<number>`(SELECT COUNT(*) FROM team_members WHERE team_members.team_id = "teams"."id")`.as(
           "member_count",
         ),

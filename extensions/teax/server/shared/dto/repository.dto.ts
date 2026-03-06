@@ -35,5 +35,8 @@ export type TriggerWorkflowBody = z.infer<typeof triggerWorkflowBodySchema>;
 export const updateRepoSettingsBodySchema = z.object({
   notifyOnSuccess: z.boolean().optional(),
   notifyOnFailure: z.boolean().optional(),
+  feishuChatId: z.string().max(255).optional(),
+  approvalRequired: z.boolean().optional(),
+  notifyBranches: z.array(z.string().max(255)).max(20).optional(),
 });
 export type UpdateRepoSettingsBody = z.infer<typeof updateRepoSettingsBodySchema>;

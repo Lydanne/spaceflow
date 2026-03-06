@@ -26,6 +26,9 @@ export default defineEventHandler(async (event) => {
 
   if (body.notifyOnSuccess !== undefined) newSettings.notifyOnSuccess = body.notifyOnSuccess;
   if (body.notifyOnFailure !== undefined) newSettings.notifyOnFailure = body.notifyOnFailure;
+  if (body.feishuChatId !== undefined) newSettings.feishuChatId = body.feishuChatId;
+  if (body.approvalRequired !== undefined) newSettings.approvalRequired = body.approvalRequired;
+  if (body.notifyBranches !== undefined) newSettings.notifyBranches = body.notifyBranches;
 
   const [updated] = await db
     .update(schema.repositories)

@@ -18,12 +18,19 @@ const toast = useToast();
 interface ProjectSettings {
   notifyOnSuccess: boolean;
   notifyOnFailure: boolean;
+  feishuChatId: string;
+  approvalRequired: boolean;
+  notifyBranches: string[];
 }
 
 const settingsForm = reactive<ProjectSettings>({
   notifyOnSuccess: true,
   notifyOnFailure: true,
+  feishuChatId: "",
+  approvalRequired: false,
+  notifyBranches: [],
 });
+const notifyBranchesInput = ref("");
 const savingSettings = ref(false);
 
 watch(
@@ -33,12 +40,21 @@ watch(
     const ps = s as unknown as ProjectSettings;
     settingsForm.notifyOnSuccess = ps.notifyOnSuccess ?? true;
     settingsForm.notifyOnFailure = ps.notifyOnFailure ?? true;
+    settingsForm.feishuChatId = ps.feishuChatId ?? "";
+    settingsForm.approvalRequired = ps.approvalRequired ?? false;
+    settingsForm.notifyBranches = ps.notifyBranches ?? [];
+    notifyBranchesInput.value = settingsForm.notifyBranches.join(", ");
   },
   { immediate: true },
 );
 
 async function saveSettings() {
   savingSettings.value = true;
+  // 解析分支输入为数组
+  settingsForm.notifyBranches = notifyBranchesInput.value
+    .split(",")
+    .map((b) => b.trim())
+    .filter(Boolean);
   try {
     await $fetch(`/api/repos/${props.owner}/${props.repo}/settings`, {
       method: "PATCH",
@@ -152,6 +168,58 @@ async function deleteProject() {
             </p>
           </div>
           <USwitch v-model="settingsForm.notifyOnFailure" />
+        </div>
+      </div>
+    </UCard>
+
+    <!-- 飞书集成 -->
+    <UCard>
+      <template #header>
+        <div class="flex items-center gap-2">
+          <UIcon
+            name="i-simple-icons-lark"
+            class="w-4 h-4"
+          />
+          <h3 class="font-semibold">
+            飞书集成
+          </h3>
+        </div>
+      </template>
+      <div class="space-y-5">
+        <div>
+          <label class="block text-sm font-medium mb-1">飞书群 Chat ID</label>
+          <UInput
+            v-model="settingsForm.feishuChatId"
+            placeholder="oc_xxxxxxxxxxxxxxxx"
+            size="sm"
+          />
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            配置后通知将发送到飞书群，留空则私信通知组织成员
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">通知分支过滤</label>
+          <UInput
+            v-model="notifyBranchesInput"
+            placeholder="main, release/*"
+            size="sm"
+          />
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            多个分支用逗号分隔，留空表示所有分支都通知
+          </p>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="font-medium text-sm">
+              部署审批
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              通过飞书机器人部署时需要审批通过
+            </p>
+          </div>
+          <USwitch v-model="settingsForm.approvalRequired" />
         </div>
 
         <div class="flex justify-end pt-2">

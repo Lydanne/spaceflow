@@ -2,6 +2,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import {
   sendFeishuBatchMessage,
+  sendFeishuChatCardMessage,
   type FeishuInteractiveCard,
 } from "~~/server/utils/feishu";
 
@@ -228,6 +229,44 @@ export function buildAgentResultCard(params: {
   };
 }
 
+// ─── 分支过滤 ─────────────────────────────────────────
+
+/**
+ * 检查分支名是否匹配 notifyBranches 过滤规则。
+ * 支持简单通配符（如 release/*）。
+ * 空数组表示不过滤（所有分支都通知）。
+ */
+export function matchBranch(branch: string, patterns: string[]): boolean {
+  if (!patterns || patterns.length === 0) return true;
+  return patterns.some((p) => {
+    if (p.includes("*")) {
+      const regex = new RegExp("^" + p.replace(/\*/g, ".*") + "$");
+      return regex.test(branch);
+    }
+    return p === branch;
+  });
+}
+
+/**
+ * 发送通知卡片：优先发送到飞书群，否则私信组织成员。
+ */
+async function sendNotification(
+  card: FeishuInteractiveCard,
+  feishuChatId: string | undefined,
+  organizationId: string,
+  notifyType: NotificationType,
+): Promise<void> {
+  if (feishuChatId) {
+    await sendFeishuChatCardMessage(feishuChatId, card);
+    console.log(`[notification] sent to chat ${feishuChatId}`);
+  } else {
+    const targets = await getNotifyTargets(organizationId, notifyType);
+    if (targets.length === 0) return;
+    const result = await sendFeishuBatchMessage(targets, card);
+    console.log(`[notification] sent=${result.sent}, failed=${result.failed}`);
+  }
+}
+
 // ─── 通知对象查找 ─────────────────────────────────────────
 
 /**
@@ -295,7 +334,12 @@ export async function notifyWorkflowRunComplete(
     completed_at: string | null;
     html_url: string;
   },
-  repoSettings: { notifyOnSuccess?: boolean; notifyOnFailure?: boolean },
+  repoSettings: {
+    notifyOnSuccess?: boolean;
+    notifyOnFailure?: boolean;
+    feishuChatId?: string;
+    notifyBranches?: string[];
+  },
 ): Promise<void> {
   const isSuccess = run.conclusion === "success";
   const isFailure = run.conclusion === "failure";
@@ -305,10 +349,10 @@ export async function notifyWorkflowRunComplete(
   if (isFailure && !repoSettings.notifyOnFailure) return;
   if (!isSuccess && !isFailure) return;
 
-  try {
-    const targets = await getNotifyTargets(ctx.organizationId, "publish");
-    if (targets.length === 0) return;
+  // 分支过滤
+  if (!matchBranch(run.head_branch, repoSettings.notifyBranches || [])) return;
 
+  try {
     const config = useRuntimeConfig();
     const card = buildWorkflowRunCard({
       ...run,
@@ -323,8 +367,7 @@ export async function notifyWorkflowRunComplete(
       appUrl: config.public.appUrl,
     });
 
-    const result = await sendFeishuBatchMessage(targets, card);
-    console.log(`[notification] workflow run #${run.run_number}: sent=${result.sent}, failed=${result.failed}`);
+    await sendNotification(card, repoSettings.feishuChatId, ctx.organizationId, "publish");
   } catch (err) {
     console.error("[notification] Failed to send workflow run notification:", err);
   }
@@ -341,11 +384,15 @@ export async function notifyPushEvent(
     commits: Array<{ id: string; message: string }>;
     compareUrl: string;
   },
+  repoSettings?: {
+    feishuChatId?: string;
+    notifyBranches?: string[];
+  },
 ): Promise<void> {
-  try {
-    const targets = await getNotifyTargets(ctx.organizationId, "publish");
-    if (targets.length === 0) return;
+  // 分支过滤
+  if (!matchBranch(push.branch, repoSettings?.notifyBranches || [])) return;
 
+  try {
     const config = useRuntimeConfig();
     const card = buildPushCard({
       repoFullName: ctx.repoFullName,
@@ -356,8 +403,7 @@ export async function notifyPushEvent(
       appUrl: config.public.appUrl,
     });
 
-    const result = await sendFeishuBatchMessage(targets, card);
-    console.log(`[notification] push event: sent=${result.sent}, failed=${result.failed}`);
+    await sendNotification(card, repoSettings?.feishuChatId, ctx.organizationId, "publish");
   } catch (err) {
     console.error("[notification] Failed to send push notification:", err);
   }
@@ -375,11 +421,11 @@ export async function notifyAgentResult(
     summary?: string;
     prUrl?: string;
   },
+  repoSettings?: {
+    feishuChatId?: string;
+  },
 ): Promise<void> {
   try {
-    const targets = await getNotifyTargets(ctx.organizationId, "agent");
-    if (targets.length === 0) return;
-
     const config = useRuntimeConfig();
     const card = buildAgentResultCard({
       repoFullName: ctx.repoFullName,
@@ -387,8 +433,7 @@ export async function notifyAgentResult(
       appUrl: config.public.appUrl,
     });
 
-    const result = await sendFeishuBatchMessage(targets, card);
-    console.log(`[notification] agent result: sent=${result.sent}, failed=${result.failed}`);
+    await sendNotification(card, repoSettings?.feishuChatId, ctx.organizationId, "agent");
   } catch (err) {
     console.error("[notification] Failed to send agent notification:", err);
   }

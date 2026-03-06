@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
         sql<number>`(SELECT COUNT(*) FROM teams WHERE teams.organization_id = "organizations"."id")`.as(
           "team_count",
         ),
-      memberCount:
+      member_count:
         sql<number>`(SELECT COUNT(DISTINCT tm.user_id) FROM team_members tm JOIN teams t ON t.id = tm.team_id WHERE t.organization_id = "organizations"."id")`.as(
           "member_count",
         ),

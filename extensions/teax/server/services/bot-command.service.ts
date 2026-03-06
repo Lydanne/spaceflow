@@ -198,6 +198,7 @@ registerCommand({
         id: schema.repositories.id,
         full_name: schema.repositories.full_name,
         default_branch: schema.repositories.default_branch,
+        settings: schema.repositories.settings,
       })
       .from(schema.repositories)
       .where(eq(schema.repositories.full_name, repoFullName))
@@ -210,6 +211,28 @@ registerCommand({
 
     const branch = args[1] || repoRecord.default_branch || "main";
     const workflowFile = args[2] || "deploy.yml";
+
+    // 审批前置检查
+    const repoSettings = (repoRecord.settings || {}) as Record<string, unknown>;
+    if (repoSettings.approvalRequired) {
+      const card: FeishuInteractiveCard = {
+        header: {
+          title: { tag: "plain_text", content: "⚠️ 需要审批" },
+          template: "orange",
+        },
+        elements: [
+          {
+            tag: "div",
+            text: {
+              tag: "lark_md",
+              content: `**仓库**: ${repoFullName}\n**分支**: ${branch}\n**Workflow**: ${workflowFile}\n\n该仓库已开启部署审批，请在 Teax 中发起审批后再部署。`,
+            },
+          },
+        ],
+      };
+      await replyFeishuCardMessage(ctx.messageId, card);
+      return;
+    }
 
     try {
       const gitea = await createServiceGiteaClient();

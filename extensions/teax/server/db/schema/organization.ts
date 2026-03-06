@@ -1,4 +1,4 @@
-import { pgTable, uuid, integer, varchar, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, uuid, integer, varchar, text, timestamp, unique, jsonb } from "drizzle-orm/pg-core";
 import { users } from "./user";
 import { baseColumns } from "./base";
 
@@ -8,6 +8,7 @@ export const organizations = pgTable("organizations", {
   name: varchar("name", { length: 255 }).notNull(),
   full_name: varchar("full_name", { length: 255 }),
   avatar_url: text("avatar_url"),
+  settings: jsonb("settings").default({}),
   synced_at: timestamp("synced_at", { withTimezone: true }),
   ...baseColumns(),
 });

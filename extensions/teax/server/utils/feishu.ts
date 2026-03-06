@@ -181,6 +181,34 @@ export async function sendFeishuCardMessage(
 }
 
 /**
+ * 发送飞书交互式卡片消息到群聊。
+ * @param chatId - 群聊 chat_id（如 oc_xxx）
+ * @param card - 交互式卡片
+ */
+export async function sendFeishuChatCardMessage(
+  chatId: string,
+  card: FeishuInteractiveCard,
+): Promise<void> {
+  const token = await getFeishuTenantAccessToken();
+  const response = await $fetch<FeishuApiResponse>(
+    `${FEISHU_BASE_URL}/im/v1/messages?receive_id_type=chat_id`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: {
+        receive_id: chatId,
+        msg_type: "interactive",
+        content: JSON.stringify(card),
+      },
+    },
+  );
+
+  if (response.code !== 0) {
+    console.error(`Feishu send chat card message error: ${response.msg}`);
+  }
+}
+
+/**
  * 批量发送飞书消息给多个用户（忽略单个失败）。
  */
 export async function sendFeishuBatchMessage(
