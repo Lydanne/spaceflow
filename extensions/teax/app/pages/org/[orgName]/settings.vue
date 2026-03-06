@@ -18,7 +18,14 @@ const orgId = org.value.id;
 
 const activeTab = ref<"teams" | "permissions">("teams");
 
-const { isOwnerOrAdmin } = useOrgRole(orgId);
+const { data: roleData } = await useFetch<{ role: string }>(
+  `/api/orgs/${orgId}/role`,
+  { key: `org-role-${orgId}` },
+);
+const isOwnerOrAdmin = computed(() => {
+  const role = roleData.value?.role ?? "member";
+  return role === "admin" || role === "owner";
+});
 
 if (!isOwnerOrAdmin.value) {
   await navigateTo(`/${orgName}`, { replace: true });
@@ -140,7 +147,7 @@ async function syncOrg() {
       :org-id="orgId"
       :all-groups="allGroups"
       :available-permissions="availablePermissions"
-      :show-project-scope="false"
+      :show-repo-scope="false"
       @refresh-groups="refreshGroups"
     />
   </div>

@@ -19,8 +19,8 @@ export default defineEventHandler(async (event) => {
       team_id: schema.teamPermissions.team_id,
       permission_group_id: schema.teamPermissions.permission_group_id,
       created_at: schema.teamPermissions.created_at,
-      groupName: schema.permissionGroups.name,
-      groupDescription: schema.permissionGroups.description,
+      group_name: schema.permissionGroups.name,
+      group_description: schema.permissionGroups.description,
       permissions: schema.permissionGroups.permissions,
     })
     .from(schema.teamPermissions)
