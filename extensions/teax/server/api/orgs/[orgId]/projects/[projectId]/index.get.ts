@@ -14,21 +14,21 @@ export default defineEventHandler(async (event) => {
   const [project] = await db
     .select({
       id: schema.repositories.id,
-      organizationId: schema.repositories.organizationId,
-      giteaRepoId: schema.repositories.giteaRepoId,
+      organization_id: schema.repositories.organization_id,
+      gitea_repo_id: schema.repositories.gitea_repo_id,
       name: schema.repositories.name,
-      fullName: schema.repositories.fullName,
+      full_name: schema.repositories.full_name,
       description: schema.repositories.description,
-      defaultBranch: schema.repositories.defaultBranch,
-      cloneUrl: schema.repositories.cloneUrl,
-      webhookId: schema.repositories.webhookId,
+      default_branch: schema.repositories.default_branch,
+      clone_url: schema.repositories.clone_url,
+      webhook_id: schema.repositories.webhook_id,
       settings: schema.repositories.settings,
-      createdBy: schema.repositories.createdBy,
-      createdAt: schema.repositories.createdAt,
-      updatedAt: schema.repositories.updatedAt,
+      created_by: schema.repositories.created_by,
+      created_at: schema.repositories.created_at,
+      updated_at: schema.repositories.updated_at,
     })
     .from(schema.repositories)
-    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organizationId, orgId)))
+    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organization_id, orgId)))
     .limit(1);
 
   if (!project) {

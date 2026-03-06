@@ -15,18 +15,18 @@ export default defineEventHandler(async (event) => {
 
   const [project] = await db
     .select({
-      fullName: schema.repositories.fullName,
+      full_name: schema.repositories.full_name,
       name: schema.repositories.name,
       description: schema.repositories.description,
-      defaultBranch: schema.repositories.defaultBranch,
-      cloneUrl: schema.repositories.cloneUrl,
-      createdAt: schema.repositories.createdAt,
+      default_branch: schema.repositories.default_branch,
+      clone_url: schema.repositories.clone_url,
+      created_at: schema.repositories.created_at,
     })
     .from(schema.repositories)
     .where(
       and(
         eq(schema.repositories.id, projectId),
-        eq(schema.repositories.organizationId, orgId),
+        eq(schema.repositories.organization_id, orgId),
       ),
     )
     .limit(1);
@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Project not found" });
   }
 
-  const parts = project.fullName.split("/");
+  const parts = project.full_name.split("/");
   const owner = parts[0] ?? "";
   const repo = parts[1] ?? "";
   if (!owner || !repo) {
@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const gitea = await createServiceGiteaClient();
-  const branch = project.defaultBranch || "main";
+  const branch = project.default_branch || "main";
 
   // 优先 TEAX.md，其次 README.md
   const teaxContent = await gitea.getFileContent(owner, repo, "TEAX.md", branch);
@@ -58,11 +58,11 @@ export default defineEventHandler(async (event) => {
 
   // 无 README，返回仓库信息
   let repoInfo: {
-    fullName: string;
+    full_name: string;
     description: string | null;
-    defaultBranch: string | null;
-    cloneUrl: string | null;
-    createdAt: string | null;
+    default_branch: string | null;
+    clone_url: string | null;
+    created_at: string | null;
     htmlUrl: string;
     stars: number;
     forks: number;
@@ -72,11 +72,11 @@ export default defineEventHandler(async (event) => {
   try {
     const giteaRepo = await gitea.getRepo(owner, repo);
     repoInfo = {
-      fullName: project.fullName,
+      full_name: project.full_name,
       description: project.description,
-      defaultBranch: project.defaultBranch,
-      cloneUrl: project.cloneUrl,
-      createdAt: project.createdAt ? new Date(project.createdAt).toISOString() : null,
+      default_branch: project.default_branch,
+      clone_url: project.clone_url,
+      created_at: project.created_at ? new Date(project.created_at).toISOString() : null,
       htmlUrl: giteaRepo.html_url || "",
       stars: giteaRepo.stars_count || 0,
       forks: giteaRepo.forks_count || 0,
@@ -84,11 +84,11 @@ export default defineEventHandler(async (event) => {
     };
   } catch {
     repoInfo = {
-      fullName: project.fullName,
+      full_name: project.full_name,
       description: project.description,
-      defaultBranch: project.defaultBranch,
-      cloneUrl: project.cloneUrl,
-      createdAt: project.createdAt ? new Date(project.createdAt).toISOString() : null,
+      default_branch: project.default_branch,
+      clone_url: project.clone_url,
+      created_at: project.created_at ? new Date(project.created_at).toISOString() : null,
       htmlUrl: "",
       stars: 0,
       forks: 0,

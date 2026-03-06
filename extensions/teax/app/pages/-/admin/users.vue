@@ -6,13 +6,13 @@ definePageMeta({
 
 interface UserItem {
   id: string;
-  giteaId: number;
-  giteaUsername: string;
+  gitea_id: number;
+  gitea_username: string;
   email: string;
-  avatarUrl: string | null;
-  isAdmin: boolean | null;
-  createdAt: string;
-  updatedAt: string;
+  avatar_url: string | null;
+  is_admin: boolean | null;
+  created_at: string;
+  updated_at: string;
 }
 
 const toast = useToast();
@@ -38,7 +38,7 @@ async function toggleAdmin(user: UserItem) {
       method: "POST",
     });
     toast.add({
-      title: user.isAdmin ? "已取消管理员" : "已设为管理员",
+      title: user.is_admin ? "已取消管理员" : "已设为管理员",
       color: "success",
     });
     await refresh();
@@ -78,48 +78,48 @@ async function toggleAdmin(user: UserItem) {
         v-else
         :data="users"
         :columns="[
-          { accessorKey: 'giteaUsername', header: '用户名' },
+          { accessorKey: 'gitea_username', header: '用户名' },
           { accessorKey: 'email', header: '邮箱' },
-          { accessorKey: 'isAdmin', header: '角色' },
-          { accessorKey: 'createdAt', header: '注册时间' },
+          { accessorKey: 'is_admin', header: '角色' },
+          { accessorKey: 'created_at', header: '注册时间' },
           { accessorKey: 'actions', header: '操作' },
         ]"
       >
-        <template #giteaUsername-cell="{ row }">
+        <template #gitea_username-cell="{ row }">
           <div class="flex items-center gap-2">
             <UAvatar
-              :src="row.original.avatarUrl || undefined"
-              :alt="row.original.giteaUsername"
+              :src="row.original.avatar_url || undefined"
+              :alt="row.original.gitea_username"
               size="xs"
             />
-            <span class="font-medium">{{ row.original.giteaUsername }}</span>
+            <span class="font-medium">{{ row.original.gitea_username }}</span>
           </div>
         </template>
 
-        <template #isAdmin-cell="{ row }">
+        <template #is_admin-cell="{ row }">
           <UBadge
-            :color="row.original.isAdmin ? 'primary' : 'neutral'"
+            :color="row.original.is_admin ? 'primary' : 'neutral'"
             variant="subtle"
             size="sm"
           >
-            {{ row.original.isAdmin ? "管理员" : "普通用户" }}
+            {{ row.original.is_admin ? "管理员" : "普通用户" }}
           </UBadge>
         </template>
 
-        <template #createdAt-cell="{ row }">
+        <template #created_at-cell="{ row }">
           <span class="text-sm text-gray-500">
-            {{ new Date(row.original.createdAt).toLocaleDateString("zh-CN") }}
+            {{ new Date(row.original.created_at).toLocaleDateString("zh-CN") }}
           </span>
         </template>
 
         <template #actions-cell="{ row }">
           <UButton
             size="xs"
-            :color="row.original.isAdmin ? 'neutral' : 'primary'"
+            :color="row.original.is_admin ? 'neutral' : 'primary'"
             variant="soft"
             @click="toggleAdmin(row.original)"
           >
-            {{ row.original.isAdmin ? "取消管理员" : "设为管理员" }}
+            {{ row.original.is_admin ? "取消管理员" : "设为管理员" }}
           </UButton>
         </template>
       </UTable>

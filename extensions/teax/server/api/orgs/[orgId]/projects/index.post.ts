@@ -14,16 +14,16 @@ export default defineEventHandler(async (event) => {
   const db = useDB();
 
   const body = await readBody(event);
-  const { repoFullName } = body as { repoFullName: string };
+  const { repo_full_name } = body as { repo_full_name: string };
 
-  if (!repoFullName || !repoFullName.includes("/")) {
+  if (!repo_full_name || !repo_full_name.includes("/")) {
     throw createError({
       statusCode: 400,
       message: "Invalid repository name, expected format: owner/repo",
     });
   }
 
-  const parts = repoFullName.split("/");
+  const parts = repo_full_name.split("/");
   const owner = parts[0]!;
   const repo = parts[1]!;
   const gitea = await createServiceGiteaClient();
@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
   const existing = await db
     .select()
     .from(schema.repositories)
-    .where(eq(schema.repositories.giteaRepoId, giteaRepo.id))
+    .where(eq(schema.repositories.gitea_repo_id, giteaRepo.id))
     .limit(1);
 
   if (existing.length > 0) {
@@ -52,10 +52,10 @@ export default defineEventHandler(async (event) => {
   const webhookSecret = generateWebhookSecret();
   const webhookUrl = `${config.public.appUrl}/api/webhooks/gitea`;
 
-  let webhookId: number | undefined;
+  let webhookIdValue: number | undefined;
   try {
     const webhook = await gitea.createWebhook(owner!, repo!, webhookUrl, webhookSecret, ["push"]);
-    webhookId = webhook.id;
+    webhookIdValue = webhook.id;
   } catch (err: unknown) {
     console.error("Failed to create webhook:", err);
     // Webhook 创建失败不阻塞项目创建
@@ -64,16 +64,16 @@ export default defineEventHandler(async (event) => {
   const [project] = await db
     .insert(schema.repositories)
     .values({
-      organizationId: orgId,
-      giteaRepoId: giteaRepo.id,
+      organization_id: orgId,
+      gitea_repo_id: giteaRepo.id,
       name: giteaRepo.name,
-      fullName: giteaRepo.full_name,
+      full_name: giteaRepo.full_name,
       description: giteaRepo.description,
-      defaultBranch: giteaRepo.default_branch,
-      cloneUrl: giteaRepo.clone_url,
-      webhookId: webhookId ?? null,
-      webhookSecret,
-      createdBy: session.user.id,
+      default_branch: giteaRepo.default_branch,
+      clone_url: giteaRepo.clone_url,
+      webhook_id: webhookIdValue ?? null,
+      webhook_secret: webhookSecret,
+      created_by: session.user.id,
       settings: {
         autoDeploy: false,
         deployBranches: [giteaRepo.default_branch],
@@ -84,27 +84,27 @@ export default defineEventHandler(async (event) => {
     })
     .returning({
       id: schema.repositories.id,
-      organizationId: schema.repositories.organizationId,
-      giteaRepoId: schema.repositories.giteaRepoId,
+      organization_id: schema.repositories.organization_id,
+      gitea_repo_id: schema.repositories.gitea_repo_id,
       name: schema.repositories.name,
-      fullName: schema.repositories.fullName,
+      full_name: schema.repositories.full_name,
       description: schema.repositories.description,
-      defaultBranch: schema.repositories.defaultBranch,
-      cloneUrl: schema.repositories.cloneUrl,
-      webhookId: schema.repositories.webhookId,
+      default_branch: schema.repositories.default_branch,
+      clone_url: schema.repositories.clone_url,
+      webhook_id: schema.repositories.webhook_id,
       settings: schema.repositories.settings,
-      createdBy: schema.repositories.createdBy,
-      createdAt: schema.repositories.createdAt,
-      updatedAt: schema.repositories.updatedAt,
+      created_by: schema.repositories.created_by,
+      created_at: schema.repositories.created_at,
+      updated_at: schema.repositories.updated_at,
     });
 
   await writeAuditLog(event, {
-    userId: session.user.id,
-    organizationId: orgId,
+    user_id: session.user.id,
+    organization_id: orgId,
     action: "project.create",
-    resourceType: "project",
-    resourceId: project?.id,
-    detail: { fullName: repoFullName },
+    resource_type: "project",
+    resource_id: project?.id,
+    detail: { full_name: repo_full_name },
   });
 
   return project;

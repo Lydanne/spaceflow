@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   const [target] = await db
     .select({ type: schema.permissionGroups.type })
     .from(schema.permissionGroups)
-    .where(and(eq(schema.permissionGroups.id, groupId), eq(schema.permissionGroups.organizationId, orgId)))
+    .where(and(eq(schema.permissionGroups.id, groupId), eq(schema.permissionGroups.organization_id, orgId)))
     .limit(1);
 
   if (target?.type === "default") {
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     .where(
       and(
         eq(schema.permissionGroups.id, groupId),
-        eq(schema.permissionGroups.organizationId, orgId),
+        eq(schema.permissionGroups.organization_id, orgId),
       ),
     )
     .returning({ id: schema.permissionGroups.id });
@@ -40,11 +40,11 @@ export default defineEventHandler(async (event) => {
   }
 
   await writeAuditLog(event, {
-    userId: session.user.id,
-    organizationId: orgId,
+    user_id: session.user.id,
+    organization_id: orgId,
     action: "permission_group.delete",
-    resourceType: "permission_group",
-    resourceId: groupId,
+    resource_type: "permission_group",
+    resource_id: groupId,
   });
 
   return { success: true };

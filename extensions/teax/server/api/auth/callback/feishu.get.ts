@@ -32,10 +32,10 @@ export default defineEventHandler(async (event) => {
     // 创建 session
     const sessionId = generateSessionId();
     await registerSession(user.id, sessionId, {
-      userId: user.id,
-      username: user.giteaUsername,
-      loginAt: Date.now(),
-      loginProvider: "feishu",
+      user_id: user.id,
+      username: user.gitea_username,
+      login_at: Date.now(),
+      login_provider: "feishu",
       ip: getRequestIP(event) || undefined,
       ua: getRequestHeader(event, "user-agent") || undefined,
     });
@@ -43,11 +43,11 @@ export default defineEventHandler(async (event) => {
     await setUserSession(event, {
       user: {
         id: user.id,
-        giteaId: user.giteaId,
-        username: user.giteaUsername,
+        gitea_id: user.gitea_id,
+        username: user.gitea_username,
         email: user.email,
-        avatarUrl: user.avatarUrl,
-        isAdmin: user.isAdmin,
+        avatar_url: user.avatar_url,
+        is_admin: user.is_admin,
       },
       sessionId,
       giteaAccessToken: "",

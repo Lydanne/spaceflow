@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
   const [project] = await db
     .select({ settings: schema.repositories.settings })
     .from(schema.repositories)
-    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organizationId, orgId)))
+    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organization_id, orgId)))
     .limit(1);
 
   if (!project) {
@@ -36,12 +36,12 @@ export default defineEventHandler(async (event) => {
 
   const [updated] = await db
     .update(schema.repositories)
-    .set({ settings: newSettings, updatedAt: new Date() })
-    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organizationId, orgId)))
+    .set({ settings: newSettings, updated_at: new Date() })
+    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organization_id, orgId)))
     .returning({
       id: schema.repositories.id,
       settings: schema.repositories.settings,
-      updatedAt: schema.repositories.updatedAt,
+      updated_at: schema.repositories.updated_at,
     });
 
   return { data: updated };

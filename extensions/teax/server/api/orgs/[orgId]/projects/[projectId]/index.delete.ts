@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   const [project] = await db
     .select()
     .from(schema.repositories)
-    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organizationId, orgId)))
+    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organization_id, orgId)))
     .limit(1);
 
   if (!project) {
@@ -26,12 +26,12 @@ export default defineEventHandler(async (event) => {
   }
 
   // 尝试删除 Gitea Webhook
-  if (project.webhookId) {
+  if (project.webhook_id) {
     try {
       const gitea = await createServiceGiteaClient();
-      const [owner, repo] = project.fullName.split("/");
+      const [owner, repo] = project.full_name.split("/");
       if (owner && repo) {
-        await gitea.deleteWebhook(owner, repo, project.webhookId);
+        await gitea.deleteWebhook(owner, repo, project.webhook_id);
       }
     } catch (err: unknown) {
       console.warn("Failed to delete webhook on Gitea:", err);
@@ -40,15 +40,15 @@ export default defineEventHandler(async (event) => {
 
   await db
     .delete(schema.repositories)
-    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organizationId, orgId)));
+    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organization_id, orgId)));
 
   await writeAuditLog(event, {
-    userId: session.user.id,
-    organizationId: orgId,
+    user_id: session.user.id,
+    organization_id: orgId,
     action: "project.delete",
-    resourceType: "project",
-    resourceId: projectId,
-    detail: { fullName: project.fullName },
+    resource_type: "project",
+    resource_id: projectId,
+    detail: { full_name: project.full_name },
   });
 
   return { success: true };

@@ -32,18 +32,18 @@ export default defineEventHandler(async (event) => {
       const [dbTeam] = await db
         .insert(schema.teams)
         .values({
-          organizationId: org.id,
-          giteaTeamId: team.id,
+          organization_id: org.id,
+          gitea_team_id: team.id,
           name: team.name,
           description: team.description,
-          syncedAt: new Date(),
+          synced_at: new Date(),
         })
         .onConflictDoUpdate({
-          target: [schema.teams.organizationId, schema.teams.giteaTeamId],
+          target: [schema.teams.organization_id, schema.teams.gitea_team_id],
           set: {
             name: team.name,
             description: team.description,
-            syncedAt: new Date(),
+            synced_at: new Date(),
           },
         })
         .returning();
@@ -59,18 +59,18 @@ export default defineEventHandler(async (event) => {
         const [memberUser] = await db
           .insert(schema.users)
           .values({
-            giteaId: member.id,
-            giteaUsername: member.login,
+            gitea_id: member.id,
+            gitea_username: member.login,
             email: member.email || `${member.login}@placeholder`,
-            avatarUrl: member.avatar_url,
+            avatar_url: member.avatar_url,
           })
           .onConflictDoUpdate({
-            target: schema.users.giteaId,
+            target: schema.users.gitea_id,
             set: {
-              giteaUsername: member.login,
-              avatarUrl: member.avatar_url,
+              gitea_username: member.login,
+              avatar_url: member.avatar_url,
               ...(member.email ? { email: member.email } : {}),
-              updatedAt: new Date(),
+              updated_at: new Date(),
             },
           })
           .returning({ id: schema.users.id });
@@ -79,8 +79,8 @@ export default defineEventHandler(async (event) => {
           await db
             .insert(schema.teamMembers)
             .values({
-              teamId: dbTeam.id,
-              userId: memberUser.id,
+              team_id: dbTeam.id,
+              user_id: memberUser.id,
               role: "member",
             })
             .onConflictDoNothing();
@@ -94,12 +94,12 @@ export default defineEventHandler(async (event) => {
           .delete(schema.teamMembers)
           .where(
             and(
-              eq(schema.teamMembers.teamId, dbTeam.id),
-              notInArray(schema.teamMembers.userId, syncedMemberUserIds),
+              eq(schema.teamMembers.team_id, dbTeam.id),
+              notInArray(schema.teamMembers.user_id, syncedMemberUserIds),
             ),
           );
       } else {
-        await db.delete(schema.teamMembers).where(eq(schema.teamMembers.teamId, dbTeam.id));
+        await db.delete(schema.teamMembers).where(eq(schema.teamMembers.team_id, dbTeam.id));
       }
     }
 
@@ -108,15 +108,15 @@ export default defineEventHandler(async (event) => {
       await db
         .delete(schema.teams)
         .where(
-          and(eq(schema.teams.organizationId, org.id), notInArray(schema.teams.id, syncedTeamIds)),
+          and(eq(schema.teams.organization_id, org.id), notInArray(schema.teams.id, syncedTeamIds)),
         );
     } else {
-      await db.delete(schema.teams).where(eq(schema.teams.organizationId, org.id));
+      await db.delete(schema.teams).where(eq(schema.teams.organization_id, org.id));
     }
 
     await db
       .update(schema.organizations)
-      .set({ syncedAt: new Date() })
+      .set({ synced_at: new Date() })
       .where(eq(schema.organizations.id, orgId));
 
     return { success: true, message: `Synced ${teams.length} teams` };

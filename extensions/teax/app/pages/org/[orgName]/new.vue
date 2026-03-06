@@ -53,7 +53,7 @@ async function createProject() {
   try {
     await $fetch(`/api/orgs/${orgId}/projects`, {
       method: "POST",
-      body: { repoFullName: selectedRepo.value.full_name },
+      body: { repo_full_name: selectedRepo.value.full_name },
     });
     toast.add({
       title: `项目 ${selectedRepo.value.full_name} 创建成功`,

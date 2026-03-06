@@ -14,12 +14,12 @@ export default defineEventHandler(async (event) => {
   const orgs = await db
     .select({
       id: schema.organizations.id,
-      giteaOrgId: schema.organizations.giteaOrgId,
+      gitea_org_id: schema.organizations.gitea_org_id,
       name: schema.organizations.name,
-      fullName: schema.organizations.fullName,
-      avatarUrl: schema.organizations.avatarUrl,
-      syncedAt: schema.organizations.syncedAt,
-      createdAt: schema.organizations.createdAt,
+      full_name: schema.organizations.full_name,
+      avatar_url: schema.organizations.avatar_url,
+      synced_at: schema.organizations.synced_at,
+      created_at: schema.organizations.created_at,
       teamCount:
         sql<number>`(SELECT COUNT(*) FROM teams WHERE teams.organization_id = "organizations"."id")`.as(
           "team_count",

@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const gitea = await createServiceGiteaClient();
-  const parts = project.fullName.split("/");
+  const parts = project.full_name.split("/");
   const owner = parts[0] ?? "";
   const repo = parts[1] ?? "";
 
@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
         htmlUrl: run.html_url,
         startedAt: run.started_at,
         completedAt: run.completed_at,
-        actor: run.actor ? { login: run.actor.login, avatarUrl: run.actor.avatar_url } : null,
+        actor: run.actor ? { login: run.actor.login, avatar_url: run.actor.avatar_url } : null,
       })),
     };
   } catch {

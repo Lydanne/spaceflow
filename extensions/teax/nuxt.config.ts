@@ -35,6 +35,11 @@ export default defineNuxtConfig({
     experimental: {
       tasks: true,
     },
+    typescript: {
+      tsConfig: {
+        include: ["../auth.d.ts"],
+      },
+    },
   },
 
   eslint: {

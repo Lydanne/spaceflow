@@ -25,19 +25,19 @@ export default defineEventHandler(async (event) => {
   const [updated] = await db
     .update(schema.users)
     .set({
-      isAdmin: !user.isAdmin,
-      updatedAt: new Date(),
+      is_admin: !user.is_admin,
+      updated_at: new Date(),
     })
     .where(eq(schema.users.id, userId))
     .returning({
       id: schema.users.id,
-      giteaId: schema.users.giteaId,
-      giteaUsername: schema.users.giteaUsername,
+      gitea_id: schema.users.gitea_id,
+      gitea_username: schema.users.gitea_username,
       email: schema.users.email,
-      avatarUrl: schema.users.avatarUrl,
-      isAdmin: schema.users.isAdmin,
-      createdAt: schema.users.createdAt,
-      updatedAt: schema.users.updatedAt,
+      avatar_url: schema.users.avatar_url,
+      is_admin: schema.users.is_admin,
+      created_at: schema.users.created_at,
+      updated_at: schema.users.updated_at,
     });
 
   return updated;

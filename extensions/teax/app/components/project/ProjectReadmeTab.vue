@@ -1,10 +1,10 @@
 <script setup lang="ts">
 interface RepoInfo {
-  fullName: string;
+  full_name: string;
   description: string | null;
-  defaultBranch: string | null;
-  cloneUrl: string | null;
-  createdAt: string | null;
+  default_branch: string | null;
+  clone_url: string | null;
+  created_at: string | null;
   htmlUrl: string;
   stars: number;
   forks: number;
@@ -62,7 +62,7 @@ function formatDate(dateStr: string | null) {
           <div class="flex items-start justify-between">
             <div>
               <h3 class="text-lg font-semibold">
-                {{ data.repoInfo.fullName }}
+                {{ data.repoInfo.full_name }}
               </h3>
               <p
                 v-if="data.repoInfo.description"
@@ -100,7 +100,7 @@ function formatDate(dateStr: string | null) {
               {{ data.repoInfo.language }}
             </UBadge>
             <UBadge
-              v-if="data.repoInfo.defaultBranch"
+              v-if="data.repoInfo.default_branch"
               color="neutral"
               variant="subtle"
               size="sm"
@@ -109,7 +109,7 @@ function formatDate(dateStr: string | null) {
                 name="i-lucide-git-branch"
                 class="w-3 h-3 mr-1"
               />
-              {{ data.repoInfo.defaultBranch }}
+              {{ data.repoInfo.default_branch }}
             </UBadge>
             <UBadge
               color="neutral"
@@ -136,7 +136,7 @@ function formatDate(dateStr: string | null) {
           </div>
 
           <div
-            v-if="data.repoInfo.cloneUrl"
+            v-if="data.repoInfo.clone_url"
             class="flex items-center gap-2"
           >
             <UIcon
@@ -144,7 +144,7 @@ function formatDate(dateStr: string | null) {
               class="w-4 h-4 text-gray-400 shrink-0"
             />
             <code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded flex-1 truncate">
-              {{ data.repoInfo.cloneUrl }}
+              {{ data.repoInfo.clone_url }}
             </code>
           </div>
 
@@ -153,7 +153,7 @@ function formatDate(dateStr: string | null) {
               name="i-lucide-calendar"
               class="w-3.5 h-3.5"
             />
-            <span>创建于 {{ formatDate(data.repoInfo.createdAt) }}</span>
+            <span>创建于 {{ formatDate(data.repoInfo.created_at) }}</span>
           </div>
 
           <div class="border-t border-gray-200 dark:border-gray-800 pt-4">

@@ -12,7 +12,7 @@ export async function requireOrgOwnerOrAdmin(event: H3Event, orgId: string) {
   const session = await requireAuth(event);
 
   // 管理员可以操作所有组织
-  if (session.user.isAdmin) {
+  if (session.user.is_admin) {
     return session;
   }
 
@@ -20,11 +20,11 @@ export async function requireOrgOwnerOrAdmin(event: H3Event, orgId: string) {
   const ownership = await db
     .select({ role: schema.teamMembers.role })
     .from(schema.teamMembers)
-    .innerJoin(schema.teams, eq(schema.teams.id, schema.teamMembers.teamId))
+    .innerJoin(schema.teams, eq(schema.teams.id, schema.teamMembers.team_id))
     .where(
       and(
-        eq(schema.teams.organizationId, orgId),
-        eq(schema.teamMembers.userId, session.user.id),
+        eq(schema.teams.organization_id, orgId),
+        eq(schema.teamMembers.user_id, session.user.id),
         eq(schema.teamMembers.role, "owner"),
       ),
     )

@@ -19,7 +19,7 @@ const userMenuItems = computed(() => {
   const items: unknown[][] = [
     [{ label: user.value?.username || "", type: "label" as const }],
   ];
-  if (user.value?.isAdmin) {
+  if (user.value?.is_admin) {
     items.push([
       {
         label: "系统管理",

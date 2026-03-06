@@ -14,8 +14,8 @@ export default defineEventHandler(async (event) => {
   const groups = await db
     .select()
     .from(schema.permissionGroups)
-    .where(eq(schema.permissionGroups.organizationId, orgId))
-    .orderBy(schema.permissionGroups.createdAt);
+    .where(eq(schema.permissionGroups.organization_id, orgId))
+    .orderBy(schema.permissionGroups.created_at);
 
   return { data: groups };
 });

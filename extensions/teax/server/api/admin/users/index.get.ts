@@ -15,16 +15,16 @@ export default defineEventHandler(async (event) => {
     db
       .select({
         id: schema.users.id,
-        giteaId: schema.users.giteaId,
-        giteaUsername: schema.users.giteaUsername,
+        gitea_id: schema.users.gitea_id,
+        gitea_username: schema.users.gitea_username,
         email: schema.users.email,
-        avatarUrl: schema.users.avatarUrl,
-        isAdmin: schema.users.isAdmin,
-        createdAt: schema.users.createdAt,
-        updatedAt: schema.users.updatedAt,
+        avatar_url: schema.users.avatar_url,
+        is_admin: schema.users.is_admin,
+        created_at: schema.users.created_at,
+        updated_at: schema.users.updated_at,
       })
       .from(schema.users)
-      .orderBy(asc(schema.users.createdAt))
+      .orderBy(asc(schema.users.created_at))
       .limit(limit)
       .offset(offset),
     db.select({ count: sql<number>`COUNT(*)` }).from(schema.users),

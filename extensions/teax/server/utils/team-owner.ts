@@ -12,7 +12,7 @@ export async function requireTeamOwnerOrAdmin(event: H3Event, teamId: string) {
   const session = await requireAuth(event);
 
   // 管理员可以操作所有团队
-  if (session.user.isAdmin) {
+  if (session.user.is_admin) {
     return session;
   }
 
@@ -21,7 +21,7 @@ export async function requireTeamOwnerOrAdmin(event: H3Event, teamId: string) {
     .select({ role: schema.teamMembers.role })
     .from(schema.teamMembers)
     .where(
-      and(eq(schema.teamMembers.teamId, teamId), eq(schema.teamMembers.userId, session.user.id)),
+      and(eq(schema.teamMembers.team_id, teamId), eq(schema.teamMembers.user_id, session.user.id)),
     )
     .limit(1);
 

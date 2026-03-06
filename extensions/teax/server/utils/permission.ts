@@ -6,7 +6,7 @@ import { VALID_PERMISSION_KEYS } from "../shared/permissions";
 
 interface PermissionGroupRow {
   permissions: unknown;
-  repositoryIds: unknown;
+  repository_ids: unknown;
 }
 
 /**
@@ -18,17 +18,17 @@ async function queryUserPermissionGroups(userId: string, orgId: string): Promise
   return db
     .select({
       permissions: schema.permissionGroups.permissions,
-      repositoryIds: schema.permissionGroups.repositoryIds,
+      repository_ids: schema.permissionGroups.repository_ids,
     })
     .from(schema.teamMembers)
-    .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
-    .innerJoin(schema.teamPermissions, eq(schema.teamPermissions.teamId, schema.teams.id))
+    .innerJoin(schema.teams, eq(schema.teamMembers.team_id, schema.teams.id))
+    .innerJoin(schema.teamPermissions, eq(schema.teamPermissions.team_id, schema.teams.id))
     .innerJoin(
       schema.permissionGroups,
-      eq(schema.teamPermissions.permissionGroupId, schema.permissionGroups.id),
+      eq(schema.teamPermissions.permission_group_id, schema.permissionGroups.id),
     )
     .where(
-      and(eq(schema.teamMembers.userId, userId), eq(schema.teams.organizationId, orgId)),
+      and(eq(schema.teamMembers.user_id, userId), eq(schema.teams.organization_id, orgId)),
     );
 }
 
@@ -44,12 +44,12 @@ function rowGrantsPermission(row: PermissionGroupRow, permission: string, reposi
   // 不需要仓库级 scope 检查
   if (!repositoryId) return true;
 
-  // repositoryIds 为 null 表示全部仓库
-  if (row.repositoryIds === null || row.repositoryIds === undefined) return true;
+  // repository_ids 为 null 表示全部仓库
+  if (row.repository_ids === null || row.repository_ids === undefined) return true;
 
-  // repositoryIds 为数组则检查包含关系
-  if (Array.isArray(row.repositoryIds)) {
-    return row.repositoryIds.includes(repositoryId);
+  // repository_ids 为数组则检查包含关系
+  if (Array.isArray(row.repository_ids)) {
+    return row.repository_ids.includes(repositoryId);
   }
 
   return false;
@@ -78,7 +78,7 @@ export async function requirePermission(event: H3Event, orgId: string, permissio
   const session = await requireAuth(event);
 
   // 管理员拥有所有权限
-  if (session.user.isAdmin) {
+  if (session.user.is_admin) {
     return session;
   }
 
@@ -134,11 +134,11 @@ export async function getVisibleRepositoryIds(userId: string, orgId: string, isA
     const perms = row.permissions;
     if (!Array.isArray(perms) || !perms.includes("repo:view")) continue;
 
-    // repositoryIds=null → 全部可见
-    if (row.repositoryIds === null || row.repositoryIds === undefined) return null;
+    // repository_ids=null → 全部可见
+    if (row.repository_ids === null || row.repository_ids === undefined) return null;
 
-    if (Array.isArray(row.repositoryIds)) {
-      for (const id of row.repositoryIds) {
+    if (Array.isArray(row.repository_ids)) {
+      for (const id of row.repository_ids) {
         if (typeof id === "string") visibleIds.add(id);
       }
     }

@@ -6,14 +6,14 @@ definePageMeta({
 
 interface OrgItem {
   id: string;
-  giteaOrgId: number;
+  gitea_org_id: number;
   name: string;
-  fullName: string | null;
-  avatarUrl: string | null;
-  syncedAt: string | null;
-  createdAt: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  synced_at: string | null;
+  created_at: string;
   teamCount: number;
-  memberCount: number;
+  member_count: number;
 }
 
 const toast = useToast();
@@ -87,7 +87,7 @@ function formatDate(date: string | null) {
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
             <UAvatar
-              :src="org.avatarUrl || undefined"
+              :src="org.avatar_url || undefined"
               :alt="org.name"
               size="md"
             />
@@ -96,7 +96,7 @@ function formatDate(date: string | null) {
                 :to="`/-/admin/orgs/${org.id}`"
                 class="font-semibold hover:text-primary-500 transition-colors"
               >
-                {{ org.fullName || org.name }}
+                {{ org.full_name || org.name }}
               </NuxtLink>
               <div
                 class="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-0.5"
@@ -113,14 +113,14 @@ function formatDate(date: string | null) {
                     name="i-lucide-user"
                     class="w-3.5 h-3.5"
                   />
-                  {{ org.memberCount }} 名成员
+                  {{ org.member_count }} 名成员
                 </span>
                 <span class="flex items-center gap-1">
                   <UIcon
                     name="i-lucide-refresh-cw"
                     class="w-3.5 h-3.5"
                   />
-                  {{ formatDate(org.syncedAt) }}
+                  {{ formatDate(org.synced_at) }}
                 </span>
               </div>
             </div>

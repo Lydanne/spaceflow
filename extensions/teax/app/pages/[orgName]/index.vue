@@ -5,8 +5,8 @@ const orgName = route.params.orgName as string;
 const { data: org, status: orgStatus } = await useFetch<{
   id: string;
   name: string;
-  fullName: string | null;
-  avatarUrl: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
 }>(`/api/resolve/${orgName}`);
 
 const orgId = computed(() => org.value?.id ?? "");
@@ -16,10 +16,10 @@ const { isOwnerOrAdmin } = useOrgRole(orgId.value);
 interface ProjectItem {
   id: string;
   name: string;
-  fullName: string;
+  full_name: string;
   description: string | null;
-  defaultBranch: string | null;
-  updatedAt: string;
+  default_branch: string | null;
+  updated_at: string;
 }
 
 const page = ref(1);
@@ -106,14 +106,14 @@ const total = computed(() => data.value?.total ?? 0);
           <NuxtLink
             v-for="project in projects"
             :key="project.id"
-            :to="`/${project.fullName}`"
+            :to="`/${project.full_name}`"
             class="block"
           >
             <UCard class="hover:ring-1 hover:ring-primary-500 transition-all">
               <div class="flex items-center justify-between">
                 <div>
                   <p class="font-semibold">
-                    {{ project.fullName }}
+                    {{ project.full_name }}
                   </p>
                   <p
                     v-if="project.description"
@@ -131,12 +131,12 @@ const total = computed(() => data.value?.total ?? 0);
                         name="i-lucide-git-branch"
                         class="w-3 h-3 mr-1"
                       />
-                      {{ project.defaultBranch || "main" }}
+                      {{ project.default_branch || "main" }}
                     </UBadge>
                     <span class="text-xs text-gray-400">
                       更新于
                       {{
-                        new Date(project.updatedAt).toLocaleDateString("zh-CN")
+                        new Date(project.updated_at).toLocaleDateString("zh-CN")
                       }}
                     </span>
                   </div>

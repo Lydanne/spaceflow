@@ -15,19 +15,19 @@ export default defineEventHandler(async (event) => {
     .select({
       id: schema.auditLogs.id,
       action: schema.auditLogs.action,
-      resourceType: schema.auditLogs.resourceType,
-      resourceId: schema.auditLogs.resourceId,
-      ipAddress: schema.auditLogs.ipAddress,
+      resource_type: schema.auditLogs.resource_type,
+      resource_id: schema.auditLogs.resource_id,
+      ip_address: schema.auditLogs.ip_address,
       detail: schema.auditLogs.detail,
-      createdAt: schema.auditLogs.createdAt,
-      username: schema.users.giteaUsername,
-      userAvatar: schema.users.avatarUrl,
+      created_at: schema.auditLogs.created_at,
+      username: schema.users.gitea_username,
+      userAvatar: schema.users.avatar_url,
       orgName: schema.organizations.name,
     })
     .from(schema.auditLogs)
-    .leftJoin(schema.users, eq(schema.auditLogs.userId, schema.users.id))
-    .leftJoin(schema.organizations, eq(schema.auditLogs.organizationId, schema.organizations.id))
-    .orderBy(desc(schema.auditLogs.createdAt))
+    .leftJoin(schema.users, eq(schema.auditLogs.user_id, schema.users.id))
+    .leftJoin(schema.organizations, eq(schema.auditLogs.organization_id, schema.organizations.id))
+    .orderBy(desc(schema.auditLogs.created_at))
     .limit(limit)
     .offset(offset);
 

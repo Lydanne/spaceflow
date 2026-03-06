@@ -58,7 +58,7 @@ async function syncOrg() {
         />
         <div>
           <h1 class="text-xl font-bold">
-            {{ (org as any)?.fullName || (org as any)?.name || "组织详情" }}
+            {{ (org as any)?.full_name || (org as any)?.name || "组织详情" }}
           </h1>
           <p class="text-sm text-gray-500 dark:text-gray-400">
             {{ teams.length }} 个团队 · {{ allGroups.length }} 个权限组

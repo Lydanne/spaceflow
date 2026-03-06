@@ -21,7 +21,7 @@ interface WorkflowRunItem {
   htmlUrl: string;
   startedAt: string;
   completedAt: string | null;
-  actor: { login: string; avatarUrl: string } | null;
+  actor: { login: string; avatar_url: string } | null;
 }
 
 interface WorkflowInput {
@@ -72,11 +72,11 @@ const workflows = computed(() => workflowsData.value?.data ?? []);
 // 分支列表
 const { data: branchesData, error: branchesError, status: branchesStatus } = useLazyFetch<{
   data: BranchItem[];
-  defaultBranch: string | null;
+  default_branch: string | null;
 }>(`/api/orgs/${props.orgId}/projects/${props.projectId}/branches`);
 const branches = computed(() => branchesData.value?.data ?? []);
 const defaultBranch = computed(
-  () => branchesData.value?.defaultBranch || "main",
+  () => branchesData.value?.default_branch || "main",
 );
 
 // 加载状态

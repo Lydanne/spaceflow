@@ -7,11 +7,11 @@ definePageMeta({
 interface AuditLogItem {
   id: number;
   action: string;
-  resourceType: string | null;
-  resourceId: string | null;
-  ipAddress: string | null;
+  resource_type: string | null;
+  resource_id: string | null;
+  ip_address: string | null;
   detail: Record<string, unknown> | null;
-  createdAt: string;
+  created_at: string;
   username: string | null;
   userAvatar: string | null;
   orgName: string | null;
@@ -106,11 +106,11 @@ function actionColor(action: string): string {
                   </span>
                 </div>
                 <div class="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
-                  <span v-if="log.resourceType">
-                    {{ log.resourceType }}{{ log.resourceId ? `: ${log.resourceId.substring(0, 8)}` : "" }}
+                  <span v-if="log.resource_type">
+                    {{ log.resource_type }}{{ log.resource_id ? `: ${log.resource_id.substring(0, 8)}` : "" }}
                   </span>
-                  <span v-if="log.ipAddress">
-                    IP: {{ log.ipAddress }}
+                  <span v-if="log.ip_address">
+                    IP: {{ log.ip_address }}
                   </span>
                   <span v-if="log.detail && Object.keys(log.detail).length > 0">
                     {{ JSON.stringify(log.detail) }}
@@ -119,7 +119,7 @@ function actionColor(action: string): string {
               </div>
             </div>
             <span class="text-xs text-gray-400 shrink-0">
-              {{ new Date(log.createdAt).toLocaleString("zh-CN") }}
+              {{ new Date(log.created_at).toLocaleString("zh-CN") }}
             </span>
           </div>
         </UCard>

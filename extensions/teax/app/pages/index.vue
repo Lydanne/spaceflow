@@ -4,8 +4,8 @@ const { user } = useUserSession();
 interface OrgItem {
   id: string;
   name: string;
-  fullName: string | null;
-  avatarUrl: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
   repoCount: number;
 }
 
@@ -27,12 +27,12 @@ const repoCount = computed(() => repoCountData.value?.count ?? 0);
 interface CommitItem {
   sha: string;
   message: string;
-  authorName: string;
-  authorEmail: string;
+  author_name: string;
+  author_email: string;
   date: string;
-  htmlUrl: string;
-  projectName: string;
-  projectFullName: string;
+  html_url: string;
+  project_name: string;
+  project_full_name: string;
 }
 
 const { data: commitsData } = await useFetch<{ data: CommitItem[] }>(
@@ -119,13 +119,13 @@ function timeAgo(dateStr: string) {
           <UCard class="hover:ring-1 hover:ring-primary-500 transition-all">
             <div class="flex items-center gap-3">
               <UAvatar
-                :src="org.avatarUrl || undefined"
+                :src="org.avatar_url || undefined"
                 :alt="org.name"
                 size="lg"
               />
               <div>
                 <p class="font-semibold">
-                  {{ org.fullName || org.name }}
+                  {{ org.full_name || org.name }}
                 </p>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
                   {{ org.repoCount || 0 }} 个仓库
@@ -168,7 +168,7 @@ function timeAgo(dateStr: string) {
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
                 <a
-                  :href="commit.htmlUrl"
+                  :href="commit.html_url"
                   target="_blank"
                   class="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline truncate"
                 >
@@ -178,9 +178,9 @@ function timeAgo(dateStr: string) {
               <div class="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                 <span class="font-mono">{{ commit.sha.slice(0, 7) }}</span>
                 <span>·</span>
-                <span>{{ commit.projectFullName }}</span>
+                <span>{{ commit.project_full_name }}</span>
                 <span>·</span>
-                <span>{{ commit.authorName }}</span>
+                <span>{{ commit.author_name }}</span>
                 <span>·</span>
                 <span>{{ timeAgo(commit.date) }}</span>
               </div>

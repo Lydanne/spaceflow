@@ -16,9 +16,9 @@ export default defineEventHandler(async (event) => {
   const assignments = await db
     .select({
       id: schema.teamPermissions.id,
-      teamId: schema.teamPermissions.teamId,
-      permissionGroupId: schema.teamPermissions.permissionGroupId,
-      createdAt: schema.teamPermissions.createdAt,
+      team_id: schema.teamPermissions.team_id,
+      permission_group_id: schema.teamPermissions.permission_group_id,
+      created_at: schema.teamPermissions.created_at,
       groupName: schema.permissionGroups.name,
       groupDescription: schema.permissionGroups.description,
       permissions: schema.permissionGroups.permissions,
@@ -26,9 +26,9 @@ export default defineEventHandler(async (event) => {
     .from(schema.teamPermissions)
     .innerJoin(
       schema.permissionGroups,
-      eq(schema.teamPermissions.permissionGroupId, schema.permissionGroups.id),
+      eq(schema.teamPermissions.permission_group_id, schema.permissionGroups.id),
     )
-    .where(eq(schema.teamPermissions.teamId, teamId));
+    .where(eq(schema.teamPermissions.team_id, teamId));
 
   return { data: assignments };
 });

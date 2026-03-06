@@ -1,18 +1,18 @@
 declare module "#auth-utils" {
   interface User {
     id: string;
-    giteaId: number;
+    gitea_id: number;
     username: string;
     email: string;
-    avatarUrl: string | null;
-    isAdmin: boolean | null;
+    avatar_url: string | null;
+    is_admin: boolean | null;
   }
 
   interface UserSession {
     user: User;
     sessionId: string;
     giteaAccessToken: string;
-    giteaRefreshToken: string;
+    giteaRefreshToken?: string;
   }
 }
 

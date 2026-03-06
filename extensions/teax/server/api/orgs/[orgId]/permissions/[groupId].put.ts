@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     name?: string;
     description?: string;
     permissions?: string[];
-    repositoryIds?: string[] | null;
+    repository_ids?: string[] | null;
   }>(event);
 
   const [updated] = await db
@@ -26,12 +26,12 @@ export default defineEventHandler(async (event) => {
       ...(body.name !== undefined ? { name: body.name.trim() } : {}),
       ...(body.description !== undefined ? { description: body.description.trim() || null } : {}),
       ...(body.permissions !== undefined ? { permissions: body.permissions } : {}),
-      ...(body.repositoryIds !== undefined ? { repositoryIds: body.repositoryIds } : {}),
+      ...(body.repository_ids !== undefined ? { repository_ids: body.repository_ids } : {}),
     })
     .where(
       and(
         eq(schema.permissionGroups.id, groupId),
-        eq(schema.permissionGroups.organizationId, orgId),
+        eq(schema.permissionGroups.organization_id, orgId),
       ),
     )
     .returning();

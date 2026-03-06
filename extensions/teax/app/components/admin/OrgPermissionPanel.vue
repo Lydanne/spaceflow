@@ -4,7 +4,7 @@ import type { PermissionGroup, PermissionDef } from "~/types/admin";
 interface RepositoryItem {
   id: string;
   name: string;
-  fullName: string;
+  full_name: string;
 }
 
 const props = withDefaults(defineProps<{
@@ -49,8 +49,8 @@ function openEditGroup(group: PermissionGroup) {
   formName.value = group.name;
   formDescription.value = group.description || "";
   formPermissions.value = [...(group.permissions || [])];
-  formScopeAll.value = !props.showRepoScope || group.repositoryIds === null;
-  formRepositoryIds.value = group.repositoryIds ? [...group.repositoryIds] : [];
+  formScopeAll.value = !props.showRepoScope || group.repository_ids === null;
+  formRepositoryIds.value = group.repository_ids ? [...group.repository_ids] : [];
   showGroupForm.value = true;
 }
 
@@ -134,7 +134,7 @@ async function saveGroup() {
             name: formName.value,
             description: formDescription.value,
             permissions: formPermissions.value,
-            repositoryIds: formScopeAll.value ? null : formRepositoryIds.value,
+            repository_ids: formScopeAll.value ? null : formRepositoryIds.value,
           },
         },
       );
@@ -146,7 +146,7 @@ async function saveGroup() {
           name: formName.value,
           description: formDescription.value,
           permissions: formPermissions.value,
-          repositoryIds: formScopeAll.value ? null : formRepositoryIds.value,
+          repository_ids: formScopeAll.value ? null : formRepositoryIds.value,
         },
       });
       toast.add({ title: "权限组已创建", color: "success" });
@@ -219,8 +219,8 @@ function getPermissionLabel(key: string) {
                   name="i-lucide-folder"
                   class="w-3.5 h-3.5"
                 />
-                <span v-if="group.repositoryIds === null">全部仓库</span>
-                <span v-else>{{ group.repositoryIds.length }} 个仓库</span>
+                <span v-if="group.repository_ids === null">全部仓库</span>
+                <span v-else>{{ group.repository_ids.length }} 个仓库</span>
                 <span class="mx-1">·</span>
               </template>
               <span>{{ (group.permissions || []).length }} 项权限</span>
@@ -353,7 +353,7 @@ function getPermissionLabel(key: string) {
                       :name="formRepositoryIds.includes(repo.id) ? 'i-lucide-check-square' : 'i-lucide-square'"
                       class="w-4 h-4 shrink-0"
                     />
-                    {{ repo.fullName || repo.name }}
+                    {{ repo.full_name || repo.name }}
                   </button>
                   <p
                     v-if="repoList.length === 0"

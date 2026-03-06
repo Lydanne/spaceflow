@@ -59,11 +59,11 @@ export default defineEventHandler(async (event) => {
   const [project] = await db
     .select()
     .from(schema.repositories)
-    .where(eq(schema.repositories.giteaRepoId, repoId))
+    .where(eq(schema.repositories.gitea_repo_id, repoId))
     .limit(1);
 
   // 验证签名：无论项目是否存在都返回统一的 401，避免泄漏项目存在性
-  if (!project?.webhookSecret || !verifyWebhookSignature(body, project.webhookSecret, signature)) {
+  if (!project?.webhook_secret || !verifyWebhookSignature(body, project.webhook_secret, signature)) {
     throw createError({ statusCode: 401, message: "Invalid webhook signature" });
   }
 
@@ -84,7 +84,7 @@ export default defineEventHandler(async (event) => {
       received: true,
       action: "notified",
       branch,
-      project: project.fullName,
+      project: project.full_name,
     };
   }
 

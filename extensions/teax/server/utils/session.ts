@@ -4,10 +4,10 @@ const SESSION_PREFIX = "session:";
 const SESSION_TTL = 60 * 60 * 24 * 7; // 7 天
 
 export interface SessionMeta {
-  userId: string;
+  user_id: string;
   username: string;
-  loginAt: number;
-  loginProvider: "gitea" | "feishu";
+  login_at: number;
+  login_provider: "gitea" | "feishu";
   ip?: string;
   ua?: string;
 }

@@ -4,10 +4,10 @@ const props = defineProps<{
   projectId: string;
   project: {
     id: string;
-    fullName: string;
-    defaultBranch: string | null;
-    cloneUrl: string;
-    webhookId: number | null;
+    full_name: string;
+    default_branch: string | null;
+    clone_url: string;
+    webhook_id: number | null;
     settings: Record<string, unknown>;
   };
   isOwnerOrAdmin: boolean;

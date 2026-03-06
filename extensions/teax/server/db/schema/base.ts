@@ -10,8 +10,8 @@ import { uuid, timestamp } from "drizzle-orm/pg-core";
  */
 export function baseColumns() {
   return {
-    rowCreator: uuid("row_creator"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+    row_creator: uuid("row_creator"),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   };
 }

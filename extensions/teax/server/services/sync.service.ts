@@ -19,19 +19,19 @@ export async function syncUserOrgsAndTeams(username: string) {
     const [dbOrg] = await db
       .insert(schema.organizations)
       .values({
-        giteaOrgId: org.id,
+        gitea_org_id: org.id,
         name: org.name,
-        fullName: org.full_name || org.name,
-        avatarUrl: org.avatar_url,
-        syncedAt: new Date(),
+        full_name: org.full_name || org.name,
+        avatar_url: org.avatar_url,
+        synced_at: new Date(),
       })
       .onConflictDoUpdate({
-        target: schema.organizations.giteaOrgId,
+        target: schema.organizations.gitea_org_id,
         set: {
           name: org.name,
-          fullName: org.full_name || org.name,
-          avatarUrl: org.avatar_url,
-          syncedAt: new Date(),
+          full_name: org.full_name || org.name,
+          avatar_url: org.avatar_url,
+          synced_at: new Date(),
         },
       })
       .returning();
@@ -47,18 +47,18 @@ export async function syncUserOrgsAndTeams(username: string) {
       const [dbTeam] = await db
         .insert(schema.teams)
         .values({
-          organizationId: dbOrg.id,
-          giteaTeamId: team.id,
+          organization_id: dbOrg.id,
+          gitea_team_id: team.id,
           name: team.name,
           description: team.description,
-          syncedAt: new Date(),
+          synced_at: new Date(),
         })
         .onConflictDoUpdate({
-          target: [schema.teams.organizationId, schema.teams.giteaTeamId],
+          target: [schema.teams.organization_id, schema.teams.gitea_team_id],
           set: {
             name: team.name,
             description: team.description,
-            syncedAt: new Date(),
+            synced_at: new Date(),
           },
         })
         .returning();
@@ -69,8 +69,8 @@ export async function syncUserOrgsAndTeams(username: string) {
       await db
         .insert(schema.teamPermissions)
         .values({
-          teamId: dbTeam.id,
-          permissionGroupId: defaultGroup.id,
+          team_id: dbTeam.id,
+          permission_group_id: defaultGroup.id,
         })
         .onConflictDoNothing();
 
@@ -80,15 +80,15 @@ export async function syncUserOrgsAndTeams(username: string) {
         const [memberUser] = await db
           .select()
           .from(schema.users)
-          .where(eq(schema.users.giteaId, member.id))
+          .where(eq(schema.users.gitea_id, member.id))
           .limit(1);
 
         if (memberUser) {
           await db
             .insert(schema.teamMembers)
             .values({
-              teamId: dbTeam.id,
-              userId: memberUser.id,
+              team_id: dbTeam.id,
+              user_id: memberUser.id,
               role: "member",
             })
             .onConflictDoNothing();
@@ -108,7 +108,7 @@ async function ensureDefaultPermissionGroup(db: ReturnType<typeof useDB>, orgId:
     .from(schema.permissionGroups)
     .where(
       and(
-        eq(schema.permissionGroups.organizationId, orgId),
+        eq(schema.permissionGroups.organization_id, orgId),
         eq(schema.permissionGroups.name, DEFAULT_GROUP_NAME),
       ),
     )
@@ -119,12 +119,12 @@ async function ensureDefaultPermissionGroup(db: ReturnType<typeof useDB>, orgId:
   const [created] = await db
     .insert(schema.permissionGroups)
     .values({
-      organizationId: orgId,
+      organization_id: orgId,
       type: "default",
       name: DEFAULT_GROUP_NAME,
       description: "默认权限组，仅含查看权限，对全部仓库可见",
       permissions: DEFAULT_PERMISSIONS,
-      repositoryIds: null,
+      repository_ids: null,
     })
     .returning();
 

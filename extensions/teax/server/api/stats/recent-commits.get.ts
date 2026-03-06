@@ -7,12 +7,12 @@ import { getVisibleRepositoryIds } from "../../utils/permission";
 interface CommitItem {
   sha: string;
   message: string;
-  authorName: string;
-  authorEmail: string;
+  author_name: string;
+  author_email: string;
   date: string;
-  htmlUrl: string;
-  projectName: string;
-  projectFullName: string;
+  html_url: string;
+  project_name: string;
+  project_full_name: string;
 }
 
 export default defineEventHandler(async (event) => {
@@ -26,27 +26,27 @@ export default defineEventHandler(async (event) => {
     .from(schema.organizations);
 
   // 收集所有可见项目
-  const allProjects: { fullName: string; name: string }[] = [];
+  const allProjects: { full_name: string; name: string }[] = [];
 
   for (const org of orgs) {
     const visibleIds = await getVisibleRepositoryIds(
       session.user.id,
       org.id,
-      !!session.user.isAdmin,
+      !!session.user.is_admin,
     );
 
     if (visibleIds !== null && visibleIds.length === 0) continue;
 
     const where = visibleIds === null
-      ? eq(schema.repositories.organizationId, org.id)
+      ? eq(schema.repositories.organization_id, org.id)
       : and(
-          eq(schema.repositories.organizationId, org.id),
+          eq(schema.repositories.organization_id, org.id),
           inArray(schema.repositories.id, visibleIds),
         );
 
     const projects = await db
       .select({
-        fullName: schema.repositories.fullName,
+        full_name: schema.repositories.full_name,
         name: schema.repositories.name,
       })
       .from(schema.repositories)
@@ -61,18 +61,18 @@ export default defineEventHandler(async (event) => {
 
   const results = await Promise.allSettled(
     projectsToFetch.map(async (project) => {
-      const [owner, repo] = project.fullName.split("/");
+      const [owner, repo] = project.full_name.split("/");
       if (!owner || !repo) return [];
       const repoCommits = await gitea.getRepoCommits(owner, repo, undefined, 3);
       return repoCommits.map((c: GiteaCommit) => ({
         sha: c.sha,
         message: c.commit.message.split("\n")[0],
-        authorName: c.commit.author.name,
-        authorEmail: c.commit.author.email,
+        author_name: c.commit.author.name,
+        author_email: c.commit.author.email,
         date: c.commit.author.date,
-        htmlUrl: c.html_url,
-        projectName: project.name,
-        projectFullName: project.fullName,
+        html_url: c.html_url,
+        project_name: project.name,
+        project_full_name: project.full_name,
       }));
     }),
   );

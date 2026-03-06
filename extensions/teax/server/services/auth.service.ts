@@ -8,19 +8,19 @@ export async function upsertUser(giteaUser: GiteaUser) {
   const existing = await db
     .select()
     .from(schema.users)
-    .where(eq(schema.users.giteaId, giteaUser.id))
+    .where(eq(schema.users.gitea_id, giteaUser.id))
     .limit(1);
 
   if (existing.length > 0) {
     await db
       .update(schema.users)
       .set({
-        giteaUsername: giteaUser.login,
+        gitea_username: giteaUser.login,
         email: giteaUser.email,
-        avatarUrl: giteaUser.avatar_url,
-        updatedAt: new Date(),
+        avatar_url: giteaUser.avatar_url,
+        updated_at: new Date(),
       })
-      .where(eq(schema.users.giteaId, giteaUser.id));
+      .where(eq(schema.users.gitea_id, giteaUser.id));
 
     return existing[0];
   }
@@ -32,11 +32,11 @@ export async function upsertUser(giteaUser: GiteaUser) {
   const [user] = await db
     .insert(schema.users)
     .values({
-      giteaId: giteaUser.id,
-      giteaUsername: giteaUser.login,
+      gitea_id: giteaUser.id,
+      gitea_username: giteaUser.login,
       email: giteaUser.email,
-      avatarUrl: giteaUser.avatar_url,
-      isAdmin: isFirstUser || giteaUser.is_admin,
+      avatar_url: giteaUser.avatar_url,
+      is_admin: isFirstUser || giteaUser.is_admin,
     })
     .returning();
 

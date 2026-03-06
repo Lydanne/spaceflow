@@ -5,23 +5,23 @@ const projectName = route.params.projectName as string;
 
 interface ProjectDetail {
   id: string;
-  organizationId: string;
+  organization_id: string;
   name: string;
-  fullName: string;
+  full_name: string;
   description: string | null;
-  defaultBranch: string | null;
-  cloneUrl: string;
-  webhookId: number | null;
+  default_branch: string | null;
+  clone_url: string;
+  webhook_id: number | null;
   settings: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 }
 
 const { data: project, status: projectStatus } = await useFetch<ProjectDetail>(
   `/api/resolve/${orgName}/${projectName}`,
 );
 
-const orgId = computed(() => project.value?.organizationId ?? "");
+const orgId = computed(() => project.value?.organization_id ?? "");
 const projectId = computed(() => project.value?.id ?? "");
 
 const { isOwnerOrAdmin } = useOrgRole(orgId.value);
@@ -76,7 +76,7 @@ const activeTab = computed(() => {
           />
           <div>
             <h1 class="text-xl font-bold">
-              {{ project.fullName }}
+              {{ project.full_name }}
             </h1>
             <p
               v-if="project.description"
@@ -88,7 +88,7 @@ const activeTab = computed(() => {
         </div>
 
         <UBadge
-          v-if="!project.webhookId"
+          v-if="!project.webhook_id"
           color="warning"
           variant="subtle"
         >

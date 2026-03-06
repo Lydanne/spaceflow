@@ -16,8 +16,8 @@ export default defineEventHandler(async (event) => {
     .select({
       id: schema.organizations.id,
       name: schema.organizations.name,
-      fullName: schema.organizations.fullName,
-      avatarUrl: schema.organizations.avatarUrl,
+      full_name: schema.organizations.full_name,
+      avatar_url: schema.organizations.avatar_url,
     })
     .from(schema.organizations)
     .where(eq(schema.organizations.name, orgName))

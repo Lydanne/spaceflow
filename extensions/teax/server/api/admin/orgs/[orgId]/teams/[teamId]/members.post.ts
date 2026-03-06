@@ -12,10 +12,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event);
-  const { userId, role = "member" } = body as { userId: string; role?: string };
+  const { user_id, role = "member" } = body as { user_id: string; role?: string };
 
-  if (!userId) {
-    throw createError({ statusCode: 400, message: "Missing userId" });
+  if (!user_id) {
+    throw createError({ statusCode: 400, message: "Missing user_id" });
   }
 
   if (!["owner", "member"].includes(role)) {
@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
   const [user] = await db
     .select()
     .from(schema.users)
-    .where(eq(schema.users.id, userId))
+    .where(eq(schema.users.id, user_id))
     .limit(1);
 
   if (!user) {
@@ -36,12 +36,12 @@ export default defineEventHandler(async (event) => {
   const [member] = await db
     .insert(schema.teamMembers)
     .values({
-      teamId,
-      userId,
+      team_id: teamId,
+      user_id,
       role,
     })
     .onConflictDoUpdate({
-      target: [schema.teamMembers.teamId, schema.teamMembers.userId],
+      target: [schema.teamMembers.team_id, schema.teamMembers.user_id],
       set: { role },
     })
     .returning();

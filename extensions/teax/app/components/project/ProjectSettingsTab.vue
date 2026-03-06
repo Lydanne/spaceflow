@@ -4,10 +4,10 @@ const props = defineProps<{
   projectId: string;
   project: {
     id: string;
-    fullName: string;
-    defaultBranch: string | null;
-    cloneUrl: string;
-    webhookId: number | null;
+    full_name: string;
+    default_branch: string | null;
+    clone_url: string;
+    webhook_id: number | null;
     settings: Record<string, unknown>;
   };
 }>();
@@ -57,14 +57,14 @@ const deleting = ref(false);
 const confirmDeleteName = ref("");
 
 async function deleteProject() {
-  if (confirmDeleteName.value !== props.project.fullName) return;
+  if (confirmDeleteName.value !== props.project.full_name) return;
   deleting.value = true;
   try {
     await $fetch(`/api/orgs/${props.orgId}/projects/${props.projectId}`, {
       method: "DELETE",
     });
     toast.add({ title: "项目已删除", color: "success" });
-    navigateTo(`/${props.project.fullName.split("/")[0]}`);
+    navigateTo(`/${props.project.full_name.split("/")[0]}`);
   } catch {
     toast.add({ title: "删除失败", color: "error" });
   } finally {
@@ -88,7 +88,7 @@ async function deleteProject() {
             项目名称
           </p>
           <p class="font-medium mt-0.5">
-            {{ project.fullName }}
+            {{ project.full_name }}
           </p>
         </div>
         <div>
@@ -96,7 +96,7 @@ async function deleteProject() {
             默认分支
           </p>
           <p class="font-medium mt-0.5">
-            {{ project.defaultBranch }}
+            {{ project.default_branch }}
           </p>
         </div>
         <div>
@@ -104,7 +104,7 @@ async function deleteProject() {
             Clone URL
           </p>
           <p class="font-medium font-mono text-xs mt-0.5 break-all">
-            {{ project.cloneUrl }}
+            {{ project.clone_url }}
           </p>
         </div>
         <div>
@@ -113,8 +113,8 @@ async function deleteProject() {
           </p>
           <p class="font-medium mt-0.5">
             {{
-              project.webhookId
-                ? `已配置 (ID: ${project.webhookId})`
+              project.webhook_id
+                ? `已配置 (ID: ${project.webhook_id})`
                 : "未配置"
             }}
           </p>
@@ -180,12 +180,12 @@ async function deleteProject() {
         <div>
           <p class="text-sm mb-2">
             请输入项目名称
-            <strong>{{ project.fullName }}</strong> 以确认删除：
+            <strong>{{ project.full_name }}</strong> 以确认删除：
           </p>
           <div class="flex gap-2">
             <UInput
               v-model="confirmDeleteName"
-              :placeholder="project.fullName"
+              :placeholder="project.full_name"
               size="sm"
               class="flex-1"
             />
@@ -193,7 +193,7 @@ async function deleteProject() {
               color="error"
               variant="soft"
               :loading="deleting"
-              :disabled="confirmDeleteName !== project.fullName"
+              :disabled="confirmDeleteName !== project.full_name"
               @click="deleteProject"
             >
               删除项目

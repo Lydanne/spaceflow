@@ -4,7 +4,7 @@ export default defineNuxtRouteMiddleware((to) => {
   }
 
   const { user } = useUserSession();
-  if (!user.value?.isAdmin) {
+  if (!user.value?.is_admin) {
     return navigateTo("/");
   }
 });

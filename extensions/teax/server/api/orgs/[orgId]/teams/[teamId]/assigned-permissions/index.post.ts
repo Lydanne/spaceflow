@@ -13,9 +13,9 @@ export default defineEventHandler(async (event) => {
   await requireTeamOwnerOrAdmin(event, teamId);
   const db = useDB();
 
-  const body = await readBody<{ permissionGroupId: string }>(event);
+  const body = await readBody<{ permission_group_id: string }>(event);
 
-  if (!body.permissionGroupId) {
+  if (!body.permission_group_id) {
     throw createError({ statusCode: 400, message: "permissionGroupId is required" });
   }
 
@@ -25,8 +25,8 @@ export default defineEventHandler(async (event) => {
     .from(schema.permissionGroups)
     .where(
       and(
-        eq(schema.permissionGroups.id, body.permissionGroupId),
-        eq(schema.permissionGroups.organizationId, orgId),
+        eq(schema.permissionGroups.id, body.permission_group_id),
+        eq(schema.permissionGroups.organization_id, orgId),
       ),
     )
     .limit(1);
@@ -38,8 +38,8 @@ export default defineEventHandler(async (event) => {
   const [assignment] = await db
     .insert(schema.teamPermissions)
     .values({
-      teamId,
-      permissionGroupId: body.permissionGroupId,
+      team_id: teamId,
+      permission_group_id: body.permission_group_id,
     })
     .onConflictDoNothing()
     .returning();

@@ -4,11 +4,11 @@ import type { GiteaService } from "./gitea";
 
 interface AuthUser {
   id: string;
-  giteaId: number;
+  gitea_id: number;
   username: string;
   email: string;
-  avatarUrl: string | null;
-  isAdmin: boolean | null;
+  avatar_url: string | null;
+  is_admin: boolean | null;
 }
 
 interface AuthSession {
@@ -39,7 +39,7 @@ export async function requireAuth(event: H3Event): Promise<AuthSession> {
  */
 export async function requireAdmin(event: H3Event): Promise<AuthSession> {
   const session = await requireAuth(event);
-  if (!session.user.isAdmin) {
+  if (!session.user.is_admin) {
     throw createError({
       statusCode: 403,
       message: "Admin access required",

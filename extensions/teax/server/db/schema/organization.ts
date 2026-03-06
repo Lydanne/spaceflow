@@ -4,33 +4,33 @@ import { baseColumns } from "./base";
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
-  giteaOrgId: integer("gitea_org_id").unique().notNull(),
+  gitea_org_id: integer("gitea_org_id").unique().notNull(),
   name: varchar("name", { length: 255 }).notNull(),
-  fullName: varchar("full_name", { length: 255 }),
-  avatarUrl: text("avatar_url"),
-  syncedAt: timestamp("synced_at", { withTimezone: true }),
+  full_name: varchar("full_name", { length: 255 }),
+  avatar_url: text("avatar_url"),
+  synced_at: timestamp("synced_at", { withTimezone: true }),
   ...baseColumns(),
 });
 
 export const teams = pgTable("teams", {
   id: uuid("id").primaryKey().defaultRandom(),
-  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
-  giteaTeamId: integer("gitea_team_id").notNull(),
+  organization_id: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+  gitea_team_id: integer("gitea_team_id").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  syncedAt: timestamp("synced_at", { withTimezone: true }),
+  synced_at: timestamp("synced_at", { withTimezone: true }),
   ...baseColumns(),
 }, (table) => [
-  unique("teams_org_gitea_team").on(table.organizationId, table.giteaTeamId),
+  unique("teams_org_gitea_team").on(table.organization_id, table.gitea_team_id),
 ]);
 
 export const teamMembers = pgTable("team_members", {
   id: uuid("id").primaryKey().defaultRandom(),
-  teamId: uuid("team_id").references(() => teams.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  team_id: uuid("team_id").references(() => teams.id, { onDelete: "cascade" }),
+  user_id: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   role: varchar("role", { length: 50 }).default("member"),
-  joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow(),
+  joined_at: timestamp("joined_at", { withTimezone: true }).defaultNow(),
   ...baseColumns(),
 }, (table) => [
-  unique("team_members_team_user").on(table.teamId, table.userId),
+  unique("team_members_team_user").on(table.team_id, table.user_id),
 ]);

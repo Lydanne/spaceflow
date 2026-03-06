@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
     name: string;
     description?: string;
     permissions?: string[];
-    repositoryIds?: string[] | null;
+    repository_ids?: string[] | null;
   }>(event);
 
   if (!body.name?.trim()) {
@@ -37,20 +37,20 @@ export default defineEventHandler(async (event) => {
   const [group] = await db
     .insert(schema.permissionGroups)
     .values({
-      organizationId: orgId,
+      organization_id: orgId,
       name: body.name.trim(),
       description: body.description?.trim() || null,
       permissions: body.permissions || [],
-      repositoryIds: body.repositoryIds ?? null,
+      repository_ids: body.repository_ids ?? null,
     })
     .returning();
 
   await writeAuditLog(event, {
-    userId: session.user.id,
-    organizationId: orgId,
+    user_id: session.user.id,
+    organization_id: orgId,
     action: "permission_group.create",
-    resourceType: "permission_group",
-    resourceId: group?.id,
+    resource_type: "permission_group",
+    resource_id: group?.id,
     detail: { name: body.name },
   });
 

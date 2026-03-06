@@ -2,11 +2,11 @@ import type { H3Event } from "h3";
 import { useDB, schema } from "../db";
 
 interface AuditLogParams {
-  userId: string;
-  organizationId?: string;
+  user_id: string;
+  organization_id?: string;
   action: string;
-  resourceType?: string;
-  resourceId?: string;
+  resource_type?: string;
+  resource_id?: string;
   detail?: Record<string, unknown>;
 }
 
@@ -19,13 +19,13 @@ export async function writeAuditLog(event: H3Event, params: AuditLogParams) {
     const userAgent = getRequestHeader(event, "user-agent") || "";
 
     await db.insert(schema.auditLogs).values({
-      userId: params.userId,
-      organizationId: params.organizationId || null,
+      user_id: params.user_id,
+      organization_id: params.organization_id || null,
       action: params.action,
-      resourceType: params.resourceType || null,
-      resourceId: params.resourceId || null,
-      ipAddress,
-      userAgent,
+      resource_type: params.resource_type || null,
+      resource_id: params.resource_id || null,
+      ip_address: ipAddress,
+      user_agent: userAgent,
       detail: params.detail || {},
     });
   } catch (err) {

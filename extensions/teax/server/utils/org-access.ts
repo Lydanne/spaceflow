@@ -12,17 +12,17 @@ export async function requireOrgAccess(event: H3Event, orgId: string) {
   const db = useDB();
 
   // 管理员可以访问所有组织
-  if (session.user.isAdmin) {
+  if (session.user.is_admin) {
     return session;
   }
 
   const membership = await db
     .select({ id: schema.teamMembers.id })
     .from(schema.teamMembers)
-    .innerJoin(schema.teams, eq(schema.teams.id, schema.teamMembers.teamId))
+    .innerJoin(schema.teams, eq(schema.teams.id, schema.teamMembers.team_id))
     .where(and(
-      eq(schema.teams.organizationId, orgId),
-      eq(schema.teamMembers.userId, session.user.id),
+      eq(schema.teams.organization_id, orgId),
+      eq(schema.teamMembers.user_id, session.user.id),
     ))
     .limit(1);
 

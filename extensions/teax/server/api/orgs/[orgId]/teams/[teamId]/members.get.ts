@@ -16,18 +16,18 @@ export default defineEventHandler(async (event) => {
   const members = await db
     .select({
       id: schema.teamMembers.id,
-      teamId: schema.teamMembers.teamId,
-      userId: schema.teamMembers.userId,
+      team_id: schema.teamMembers.team_id,
+      user_id: schema.teamMembers.user_id,
       role: schema.teamMembers.role,
-      joinedAt: schema.teamMembers.joinedAt,
-      username: schema.users.giteaUsername,
+      joined_at: schema.teamMembers.joined_at,
+      username: schema.users.gitea_username,
       email: schema.users.email,
-      avatarUrl: schema.users.avatarUrl,
-      giteaId: schema.users.giteaId,
+      avatar_url: schema.users.avatar_url,
+      gitea_id: schema.users.gitea_id,
     })
     .from(schema.teamMembers)
-    .innerJoin(schema.users, eq(schema.teamMembers.userId, schema.users.id))
-    .where(eq(schema.teamMembers.teamId, teamId));
+    .innerJoin(schema.users, eq(schema.teamMembers.user_id, schema.users.id))
+    .where(eq(schema.teamMembers.team_id, teamId));
 
   return { data: members };
 });

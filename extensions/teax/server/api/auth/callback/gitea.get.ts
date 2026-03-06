@@ -29,10 +29,10 @@ export default defineEventHandler(async (event) => {
 
     const sessionId = generateSessionId();
     await registerSession(user.id, sessionId, {
-      userId: user.id,
-      username: user.giteaUsername,
-      loginAt: Date.now(),
-      loginProvider: "gitea",
+      user_id: user.id,
+      username: user.gitea_username,
+      login_at: Date.now(),
+      login_provider: "gitea",
       ip: getRequestIP(event) || undefined,
       ua: getRequestHeader(event, "user-agent") || undefined,
     });
@@ -40,11 +40,11 @@ export default defineEventHandler(async (event) => {
     await setUserSession(event, {
       user: {
         id: user.id,
-        giteaId: user.giteaId,
-        username: user.giteaUsername,
+        gitea_id: user.gitea_id,
+        username: user.gitea_username,
         email: user.email,
-        avatarUrl: user.avatarUrl,
-        isAdmin: user.isAdmin,
+        avatar_url: user.avatar_url,
+        is_admin: user.is_admin,
       },
       sessionId,
       giteaAccessToken: tokenResponse.access_token,
@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
     });
 
     // 后台异步同步组织和团队
-    syncUserOrgsAndTeams(user.giteaUsername).catch((err) => {
+    syncUserOrgsAndTeams(user.gitea_username).catch((err) => {
       console.error("Failed to sync orgs and teams:", err);
     });
 

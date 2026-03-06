@@ -10,10 +10,10 @@ export default defineEventHandler(async (event) => {
   const session = await requireAuth(event);
 
   // 管理员拥有所有权限
-  if (session.user.isAdmin) {
+  if (session.user.is_admin) {
     return {
       data: {
-        isAdmin: true,
+        is_admin: true,
         permissions: ["*"],
       },
     };
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
 
   return {
     data: {
-      isAdmin: false,
+      is_admin: false,
       permissions,
     },
   };

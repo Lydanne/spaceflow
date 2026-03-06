@@ -1,24 +1,24 @@
 export interface TeamItem {
   id: string;
-  organizationId: string;
-  giteaTeamId: number;
+  organization_id: string;
+  gitea_team_id: number;
   name: string;
   description: string | null;
-  syncedAt: string | null;
-  createdAt: string;
-  memberCount: number;
+  synced_at: string | null;
+  created_at: string;
+  member_count: number;
 }
 
 export interface MemberItem {
   id: string;
-  teamId: string;
-  userId: string;
+  team_id: string;
+  user_id: string;
   role: string;
-  joinedAt: string;
+  joined_at: string;
   username: string;
   email: string;
-  avatarUrl: string | null;
-  giteaId: number;
+  avatar_url: string | null;
+  gitea_id: number;
 }
 
 export interface PermissionGroup {
@@ -27,15 +27,15 @@ export interface PermissionGroup {
   name: string;
   description: string | null;
   permissions: string[];
-  repositoryIds: string[] | null;
+  repository_ids: string[] | null;
 }
 
 export interface TeamPermissionAssignment {
   id: string;
-  teamId: string;
-  permissionGroupId: string;
-  groupName: string;
-  groupDescription: string | null;
+  team_id: string;
+  permission_group_id: string;
+  group_name: string;
+  group_description: string | null;
   permissions: string[];
 }
 

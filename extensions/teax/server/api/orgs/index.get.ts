@@ -8,11 +8,11 @@ export default defineEventHandler(async (event) => {
 
   const columns = {
     id: schema.organizations.id,
-    giteaOrgId: schema.organizations.giteaOrgId,
+    gitea_org_id: schema.organizations.gitea_org_id,
     name: schema.organizations.name,
-    fullName: schema.organizations.fullName,
-    avatarUrl: schema.organizations.avatarUrl,
-    syncedAt: schema.organizations.syncedAt,
+    full_name: schema.organizations.full_name,
+    avatar_url: schema.organizations.avatar_url,
+    synced_at: schema.organizations.synced_at,
     repoCount:
       sql<number>`(SELECT COUNT(*)::int FROM repositories WHERE repositories.organization_id = "organizations"."id")`.as(
         "repo_count",
@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
   };
 
   // 管理员可以看到所有组织
-  if (session.user.isAdmin) {
+  if (session.user.is_admin) {
     const orgs = await db.select(columns).from(schema.organizations);
     return { data: orgs };
   }
@@ -29,9 +29,9 @@ export default defineEventHandler(async (event) => {
   const orgs = await db
     .select(columns)
     .from(schema.organizations)
-    .innerJoin(schema.teams, eq(schema.teams.organizationId, schema.organizations.id))
-    .innerJoin(schema.teamMembers, eq(schema.teamMembers.teamId, schema.teams.id))
-    .where(eq(schema.teamMembers.userId, session.user.id))
+    .innerJoin(schema.teams, eq(schema.teams.organization_id, schema.organizations.id))
+    .innerJoin(schema.teamMembers, eq(schema.teamMembers.team_id, schema.teams.id))
+    .where(eq(schema.teamMembers.user_id, session.user.id))
     .groupBy(schema.organizations.id);
 
   return { data: orgs };

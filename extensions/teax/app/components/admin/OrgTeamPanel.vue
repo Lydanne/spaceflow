@@ -62,8 +62,8 @@ async function fetchTeamPermissions() {
   }
 }
 
-async function selectTeam(teamId: string) {
-  selectedTeamId.value = teamId;
+async function selectTeam(team_id: string) {
+  selectedTeamId.value = team_id;
   await Promise.all([fetchMembers(), fetchTeamPermissions()]);
 }
 
@@ -104,7 +104,7 @@ async function assignPermission(groupId: string) {
   try {
     await $fetch(
       `/api/orgs/${props.orgId}/teams/${selectedTeamId.value}/assigned-permissions`,
-      { method: "POST", body: { permissionGroupId: groupId } },
+      { method: "POST", body: { permission_group_id: groupId } },
     );
     toast.add({ title: "权限组已分配", color: "success" });
     await fetchTeamPermissions();
@@ -129,7 +129,7 @@ async function removePermission(assignmentId: string) {
 
 const unassignedGroups = computed(() => {
   const assignedIds = new Set(
-    teamPermissions.value.map((tp) => tp.permissionGroupId),
+    teamPermissions.value.map((tp) => tp.permission_group_id),
   );
   return props.allGroups.filter((g) => !assignedIds.has(g.id));
 });
@@ -169,7 +169,7 @@ const memberColumns = computed(() => {
           {{ team.name }}
         </div>
         <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          {{ team.memberCount }} 名成员
+          {{ team.member_count }} 名成员
         </div>
       </button>
 
@@ -196,7 +196,7 @@ const memberColumns = computed(() => {
             <template #username-cell="{ row }">
               <div class="flex items-center gap-2">
                 <UAvatar
-                  :src="row.original.avatarUrl || undefined"
+                  :src="row.original.avatar_url || undefined"
                   :alt="row.original.username"
                   size="xs"
                 />
@@ -271,12 +271,12 @@ const memberColumns = computed(() => {
               class="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-gray-900"
             >
               <div>
-                <span class="font-medium text-sm">{{ tp.groupName }}</span>
+                <span class="font-medium text-sm">{{ tp.group_name }}</span>
                 <span
-                  v-if="tp.groupDescription"
+                  v-if="tp.group_description"
                   class="text-xs text-gray-500 dark:text-gray-400 ml-2"
                 >
-                  {{ tp.groupDescription }}
+                  {{ tp.group_description }}
                 </span>
               </div>
               <UButton

@@ -18,19 +18,19 @@ export default defineEventHandler(async (event) => {
   const [project] = await db
     .select({
       id: schema.repositories.id,
-      organizationId: schema.repositories.organizationId,
+      organization_id: schema.repositories.organization_id,
       name: schema.repositories.name,
-      fullName: schema.repositories.fullName,
+      full_name: schema.repositories.full_name,
       description: schema.repositories.description,
-      defaultBranch: schema.repositories.defaultBranch,
-      cloneUrl: schema.repositories.cloneUrl,
-      webhookId: schema.repositories.webhookId,
+      default_branch: schema.repositories.default_branch,
+      clone_url: schema.repositories.clone_url,
+      webhook_id: schema.repositories.webhook_id,
       settings: schema.repositories.settings,
-      createdAt: schema.repositories.createdAt,
-      updatedAt: schema.repositories.updatedAt,
+      created_at: schema.repositories.created_at,
+      updated_at: schema.repositories.updated_at,
     })
     .from(schema.repositories)
-    .where(eq(schema.repositories.fullName, fullName))
+    .where(eq(schema.repositories.full_name, fullName))
     .limit(1);
 
   if (!project) {
