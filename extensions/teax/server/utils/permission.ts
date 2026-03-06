@@ -1,8 +1,8 @@
 import { eq, and } from "drizzle-orm";
-import { useDB, schema } from "../db";
+import { useDB, schema } from "~~/server/db";
 import type { H3Event } from "h3";
 import { requireAuth } from "./auth";
-import { VALID_PERMISSION_KEYS } from "../shared/permissions";
+import { VALID_PERMISSION_KEYS } from "~~/server/shared/permissions";
 
 interface PermissionGroupRow {
   permissions: unknown;

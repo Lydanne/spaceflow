@@ -1,8 +1,8 @@
 import { eq, and } from "drizzle-orm";
-import { useDB, schema } from "../../../../../db";
-import { requirePermission } from "../../../../../utils/permission";
-import { createServiceGiteaClient } from "../../../../../utils/gitea";
-import { writeAuditLog } from "../../../../../utils/audit";
+import { useDB, schema } from "~~/server/db";
+import { requirePermission } from "~~/server/utils/permission";
+import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { writeAuditLog } from "~~/server/utils/audit";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");

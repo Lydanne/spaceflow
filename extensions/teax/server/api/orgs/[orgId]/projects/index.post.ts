@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
-import { useDB, schema } from "../../../../db";
-import { requirePermission } from "../../../../utils/permission";
-import { createServiceGiteaClient } from "../../../../utils/gitea";
-import { generateWebhookSecret } from "../../../../utils/webhook-verify";
-import { writeAuditLog } from "../../../../utils/audit";
-import { createProjectBodySchema } from "../../../../shared/dto";
+import { useDB, schema } from "~~/server/db";
+import { requirePermission } from "~~/server/utils/permission";
+import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { generateWebhookSecret } from "~~/server/utils/webhook-verify";
+import { writeAuditLog } from "~~/server/utils/audit";
+import { createProjectBodySchema } from "~~/server/shared/dto";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");

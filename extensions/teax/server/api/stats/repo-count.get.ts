@@ -1,5 +1,5 @@
-import { useDB, schema } from "../../db";
-import { requireAuth, createGiteaServiceWithRefresh } from "../../utils/auth";
+import { useDB, schema } from "~~/server/db";
+import { requireAuth, createGiteaServiceWithRefresh } from "~~/server/utils/auth";
 
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event);

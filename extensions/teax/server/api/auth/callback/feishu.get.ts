@@ -1,6 +1,6 @@
-import { exchangeFeishuCode, getFeishuUserInfo } from "../../../utils/feishu";
-import { findUserByFeishuOpenId, bindFeishuToUser } from "../../../services/feishu.service";
-import { generateSessionId, registerSession } from "../../../utils/session";
+import { exchangeFeishuCode, getFeishuUserInfo } from "~~/server/utils/feishu";
+import { findUserByFeishuOpenId, bindFeishuToUser } from "~~/server/services/feishu.service";
+import { generateSessionId, registerSession } from "~~/server/utils/session";
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);

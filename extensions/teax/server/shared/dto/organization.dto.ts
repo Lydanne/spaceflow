@@ -1,5 +1,5 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
-import { organizations, teams, teamMembers } from "../../db/schema/organization";
+import { organizations, teams, teamMembers } from "~~/server/db/schema/organization";
 import type { z } from "zod";
 
 // ─── organizations ───────────────────────────────────────

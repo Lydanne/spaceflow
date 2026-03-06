@@ -1,4 +1,4 @@
-import { buildFeishuAuthUrl } from "../../utils/feishu";
+import { buildFeishuAuthUrl } from "~~/server/utils/feishu";
 
 export default defineEventHandler(async (event) => {
   const state = generateState();

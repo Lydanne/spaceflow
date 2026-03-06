@@ -1,7 +1,7 @@
-import { exchangeGiteaCode, createGiteaService } from "../../../utils/gitea";
-import { upsertUser } from "../../../services/auth.service";
-import { syncUserOrgsAndTeams } from "../../../services/sync.service";
-import { generateSessionId, registerSession } from "../../../utils/session";
+import { exchangeGiteaCode, createGiteaService } from "~~/server/utils/gitea";
+import { upsertUser } from "~~/server/services/auth.service";
+import { syncUserOrgsAndTeams } from "~~/server/services/sync.service";
+import { generateSessionId, registerSession } from "~~/server/utils/session";
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);

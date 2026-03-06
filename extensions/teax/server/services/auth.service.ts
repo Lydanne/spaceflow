@@ -1,6 +1,6 @@
 import { eq, count } from "drizzle-orm";
-import { useDB, schema } from "../db";
-import type { GiteaUser } from "../utils/gitea";
+import { useDB, schema } from "~~/server/db";
+import type { GiteaUser } from "~~/server/utils/gitea";
 
 export async function upsertUser(giteaUser: GiteaUser) {
   const db = useDB();

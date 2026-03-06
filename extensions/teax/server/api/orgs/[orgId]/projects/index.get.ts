@@ -1,7 +1,7 @@
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
-import { useDB, schema } from "../../../../db";
-import { requireAuth } from "../../../../utils/auth";
-import { getVisibleRepositoryIds } from "../../../../utils/permission";
+import { useDB, schema } from "~~/server/db";
+import { requireAuth } from "~~/server/utils/auth";
+import { getVisibleRepositoryIds } from "~~/server/utils/permission";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");

@@ -1,4 +1,4 @@
-import { removeSession } from "../../utils/session";
+import { removeSession } from "~~/server/utils/session";
 
 export default defineEventHandler(async (event) => {
   const session = await getUserSession(event);

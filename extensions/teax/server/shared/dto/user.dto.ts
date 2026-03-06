@@ -1,5 +1,5 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
-import { users, userFeishu } from "../../db/schema/user";
+import { users, userFeishu } from "~~/server/db/schema/user";
 import type { z } from "zod";
 
 // ─── users ───────────────────────────────────────────────

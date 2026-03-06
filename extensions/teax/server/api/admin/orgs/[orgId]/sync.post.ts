@@ -1,7 +1,7 @@
 import { eq, and, notInArray } from "drizzle-orm";
-import { useDB, schema } from "../../../../db";
-import { requireAdmin } from "../../../../utils/auth";
-import { createServiceGiteaClient } from "../../../../utils/gitea";
+import { useDB, schema } from "~~/server/db";
+import { requireAdmin } from "~~/server/utils/auth";
+import { createServiceGiteaClient } from "~~/server/utils/gitea";
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event);

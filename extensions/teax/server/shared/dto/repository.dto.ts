@@ -1,5 +1,5 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
-import { repositories } from "../../db/schema/repository";
+import { repositories } from "~~/server/db/schema/repository";
 import { z } from "zod";
 
 // ─── repositories ────────────────────────────────────────

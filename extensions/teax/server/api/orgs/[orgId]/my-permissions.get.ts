@@ -1,5 +1,5 @@
-import { requireAuth } from "../../../utils/auth";
-import { getUserPermissions } from "../../../utils/permission";
+import { requireAuth } from "~~/server/utils/auth";
+import { getUserPermissions } from "~~/server/utils/permission";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");

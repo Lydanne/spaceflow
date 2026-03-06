@@ -1,5 +1,5 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { auditLogs } from "../../db/schema/audit";
+import { auditLogs } from "~~/server/db/schema/audit";
 import type { z } from "zod";
 
 // ─── auditLogs ───────────────────────────────────────────

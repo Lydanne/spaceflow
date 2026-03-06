@@ -1,7 +1,7 @@
 import { eq, and, notInArray } from "drizzle-orm";
-import { useDB, schema } from "../../../db";
-import { requireOrgOwnerOrAdmin } from "../../../utils/org-owner";
-import { createServiceGiteaClient } from "../../../utils/gitea";
+import { useDB, schema } from "~~/server/db";
+import { requireOrgOwnerOrAdmin } from "~~/server/utils/org-owner";
+import { createServiceGiteaClient } from "~~/server/utils/gitea";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");

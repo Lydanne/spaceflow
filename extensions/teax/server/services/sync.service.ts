@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
-import { useDB, schema } from "../db";
-import { createServiceGiteaClient } from "../utils/gitea";
+import { useDB, schema } from "~~/server/db";
+import { createServiceGiteaClient } from "~~/server/utils/gitea";
 
 const DEFAULT_GROUP_NAME = "默认权限";
 

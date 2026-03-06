@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { useDB, schema } from "../../../../../../../db";
-import { requireAdmin } from "../../../../../../../utils/auth";
+import { useDB, schema } from "~~/server/db";
+import { requireAdmin } from "~~/server/utils/auth";
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event);

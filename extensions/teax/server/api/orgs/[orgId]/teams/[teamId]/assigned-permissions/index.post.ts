@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
-import { useDB, schema } from "../../../../../../db";
-import { requireTeamOwnerOrAdmin } from "../../../../../../utils/team-owner";
-import { assignPermissionBodySchema } from "../../../../../../shared/dto";
+import { useDB, schema } from "~~/server/db";
+import { requireTeamOwnerOrAdmin } from "~~/server/utils/team-owner";
+import { assignPermissionBodySchema } from "~~/server/shared/dto";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");

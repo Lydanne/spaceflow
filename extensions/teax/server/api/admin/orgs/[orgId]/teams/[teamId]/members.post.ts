@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
-import { useDB, schema } from "../../../../../../db";
-import { requireAdmin } from "../../../../../../utils/auth";
-import { addTeamMemberBodySchema } from "../../../../../../shared/dto";
+import { useDB, schema } from "~~/server/db";
+import { requireAdmin } from "~~/server/utils/auth";
+import { addTeamMemberBodySchema } from "~~/server/shared/dto";
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event);

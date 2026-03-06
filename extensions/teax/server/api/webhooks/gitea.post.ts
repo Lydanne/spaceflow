@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { useDB, schema } from "../../db";
-import { verifyWebhookSignature } from "../../utils/webhook-verify";
+import { useDB, schema } from "~~/server/db";
+import { verifyWebhookSignature } from "~~/server/utils/webhook-verify";
 
 interface GiteaPushPayload {
   ref: string;

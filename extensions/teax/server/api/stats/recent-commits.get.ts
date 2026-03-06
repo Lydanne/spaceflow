@@ -1,8 +1,8 @@
 import { eq, and, inArray } from "drizzle-orm";
-import { useDB, schema } from "../../db";
-import { requireAuth, createGiteaServiceWithRefresh } from "../../utils/auth";
-import type { GiteaCommit } from "../../utils/gitea";
-import { getVisibleRepositoryIds } from "../../utils/permission";
+import { useDB, schema } from "~~/server/db";
+import { requireAuth, createGiteaServiceWithRefresh } from "~~/server/utils/auth";
+import type { GiteaCommit } from "~~/server/utils/gitea";
+import { getVisibleRepositoryIds } from "~~/server/utils/permission";
 
 interface CommitItem {
   sha: string;

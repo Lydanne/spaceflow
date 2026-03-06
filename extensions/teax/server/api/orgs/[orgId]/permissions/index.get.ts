@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { useDB, schema } from "../../../../db";
-import { requireOrgAccess } from "../../../../utils/org-access";
+import { useDB, schema } from "~~/server/db";
+import { requireOrgAccess } from "~~/server/utils/org-access";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");

@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { parse as parseYaml } from "yaml";
-import { useDB, schema } from "../../../../../db";
-import { requirePermission } from "../../../../../utils/permission";
-import { createServiceGiteaClient } from "../../../../../utils/gitea";
+import { useDB, schema } from "~~/server/db";
+import { requirePermission } from "~~/server/utils/permission";
+import { createServiceGiteaClient } from "~~/server/utils/gitea";
 
 interface WorkflowInput {
   description?: string;

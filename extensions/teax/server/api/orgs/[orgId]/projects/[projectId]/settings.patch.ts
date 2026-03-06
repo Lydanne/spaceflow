@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
-import { useDB, schema } from "../../../../../db";
-import { requirePermission } from "../../../../../utils/permission";
-import { updateRepoSettingsBodySchema } from "../../../../../shared/dto";
+import { useDB, schema } from "~~/server/db";
+import { requirePermission } from "~~/server/utils/permission";
+import { updateRepoSettingsBodySchema } from "~~/server/shared/dto";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");

@@ -1,5 +1,5 @@
 import type { H3Event } from "h3";
-import { useDB, schema } from "../db";
+import { useDB, schema } from "~~/server/db";
 
 interface AuditLogParams {
   user_id: string;

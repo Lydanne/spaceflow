@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { useDB, schema } from "../../../../../../db";
-import { requireTeamOwnerOrAdmin } from "../../../../../../utils/team-owner";
+import { useDB, schema } from "~~/server/db";
+import { requireTeamOwnerOrAdmin } from "~~/server/utils/team-owner";
 
 export default defineEventHandler(async (event) => {
   const teamId = getRouterParam(event, "teamId");

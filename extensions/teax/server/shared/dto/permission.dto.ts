@@ -1,5 +1,5 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
-import { permissionGroups, teamPermissions } from "../../db/schema/permission";
+import { permissionGroups, teamPermissions } from "~~/server/db/schema/permission";
 import { z } from "zod";
 
 // ─── permissionGroups ────────────────────────────────────

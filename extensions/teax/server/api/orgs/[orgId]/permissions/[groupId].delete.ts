@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
-import { useDB, schema } from "../../../../db";
-import { requireOrgOwnerOrAdmin } from "../../../../utils/org-owner";
-import { writeAuditLog } from "../../../../utils/audit";
+import { useDB, schema } from "~~/server/db";
+import { requireOrgOwnerOrAdmin } from "~~/server/utils/org-owner";
+import { writeAuditLog } from "~~/server/utils/audit";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");

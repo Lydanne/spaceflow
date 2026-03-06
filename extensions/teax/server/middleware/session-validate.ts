@@ -1,4 +1,4 @@
-import { isSessionValid } from "../utils/session";
+import { isSessionValid } from "~~/server/utils/session";
 
 export default defineEventHandler(async (event) => {
   // 只对 API 路由做 session 验证，排除 auth 相关路径
