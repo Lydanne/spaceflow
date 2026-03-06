@@ -136,14 +136,14 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)    Phase 6 (Week 11-13)
 
 | 任务 | 优先级 | 预估 | 状态 |
 | ---- | ------ | ---- | ---- |
-| 代理 API：Run 详情（`GET /api/repos/:owner/:repo/actions/runs/:runId`） | P2 | 1h | ⬜ |
-| 代理 API：Run 下 Jobs 列表（`GET /api/repos/:owner/:repo/actions/runs/:runId/jobs`） | P2 | 1h | ⬜ |
-| 代理 API：Job 日志下载（`GET /api/repos/:owner/:repo/actions/jobs/:jobId/logs`） | P2 | 1h | ⬜ |
-| Run 详情页面布局（`/:owner/:repo/actions/:runId`，左侧 Jobs 列表 + 右侧日志面板） | P2 | 4h | ⬜ |
-| Job 日志组件（ANSI 颜色渲染 + Step 折叠展开） | P2 | 4h | ⬜ |
-| Actions Tab 列表项点击跳转到 Run 详情页 | P2 | 2h | ⬜ |
+| 代理 API：Run 详情（`GET /api/repos/:owner/:repo/actions/runs/:runId`） | P2 | 1h | ✅ |
+| 代理 API：Run 下 Jobs 列表（`GET /api/repos/:owner/:repo/actions/runs/:runId/jobs`） | P2 | 1h | ✅ |
+| 代理 API：Job 日志下载（`GET /api/repos/:owner/:repo/actions/jobs/:jobId/logs`） | P2 | 1h | ✅ |
+| Run 详情页面布局（`/:owner/:repo/actions/runs/:runId`，左侧 Jobs 列表 + 右侧日志面板） | P2 | 4h | ✅ |
+| Job 日志组件（ANSI 颜色渲染 + 从日志文本解析 Step 折叠展开） | P2 | 4h | ✅ |
+| Actions Tab 列表项点击跳转到 Run 详情页 | P2 | 2h | ✅ |
 
-> **Gitea API 依赖**：基于 Gitea 1.25.4 Actions API（`/api/v1/repos/{owner}/{repo}/actions/runs`、`jobs`、`jobs/{id}/logs`）。日志为纯文本格式（含 ANSI 转义码），前端需 `ansi-to-html` 渲染。
+> **Gitea API 依赖**：基于 Gitea 1.25.4 Actions API。注意：Jobs API 返回 `steps: null`（不提供 step 数据），因此 Step 折叠从日志文本中解析 `⭐ Run Main/Post/Pre` 标记实现。日志为纯文本格式（含 ANSI 转义码），前端用 `ansi-to-html` 渲染。URL 格式对齐 Gitea（`/actions/runs/:runId`）。
 
 #### Week 4+: 权限组管理（从 Week 9 提前）
 
@@ -169,7 +169,7 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)    Phase 6 (Week 11-13)
 - [x] 基础权限中间件（requireAuth / requireAdmin / requireOrgAccess）
 - [x] 权限组管理（CRUD + 团队分配 + 细粒度校验）
 - [x] 首页统计卡片（我的组织/项目总数/仓库总数/今日构建）
-- [ ] Actions Run 详情 + Job 日志查看（P2 补充）
+- [x] Actions Run 详情 + Job 日志查看（P2 补充）
 
 ### 验收标准
 

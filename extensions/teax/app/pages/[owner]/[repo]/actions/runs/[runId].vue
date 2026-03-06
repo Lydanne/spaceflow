@@ -9,15 +9,6 @@ const props = defineProps<{
 const route = useRoute();
 const runId = computed(() => route.params.runId as string);
 
-interface StepItem {
-  name: string;
-  number: number;
-  status: string;
-  conclusion: string;
-  startedAt: string;
-  completedAt: string | null;
-}
-
 interface JobItem {
   id: number;
   runId: number;
@@ -28,7 +19,7 @@ interface JobItem {
   completedAt: string | null;
   runnerName: string | null;
   labels: string[];
-  steps: StepItem[];
+  steps: unknown[];
 }
 
 interface RunDetail {
@@ -119,45 +110,96 @@ const activeJobLogHtml = computed(() => {
 
 // Step 折叠状态
 const expandedSteps = ref<Set<number>>(new Set());
-function toggleStep(stepNumber: number) {
-  if (expandedSteps.value.has(stepNumber)) {
-    expandedSteps.value.delete(stepNumber);
+function toggleStep(stepIndex: number) {
+  if (expandedSteps.value.has(stepIndex)) {
+    expandedSteps.value.delete(stepIndex);
   } else {
-    expandedSteps.value.add(stepNumber);
+    expandedSteps.value.add(stepIndex);
   }
 }
 
-// 按 step 分割日志
-const stepLogs = computed(() => {
-  if (!activeJobId.value) return new Map<number, string>();
+interface ParsedStep {
+  name: string;
+  logHtml: string;
+  logRaw: string;
+}
+
+// 从日志文本中解析 Steps（基于 "⭐ Run" 标记）
+const parsedSteps = computed<ParsedStep[]>(() => {
+  if (!activeJobId.value) return [];
   const raw = jobLogs.value[activeJobId.value];
-  if (!raw || !activeJob.value) return new Map<number, string>();
+  if (!raw) return [];
 
   const lines = raw.split("\n");
-  const map = new Map<number, string[]>();
-  let currentStep = 1;
+  const steps: { name: string; lines: string[] }[] = [];
+  let current: { name: string; lines: string[] } = { name: "Set up job", lines: [] };
 
   for (const line of lines) {
-    // Gitea 日志格式: 每行可能以时间戳开头，step 之间的分割靠 "##[group]" 标记
-    const groupMatch = line.match(/^##\[group\](.*)/);
-    if (groupMatch) {
-      currentStep++;
-      if (!map.has(currentStep)) map.set(currentStep, []);
+    // 匹配 "⭐ Run Main StepName" 或 "⭐ Run Post StepName"
+    const stepMatch = line.match(/⭐\s+Run\s+(Main|Post|Pre)\s+(.+)/);
+    if (stepMatch) {
+      if (current.lines.length > 0 || steps.length === 0) {
+        steps.push(current);
+      }
+      const phase = stepMatch[1] === "Main" ? "" : `[${stepMatch[1] ?? ""}] `;
+      current = { name: `${phase}${(stepMatch[2] ?? "").trim()}`, lines: [] };
       continue;
     }
-    const endGroupMatch = line.match(/^##\[endgroup\]/);
-    if (endGroupMatch) continue;
 
-    if (!map.has(currentStep)) map.set(currentStep, []);
-    map.get(currentStep)!.push(line);
+    // 过滤 ::group:: / ::endgroup:: 标记，保留其余日志
+    if (/::endgroup::/.test(line)) continue;
+    const groupMatch = line.match(/::group::(.*)/);
+    if (groupMatch) {
+      current.lines.push(groupMatch[1] ?? "");
+      continue;
+    }
+
+    current.lines.push(line);
+  }
+  // 推入最后一个 step
+  if (current.lines.length > 0) {
+    steps.push(current);
   }
 
-  const result = new Map<number, string>();
-  for (const [step, logLines] of map) {
-    result.set(step, ansiConverter.toHtml(logLines.join("\n")));
-  }
-  return result;
+  return steps.map((s) => {
+    const raw = s.lines.join("\n");
+    return {
+      name: s.name,
+      logRaw: raw,
+      logHtml: ansiConverter.toHtml(raw),
+    };
+  });
 });
+
+// 复制日志
+const copiedId = ref<string | null>(null);
+async function copyLogs(text: string, id: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    copiedId.value = id;
+    setTimeout(() => {
+      copiedId.value = null;
+    }, 2000);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    copiedId.value = id;
+    setTimeout(() => {
+      copiedId.value = null;
+    }, 2000);
+  }
+}
+
+function getActiveJobRawLogs(): string {
+  if (!activeJobId.value) return "";
+  return jobLogs.value[activeJobId.value] || "";
+}
 
 // 辅助函数
 function runStatusColor(status: string, conclusion: string): string {
@@ -222,23 +264,6 @@ function eventLabel(event: string): string {
     release: "发布",
   };
   return map[event] || event;
-}
-
-function stepStatusIcon(status: string, conclusion: string): string {
-  if (status === "queued" || status === "waiting") return "i-lucide-clock";
-  if (status === "running" || status === "in_progress") return "i-lucide-loader";
-  if (conclusion === "success") return "i-lucide-check-circle";
-  if (conclusion === "failure") return "i-lucide-x-circle";
-  if (conclusion === "skipped") return "i-lucide-skip-forward";
-  return "i-lucide-circle-dot";
-}
-
-function stepStatusColorClass(status: string, conclusion: string): string {
-  if (status === "running" || status === "in_progress") return "text-amber-500 animate-spin";
-  if (conclusion === "success") return "text-green-500";
-  if (conclusion === "failure") return "text-red-500";
-  if (conclusion === "skipped") return "text-gray-400";
-  return "text-blue-500";
 }
 </script>
 
@@ -439,94 +464,112 @@ function stepStatusColorClass(status: string, conclusion: string): string {
                 <span v-if="formatDuration(activeJob.startedAt, activeJob.completedAt)">
                   {{ formatDuration(activeJob.startedAt, activeJob.completedAt) }}
                 </span>
-              </div>
-            </div>
-
-            <!-- Steps 折叠列表 -->
-            <div
-              v-if="activeJob.steps && activeJob.steps.length > 0"
-              class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
-            >
-              <div
-                v-for="step in activeJob.steps"
-                :key="step.number"
-                class="border-b border-gray-200 dark:border-gray-700 last:border-b-0"
-              >
-                <!-- Step 头部 -->
-                <button
-                  class="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors text-left"
-                  @click="toggleStep(step.number)"
-                >
-                  <UIcon
-                    :name="expandedSteps.has(step.number) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-                    class="w-4 h-4 text-gray-400 shrink-0"
+                <div class="flex justify-end">
+                  <UButton
+                    :icon="copiedId === 'all' ? 'i-lucide-check' : 'i-lucide-copy'"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    :label="copiedId === 'all' ? '已复制' : '复制日志'"
+                    @click="copyLogs(getActiveJobRawLogs(), 'all')"
                   />
-                  <UIcon
-                    :name="stepStatusIcon(step.status, step.conclusion)"
-                    class="w-4 h-4 shrink-0"
-                    :class="stepStatusColorClass(step.status, step.conclusion)"
-                  />
-                  <span class="flex-1 truncate">{{ step.name }}</span>
-                  <span
-                    v-if="formatDuration(step.startedAt, step.completedAt)"
-                    class="text-xs text-gray-400 shrink-0"
-                  >
-                    {{ formatDuration(step.startedAt, step.completedAt) }}
-                  </span>
-                </button>
-
-                <!-- Step 日志内容 -->
-                <div
-                  v-if="expandedSteps.has(step.number)"
-                  class="bg-gray-900 text-gray-200 px-4 py-3 overflow-x-auto"
-                >
-                  <div
-                    v-if="jobLogsLoading[activeJob.id]"
-                    class="flex items-center gap-2 text-gray-400 text-sm"
-                  >
-                    <UIcon
-                      name="i-lucide-loader-2"
-                      class="w-4 h-4 animate-spin"
-                    />
-                    加载日志中...
-                  </div>
-                  <pre
-                    v-else-if="stepLogs.has(step.number)"
-                    class="text-xs font-mono leading-5 whitespace-pre-wrap break-all"
-                    v-html="stepLogs.get(step.number)"
-                  />
-                  <pre
-                    v-else
-                    class="text-xs font-mono leading-5 text-gray-500"
-                  >无日志</pre>
                 </div>
               </div>
             </div>
 
-            <!-- 无 Steps 时直接显示全部日志 -->
+            <!-- 加载中 -->
             <div
-              v-else
-              class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-900 text-gray-200 px-4 py-3 overflow-x-auto"
+              v-if="jobLogsLoading[activeJob.id]"
+              class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-900 text-gray-200 px-4 py-3"
             >
-              <div
-                v-if="jobLogsLoading[activeJob.id]"
-                class="flex items-center gap-2 text-gray-400 text-sm"
-              >
+              <div class="flex items-center gap-2 text-gray-400 text-sm">
                 <UIcon
                   name="i-lucide-loader-2"
                   class="w-4 h-4 animate-spin"
                 />
                 加载日志中...
               </div>
-              <pre
-                v-else-if="activeJobLogHtml"
-                class="text-xs font-mono leading-5 whitespace-pre-wrap break-all"
-                v-html="activeJobLogHtml"
-              />
-              <pre
-                v-else
-                class="text-xs font-mono leading-5 text-gray-500"
-              >暂无日志</pre>
+            </div>
+
+            <!-- Steps 折叠列表（从日志文本中解析） -->
+            <div
+              v-else-if="parsedSteps.length > 0"
+              class="space-y-2"
+            >
+              <div class="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div
+                  v-for="(step, idx) in parsedSteps"
+                  :key="idx"
+                  class="border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                >
+                  <!-- Step 头部 -->
+                  <div class="flex items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                    <button
+                      class="flex-1 flex items-center gap-2 px-4 py-2.5 text-sm text-left"
+                      @click="toggleStep(idx)"
+                    >
+                      <UIcon
+                        :name="expandedSteps.has(idx) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                        class="w-4 h-4 text-gray-400 shrink-0"
+                      />
+                      <span class="flex-1 truncate">{{ step.name }}</span>
+                      <span class="text-xs text-gray-400 shrink-0">
+                        Step {{ idx + 1 }}
+                      </span>
+                    </button>
+                    <UButton
+                      :icon="copiedId === `step-${idx}` ? 'i-lucide-check' : 'i-lucide-copy'"
+                      size="xs"
+                      color="neutral"
+                      variant="ghost"
+                      class="mr-2 shrink-0"
+                      @click.stop="copyLogs(step.logRaw, `step-${idx}`)"
+                    />
+                  </div>
+
+                  <!-- Step 日志内容 -->
+                  <div
+                    v-if="expandedSteps.has(idx)"
+                    class="bg-gray-900 text-gray-200 px-4 py-3 overflow-x-auto"
+                  >
+                    <pre
+                      class="text-xs font-mono leading-5 whitespace-pre-wrap break-all"
+                      v-html="step.logHtml"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 无 Steps 解析结果时显示全部日志 -->
+            <div
+              v-else
+              class="space-y-2"
+            >
+              <div
+                v-if="activeJobLogHtml"
+                class="flex justify-end"
+              >
+                <UButton
+                  :icon="copiedId === 'all' ? 'i-lucide-check' : 'i-lucide-copy'"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  :label="copiedId === 'all' ? '已复制' : '复制日志'"
+                  @click="copyLogs(getActiveJobRawLogs(), 'all')"
+                />
+              </div>
+              <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-900 text-gray-200 px-4 py-3 overflow-x-auto">
+                <pre
+                  v-if="activeJobLogHtml"
+                  class="text-xs font-mono leading-5 whitespace-pre-wrap break-all"
+                  v-html="activeJobLogHtml"
+                />
+                <pre
+                  v-else
+                  class="text-xs font-mono leading-5 text-gray-500"
+                >暂无日志</pre>
+              </div>
             </div>
           </template>
 

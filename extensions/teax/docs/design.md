@@ -452,7 +452,7 @@ Webhook 接收：
 - **事件 badge**：中文化（push→推送、workflow_dispatch→手动触发、schedule→定时、pull_request→PR）
 - **相对时间**：刚刚 / N 分钟前 / N 小时前 / N 天前（超 7 天显示日期）
 - **耗时**：空值自动隐藏（不显示无意义的 "-"）
-- 点击整个卡片跳转到 Gitea Actions 查看详细日志
+- 点击整个卡片跳转到 Run 详情页（`/:orgName/:projectName/actions/runs/:runId`）查看 Jobs 列表和日志
 
 > **Gitea Workflow Runs API `path` 字段格式**：返回 `filename.yml@refs/heads/branch`（如 `publish.yml@refs/heads/main`），而非完整文件路径。解析 workflow 文件名需用 `@` 分隔取前半部分。Workflows 列表 API 的 `path` 字段则返回完整路径（如 `.gitea/workflows/publish.yml`）。
 
@@ -474,7 +474,47 @@ Webhook 接收：
 | - | `cancelled` | 已取消 | neutral(灰) | ban |
 | - | `skipped` | 已跳过 | - | skip-forward |
 
-#### 3.6 Workflows API
+#### 3.6 Run 详情页
+
+路由：`/:orgName/:projectName/actions/runs/:runId`
+
+页面布局：左侧 Jobs 列表 + 右侧日志面板。
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  ← 返回 Actions                                             │
+│  ci: 添加工作流描述信息  #508                                  │
+│  🌿 develop  9bcc505  [推送]  👤 liuhuan                     │
+├──────────────┬──────────────────────────────────────────────┤
+│  Jobs        │  Job: build                                  │
+│              │  ┌────────────────────────────────────────┐  │
+│  ● build ✓   │  │ ▸ Set up job          Step 1           │  │
+│              │  │ ▾ Checkout repository  Step 2           │  │
+│              │  │   2026-03-06T06:28:02Z Getting Git...   │  │
+│              │  │   2026-03-06T06:28:03Z git version...   │  │
+│              │  │ ▸ [Post] Checkout repository  Step 3    │  │
+│              │  └────────────────────────────────────────┘  │
+└──────────────┴──────────────────────────────────────────────┘
+```
+
+**后端 API**：
+
+| API | 说明 |
+| --- | --- |
+| `GET /api/repos/:owner/:repo/actions/runs/:runId` | Run 详情（代理 Gitea API） |
+| `GET /api/repos/:owner/:repo/actions/runs/:runId/jobs` | Jobs 列表（代理 Gitea API） |
+| `GET /api/repos/:owner/:repo/actions/jobs/:jobId/logs` | Job 日志（纯文本，含 ANSI 转义码） |
+
+**Step 解析逻辑**：Gitea 1.25.4 Jobs API 返回 `steps: null`，因此 Step 折叠不依赖 API，而是从日志文本中解析：
+- `⭐ Run Main <StepName>` → 新 Step（Main 阶段）
+- `⭐ Run Post <StepName>` → 新 Step（Post 阶段，显示为 `[Post] StepName`）
+- `⭐ Run Pre <StepName>` → 新 Step（Pre 阶段）
+- `::group::<title>` / `::endgroup::` → 子分组标记（过滤掉，保留 title 文本）
+- 首个 `⭐ Run` 之前的日志归入 "Set up job" Step
+
+**日志渲染**：使用 `ansi-to-html` 将 ANSI 转义码转为 HTML，支持颜色高亮。
+
+#### 3.7 Workflows API
 
 `GET /api/orgs/{orgId}/projects/{projectId}/workflows`
 
@@ -877,6 +917,7 @@ Organization
 │   └── /:projectName               # 项目工作台（布局页 [projectName].vue）
 │       ├── /                        # README / 概览（默认）
 │       ├── /actions                 # Actions — Gitea Workflow Runs
+│       │   └── /runs/:runId        # Run 详情（Jobs 列表 + Step 日志）
 │       ├── /agents                  # Agents — AI Agent Sessions（Teax 扩展）
 │       ├── /pages                   # Pages — 静态托管（Teax 扩展）
 │       ├── /workspaces              # Workspaces — 工作区管理（Teax 扩展）
