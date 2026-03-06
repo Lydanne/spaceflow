@@ -2756,8 +2756,8 @@ Teax 为 Gitea 提供以下扩展能力：
 
 1. **Phase 1（Week 1-2）✅ 已完成**：Nuxt 4 项目初始化、数据库 Schema（7 张表）、Gitea OAuth + 飞书 OAuth 登录、组织/团队同步、Redis session 追踪、首次登录用户自动成为管理员
 2. **Phase 2（Week 3-4）✅ 已完成**：后台管理系统（用户/组织/团队/成员管理）、项目管理、Gitea Webhook（含 HMAC 签名验证）、CI/CD 改为 Gitea Actions 原生驱动（移除 PublishTask）、基础权限中间件
-3. **Phase 3（Week 5-6）**：Agent 定义（open-code 集成）、密钥管理、Session 管理（隔离容器执行）、Pages 静态托管
-4. **Phase 4（Week 7-8）**：飞书消息通知、机器人指令（含越权校验）、审批流程
+3. **Phase 3（Week 5-6）**：飞书消息通知、机器人指令（含越权校验）、审批流程
+4. **Phase 4（Week 7-8）**：Agent 定义（open-code 集成）、密钥管理、Session 管理（隔离容器执行）、Pages 静态托管
 5. **Phase 5（Week 9-10）✅ 部分完成**：权限组完整 UI ✅、审计日志 ✅、DTO 验证迁移 ✅、路由重构为 Gitea 风格 ✅、小程序码管理（待定）、生产环境部署上线（待定）
 6. **Phase 6（Week 11-13）**：工作区功能
    - **Week 11**：容器运行时抽象层（ContainerRuntime 接口 + DockerRuntime 实现）、workspaces 数据库表、workspace.dto.ts、WorkspaceService（create/start/stop/delete）
