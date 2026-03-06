@@ -1641,6 +1641,25 @@ server/
     └── logger.ts              # 日志工具
 ```
 
+> **路径别名约定**：server 端代码统一使用 Nuxt 内置别名 `~~/server/` 替代相对路径，避免多层 `../../` 嵌套。例如：
+>
+> ```typescript
+> // ✅ 使用别名
+> import { useDB, schema } from "~~/server/db";
+> import { requireAdmin } from "~~/server/utils/auth";
+> import { createProjectBodySchema } from "~~/server/shared/dto";
+>
+> // ❌ 避免相对路径
+> import { useDB, schema } from "../../../../../../../db";
+> ```
+>
+> - `~~` — Nuxt 内置别名，指向项目根目录（零配置）
+> - `~~/server/db` — 数据库
+> - `~~/server/utils/*` — 工具函数
+> - `~~/server/shared/dto` — DTO schema
+> - `~~/server/shared/permissions` — 权限定义
+> - `~~/server/services/*` — 业务服务
+
 > **BullMQ 失败处理**：所有任务需要配置 `attempts`（建议 3 次）和 `backoff`（指数退避）。失败超次数后进入死信队列（`dead`），并更新对应任务状态为 `failed`。最终失败部署应触发飞书告警通知。
 
 ---
