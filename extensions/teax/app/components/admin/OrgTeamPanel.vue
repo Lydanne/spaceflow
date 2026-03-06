@@ -26,18 +26,18 @@ const emit = defineEmits<{
 
 const toast = useToast();
 
-const selectedTeamId = ref<string | null>(null);
+const selectedTeamName = ref<string | null>(null);
 const members = ref<MemberItem[]>([]);
 const membersLoading = ref(false);
 const teamPermissions = ref<TeamPermissionAssignment[]>([]);
 const permLoading = ref(false);
 
 async function fetchMembers() {
-  if (!selectedTeamId.value) return;
+  if (!selectedTeamName.value) return;
   membersLoading.value = true;
   try {
     const res = await $fetch<{ data: MemberItem[] }>(
-      `${props.apiPrefix}/${props.orgName}/teams/${selectedTeamId.value}/members`,
+      `${props.apiPrefix}/${props.orgName}/teams/${selectedTeamName.value}/members`,
     );
     members.value = res.data ?? [];
   } catch {
@@ -48,11 +48,11 @@ async function fetchMembers() {
 }
 
 async function fetchTeamPermissions() {
-  if (!selectedTeamId.value) return;
+  if (!selectedTeamName.value) return;
   permLoading.value = true;
   try {
     const res = await $fetch<{ data: TeamPermissionAssignment[] }>(
-      `/api/orgs/${props.orgName}/teams/${selectedTeamId.value}/assigned-permissions`,
+      `/api/orgs/${props.orgName}/teams/${selectedTeamName.value}/assigned-permissions`,
     );
     teamPermissions.value = res.data ?? [];
   } catch {
@@ -62,16 +62,16 @@ async function fetchTeamPermissions() {
   }
 }
 
-async function selectTeam(team_id: string) {
-  selectedTeamId.value = team_id;
+async function selectTeam(teamName: string) {
+  selectedTeamName.value = teamName;
   await Promise.all([fetchMembers(), fetchTeamPermissions()]);
 }
 
 async function removeMember(member: MemberItem) {
-  if (!selectedTeamId.value) return;
+  if (!selectedTeamName.value) return;
   try {
     await $fetch(
-      `${props.apiPrefix}/${props.orgName}/teams/${selectedTeamId.value}/members/${member.id}`,
+      `${props.apiPrefix}/${props.orgName}/teams/${selectedTeamName.value}/members/${member.id}`,
       { method: "DELETE" },
     );
     toast.add({ title: `已移除 ${member.username}`, color: "success" });
@@ -83,10 +83,10 @@ async function removeMember(member: MemberItem) {
 }
 
 async function changeRole(member: MemberItem, newRole: string) {
-  if (!selectedTeamId.value) return;
+  if (!selectedTeamName.value) return;
   try {
     await $fetch(
-      `${props.apiPrefix}/${props.orgName}/teams/${selectedTeamId.value}/members/${member.id}`,
+      `${props.apiPrefix}/${props.orgName}/teams/${selectedTeamName.value}/members/${member.id}`,
       { method: "PATCH", body: { role: newRole } },
     );
     toast.add({
@@ -100,10 +100,10 @@ async function changeRole(member: MemberItem, newRole: string) {
 }
 
 async function assignPermission(groupId: string) {
-  if (!selectedTeamId.value) return;
+  if (!selectedTeamName.value) return;
   try {
     await $fetch(
-      `/api/orgs/${props.orgName}/teams/${selectedTeamId.value}/assigned-permissions`,
+      `/api/orgs/${props.orgName}/teams/${selectedTeamName.value}/assigned-permissions`,
       { method: "POST", body: { permission_group_id: groupId } },
     );
     toast.add({ title: "权限组已分配", color: "success" });
@@ -114,10 +114,10 @@ async function assignPermission(groupId: string) {
 }
 
 async function removePermission(assignmentId: string) {
-  if (!selectedTeamId.value) return;
+  if (!selectedTeamName.value) return;
   try {
     await $fetch(
-      `/api/orgs/${props.orgName}/teams/${selectedTeamId.value}/assigned-permissions/${assignmentId}`,
+      `/api/orgs/${props.orgName}/teams/${selectedTeamName.value}/assigned-permissions/${assignmentId}`,
       { method: "DELETE" },
     );
     toast.add({ title: "权限组已移除", color: "success" });
@@ -159,11 +159,11 @@ const memberColumns = computed(() => {
         :key="team.id"
         class="w-full text-left p-3 rounded-lg border transition-colors"
         :class="
-          selectedTeamId === team.id
+          selectedTeamName === team.name
             ? 'border-primary-500 bg-primary-50 dark:bg-primary-950'
             : 'border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900'
         "
-        @click="selectTeam(team.id)"
+        @click="selectTeam(team.name)"
       >
         <div class="font-medium text-sm">
           {{ team.name }}
@@ -183,7 +183,7 @@ const memberColumns = computed(() => {
 
     <!-- 成员与权限分配 -->
     <div class="lg:col-span-2">
-      <template v-if="selectedTeamId">
+      <template v-if="selectedTeamName">
         <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3">
           团队成员
         </h2>

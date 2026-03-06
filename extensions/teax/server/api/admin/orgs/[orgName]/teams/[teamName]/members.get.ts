@@ -1,15 +1,12 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireAdmin } from "~~/server/utils/auth";
+import { resolveTeamId } from "~~/server/utils/resolve-team";
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event);
+  const { teamId } = await resolveTeamId(event);
   const db = useDB();
-  const teamId = getRouterParam(event, "teamId");
-
-  if (!teamId) {
-    throw createError({ statusCode: 400, message: "Missing teamId" });
-  }
 
   const members = await db
     .select({

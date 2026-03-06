@@ -1,15 +1,10 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireOrgAccess } from "~~/server/utils/org-access";
-import { resolveOrgId } from "~~/server/utils/resolve-org";
+import { resolveTeamId } from "~~/server/utils/resolve-team";
 
 export default defineEventHandler(async (event) => {
-  const { orgId } = await resolveOrgId(event);
-  const teamId = getRouterParam(event, "teamId");
-  if (!teamId) {
-    throw createError({ statusCode: 400, message: "Missing teamId" });
-  }
-
+  const { teamId, orgId } = await resolveTeamId(event);
   await requireOrgAccess(event, orgId);
   const db = useDB();
 

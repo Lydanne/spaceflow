@@ -1,15 +1,15 @@
 <script setup lang="ts">
 const props = defineProps<{
-  orgName: string;
-  projectId: string;
+  owner: string;
+  repo: string;
 }>();
 </script>
 
 <template>
   <ClientOnly>
     <ProjectActionsTab
-      :org-name="props.orgName"
-      :project-id="props.projectId"
+      :owner="props.owner"
+      :repo="props.repo"
     />
     <template #fallback>
       <ProjectActionsSkeleton />

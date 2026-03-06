@@ -3,7 +3,7 @@ import { parse as parseYaml } from "yaml";
 import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
 import { createServiceGiteaClient } from "~~/server/utils/gitea";
-import { resolveOrgId } from "~~/server/utils/resolve-org";
+import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
 interface WorkflowInput {
   description?: string;
@@ -56,15 +56,14 @@ function extractInputs(doc: Record<string, unknown>): Record<string, WorkflowInp
 }
 
 export default defineEventHandler(async (event) => {
-  const { orgId } = await resolveOrgId(event);
-  const projectId = getRouterParam(event, "projectId")!;
-  await requirePermission(event, orgId, "actions:view", projectId);
+  const { repoId, orgId, owner, repo } = await resolveRepoId(event);
+  await requirePermission(event, orgId, "actions:view", repoId);
 
   const db = useDB();
   const [project] = await db
     .select()
     .from(schema.repositories)
-    .where(eq(schema.repositories.id, projectId))
+    .where(eq(schema.repositories.id, repoId))
     .limit(1);
 
   if (!project) {
@@ -72,9 +71,6 @@ export default defineEventHandler(async (event) => {
   }
 
   const gitea = await createServiceGiteaClient();
-  const parts = project.full_name.split("/");
-  const owner = parts[0] ?? "";
-  const repo = parts[1] ?? "";
 
   try {
     const result = await gitea.getRepoWorkflows(owner, repo);

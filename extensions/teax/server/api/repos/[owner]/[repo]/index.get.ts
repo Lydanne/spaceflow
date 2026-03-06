@@ -1,15 +1,11 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
-import { resolveOrgId } from "~~/server/utils/resolve-org";
+import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
 export default defineEventHandler(async (event) => {
-  const { orgId } = await resolveOrgId(event);
-  const projectId = getRouterParam(event, "projectId");
-  if (!projectId) {
-    throw createError({ statusCode: 400, message: "Missing projectId" });
-  }
-  await requirePermission(event, orgId, "repo:view", projectId);
+  const { repoId, orgId } = await resolveRepoId(event);
+  await requirePermission(event, orgId, "repo:view", repoId);
   const db = useDB();
 
   const [project] = await db
@@ -29,7 +25,7 @@ export default defineEventHandler(async (event) => {
       updated_at: schema.repositories.updated_at,
     })
     .from(schema.repositories)
-    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organization_id, orgId)))
+    .where(and(eq(schema.repositories.id, repoId), eq(schema.repositories.organization_id, orgId)))
     .limit(1);
 
   if (!project) {

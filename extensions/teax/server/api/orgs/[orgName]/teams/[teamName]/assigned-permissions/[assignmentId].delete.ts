@@ -1,13 +1,14 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireTeamOwnerOrAdmin } from "~~/server/utils/team-owner";
+import { resolveTeamId } from "~~/server/utils/resolve-team";
 
 export default defineEventHandler(async (event) => {
-  const teamId = getRouterParam(event, "teamId");
+  const { teamId } = await resolveTeamId(event);
   const assignmentId = getRouterParam(event, "assignmentId");
 
-  if (!teamId || !assignmentId) {
-    throw createError({ statusCode: 400, message: "Missing teamId or assignmentId" });
+  if (!assignmentId) {
+    throw createError({ statusCode: 400, message: "Missing assignmentId" });
   }
 
   await requireTeamOwnerOrAdmin(event, teamId);

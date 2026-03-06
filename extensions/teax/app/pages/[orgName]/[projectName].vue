@@ -18,10 +18,8 @@ interface ProjectDetail {
 }
 
 const { data: project, status: projectStatus } = await useFetch<ProjectDetail>(
-  `/api/resolve/${orgName}/${projectName}`,
+  `/api/repos/${orgName}/${projectName}`,
 );
-
-const projectId = computed(() => project.value?.id ?? "");
 
 const { isOwnerOrAdmin } = useOrgRole(orgName);
 
@@ -120,8 +118,8 @@ const activeTab = computed(() => {
 
       <!-- 子路由内容 -->
       <NuxtPage
-        :org-name="orgName"
-        :project-id="projectId"
+        :owner="orgName"
+        :repo="projectName"
         :project="project"
         :is-owner-or-admin="isOwnerOrAdmin"
       />

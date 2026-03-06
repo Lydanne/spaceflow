@@ -2,16 +2,11 @@ import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
 import { createServiceGiteaClient } from "~~/server/utils/gitea";
-import { resolveOrgId } from "~~/server/utils/resolve-org";
+import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
 export default defineEventHandler(async (event) => {
-  const { orgId } = await resolveOrgId(event);
-  const projectId = getRouterParam(event, "projectId");
-  if (!projectId) {
-    throw createError({ statusCode: 400, message: "Missing projectId" });
-  }
-
-  await requirePermission(event, orgId, "repo:view", projectId);
+  const { repoId, orgId, owner, repo } = await resolveRepoId(event);
+  await requirePermission(event, orgId, "repo:view", repoId);
   const db = useDB();
 
   const [project] = await db
@@ -26,7 +21,7 @@ export default defineEventHandler(async (event) => {
     .from(schema.repositories)
     .where(
       and(
-        eq(schema.repositories.id, projectId),
+        eq(schema.repositories.id, repoId),
         eq(schema.repositories.organization_id, orgId),
       ),
     )
@@ -36,9 +31,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Project not found" });
   }
 
-  const parts = project.full_name.split("/");
-  const owner = parts[0] ?? "";
-  const repo = parts[1] ?? "";
   if (!owner || !repo) {
     throw createError({ statusCode: 500, message: "Invalid project fullName" });
   }

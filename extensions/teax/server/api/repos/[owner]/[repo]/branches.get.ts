@@ -2,21 +2,17 @@ import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
 import { createServiceGiteaClient } from "~~/server/utils/gitea";
-import { resolveOrgId } from "~~/server/utils/resolve-org";
+import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
 export default defineEventHandler(async (event) => {
-  const { orgId } = await resolveOrgId(event);
-  const projectId = getRouterParam(event, "projectId");
-  if (!projectId) {
-    throw createError({ statusCode: 400, message: "Missing projectId" });
-  }
-  await requirePermission(event, orgId, "repo:view", projectId);
+  const { repoId, orgId, owner, repo } = await resolveRepoId(event);
+  await requirePermission(event, orgId, "repo:view", repoId);
   const db = useDB();
 
   const [project] = await db
     .select()
     .from(schema.repositories)
-    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organization_id, orgId)))
+    .where(and(eq(schema.repositories.id, repoId), eq(schema.repositories.organization_id, orgId)))
     .limit(1);
 
   if (!project) {
@@ -24,13 +20,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const gitea = await createServiceGiteaClient();
-  const parts = project.full_name.split("/");
-  if (parts.length < 2 || !parts[0] || !parts[1]) {
-    throw createError({ statusCode: 500, message: "Invalid project fullName format" });
-  }
 
   try {
-    const branches = await gitea.getRepoBranches(parts[0], parts[1]);
+    const branches = await gitea.getRepoBranches(owner, repo);
     return {
       data: branches,
       default_branch: project.default_branch,

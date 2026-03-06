@@ -3,22 +3,17 @@ import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
 import { createServiceGiteaClient } from "~~/server/utils/gitea";
 import { writeAuditLog } from "~~/server/utils/audit";
-import { resolveOrgId } from "~~/server/utils/resolve-org";
+import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
 export default defineEventHandler(async (event) => {
-  const { orgId } = await resolveOrgId(event);
-  const projectId = getRouterParam(event, "projectId");
-  if (!projectId) {
-    throw createError({ statusCode: 400, message: "Missing projectId" });
-  }
-
-  const session = await requirePermission(event, orgId, "repo:delete", projectId);
+  const { repoId, orgId, owner, repo } = await resolveRepoId(event);
+  const session = await requirePermission(event, orgId, "repo:delete", repoId);
   const db = useDB();
 
   const [project] = await db
     .select()
     .from(schema.repositories)
-    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organization_id, orgId)))
+    .where(and(eq(schema.repositories.id, repoId), eq(schema.repositories.organization_id, orgId)))
     .limit(1);
 
   if (!project) {
@@ -29,10 +24,7 @@ export default defineEventHandler(async (event) => {
   if (project.webhook_id) {
     try {
       const gitea = await createServiceGiteaClient();
-      const [owner, repo] = project.full_name.split("/");
-      if (owner && repo) {
-        await gitea.deleteWebhook(owner, repo, project.webhook_id);
-      }
+      await gitea.deleteWebhook(owner, repo, project.webhook_id);
     } catch (err: unknown) {
       console.warn("Failed to delete webhook on Gitea:", err);
     }
@@ -40,14 +32,14 @@ export default defineEventHandler(async (event) => {
 
   await db
     .delete(schema.repositories)
-    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organization_id, orgId)));
+    .where(and(eq(schema.repositories.id, repoId), eq(schema.repositories.organization_id, orgId)));
 
   await writeAuditLog(event, {
     user_id: session.user.id,
     organization_id: orgId,
     action: "project.delete",
     resource_type: "project",
-    resource_id: projectId,
+    resource_id: repoId,
     detail: { full_name: project.full_name },
   });
 

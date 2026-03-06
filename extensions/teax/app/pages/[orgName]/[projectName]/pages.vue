@@ -1,7 +1,7 @@
 <script setup lang="ts">
 defineProps<{
-  orgName: string;
-  projectId: string;
+  owner: string;
+  repo: string;
 }>();
 </script>
 

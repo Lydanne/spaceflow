@@ -3,12 +3,11 @@ import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
 import { createServiceGiteaClient } from "~~/server/utils/gitea";
 import { triggerWorkflowBodySchema } from "~~/server/shared/dto";
-import { resolveOrgId } from "~~/server/utils/resolve-org";
+import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
 export default defineEventHandler(async (event) => {
-  const { orgId } = await resolveOrgId(event);
-  const projectId = getRouterParam(event, "projectId")!;
-  await requirePermission(event, orgId, "actions:trigger", projectId);
+  const { repoId, orgId, owner, repo } = await resolveRepoId(event);
+  await requirePermission(event, orgId, "actions:trigger", repoId);
 
   const body = await readValidatedBody(event, triggerWorkflowBodySchema.parse);
 
@@ -16,7 +15,7 @@ export default defineEventHandler(async (event) => {
   const [project] = await db
     .select()
     .from(schema.repositories)
-    .where(eq(schema.repositories.id, projectId))
+    .where(eq(schema.repositories.id, repoId))
     .limit(1);
 
   if (!project) {
@@ -24,9 +23,6 @@ export default defineEventHandler(async (event) => {
   }
 
   const gitea = await createServiceGiteaClient();
-  const parts = project.full_name.split("/");
-  const owner = parts[0] ?? "";
-  const repo = parts[1] ?? "";
 
   // workflow_id 可能是完整路径如 .github/workflows/test.yaml，提取文件名
   const workflowFile = body.workflow_id.split("/").pop() || body.workflow_id;

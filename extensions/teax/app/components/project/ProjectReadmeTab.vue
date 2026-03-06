@@ -12,8 +12,8 @@ interface RepoInfo {
 }
 
 const props = defineProps<{
-  orgName: string;
-  projectId: string;
+  owner: string;
+  repo: string;
 }>();
 
 const { data, status } = useLazyFetch<{
@@ -21,7 +21,7 @@ const { data, status } = useLazyFetch<{
   source: string | null;
   repoInfo: RepoInfo | null;
 }>(
-  `/api/orgs/${props.orgName}/projects/${props.projectId}/readme`,
+  `/api/repos/${props.owner}/${props.repo}/readme`,
 );
 
 function formatDate(dateStr: string | null) {
