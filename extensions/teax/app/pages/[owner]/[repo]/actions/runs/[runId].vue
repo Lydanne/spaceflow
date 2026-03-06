@@ -201,6 +201,56 @@ function getActiveJobRawLogs(): string {
   return jobLogs.value[activeJobId.value] || "";
 }
 
+// 停止 Run
+const cancelling = ref(false);
+const isRunActive = computed(() => {
+  if (!runData.value) return false;
+  const s = runData.value.status;
+  return s === "queued" || s === "waiting" || s === "running" || s === "in_progress";
+});
+
+async function cancelRun() {
+  if (!runData.value || cancelling.value) return;
+  cancelling.value = true;
+  try {
+    await $fetch(
+      `/api/repos/${props.owner}/${props.repo}/actions/runs/${runId.value}/cancel`,
+      { method: "POST" },
+    );
+    if (runData.value) {
+      runData.value.status = "completed";
+      runData.value.conclusion = "cancelled";
+    }
+  } catch {
+    // ignore
+  } finally {
+    cancelling.value = false;
+  }
+}
+
+// 重新运行 Run
+const rerunning = ref(false);
+
+async function rerunRun() {
+  if (!runData.value || rerunning.value) return;
+  rerunning.value = true;
+  try {
+    await $fetch(
+      `/api/repos/${props.owner}/${props.repo}/actions/runs/${runId.value}/rerun`,
+      { method: "POST" },
+    );
+    if (runData.value) {
+      runData.value.status = "queued";
+      runData.value.conclusion = "";
+      runData.value.completedAt = null;
+    }
+  } catch {
+    // ignore
+  } finally {
+    rerunning.value = false;
+  }
+}
+
 // 辅助函数
 function runStatusColor(status: string, conclusion: string): string {
   if (status === "queued" || status === "waiting") return "info";
@@ -383,21 +433,44 @@ function eventLabel(event: string): string {
               </div>
             </div>
           </div>
-          <a
-            :href="runData.htmlUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="shrink-0"
-          >
+          <div class="flex items-center gap-2 shrink-0">
             <UButton
-              icon="i-lucide-external-link"
-              color="neutral"
-              variant="ghost"
+              v-if="isRunActive"
+              icon="i-lucide-square"
+              color="error"
+              variant="soft"
               size="sm"
+              :loading="cancelling"
+              @click="cancelRun"
             >
-              Gitea
+              停止
             </UButton>
-          </a>
+            <UButton
+              v-if="!isRunActive"
+              icon="i-lucide-rotate-ccw"
+              color="primary"
+              variant="soft"
+              size="sm"
+              :loading="rerunning"
+              @click="rerunRun"
+            >
+              重新运行
+            </UButton>
+            <a
+              :href="runData.htmlUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <UButton
+                icon="i-lucide-external-link"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+              >
+                Gitea
+              </UButton>
+            </a>
+          </div>
         </div>
       </div>
 

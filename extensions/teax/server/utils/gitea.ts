@@ -392,6 +392,22 @@ export class GiteaService {
     ) as Promise<GiteaWorkflowJobsList>;
   }
 
+  async cancelWorkflowRun(
+    owner: string,
+    repo: string,
+    runId: number,
+  ): Promise<void> {
+    await this.fetch(`/repos/${owner}/${repo}/actions/runs/${runId}`, "DELETE");
+  }
+
+  async rerunWorkflowRun(
+    owner: string,
+    repo: string,
+    runId: number,
+  ): Promise<void> {
+    await this.fetch(`/repos/${owner}/${repo}/actions/runs/${runId}/rerun`, "POST");
+  }
+
   async getWorkflowJobLogs(
     owner: string,
     repo: string,
