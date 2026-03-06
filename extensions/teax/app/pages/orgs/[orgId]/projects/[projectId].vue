@@ -1,6 +1,5 @@
 <script setup lang="ts">
 const route = useRoute();
-const router = useRouter();
 const orgId = route.params.orgId as string;
 const projectId = route.params.projectId as string;
 
@@ -23,36 +22,28 @@ const { data: project, status: projectStatus } = await useFetch<ProjectDetail>(
 
 const { isOwnerOrAdmin } = useOrgRole(orgId);
 
+const projectBase = `/orgs/${orgId}/projects/${projectId}`;
+
 const baseTabs = [
-  { label: "README", value: "readme", icon: "i-lucide-file-text" },
-  { label: "Actions", value: "actions", icon: "i-lucide-zap" },
-  { label: "Agents", value: "agents", icon: "i-lucide-bot-message-square" },
-  { label: "Pages", value: "pages", icon: "i-lucide-earth" },
+  { label: "README", value: "readme", icon: "i-lucide-file-text", to: projectBase },
+  { label: "Actions", value: "actions", icon: "i-lucide-zap", to: `${projectBase}/actions` },
+  { label: "Agents", value: "agents", icon: "i-lucide-bot-message-square", to: `${projectBase}/agents` },
+  { label: "Pages", value: "pages", icon: "i-lucide-earth", to: `${projectBase}/pages` },
 ];
 const tabs = computed(() =>
   isOwnerOrAdmin.value
-    ? [...baseTabs, { label: "设置", value: "settings", icon: "i-lucide-settings" }]
+    ? [...baseTabs, { label: "设置", value: "settings", icon: "i-lucide-settings", to: `${projectBase}/settings` }]
     : baseTabs,
 );
 
-const validTabValues = computed(() => tabs.value.map((t) => t.value));
-const initialTab = validTabValues.value.includes(route.query.tab as string)
-  ? (route.query.tab as string)
-  : "readme";
-const activeTab = ref(initialTab);
-
-watch(activeTab, (tab) => {
-  router.replace({ query: { ...route.query, tab } });
+const activeTab = computed(() => {
+  const path = route.path;
+  if (path.endsWith("/actions")) return "actions";
+  if (path.endsWith("/agents")) return "agents";
+  if (path.endsWith("/pages")) return "pages";
+  if (path.endsWith("/settings")) return "settings";
+  return "readme";
 });
-
-watch(
-  () => route.query.tab,
-  (tab) => {
-    if (tab && typeof tab === "string" && validTabValues.value.includes(tab)) {
-      activeTab.value = tab;
-    }
-  },
-);
 </script>
 
 <template>
@@ -104,68 +95,32 @@ watch(
       <!-- Tab 导航 -->
       <div class="border-b border-gray-200 dark:border-gray-800 mb-6">
         <nav class="flex gap-1 -mb-px">
-          <button
+          <NuxtLink
             v-for="tab in tabs"
             :key="tab.value"
+            :to="tab.to"
             class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5"
             :class="
               activeTab === tab.value
                 ? 'border-primary-500 text-primary-600 dark:text-primary-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             "
-            @click="activeTab = tab.value"
           >
             <UIcon
               :name="tab.icon"
               class="w-4 h-4"
             />
             {{ tab.label }}
-          </button>
+          </NuxtLink>
         </nav>
       </div>
 
-      <!-- Tab 内容 -->
-      <ProjectReadmeTab
-        v-if="activeTab === 'readme'"
-        :org-id="orgId"
-        :project-id="projectId"
-      />
-
-      <ClientOnly v-if="activeTab === 'actions'">
-        <ProjectActionsTab
-          :org-id="orgId"
-          :project-id="projectId"
-        />
-        <template #fallback>
-          <ProjectActionsSkeleton />
-        </template>
-      </ClientOnly>
-
-      <div v-if="activeTab === 'agents'">
-        <div class="text-center py-12 text-gray-400">
-          <UIcon
-            name="i-lucide-bot-message-square"
-            class="w-12 h-12 mx-auto mb-3"
-          />
-          <p>Agent 功能将在 Phase 3 实现</p>
-        </div>
-      </div>
-
-      <div v-if="activeTab === 'pages'">
-        <div class="text-center py-12 text-gray-400">
-          <UIcon
-            name="i-lucide-earth"
-            class="w-12 h-12 mx-auto mb-3"
-          />
-          <p>Pages 功能将在 Phase 3 实现</p>
-        </div>
-      </div>
-
-      <ProjectSettingsTab
-        v-if="activeTab === 'settings' && isOwnerOrAdmin"
+      <!-- 子路由内容 -->
+      <NuxtPage
         :org-id="orgId"
         :project-id="projectId"
         :project="project"
+        :is-owner-or-admin="isOwnerOrAdmin"
       />
     </template>
   </div>
