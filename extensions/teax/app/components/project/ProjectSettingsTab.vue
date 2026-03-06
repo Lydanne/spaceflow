@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const props = defineProps<{
-  orgId: string;
+  orgName: string;
   projectId: string;
   project: {
     id: string;
@@ -40,7 +40,7 @@ watch(
 async function saveSettings() {
   savingSettings.value = true;
   try {
-    await $fetch(`/api/orgs/${props.orgId}/projects/${props.projectId}/settings`, {
+    await $fetch(`/api/orgs/${props.orgName}/projects/${props.projectId}/settings`, {
       method: "PATCH",
       body: { ...settingsForm },
     });
@@ -60,7 +60,7 @@ async function deleteProject() {
   if (confirmDeleteName.value !== props.project.full_name) return;
   deleting.value = true;
   try {
-    await $fetch(`/api/orgs/${props.orgId}/projects/${props.projectId}`, {
+    await $fetch(`/api/orgs/${props.orgName}/projects/${props.projectId}`, {
       method: "DELETE",
     });
     toast.add({ title: "项目已删除", color: "success" });

@@ -1,28 +1,21 @@
 <script setup lang="ts">
 import type { TeamItem, PermissionGroup, PermissionDef } from "~/types/admin";
 
+definePageMeta({
+  layout: "admin",
+  middleware: "admin",
+});
+
 const route = useRoute();
 const toast = useToast();
 const orgName = route.params.orgName as string;
 
 const activeTab = ref<"teams" | "permissions">("teams");
 
-const { data: roleData } = await useFetch<{ role: string }>(
-  `/api/orgs/${orgName}/role`,
-  { key: `org-role-${orgName}` },
-);
-const isOwnerOrAdmin = computed(() => {
-  const role = roleData.value?.role ?? "member";
-  return role === "admin" || role === "owner";
-});
-
-if (!isOwnerOrAdmin.value) {
-  await navigateTo(`/${orgName}`, { replace: true });
-}
-
+const { data: org } = await useFetch(`/api/admin/orgs/${orgName}`);
 const { data: teamsData, refresh: refreshTeams } = await useFetch<{
   data: TeamItem[];
-}>(`/api/orgs/${orgName}/teams`);
+}>(`/api/admin/orgs/${orgName}/teams`);
 const { data: groupsData, refresh: refreshGroups } = await useFetch<{
   data: PermissionGroup[];
 }>(`/api/orgs/${orgName}/permissions`);
@@ -40,7 +33,7 @@ const syncing = ref(false);
 async function syncOrg() {
   syncing.value = true;
   try {
-    await $fetch(`/api/orgs/${orgName}/sync`, { method: "POST" });
+    await $fetch(`/api/admin/orgs/${orgName}/sync`, { method: "POST" });
     toast.add({ title: "同步成功", color: "success" });
     await refreshTeams();
   } catch {
@@ -52,7 +45,7 @@ async function syncOrg() {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto px-4 py-8">
+  <div>
     <!-- 顶部 -->
     <div class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-3">
@@ -61,27 +54,36 @@ async function syncOrg() {
           color="neutral"
           variant="ghost"
           size="sm"
-          :to="`/${orgName}`"
+          to="/-/admin/orgs"
         />
         <div>
           <h1 class="text-xl font-bold">
-            组织设置
+            {{ (org as any)?.full_name || (org as any)?.name || "组织详情" }}
           </h1>
           <p class="text-sm text-gray-500 dark:text-gray-400">
             {{ teams.length }} 个团队 · {{ allGroups.length }} 个权限组
           </p>
         </div>
       </div>
-      <UButton
-        v-if="isOwnerOrAdmin"
-        icon="i-lucide-refresh-cw"
-        color="neutral"
-        variant="soft"
-        :loading="syncing"
-        @click="syncOrg"
-      >
-        同步团队
-      </UButton>
+      <div class="flex items-center gap-2">
+        <UButton
+          icon="i-lucide-external-link"
+          color="neutral"
+          variant="soft"
+          :to="`/org/${(org as any)?.name}/settings`"
+        >
+          组织设置页
+        </UButton>
+        <UButton
+          icon="i-lucide-refresh-cw"
+          color="neutral"
+          variant="soft"
+          :loading="syncing"
+          @click="syncOrg"
+        >
+          同步团队
+        </UButton>
+      </div>
     </div>
 
     <!-- Tab 切换 -->
@@ -102,7 +104,6 @@ async function syncOrg() {
         团队管理
       </button>
       <button
-        v-if="isOwnerOrAdmin"
         class="px-4 py-2 text-sm font-medium border-b-2 transition-colors"
         :class="
           activeTab === 'permissions'
@@ -125,8 +126,6 @@ async function syncOrg() {
       :org-name="orgName"
       :teams="teams"
       :all-groups="allGroups"
-      api-prefix="/api/orgs"
-      :show-member-actions="false"
       @refresh-teams="refreshTeams"
     />
 
@@ -136,7 +135,6 @@ async function syncOrg() {
       :org-name="orgName"
       :all-groups="allGroups"
       :available-permissions="availablePermissions"
-      :show-repo-scope="false"
       @refresh-groups="refreshGroups"
     />
   </div>

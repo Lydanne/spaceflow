@@ -2,7 +2,7 @@
 import cronstrue from "cronstrue/i18n";
 
 const props = defineProps<{
-  orgId: string;
+  orgName: string;
   projectId: string;
 }>();
 
@@ -58,7 +58,7 @@ const {
 } = useLazyFetch<{
   data: WorkflowRunItem[];
   total: number;
-}>(`/api/orgs/${props.orgId}/projects/${props.projectId}/actions`, {
+}>(`/api/orgs/${props.orgName}/projects/${props.projectId}/actions`, {
   query: { page: actionsPage, limit: 20 },
 });
 const workflowRuns = computed(() => actionsData.value?.data ?? []);
@@ -66,14 +66,14 @@ const workflowRuns = computed(() => actionsData.value?.data ?? []);
 // Workflow 列表
 const { data: workflowsData, error: workflowsError, status: workflowsStatus } = useLazyFetch<{
   data: WorkflowItem[];
-}>(`/api/orgs/${props.orgId}/projects/${props.projectId}/workflows`);
+}>(`/api/orgs/${props.orgName}/projects/${props.projectId}/workflows`);
 const workflows = computed(() => workflowsData.value?.data ?? []);
 
 // 分支列表
 const { data: branchesData, error: branchesError, status: branchesStatus } = useLazyFetch<{
   data: BranchItem[];
   default_branch: string | null;
-}>(`/api/orgs/${props.orgId}/projects/${props.projectId}/branches`);
+}>(`/api/orgs/${props.orgName}/projects/${props.projectId}/branches`);
 const branches = computed(() => branchesData.value?.data ?? []);
 const defaultBranch = computed(
   () => branchesData.value?.default_branch || "main",
@@ -213,7 +213,7 @@ async function dispatchWorkflow() {
   dispatching.value = true;
   try {
     await $fetch(
-      `/api/orgs/${props.orgId}/projects/${props.projectId}/actions`,
+      `/api/orgs/${props.orgName}/projects/${props.projectId}/actions`,
       {
         method: "POST",
         body: {

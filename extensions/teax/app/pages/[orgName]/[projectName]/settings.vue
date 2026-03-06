@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const props = defineProps<{
-  orgId: string;
+  orgName: string;
   projectId: string;
   project: {
     id: string;
@@ -17,7 +17,7 @@ const props = defineProps<{
 <template>
   <ProjectSettingsTab
     v-if="props.isOwnerOrAdmin"
-    :org-id="props.orgId"
+    :org-name="props.orgName"
     :project-id="props.projectId"
     :project="props.project"
   />

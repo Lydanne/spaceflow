@@ -4,17 +4,6 @@ const router = useRouter();
 const toast = useToast();
 const orgName = route.params.orgName as string;
 
-const { data: org } = await useFetch<{
-  id: string;
-  name: string;
-}>(`/api/resolve/${orgName}`);
-
-if (!org.value) {
-  throw createError({ statusCode: 404, message: "Organization not found" });
-}
-
-const orgId = org.value.id;
-
 interface RepoItem {
   id: number;
   name: string;
@@ -39,7 +28,7 @@ watch(searchQuery, (val) => {
 
 const { data: reposData, status: reposStatus } = await useFetch<{
   data: RepoItem[];
-}>(`/api/orgs/${orgId}/repos`, { query: { q: debouncedQuery, limit: 20 } });
+}>(`/api/orgs/${orgName}/repos`, { query: { q: debouncedQuery, limit: 20 } });
 
 const repos = computed(() => reposData.value?.data ?? []);
 
@@ -51,7 +40,7 @@ async function createProject() {
   if (!selectedRepo.value) return;
   creating.value = true;
   try {
-    await $fetch(`/api/orgs/${orgId}/projects`, {
+    await $fetch(`/api/orgs/${orgName}/projects`, {
       method: "POST",
       body: { repo_full_name: selectedRepo.value.full_name },
     });

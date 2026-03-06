@@ -12,7 +12,7 @@ interface RepoInfo {
 }
 
 const props = defineProps<{
-  orgId: string;
+  orgName: string;
   projectId: string;
 }>();
 
@@ -21,7 +21,7 @@ const { data, status } = useLazyFetch<{
   source: string | null;
   repoInfo: RepoInfo | null;
 }>(
-  `/api/orgs/${props.orgId}/projects/${props.projectId}/readme`,
+  `/api/orgs/${props.orgName}/projects/${props.projectId}/readme`,
 );
 
 function formatDate(dateStr: string | null) {

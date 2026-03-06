@@ -8,7 +8,7 @@ import type {
 
 const props = withDefaults(
   defineProps<{
-    orgId: string;
+    orgName: string;
     teams: TeamItem[];
     allGroups: PermissionGroup[];
     apiPrefix?: string;
@@ -37,7 +37,7 @@ async function fetchMembers() {
   membersLoading.value = true;
   try {
     const res = await $fetch<{ data: MemberItem[] }>(
-      `${props.apiPrefix}/${props.orgId}/teams/${selectedTeamId.value}/members`,
+      `${props.apiPrefix}/${props.orgName}/teams/${selectedTeamId.value}/members`,
     );
     members.value = res.data ?? [];
   } catch {
@@ -52,7 +52,7 @@ async function fetchTeamPermissions() {
   permLoading.value = true;
   try {
     const res = await $fetch<{ data: TeamPermissionAssignment[] }>(
-      `/api/orgs/${props.orgId}/teams/${selectedTeamId.value}/assigned-permissions`,
+      `/api/orgs/${props.orgName}/teams/${selectedTeamId.value}/assigned-permissions`,
     );
     teamPermissions.value = res.data ?? [];
   } catch {
@@ -71,7 +71,7 @@ async function removeMember(member: MemberItem) {
   if (!selectedTeamId.value) return;
   try {
     await $fetch(
-      `${props.apiPrefix}/${props.orgId}/teams/${selectedTeamId.value}/members/${member.id}`,
+      `${props.apiPrefix}/${props.orgName}/teams/${selectedTeamId.value}/members/${member.id}`,
       { method: "DELETE" },
     );
     toast.add({ title: `已移除 ${member.username}`, color: "success" });
@@ -86,7 +86,7 @@ async function changeRole(member: MemberItem, newRole: string) {
   if (!selectedTeamId.value) return;
   try {
     await $fetch(
-      `${props.apiPrefix}/${props.orgId}/teams/${selectedTeamId.value}/members/${member.id}`,
+      `${props.apiPrefix}/${props.orgName}/teams/${selectedTeamId.value}/members/${member.id}`,
       { method: "PATCH", body: { role: newRole } },
     );
     toast.add({
@@ -103,7 +103,7 @@ async function assignPermission(groupId: string) {
   if (!selectedTeamId.value) return;
   try {
     await $fetch(
-      `/api/orgs/${props.orgId}/teams/${selectedTeamId.value}/assigned-permissions`,
+      `/api/orgs/${props.orgName}/teams/${selectedTeamId.value}/assigned-permissions`,
       { method: "POST", body: { permission_group_id: groupId } },
     );
     toast.add({ title: "权限组已分配", color: "success" });
@@ -117,7 +117,7 @@ async function removePermission(assignmentId: string) {
   if (!selectedTeamId.value) return;
   try {
     await $fetch(
-      `/api/orgs/${props.orgId}/teams/${selectedTeamId.value}/assigned-permissions/${assignmentId}`,
+      `/api/orgs/${props.orgName}/teams/${selectedTeamId.value}/assigned-permissions/${assignmentId}`,
       { method: "DELETE" },
     );
     toast.add({ title: "权限组已移除", color: "success" });

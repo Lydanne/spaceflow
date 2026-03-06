@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineProps<{
-  orgId: string;
+  orgName: string;
   projectId: string;
 }>();
 </script>

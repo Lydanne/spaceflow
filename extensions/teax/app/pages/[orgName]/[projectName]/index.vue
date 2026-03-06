@@ -1,13 +1,13 @@
 <script setup lang="ts">
 const props = defineProps<{
-  orgId: string;
+  orgName: string;
   projectId: string;
 }>();
 </script>
 
 <template>
   <ProjectReadmeTab
-    :org-id="props.orgId"
+    :org-name="props.orgName"
     :project-id="props.projectId"
   />
 </template>

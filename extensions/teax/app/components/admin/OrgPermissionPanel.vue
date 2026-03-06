@@ -8,7 +8,7 @@ interface RepositoryItem {
 }
 
 const props = withDefaults(defineProps<{
-  orgId: string;
+  orgName: string;
   allGroups: PermissionGroup[];
   availablePermissions: PermissionDef[];
   showRepoScope?: boolean;
@@ -31,7 +31,7 @@ const formScopeAll = ref(true);
 const formRepositoryIds = ref<string[]>([]);
 const formLoading = ref(false);
 
-const { data: reposData } = useFetch<{ data: RepositoryItem[] }>(`/api/orgs/${props.orgId}/projects?limit=100`);
+const { data: reposData } = useFetch<{ data: RepositoryItem[] }>(`/api/orgs/${props.orgName}/projects?limit=100`);
 const repoList = computed(() => reposData.value?.data ?? []);
 
 function openCreateGroup() {
@@ -127,7 +127,7 @@ async function saveGroup() {
   try {
     if (editingGroup.value) {
       await $fetch(
-        `/api/orgs/${props.orgId}/permissions/${editingGroup.value.id}`,
+        `/api/orgs/${props.orgName}/permissions/${editingGroup.value.id}`,
         {
           method: "PUT",
           body: {
@@ -140,7 +140,7 @@ async function saveGroup() {
       );
       toast.add({ title: "权限组已更新", color: "success" });
     } else {
-      await $fetch(`/api/orgs/${props.orgId}/permissions`, {
+      await $fetch(`/api/orgs/${props.orgName}/permissions`, {
         method: "POST",
         body: {
           name: formName.value,
@@ -167,7 +167,7 @@ async function deleteGroup(group: PermissionGroup) {
   )
     return;
   try {
-    await $fetch(`/api/orgs/${props.orgId}/permissions/${group.id}`, {
+    await $fetch(`/api/orgs/${props.orgName}/permissions/${group.id}`, {
       method: "DELETE",
     });
     toast.add({ title: "权限组已删除", color: "success" });

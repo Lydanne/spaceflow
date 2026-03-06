@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const props = defineProps<{
-  orgId: string;
+  orgName: string;
   projectId: string;
 }>();
 </script>
@@ -8,7 +8,7 @@ const props = defineProps<{
 <template>
   <ClientOnly>
     <ProjectActionsTab
-      :org-id="props.orgId"
+      :org-name="props.orgName"
       :project-id="props.projectId"
     />
     <template #fallback>

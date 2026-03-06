@@ -33,9 +33,9 @@ const total = computed(() => data.value?.total ?? 0);
 const syncing = ref<string | null>(null);
 
 async function syncOrg(org: OrgItem) {
-  syncing.value = org.id;
+  syncing.value = org.name;
   try {
-    await $fetch(`/api/admin/orgs/${org.id}/sync`, { method: "POST" });
+    await $fetch(`/api/admin/orgs/${org.name}/sync`, { method: "POST" });
     toast.add({ title: `已同步组织 ${org.name}`, color: "success" });
     await refresh();
   } catch (err: unknown) {
@@ -93,7 +93,7 @@ function formatDate(date: string | null) {
             />
             <div>
               <NuxtLink
-                :to="`/-/admin/orgs/${org.id}`"
+                :to="`/-/admin/orgs/${org.name}`"
                 class="font-semibold hover:text-primary-500 transition-colors"
               >
                 {{ org.full_name || org.name }}
@@ -131,7 +131,7 @@ function formatDate(date: string | null) {
               color="neutral"
               variant="soft"
               icon="i-lucide-refresh-cw"
-              :loading="syncing === org.id"
+              :loading="syncing === org.name"
               @click="syncOrg(org)"
             >
               同步
@@ -141,7 +141,7 @@ function formatDate(date: string | null) {
               color="neutral"
               variant="ghost"
               icon="i-lucide-chevron-right"
-              :to="`/-/admin/orgs/${org.id}`"
+              :to="`/-/admin/orgs/${org.name}`"
             />
           </div>
         </div>

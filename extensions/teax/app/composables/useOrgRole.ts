@@ -1,7 +1,7 @@
-export function useOrgRole(orgId: string) {
+export function useOrgRole(orgName: string) {
   const { data } = useFetch<{ role: string }>(
-    `/api/orgs/${orgId}/role`,
-    { key: `org-role-${orgId}` },
+    `/api/orgs/${orgName}/role`,
+    { key: `org-role-${orgName}` },
   );
 
   const role = computed(() => data.value?.role ?? "member");
