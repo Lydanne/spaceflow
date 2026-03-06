@@ -6,10 +6,10 @@
 
 | 项目 | 说明 |
 | ---- | ---- |
-| **目标** | 为 Gitea 提供 CI/CD、Pages、小程序管理、Agent 运行时等扩展功能 |
+| **目标** | 为 Gitea 提供 CI/CD、Pages、小程序管理、Agent 运行时、工作区（容器化开发环境）等扩展功能 |
 | **核心依赖** | Gitea（必需）、飞书（可选） |
 | **技术栈** | Nuxt 4 + Drizzle ORM + PostgreSQL + Redis |
-| **预计周期** | 8-10 周 |
+| **预计周期** | 11-13 周 |
 
 ---
 
@@ -20,16 +20,18 @@ Phase 1 (Week 1-2)     Phase 2 (Week 3-4)     Phase 3 (Week 5-6)
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   基础架构       │───▶│   核心功能       │───▶│   扩展功能       │
 │   + 认证系统     │    │   + 项目管理     │    │   + Agent       │
-│                 │    │   + CI/CD 集成  │    │   + Pages       │
+│   ✅            │    │   + CI/CD 集成  │    │   + Pages       │
+│                 │    │   ✅            │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                                       │
                                                       ▼
-Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
-┌─────────────────┐    ┌─────────────────┐
-│   飞书集成       │───▶│   优化上线       │
-│   + 通知        │    │   + 监控        │
-│   + 审批        │    │   + 文档        │
-└─────────────────┘    └─────────────────┘
+Phase 4 (Week 7-8)     Phase 5 (Week 9-10)    Phase 6 (Week 11-13)
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   飞书集成       │───▶│   优化上线       │───▶│   工作区        │
+│   + 通知        │    │   + 监控        │    │   + 容器管理    │
+│   + 审批        │    │   + 文档        │    │   + Web IDE     │
+│                 │    │   ⚡ 部分完成    │    │   + 网关代理    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
 ---
@@ -323,6 +325,95 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 
 ---
 
+## Phase 6: 工作区 — 容器化开发环境（Week 11-13）
+
+### 目标
+
+实现工作区功能：创建容器化开发环境，通过 Web VSCode 或 VSCode Remote 进入容器进行代码编辑、提交和测试环境部署。容器生命周期与工作区同步，删除工作区即销毁容器。
+
+### 技术选型
+
+| 技术 | 选择 | 说明 |
+| ---- | ---- | ---- |
+| **容器运行时** | Docker（dockerode） | 接口层抽象 `ContainerRuntime`，后续可切 K8s |
+| **Web IDE** | openvscode-server | Gitpod 维护，功能完整的 Web 端 VSCode |
+| **网关代理** | Teax 内置（h3 proxyRequest） | Nitro server route 反向代理，支持 WebSocket |
+
+### 任务清单
+
+#### Week 11: 容器运行时 + 数据库 + 服务层
+
+| 任务 | 优先级 | 预估 | 状态 |
+| ---- | ------ | ---- | ---- |
+| `ContainerRuntime` 接口定义（create/start/stop/remove/inspect/list/logs） | P0 | 3h | ⬜ |
+| `DockerRuntime` 实现（基于 dockerode） | P0 | 6h | ⬜ |
+| `workspaces` 数据库表 + Drizzle Schema（`server/db/schema/workspace.ts`） | P0 | 3h | ⬜ |
+| `workspace.dto.ts` — createWorkspaceBody + select/insert schema | P0 | 2h | ⬜ |
+| `WorkspaceService`：createWorkspace（创建容器 + 端口分配 + DB 记录） | P0 | 8h | ⬜ |
+| `WorkspaceService`：startWorkspace / stopWorkspace | P0 | 4h | ⬜ |
+| `WorkspaceService`：deleteWorkspace（销毁容器 + 清理数据卷 + 释放端口） | P0 | 4h | ⬜ |
+| 端口分配策略（IDE: 10000-19999，App: 20000-29999，持久化到 DB） | P0 | 3h | ⬜ |
+| 工作区状态机（creating → running → stopping → stopped → starting → deleting） | P0 | 2h | ⬜ |
+| 权限 key 定义（`workspace:create`, `workspace:manage`） | P1 | 1h | ⬜ |
+
+#### Week 12: 网关代理 + 容器镜像 + API
+
+| 任务 | 优先级 | 预估 | 状态 |
+| ---- | ------ | ---- | ---- |
+| 工作区容器镜像（`Dockerfile.workspace` + `entrypoint.sh`） | P0 | 6h | ⬜ |
+| 镜像内容：openvscode-server + Git + Node.js 20 + SSH Server | P0 | 含上 | ⬜ |
+| entrypoint.sh：clone 仓库 → 配置 Git → 启动 openvscode-server | P0 | 含上 | ⬜ |
+| 网关代理 server route（`server/routes/workspace/[name]/[...path].ts`） | P0 | 6h | ⬜ |
+| 代理路径分流：`/ide/**` → 容器:3000，`/**` → 容器:8080 | P0 | 含上 | ⬜ |
+| WebSocket 升级支持（openvscode-server 实时通信） | P0 | 3h | ⬜ |
+| 代理层权限校验（session + 工作区归属） | P0 | 3h | ⬜ |
+| 项目级工作区 API（6 个 endpoint：list/create/detail/delete/start/stop） | P0 | 8h | ⬜ |
+| 管理员工作区 API（全局列表 + 强制删除） | P1 | 3h | ⬜ |
+| Git 凭证注入（Gitea PAT → 容器环境变量） | P0 | 2h | ⬜ |
+
+#### Week 13: 前端页面 + 集成 + 测试
+
+| 任务 | 优先级 | 预估 | 状态 |
+| ---- | ------ | ---- | ---- |
+| `WorkspaceCard.vue` 组件（名称、分支、状态、操作按钮） | P0 | 4h | ⬜ |
+| `WorkspaceCreateModal.vue` 组件（名称、分支选择、资源配置） | P0 | 4h | ⬜ |
+| Workspaces Tab 页面（`/:orgName/:projectName/workspaces`） | P0 | 6h | ⬜ |
+| 管理员全局工作区页面（`/-/admin/workspaces`） | P0 | 4h | ⬜ |
+| Admin 侧边栏新增「工作区」导航项 | P0 | 1h | ⬜ |
+| 项目工作台 Tab 导航新增 Workspaces | P0 | 1h | ⬜ |
+| `workspace:create` / `workspace:manage` 权限集成 | P0 | 3h | ⬜ |
+| 审计日志集成（workspace.create / workspace.delete） | P1 | 2h | ⬜ |
+| 容器资源限制验证（CPU/内存上限生效） | P0 | 2h | ⬜ |
+| 端到端测试（创建 → 打开 IDE → 停止 → 删除完整流程） | P0 | 4h | ⬜ |
+| 默认权限组更新（新增 workspace:create 到"开发者"默认权限） | P1 | 1h | ⬜ |
+
+### 交付物
+
+- [ ] 容器运行时抽象层（`ContainerRuntime` 接口 + `DockerRuntime` 实现）
+- [ ] 工作区 CRUD + 容器生命周期管理（`WorkspaceService`）
+- [ ] 工作区容器镜像（openvscode-server + Git + Node.js）
+- [ ] 网关代理（IDE + 测试环境 + WebSocket 支持）
+- [ ] 项目级工作区 API（6 个 endpoint）
+- [ ] 管理员工作区 API（全局列表 + 强制删除）
+- [ ] 前端 Workspaces Tab + 创建弹窗 + Admin 管理页
+- [ ] 权限集成（`workspace:create` / `workspace:manage`）
+- [ ] 审计日志集成
+
+### 验收标准
+
+1. 可在项目下创建工作区，自动启动容器并 clone 仓库代码
+2. 通过 `/workspace/{name}/ide/` 打开 Web VSCode，可正常编辑和保存文件
+3. 通过 `/workspace/{name}/` 预览容器内测试环境应用
+4. 停止工作区后数据卷保留，重新启动后代码仍在
+5. 删除工作区后容器和数据卷被完全清理
+6. 宿主端口绑定 127.0.0.1，外部无法直接访问容器端口
+7. 未授权用户无法通过网关代理访问他人工作区
+8. 容器 CPU/内存限制生效，不超过配置上限
+9. 管理员可在全局管理页查看和强制删除任意工作区
+10. 审计日志正确记录工作区的创建和删除操作
+
+---
+
 ## 技术风险
 
 | 风险 | 影响 | 缓解措施 |
@@ -331,6 +422,10 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 | 飞书审批流程复杂 | 中 | 先实现基础通知，审批作为 P1 |
 | WebSocket 连接稳定性 | 中 | 实现重连机制，降级为轮询（当前已延期） |
 | Agent 任务资源消耗 | 中 | 限制并发数，Docker 隔离执行 |
+| 工作区容器逃逸 | 高 | 非 root 用户运行，挂载目录限定为工作区数据卷，宿主端口绑定 127.0.0.1 |
+| 工作区端口耗尽 | 中 | 端口范围 10000-29999（可支持约 10000 个工作区），定期清理已删除工作区端口 |
+| Docker Socket 安全 | 高 | 限制 Teax 容器内 Docker API 调用范围，后续可迁移到 K8s RBAC |
+| openvscode-server 兼容性 | 中 | 锁定版本，预构建镜像测试，提供 SSH 备选方案 |
 
 ---
 
@@ -343,7 +438,7 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 | Gitea 实例 | 仓库托管 | 运维 | ⬜ |
 | PostgreSQL 16 | 主数据库 | 运维 | ⬜ |
 | Redis 7 | 缓存/队列 | 运维 | ⬜ |
-| Docker Engine | Agent 隔离运行环境 | 运维 | ⬜ |
+| Docker Engine | Agent 隔离运行环境 + 工作区容器运行时 | 运维 | ⬜ |
 | S3 兼容存储 | 对象存储（火山引擎 TOS） | 运维 | ⬜ |
 | 飞书应用 | 消息/审批 | 产品 | ⬜ |
 | 微信开放平台账号 | 小程序码生成 | 产品 | ⬜ |
@@ -355,6 +450,8 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)
 | ---- | ---- | ---- |
 | Gitea OAuth 应用 | 用户认证 | ⬜ |
 | @opencode-ai/sdk | Agent 执行引擎 | ⬜ |
+| dockerode | Docker Engine API 客户端（容器运行时） | ⬜ |
+| openvscode-server 镜像 | 工作区 Web IDE 基础镜像 | ⬜ |
 | 飞书企业应用 | 消息通知 | ⬜ |
 | 飞书机器人 | 指令交互 | ⬜ |
 
@@ -401,11 +498,12 @@ feature/*     ──────┴──────────────┴
 
 - [ ] Node.js 20+ 安装
 - [ ] pnpm 安装
-- [ ] Docker Desktop 安装
+- [ ] Docker Desktop 安装（含 Docker Socket 访问权限，工作区容器运行时需要）
 - [ ] PostgreSQL 本地实例
 - [ ] Redis 本地实例
 - [ ] Gitea 测试实例访问权限
 - [ ] 飞书开发者账号
+- [ ] openvscode-server 镜像预拉取（`docker pull gitpod/openvscode-server:latest`）
 
 ### 配置项
 
@@ -418,6 +516,9 @@ feature/*     ──────┴──────────────┴
 
 ## 下一步行动
 
-1. **当前**：Phase 1-2 已完成，Phase 5 Week 9 已完成（权限 + 代码质量 + 文档）
-2. **下一步**：Phase 3（Agent + Pages）或 Phase 4（飞书集成）
-3. **持续**：每周 Review 进度，调整计划
+1. **已完成**：Phase 1-2 ✅，Phase 5 Week 9 ⚡ 部分完成（权限 + 代码质量 + 文档）
+2. **设计完成**：Phase 6 工作区功能设计已写入 design.md（技术选型 + 架构 + 数据模型 + API + 页面）
+3. **下一步**：
+   - **优先**：Phase 6 Week 11 — 容器运行时抽象层 + DB Schema + WorkspaceService
+   - **并行**：Phase 3（Agent + Pages）或 Phase 4（飞书集成）可根据业务优先级穿插
+4. **持续**：每周 Review 进度，调整计划
