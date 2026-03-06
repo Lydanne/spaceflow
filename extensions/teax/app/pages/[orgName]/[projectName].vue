@@ -1,10 +1,11 @@
 <script setup lang="ts">
 const route = useRoute();
-const orgId = route.params.orgId as string;
-const projectId = route.params.projectId as string;
+const orgName = route.params.orgName as string;
+const projectName = route.params.projectName as string;
 
 interface ProjectDetail {
   id: string;
+  organizationId: string;
   name: string;
   fullName: string;
   description: string | null;
@@ -17,12 +18,15 @@ interface ProjectDetail {
 }
 
 const { data: project, status: projectStatus } = await useFetch<ProjectDetail>(
-  `/api/orgs/${orgId}/projects/${projectId}`,
+  `/api/resolve/${orgName}/${projectName}`,
 );
 
-const { isOwnerOrAdmin } = useOrgRole(orgId);
+const orgId = computed(() => project.value?.organizationId ?? "");
+const projectId = computed(() => project.value?.id ?? "");
 
-const projectBase = `/orgs/${orgId}/projects/${projectId}`;
+const { isOwnerOrAdmin } = useOrgRole(orgId.value);
+
+const projectBase = `/${orgName}/${projectName}`;
 
 const baseTabs = [
   { label: "README", value: "readme", icon: "i-lucide-file-text", to: projectBase },
@@ -68,7 +72,7 @@ const activeTab = computed(() => {
             color="neutral"
             variant="ghost"
             size="sm"
-            :to="`/orgs/${orgId}/projects`"
+            :to="`/${orgName}`"
           />
           <div>
             <h1 class="text-xl font-bold">

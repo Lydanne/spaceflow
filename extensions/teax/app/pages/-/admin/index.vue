@@ -4,7 +4,7 @@ definePageMeta({
   middleware: "admin",
 });
 
-navigateTo("/admin/users", { replace: true });
+navigateTo("/-/admin/users", { replace: true });
 </script>
 
 <template>

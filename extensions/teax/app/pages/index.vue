@@ -113,7 +113,7 @@ function timeAgo(dateStr: string) {
         <NuxtLink
           v-for="org in orgs"
           :key="org.id"
-          :to="`/orgs/${org.id}/projects`"
+          :to="`/${org.name}`"
           class="block"
         >
           <UCard class="hover:ring-1 hover:ring-primary-500 transition-all">

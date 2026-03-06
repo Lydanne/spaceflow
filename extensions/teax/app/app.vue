@@ -24,7 +24,7 @@ const userMenuItems = computed(() => {
       {
         label: "系统管理",
         icon: "i-lucide-shield",
-        onSelect: () => navigateTo("/admin/users"),
+        onSelect: () => navigateTo("/-/admin/users"),
       },
     ]);
   }

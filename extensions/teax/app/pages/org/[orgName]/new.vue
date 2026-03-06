@@ -2,7 +2,18 @@
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
-const orgId = route.params.orgId as string;
+const orgName = route.params.orgName as string;
+
+const { data: org } = await useFetch<{
+  id: string;
+  name: string;
+}>(`/api/resolve/${orgName}`);
+
+if (!org.value) {
+  throw createError({ statusCode: 404, message: "Organization not found" });
+}
+
+const orgId = org.value.id;
 
 interface RepoItem {
   id: number;
@@ -40,7 +51,7 @@ async function createProject() {
   if (!selectedRepo.value) return;
   creating.value = true;
   try {
-    const project = await $fetch(`/api/orgs/${orgId}/projects`, {
+    await $fetch(`/api/orgs/${orgId}/projects`, {
       method: "POST",
       body: { repoFullName: selectedRepo.value.full_name },
     });
@@ -48,7 +59,7 @@ async function createProject() {
       title: `项目 ${selectedRepo.value.full_name} 创建成功`,
       color: "success",
     });
-    router.push(`/orgs/${orgId}/projects/${(project as { id: string }).id}`);
+    router.push(`/${selectedRepo.value.full_name}`);
   } catch (err: unknown) {
     const msg =
       (err as { data?: { message?: string } })?.data?.message || "创建失败";
@@ -67,7 +78,7 @@ async function createProject() {
         color="neutral"
         variant="ghost"
         size="sm"
-        :to="`/orgs/${orgId}/projects`"
+        :to="`/${orgName}`"
       />
       <h1 class="text-xl font-bold">
         创建项目
@@ -169,7 +180,7 @@ async function createProject() {
           <UButton
             color="neutral"
             variant="soft"
-            :to="`/orgs/${orgId}/projects`"
+            :to="`/${orgName}`"
           >
             取消
           </UButton>

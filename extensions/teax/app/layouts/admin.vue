@@ -5,22 +5,17 @@ const navItems = [
   {
     label: "用户管理",
     icon: "i-lucide-users",
-    to: "/admin/users",
-  },
-  {
-    label: "组织管理",
-    icon: "i-lucide-building-2",
-    to: "/admin/orgs",
+    to: "/-/admin/users",
   },
   {
     label: "审计日志",
     icon: "i-lucide-scroll-text",
-    to: "/admin/audit-logs",
+    to: "/-/admin/audit-logs",
   },
   {
     label: "系统设置",
     icon: "i-lucide-settings",
-    to: "/admin/settings",
+    to: "/-/admin/settings",
   },
 ];
 

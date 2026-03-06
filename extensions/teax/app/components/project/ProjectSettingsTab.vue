@@ -64,7 +64,7 @@ async function deleteProject() {
       method: "DELETE",
     });
     toast.add({ title: "项目已删除", color: "success" });
-    navigateTo(`/orgs/${props.orgId}/projects`);
+    navigateTo(`/${props.project.fullName.split("/")[0]}`);
   } catch {
     toast.add({ title: "删除失败", color: "error" });
   } finally {
