@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "../../../../../../db";
 import { requireAdmin } from "../../../../../../utils/auth";
+import { addTeamMemberBodySchema } from "../../../../../../shared/dto";
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event);
@@ -11,16 +12,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: "Missing teamId" });
   }
 
-  const body = await readBody(event);
-  const { user_id, role = "member" } = body as { user_id: string; role?: string };
-
-  if (!user_id) {
-    throw createError({ statusCode: 400, message: "Missing user_id" });
-  }
-
-  if (!["owner", "member"].includes(role)) {
-    throw createError({ statusCode: 400, message: "Invalid role, must be 'owner' or 'member'" });
-  }
+  const { user_id, role } = await readValidatedBody(event, addTeamMemberBodySchema.parse);
 
   // 验证用户存在
   const [user] = await db

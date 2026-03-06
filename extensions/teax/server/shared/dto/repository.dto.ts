@@ -22,3 +22,18 @@ export const createProjectBodySchema = z.object({
   repo_full_name: z.string().min(1).includes("/"),
 });
 export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
+
+// ─── 触发 Workflow request body ─────────────────────────
+export const triggerWorkflowBodySchema = z.object({
+  workflow_id: z.string().min(1),
+  ref: z.string().min(1),
+  inputs: z.record(z.string(), z.string()).optional(),
+});
+export type TriggerWorkflowBody = z.infer<typeof triggerWorkflowBodySchema>;
+
+// ─── 更新仓库设置 request body（JSONB 内部保持 camelCase）──
+export const updateRepoSettingsBodySchema = z.object({
+  notifyOnSuccess: z.boolean().optional(),
+  notifyOnFailure: z.boolean().optional(),
+});
+export type UpdateRepoSettingsBody = z.infer<typeof updateRepoSettingsBodySchema>;

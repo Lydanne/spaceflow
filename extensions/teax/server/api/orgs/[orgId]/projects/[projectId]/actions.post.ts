@@ -2,21 +2,14 @@ import { eq } from "drizzle-orm";
 import { useDB, schema } from "../../../../../db";
 import { requirePermission } from "../../../../../utils/permission";
 import { createServiceGiteaClient } from "../../../../../utils/gitea";
+import { triggerWorkflowBodySchema } from "../../../../../shared/dto";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId")!;
   const projectId = getRouterParam(event, "projectId")!;
   await requirePermission(event, orgId, "actions:trigger", projectId);
 
-  const body = await readBody<{
-    workflowId: string;
-    ref: string;
-    inputs?: Record<string, string>;
-  }>(event);
-
-  if (!body.workflowId || !body.ref) {
-    throw createError({ statusCode: 400, message: "Missing workflowId or ref" });
-  }
+  const body = await readValidatedBody(event, triggerWorkflowBodySchema.parse);
 
   const db = useDB();
   const [project] = await db
@@ -34,8 +27,8 @@ export default defineEventHandler(async (event) => {
   const owner = parts[0] ?? "";
   const repo = parts[1] ?? "";
 
-  // workflowId 可能是完整路径如 .github/workflows/test.yaml，提取文件名
-  const workflowFile = body.workflowId.split("/").pop() || body.workflowId;
+  // workflow_id 可能是完整路径如 .github/workflows/test.yaml，提取文件名
+  const workflowFile = body.workflow_id.split("/").pop() || body.workflow_id;
   await gitea.dispatchWorkflow(owner, repo, workflowFile, body.ref, body.inputs);
 
   return { success: true };

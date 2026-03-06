@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { useDB, schema } from "../../../../db";
 import { requireOrgOwnerOrAdmin } from "../../../../utils/org-owner";
 import { writeAuditLog } from "../../../../utils/audit";
+import { createPermissionGroupBodySchema } from "../../../../shared/dto";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
@@ -23,16 +24,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Organization not found" });
   }
 
-  const body = await readBody<{
-    name: string;
-    description?: string;
-    permissions?: string[];
-    repository_ids?: string[] | null;
-  }>(event);
-
-  if (!body.name?.trim()) {
-    throw createError({ statusCode: 400, message: "Name is required" });
-  }
+  const body = await readValidatedBody(event, createPermissionGroupBodySchema.parse);
 
   const [group] = await db
     .insert(schema.permissionGroups)

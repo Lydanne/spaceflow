@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "../../../../../../../db";
 import { requireAdmin } from "../../../../../../../utils/auth";
+import { updateMemberRoleBodySchema } from "../../../../../../../shared/dto";
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event);
@@ -11,12 +12,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: "Missing memberId" });
   }
 
-  const body = await readBody(event);
-  const { role } = body as { role: string };
-
-  if (!role || !["owner", "member"].includes(role)) {
-    throw createError({ statusCode: 400, message: "Invalid role, must be 'owner' or 'member'" });
-  }
+  const { role } = await readValidatedBody(event, updateMemberRoleBodySchema.parse);
 
   const [updated] = await db
     .update(schema.teamMembers)

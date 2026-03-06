@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "../../../../../../db";
 import { requireTeamOwnerOrAdmin } from "../../../../../../utils/team-owner";
+import { assignPermissionBodySchema } from "../../../../../../shared/dto";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
@@ -13,11 +14,7 @@ export default defineEventHandler(async (event) => {
   await requireTeamOwnerOrAdmin(event, teamId);
   const db = useDB();
 
-  const body = await readBody<{ permission_group_id: string }>(event);
-
-  if (!body.permission_group_id) {
-    throw createError({ statusCode: 400, message: "permissionGroupId is required" });
-  }
+  const body = await readValidatedBody(event, assignPermissionBodySchema.parse);
 
   // 验证权限组属于该组织
   const [group] = await db

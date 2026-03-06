@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "../../../../../db";
 import { requirePermission } from "../../../../../utils/permission";
+import { updateRepoSettingsBodySchema } from "../../../../../shared/dto";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
@@ -13,10 +14,7 @@ export default defineEventHandler(async (event) => {
   await requirePermission(event, orgId, "repo:settings", projectId);
   const db = useDB();
 
-  const body = await readBody<{
-    notifyOnSuccess?: boolean;
-    notifyOnFailure?: boolean;
-  }>(event);
+  const body = await readValidatedBody(event, updateRepoSettingsBodySchema.parse);
 
   const [project] = await db
     .select({ settings: schema.repositories.settings })

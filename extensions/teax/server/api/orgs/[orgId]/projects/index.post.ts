@@ -4,6 +4,7 @@ import { requirePermission } from "../../../../utils/permission";
 import { createServiceGiteaClient } from "../../../../utils/gitea";
 import { generateWebhookSecret } from "../../../../utils/webhook-verify";
 import { writeAuditLog } from "../../../../utils/audit";
+import { createProjectBodySchema } from "../../../../shared/dto";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
@@ -13,15 +14,7 @@ export default defineEventHandler(async (event) => {
   const session = await requirePermission(event, orgId, "repo:create");
   const db = useDB();
 
-  const body = await readBody(event);
-  const { repo_full_name } = body as { repo_full_name: string };
-
-  if (!repo_full_name || !repo_full_name.includes("/")) {
-    throw createError({
-      statusCode: 400,
-      message: "Invalid repository name, expected format: owner/repo",
-    });
-  }
+  const { repo_full_name } = await readValidatedBody(event, createProjectBodySchema.parse);
 
   const parts = repo_full_name.split("/");
   const owner = parts[0]!;

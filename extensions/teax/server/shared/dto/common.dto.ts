@@ -24,3 +24,9 @@ export const addTeamMemberBodySchema = z.object({
   role: z.enum(["owner", "member"]).default("member"),
 });
 export type AddTeamMemberBody = z.infer<typeof addTeamMemberBodySchema>;
+
+// ─── 更新成员角色 request body ────────────────────────────
+export const updateMemberRoleBodySchema = z.object({
+  role: z.enum(["owner", "member"]),
+});
+export type UpdateMemberRoleBody = z.infer<typeof updateMemberRoleBodySchema>;

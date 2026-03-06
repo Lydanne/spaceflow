@@ -217,7 +217,7 @@ async function dispatchWorkflow() {
       {
         method: "POST",
         body: {
-          workflowId: selectedWorkflow.value,
+          workflow_id: selectedWorkflow.value,
           ref: selectedBranch.value,
           inputs: { ...inputValues },
         },
