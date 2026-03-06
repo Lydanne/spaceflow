@@ -8,6 +8,11 @@ const navItems = [
     to: "/-/admin/users",
   },
   {
+    label: "组织管理",
+    icon: "i-lucide-building-2",
+    to: "/-/admin/orgs",
+  },
+  {
     label: "审计日志",
     icon: "i-lucide-scroll-text",
     to: "/-/admin/audit-logs",

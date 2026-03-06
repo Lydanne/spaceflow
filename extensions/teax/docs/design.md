@@ -399,6 +399,8 @@ AgentService 通过 Docker SDK（`dockerode`）管理容器生命周期，容器
 │
 └── /-/admin                         # 系统管理（仅管理员可访问，类似 Gitea /-/admin）
     ├── /users                       # 用户管理（列表/切换管理员）
+    ├── /orgs                        # 组织管理（列表/同步状态）
+    │   └── /:orgId                  # 组织详情（团队+成员+权限组管理）
     ├── /audit-logs                  # 审计日志（操作记录查看）
     └── /settings                    # 系统设置（待实现）
 ```
