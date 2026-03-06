@@ -440,7 +440,7 @@ Webhook 接收：
 
 #### 3.6 Workflows API
 
-`GET /api/orgs/{orgId}/projects/{projectId}/workflows`
+`GET /api/repos/{owner}/{repo}/actions/workflows`
 
 返回字段：
 
@@ -499,10 +499,10 @@ interface WorkflowItem {
          │        ├─ tool_use    → session_logs(tool)    + WebSocket push
          │        ├─ reasoning   → session_logs(reasoning)
          │        ├─ step_start  → session_logs(system) + 更新 AgentSession.steps
-         │        └─ step_finish → 累加 tokensUsed / cost
+         │        └─ step_finish → 累加 tokens_used / cost
          │
          ├─ 8. [可选] git add . && git commit && Gitea API 创建 PR
-         │        └─ 写入 AgentSession.prUrl
+         │        └─ 写入 AgentSession.pr_url
          └─ 9. 清理：client.session.delete + cleanup opencode server + 删除工作区
 ```
 
@@ -819,14 +819,14 @@ AgentService 通过 Docker SDK（`dockerode`）管理容器生命周期，容器
 │  │  ┌──────────────────────────────────────────────┐   │   │
 │  │  │  管理员                                       │   │   │
 │  │  │  拥有所有权限                                  │   │   │
-│  │  │  权限: project:* publish:* agent:* ...       │   │   │
+│  │  │  权限: repo:* actions:* agent:* ...          │   │   │
 │  │  │                                    [编辑]     │   │   │
 │  │  └──────────────────────────────────────────────┘   │   │
 │  │                                                     │   │
 │  │  ┌──────────────────────────────────────────────┐   │   │
 │  │  │  开发者                                       │   │   │
-│  │  │  可以触发发布和启动 Agent                      │   │   │
-│  │  │  权限: publish:trigger agent:start agent:stop │   │   │
+│  │  │  可以触发 Actions 和启动 Agent                  │   │   │
+│  │  │  权限: actions:trigger agent:start agent:stop │   │   │
 │  │  │                                    [编辑]     │   │   │
 │  │  └──────────────────────────────────────────────┘   │   │
 │  │                                                     │   │
@@ -971,12 +971,12 @@ AgentService 通过 Docker SDK（`dockerode`）管理容器生命周期，容器
        ▼                                       ▼
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │Organization │────▶│    Team     │────▶│TeamPermission│
-└──────┬──────┘     └─────────────┘     └─────────────┘
-       │
-       │ has_many
-       ▼
+└──────┬──────┘     └──────┬──────┘     └─────────────┘
+       │                   │
+       │ has_many          │ has_many
+       ▼                   ▼
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Project   │────▶│ PublishTask │     │   Action    │
+│ Repository  │     │ TeamMember  │     │  AuditLog   │
 └──────┬──────┘     └─────────────┘     └─────────────┘
        │
        │ has_many
@@ -995,13 +995,14 @@ AgentService 通过 Docker SDK（`dockerode`）管理容器生命周期，容器
 ```typescript
 interface User {
   id: string;
-  giteaId: number;              // Gitea 用户 ID
-  giteaUsername: string;        // Gitea 用户名
+  gitea_id: number;              // Gitea 用户 ID
+  gitea_username: string;        // Gitea 用户名
   email: string;
-  avatarUrl?: string;
-  isAdmin: boolean;             // 系统管理员
-  createdAt: Date;
-  updatedAt: Date;
+  avatar_url?: string;
+  is_admin: boolean;             // 系统管理员
+  row_creator?: string;          // 记录创建者（公共字段）
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1010,18 +1011,20 @@ interface User {
 ```typescript
 interface UserFeishu {
   id: string;
-  userId: string;               // 关联 User.id
-  feishuOpenId: string;         // 飞书 open_id
-  feishuUnionId?: string;       // 飞书 union_id
-  feishuName: string;           // 飞书显示名
-  feishuAvatar?: string;
-  accessToken?: string;         // 飞书 access_token（加密存储）
-  tokenExpiresAt?: Date;        // token 过期时间
-  notifyPublish: boolean;       // 接收发布通知（默认 true）
-  notifyApproval: boolean;      // 接收审批请求（默认 true）
-  notifyAgent: boolean;         // 接收 Agent 运行结果（默认 true）
-  notifySystem: boolean;        // 接收系统通知（默认 false）
-  createdAt: Date;
+  user_id: string;               // 关联 User.id
+  feishu_open_id: string;        // 飞书 open_id
+  feishu_union_id?: string;      // 飞书 union_id
+  feishu_name: string;           // 飞书显示名
+  feishu_avatar?: string;
+  access_token?: string;         // 飞书 access_token（加密存储）
+  token_expires_at?: Date;       // token 过期时间
+  notify_publish: boolean;       // 接收发布通知（默认 true）
+  notify_approval: boolean;      // 接收审批请求（默认 true）
+  notify_agent: boolean;         // 接收 Agent 运行结果（默认 true）
+  notify_system: boolean;        // 接收系统通知（默认 false）
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1030,12 +1033,14 @@ interface UserFeishu {
 ```typescript
 interface Organization {
   id: string;
-  giteaOrgId: number;           // Gitea Organization ID
-  name: string;                 // 组织名称
-  fullName?: string;
-  avatarUrl?: string;
-  syncedAt: Date;               // 最后同步时间
-  createdAt: Date;
+  gitea_org_id: number;          // Gitea Organization ID
+  name: string;                  // 组织名称
+  full_name?: string;
+  avatar_url?: string;
+  synced_at: Date;               // 最后同步时间
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1044,12 +1049,14 @@ interface Organization {
 ```typescript
 interface Team {
   id: string;
-  organizationId: string;       // 关联 Organization.id
-  giteaTeamId: number;          // Gitea Team ID
+  organization_id: string;      // 关联 Organization.id
+  gitea_team_id: number;        // Gitea Team ID
   name: string;
   description?: string;
-  syncedAt: Date;
-  createdAt: Date;
+  synced_at: Date;
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1058,10 +1065,13 @@ interface Team {
 ```typescript
 interface TeamMember {
   id: string;
-  teamId: string;               // 关联 Team.id
-  userId: string;               // 关联 User.id
-  role: 'owner' | 'member';     // 团队角色
-  joinedAt: Date;
+  team_id: string;               // 关联 Team.id
+  user_id: string;               // 关联 User.id
+  role: 'owner' | 'member';      // 团队角色
+  joined_at: Date;
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1070,14 +1080,15 @@ interface TeamMember {
 ```typescript
 interface PermissionGroup {
   id: string;
-  organizationId: string;       // 所属组织
-  type: 'default' | 'custom';   // 权限组类型
-  name: string;                 // 权限组名称
+  organization_id: string;       // 所属组织
+  type: 'default' | 'custom';    // 权限组类型
+  name: string;                  // 权限组名称
   description?: string;
-  permissions: string[];         // 权限 key 列表，如 ["repo:view", "actions:view"]
-  repositoryIds: string[] | null; // null=全部仓库, ["id1"]=指定仓库
-  createdAt: Date;
-  updatedAt: Date;
+  permissions: string[];          // 权限 key 列表，如 ["repo:view", "actions:view"]
+  repository_ids: string[] | null; // null=全部仓库, ["id1"]=指定仓库
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 type Permission =
@@ -1100,9 +1111,11 @@ type Permission =
 ```typescript
 interface TeamPermission {
   id: string;
-  teamId: string;               // 关联 Team.id
-  permissionGroupId: string;    // 关联 PermissionGroup.id
-  createdAt: Date;
+  team_id: string;               // 关联 Team.id
+  permission_group_id: string;   // 关联 PermissionGroup.id
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1115,54 +1128,29 @@ interface TeamPermission {
 ```typescript
 interface Repository {
   id: string;
-  organizationId: string;       // 所属组织
-  giteaRepoId: number;          // Gitea 仓库 ID
-  name: string;                 // 仓库名称
-  fullName: string;             // 完整名称 (owner/repo)
+  organization_id: string;       // 所属组织
+  gitea_repo_id: number;         // Gitea 仓库 ID
+  name: string;                  // 仓库名称
+  full_name: string;             // 完整名称 (owner/repo)
   description?: string;
-  defaultBranch: string;        // 默认分支
-  cloneUrl: string;             // Git clone 地址
-  webhookId?: number;           // Gitea Webhook ID
-  webhookSecret?: string;       // Webhook 签名密钥
+  default_branch: string;        // 默认分支
+  clone_url: string;             // Git clone 地址
+  webhook_id?: number;           // Gitea Webhook ID
+  webhook_secret?: string;       // Webhook 签名密钥
   settings: RepositorySettings;
-  createdBy?: string;           // 创建者 User.id
-  createdAt: Date;
-  updatedAt: Date;
+  created_by?: string;           // 创建者 User.id
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 interface RepositorySettings {
-  notifyOnSuccess: boolean;     // 成功时通知
-  notifyOnFailure: boolean;     // 失败时通知
+  notifyOnSuccess: boolean;      // 成功时通知（JSONB 内部结构保持 camelCase）
+  notifyOnFailure: boolean;      // 失败时通知
 }
 ```
 
-#### Action（CI/CD 流水线）
-
-```typescript
-interface Action {
-  id: string;
-  repositoryId: string;
-  name: string;                 // 流水线名称
-  trigger: ActionTrigger;
-  steps: ActionStep[];
-  enabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface ActionTrigger {
-  type: 'push' | 'pull_request' | 'tag' | 'manual';
-  branches?: string[];          // 触发分支
-  paths?: string[];             // 触发路径
-}
-
-interface ActionStep {
-  name: string;
-  command: string;
-  env?: Record<string, string>;
-  timeout?: number;             // 超时（秒）
-}
-```
+> **注意**：CI/CD 流水线（Action）完全由 Gitea Actions 驱动，Teax 不在本地数据库维护 Action 定义。Teax 通过 Gitea API 代理展示 Workflow Runs。
 
 ---
 
@@ -1175,39 +1163,39 @@ Agent 由 **`@opencode-ai/sdk`** 驱动执行，通过配置 systemPrompt + LLM 
 ```typescript
 interface Agent {
   id: string;
-  repositoryId: string;
+  repository_id: string;
   name: string;
   description?: string;
 
   // open-code 核心配置
-  systemPrompt: string;          // Agent 任务定义（系统提示词）
-  llmConfig: AgentLlmConfig;     // LLM 供应商配置
-  toolConfig: AgentToolConfig;   // 工具权限配置
+  system_prompt: string;          // Agent 任务定义（系统提示词）
+  llm_config: AgentLlmConfig;     // LLM 供应商配置
+  tool_config: AgentToolConfig;   // 工具权限配置
 
   // 触发配置
-  triggerConfig?: {
-    onPush?: boolean;            // push 时自动触发
-    branches?: string[];         // 触发分支过滤，空则所有分支
-    promptTemplate?: string;     // user prompt 模板，支持变量：
-                                 // {{branch}} {{commitSha}} {{commitMsg}} {{author}}
+  trigger_config?: {
+    onPush?: boolean;             // push 时自动触发（JSONB 内部结构）
+    branches?: string[];
+    promptTemplate?: string;
   };
 
   // 工作区配置
-  workspaceConfig?: {
-    branch?: string;             // 默认签出分支
-    createPR?: boolean;          // 执行完成后自动提交变更并创建 PR
-    prTitleTemplate?: string;    // PR 标题模板，如 "chore: {{agentName}} auto fix"
+  workspace_config?: {
+    branch?: string;
+    createPR?: boolean;
+    prTitleTemplate?: string;     // PR 标题模板，如 "chore: {{agentName}} auto fix"
   };
 
   // 资源限制
   resources?: {
-    timeout?: number;            // 最大运行时间（秒），默认 3600
-    maxSteps?: number;           // open-code 最大步骤数，防止无限循环，默认 50
+    timeout?: number;             // 最大运行时间（秒），默认 3600
+    maxSteps?: number;            // open-code 最大步骤数，防止无限循环，默认 50
   };
 
   enabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 // LLM 供应商配置（对应 open-code 的 provider 配置）
@@ -1231,12 +1219,13 @@ interface AgentToolConfig {
 ```typescript
 interface AgentSecret {
   id: string;
-  repositoryId: string;
-  name: string;                  // 密钥名称，如 "OPENAI_API_KEY"
-  encryptedValue: string;        // AES-256-GCM 加密后的值
-  createdBy: string;             // 创建者 User.id
-  createdAt: Date;
-  updatedAt: Date;
+  repository_id: string;
+  name: string;                   // 密钥名称，如 "OPENAI_API_KEY"
+  encrypted_value: string;        // AES-256-GCM 加密后的值
+  created_by: string;             // 创建者 User.id
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1245,28 +1234,30 @@ interface AgentSecret {
 ```typescript
 interface AgentSession {
   id: string;
-  repositoryId: string;
-  agentId: string;              // Agent 定义 ID
-  agentName: string;
+  repository_id: string;
+  agent_id: string;               // Agent 定义 ID
+  agent_name: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'stopped';
-  triggeredBy: string;          // 触发者 User.id
-  triggerType: 'manual' | 'webhook' | 'feishu';
-  userPrompt?: string;          // 实际发送给 open-code 的 user prompt（模板渲染后）
-  startedAt?: Date;
-  endedAt?: Date;
+  triggered_by: string;           // 触发者 User.id
+  trigger_type: 'manual' | 'webhook' | 'feishu';
+  user_prompt?: string;           // 实际发送给 open-code 的 user prompt（模板渲染后）
+  started_at?: Date;
+  ended_at?: Date;
   duration?: number;
 
   // open-code 运行追踪
-  ocSessionId?: string;         // open-code 内部 session ID
-  steps?: number;               // 已执行步骤数
-  tokensUsed?: number;          // 累计消耗 token 数
-  cost?: number;                // 推算费用（USD）
+  oc_session_id?: string;         // open-code 内部 session ID
+  steps?: number;                 // 已执行步骤数
+  tokens_used?: number;           // 累计消耗 token 数
+  cost?: number;                  // 推算费用（USD）
 
   // 产物
-  prUrl?: string;               // 若 workspaceConfig.createPR=true，记录创建的 PR 链接
-  logUrl?: string;              // 完整日志 S3 URL（完成后归档）
+  pr_url?: string;                // 若 workspace_config.createPR=true，记录创建的 PR 链接
+  log_url?: string;               // 完整日志 S3 URL（完成后归档）
   metadata: Record<string, unknown>;
-  createdAt: Date;
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
   // 实时日志通过 session_logs 表流式写入，不内联在主实体
 }
 ```
@@ -1280,17 +1271,18 @@ interface AgentSession {
 ```typescript
 interface Page {
   id: string;
-  repositoryId: string;
-  name: string;                 // 页面名称
-  domain?: string;              // 自定义域名
-  subdomain: string;            // 子域名
-  branch: string;               // 部署分支
-  buildCommand?: string;        // 构建命令
-  outputDir: string;            // 输出目录
+  repository_id: string;
+  name: string;                  // 页面名称
+  domain?: string;               // 自定义域名
+  subdomain: string;             // 子域名
+  branch: string;                // 部署分支
+  build_command?: string;        // 构建命令
+  output_dir: string;            // 输出目录
   status: 'active' | 'building' | 'failed' | 'disabled';
-  lastDeployedAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  last_deployed_at?: Date;
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1299,13 +1291,15 @@ interface Page {
 ```typescript
 interface MiniAppCode {
   id: string;
-  repositoryId: string;
+  repository_id: string;
   type: 'preview' | 'experience' | 'release';
   version: string;
-  qrcodeUrl: string;            // 二维码图片 URL
-  expiredAt?: Date;             // 过期时间
-  createdBy: string;            // 创建者 User.id
-  createdAt: Date;
+  qrcode_url: string;            // 二维码图片 URL
+  expired_at?: Date;             // 过期时间
+  created_by: string;            // 创建者 User.id
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1319,13 +1313,15 @@ interface MiniAppCode {
 interface FeishuNotification {
   id: string;
   type: 'publish' | 'approval' | 'agent' | 'system';
-  targetType: 'user' | 'group';
-  targetId: string;             // 飞书 open_id 或 chat_id
-  messageId?: string;           // 飞书消息 ID
+  target_type: 'user' | 'group';
+  target_id: string;             // 飞书 open_id 或 chat_id
+  message_id?: string;           // 飞书消息 ID
   content: Record<string, unknown>;
   status: 'pending' | 'sent' | 'failed';
-  sentAt?: Date;
-  createdAt: Date;
+  sent_at?: Date;
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1334,14 +1330,16 @@ interface FeishuNotification {
 ```typescript
 interface FeishuApproval {
   id: string;
-  publishTaskId: string;        // 关联发布任务
-  approvalCode: string;         // 飞书审批定义 code
-  instanceCode: string;         // 飞书审批实例 code
+  repository_id: string;         // 关联仓库
+  approval_code: string;         // 飞书审批定义 code
+  instance_code: string;         // 飞书审批实例 code
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
-  approverOpenId?: string;
-  approvedAt?: Date;
+  approver_open_id?: string;
+  approved_at?: Date;
   comment?: string;
-  createdAt: Date;
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1349,16 +1347,18 @@ interface FeishuApproval {
 
 ```typescript
 interface AuditLog {
-  id: string;
-  userId: string;               // 操作者
-  organizationId?: string;      // 所属组织
-  action: string;               // 操作类型，如 publish.trigger / agent.stop / permission.update
-  resourceType?: string;        // project | publish_task | agent_session | permission_group
-  resourceId?: string;
-  ipAddress?: string;
-  userAgent?: string;
+  id: number;                    // bigserial
+  user_id: string;               // 操作者
+  organization_id?: string;      // 所属组织
+  action: string;                // 操作类型，如 repo.create / agent.stop / permission.update
+  resource_type?: string;        // repository | agent_session | permission_group
+  resource_id?: string;
+  ip_address?: string;
+  user_agent?: string;
   detail: Record<string, unknown>; // 操作内容快照
-  createdAt: Date;
+  row_creator?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 ```
 
@@ -1373,11 +1373,11 @@ interface AuditLog {
 | **Webhook 伪造** | 注册 Webhook 时保存 secret，每次请求校验 `X-Gitea-Signature` HMAC-SHA256 签名，失败则返回 401 |
 | **越权访问** | 每个 API 路由通过权限中间件，校验用户是否属于该组织且持有对应权限 |
 | **构建任务隔离** | 所有构建任务在独立 Docker 容器中执行，不得在 Teax 服务进程内直接 `exec` 命令 |
-| **OAuth Token 过期** | Gitea access_token 过期后需重新授权；飞书 token 存储到 `user_feishu.access_token`，访问前检查 `tokenExpiresAt` |
-| **飞书机器人越权** | 收到机器人指令时，通过 `feishuOpenId` 查找关联 Teax 用户，校验权限组后才执行操作 |
+| **OAuth Token 过期** | Gitea access_token 过期后需重新授权；飞书 token 存储到 `user_feishu.access_token`，访问前检查 `token_expires_at` |
+| **飞书机器人越权** | 收到机器人指令时，通过 `feishu_open_id` 查找关联 Teax 用户，校验权限组后才执行操作 |
 | **敏感信息过滤** | API 响应不返回密钥、token 字段；日志中过滤 env 中标记为 `SECRET_*` 的字段 |
 | **请求限流** | Webhook 接收端点和 API 路由应配置限流（如 10 req/s），利用 Redis 实现滑动窗口计数器 |
-| **Session 服务端校验** | Cookie sealed session 内嵌 `sessionId`，每次 API 请求通过 `session-validate` middleware 检查 Redis（`session:{userId}:{sessionId}`）是否仍有效，支持服务端主动踢人 |
+| **Session 服务端校验** | Cookie sealed session 内嵌 `session_id`，每次 API 请求通过 `session-validate` middleware 检查 Redis（`session:{user_id}:{session_id}`）是否仍有效，支持服务端主动踢人 |
 
 ---
 
@@ -1534,7 +1534,8 @@ app/
 | 类别 | 技术 | 版本 | 说明 |
 | ---- | ---- | ---- | ---- |
 | **运行时** | Nuxt Server (Nitro) | - | 基于 H3 的服务端 |
-| **ORM** | Drizzle ORM | 0.30+ | TypeScript ORM，轻量高性能 |
+| **ORM** | Drizzle ORM | 0.45+ | TypeScript ORM，轻量高性能 |
+| **Schema 验证** | Zod + drizzle-zod | 3.x / 0.8.x | 从 Drizzle Schema 自动生成 Zod 验证 schema，用于 API 请求/响应 DTO |
 | **数据库** | PostgreSQL | 16.x | 主数据库 |
 | **缓存** | Redis | 7.x | Session、缓存、消息队列 |
 | **对象存储** | S3 兼容存储 | - | 火山引擎 TOS，日志、构建产物存储 |
@@ -1602,17 +1603,29 @@ server/
 ├── services/                  # 业务服务
 │   ├── auth.service.ts        # upsertUser（首次登录自动管理员）
 │   ├── sync.service.ts        # syncUserOrgsAndTeams
-│   ├── feishu.service.ts      # findUserByFeishuOpenId + bindFeishuToUser
+│   ├── feishu.service.ts      # 飞书用户查找（by feishu_open_id）+ 绑定
 │   ├── project.service.ts     # 项目管理（name → UUID 解析）
 │   ├── agent.service.ts       # Agent Session 管理
 │   ├── team.service.ts        # 团队管理
 │   └── permission.service.ts  # 权限组管理
+├── shared/                    # 前后端共享代码
+│   ├── dto/                   # DTO（Data Transfer Object）— 从 Drizzle Schema 自动生成
+│   │   ├── user.dto.ts        # users + user_feishu 的 insert/select/update schema
+│   │   ├── organization.dto.ts # organizations + teams + team_members
+│   │   ├── repository.dto.ts  # repositories + 自定义 body schema（createProjectBody 等）
+│   │   ├── permission.dto.ts  # permission_groups + team_permissions + CRUD body schema
+│   │   ├── audit.dto.ts       # audit_logs
+│   │   ├── common.dto.ts      # 通用分页参数、addTeamMember body 等
+│   │   └── index.ts           # 统一导出
+│   └── permissions.ts         # 权限 key 和分组定义
 ├── db/                        # 数据库
-│   ├── schema/                # Drizzle Schema
+│   ├── schema/                # Drizzle Schema（snake_case 字段名）
+│   │   ├── base.ts            # baseColumns()：row_creator, created_at, updated_at
 │   │   ├── user.ts            # users + user_feishu
 │   │   ├── organization.ts    # organizations + teams + team_members
 │   │   ├── permission.ts      # permission_groups + team_permissions
-│   │   ├── project.ts         # projects
+│   │   ├── repository.ts      # repositories
+│   │   ├── audit.ts           # audit_logs
 │   │   └── index.ts           # 统一导出
 │   └── index.ts               # useDB() 单例
 ├── types/
@@ -1634,6 +1647,8 @@ server/
 
 ### 数据库设计
 
+> **字段命名约定**：所有数据库列名、Drizzle ORM Schema 字段名、API JSON key 统一使用 `snake_case`。每张表通过 `baseColumns()` 自动包含 `row_creator`、`created_at`、`updated_at` 三个公共字段。
+
 #### PostgreSQL 表结构
 
 ```sql
@@ -1645,6 +1660,7 @@ CREATE TABLE users (
   email VARCHAR(255) NOT NULL,
   avatar_url TEXT,
   is_admin BOOLEAN DEFAULT FALSE,
+  row_creator UUID,                          -- 公共字段：记录创建者
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -1663,7 +1679,9 @@ CREATE TABLE user_feishu (
   notify_approval BOOLEAN DEFAULT TRUE,
   notify_agent BOOLEAN DEFAULT TRUE,
   notify_system BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  row_creator UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 组织表
@@ -1674,7 +1692,9 @@ CREATE TABLE organizations (
   full_name VARCHAR(255),
   avatar_url TEXT,
   synced_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  row_creator UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 团队表
@@ -1685,7 +1705,9 @@ CREATE TABLE teams (
   name VARCHAR(255) NOT NULL,
   description TEXT,
   synced_at TIMESTAMPTZ,
+  row_creator UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(organization_id, gitea_team_id)
 );
 
@@ -1698,6 +1720,7 @@ CREATE TABLE permission_groups (
   description TEXT,
   permissions JSONB DEFAULT '[]',              -- ["repo:view", "actions:view", ...]
   repository_ids JSONB,                        -- null=全部仓库, ["id1","id2"]=指定仓库
+  row_creator UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -1728,6 +1751,9 @@ CREATE TABLE team_members (
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   role VARCHAR(50) DEFAULT 'member',  -- owner | member
   joined_at TIMESTAMPTZ DEFAULT NOW(),
+  row_creator UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(team_id, user_id)
 );
 
@@ -1736,7 +1762,9 @@ CREATE TABLE team_permissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
   permission_group_id UUID REFERENCES permission_groups(id) ON DELETE CASCADE,
+  row_creator UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(team_id, permission_group_id)
 );
 
@@ -1806,13 +1834,15 @@ CREATE TABLE audit_logs (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID REFERENCES users(id),
   organization_id UUID REFERENCES organizations(id),
-  action VARCHAR(100) NOT NULL,       -- 如 publish.trigger, agent.stop, permission.update
+  action VARCHAR(100) NOT NULL,       -- 如 repo.create, agent.stop, permission.update
   resource_type VARCHAR(50),          -- repository | agent_session | permission_group
   resource_id UUID,
   ip_address INET,
   user_agent TEXT,
   detail JSONB DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  row_creator UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 索引
@@ -1962,6 +1992,77 @@ Pages 功能需要在基础设施上实现以下：
 ### API 设计规范
 
 > 详见「设计规范 > 后端 API 规范」。以下为 TypeScript 接口定义。
+
+#### 命名规范
+
+所有 API 请求/响应的 JSON key 统一使用 **snake_case**，与 PostgreSQL 列名和 Gitea/GitHub API 风格保持一致：
+
+```json
+{
+  "id": "uuid",
+  "gitea_username": "admin",
+  "is_admin": true,
+  "created_at": "2026-01-15T10:30:00Z",
+  "organization_id": "uuid",
+  "repository_ids": ["id1", "id2"]
+}
+```
+
+> **规范**：TypeScript schema 字段名 = PostgreSQL 列名 = API JSON key，全部 `snake_case`。JSONB 内部结构（如 `settings`）不受此约束。
+
+#### DTO 验证（drizzle-zod）
+
+API 请求/响应的类型定义和运行时验证采用 **DTO（Data Transfer Object）** 模式，通过 `drizzle-zod` 从 Drizzle Schema 自动生成 Zod 验证 schema：
+
+```typescript
+// server/shared/dto/repository.dto.ts
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import { repositories } from "../../db/schema/repository";
+import { z } from "zod";
+
+// 自动从 Drizzle schema 生成
+export const insertRepositorySchema = createInsertSchema(repositories);
+export const selectRepositorySchema = createSelectSchema(repositories);
+
+// 排除敏感字段
+export const repositoryResponseSchema = selectRepositorySchema.omit({
+  webhook_secret: true,
+});
+
+// 自定义 request body schema（非直接映射 insert 的）
+export const createProjectBodySchema = z.object({
+  repo_full_name: z.string().min(1).includes("/"),
+});
+
+// 推断出的 TS 类型，前后端共享
+export type RepositoryResponse = z.infer<typeof repositoryResponseSchema>;
+export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
+```
+
+**使用方式**（所有 API handler 已完成迁移）：
+
+```typescript
+// ✅ 使用 readValidatedBody + DTO schema（Zod 运行时验证 + 自动类型推断）
+import { createProjectBodySchema } from "~~/server/shared/dto";
+const { repo_full_name } = await readValidatedBody(event, createProjectBodySchema.parse);
+// 验证失败时自动抛出 400 错误，无需手动 if 检查
+```
+
+DTO 文件位于 `server/shared/dto/`，前端可通过 `import type` 直接引用推断出的类型。
+
+**已定义的 request body schema 一览**：
+
+| Schema | 文件 | 用途 |
+| ------ | ---- | ---- |
+| `createProjectBodySchema` | repository.dto.ts | 创建项目（`repo_full_name`） |
+| `triggerWorkflowBodySchema` | repository.dto.ts | 触发 Workflow（`workflow_id`, `ref`, `inputs?`） |
+| `updateRepoSettingsBodySchema` | repository.dto.ts | 更新仓库设置（`notifyOnSuccess?`, `notifyOnFailure?`） |
+| `createPermissionGroupBodySchema` | permission.dto.ts | 创建权限组 |
+| `updatePermissionGroupBodySchema` | permission.dto.ts | 更新权限组 |
+| `assignPermissionBodySchema` | permission.dto.ts | 分配权限组到团队（`permission_group_id`） |
+| `addTeamMemberBodySchema` | common.dto.ts | 添加团队成员（`user_id`, `role`） |
+| `updateMemberRoleBodySchema` | common.dto.ts | 更新成员角色（`role`） |
+| `paginationQuerySchema` | common.dto.ts | 通用分页查询参数（`page`, `limit`） |
 
 #### 分页
 
