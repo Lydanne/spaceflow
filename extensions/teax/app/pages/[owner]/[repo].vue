@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const route = useRoute();
-const orgName = route.params.orgName as string;
-const projectName = route.params.projectName as string;
+const owner = route.params.owner as string;
+const repo = route.params.repo as string;
 
 interface ProjectDetail {
   id: string;
@@ -18,12 +18,12 @@ interface ProjectDetail {
 }
 
 const { data: project, status: projectStatus } = await useFetch<ProjectDetail>(
-  `/api/repos/${orgName}/${projectName}`,
+  `/api/repos/${owner}/${repo}`,
 );
 
-const { isOwnerOrAdmin } = useOrgRole(orgName);
+const { isOwnerOrAdmin } = useOrgRole(owner);
 
-const projectBase = `/${orgName}/${projectName}`;
+const projectBase = `/${owner}/${repo}`;
 
 const baseTabs = [
   { label: "README", value: "readme", icon: "i-lucide-file-text", to: projectBase },
@@ -69,7 +69,7 @@ const activeTab = computed(() => {
             color="neutral"
             variant="ghost"
             size="sm"
-            :to="`/${orgName}`"
+            :to="`/${owner}`"
           />
           <div>
             <h1 class="text-xl font-bold">
@@ -118,8 +118,8 @@ const activeTab = computed(() => {
 
       <!-- 子路由内容 -->
       <NuxtPage
-        :owner="orgName"
-        :repo="projectName"
+        :owner="owner"
+        :repo="repo"
         :project="project"
         :is-owner-or-admin="isOwnerOrAdmin"
       />

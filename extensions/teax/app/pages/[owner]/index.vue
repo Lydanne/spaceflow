@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const route = useRoute();
-const orgName = route.params.orgName as string;
+const orgName = route.params.owner as string;
 
 const { isOwnerOrAdmin } = useOrgRole(orgName);
 

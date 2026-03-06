@@ -1,5 +1,3 @@
-import { eq } from "drizzle-orm";
-import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
 import { createServiceGiteaClient } from "~~/server/utils/gitea";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
@@ -10,17 +8,6 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const page = Number(query.page) || 1;
   const limit = Number(query.limit) || 20;
-
-  const db = useDB();
-  const [project] = await db
-    .select()
-    .from(schema.repositories)
-    .where(eq(schema.repositories.id, repoId))
-    .limit(1);
-
-  if (!project) {
-    throw createError({ statusCode: 404, message: "Project not found" });
-  }
 
   const gitea = await createServiceGiteaClient();
 

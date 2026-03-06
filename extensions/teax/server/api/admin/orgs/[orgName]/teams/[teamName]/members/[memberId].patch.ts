@@ -1,10 +1,12 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireAdmin } from "~~/server/utils/auth";
 import { updateMemberRoleBodySchema } from "~~/server/shared/dto";
+import { resolveTeamId } from "~~/server/utils/resolve-team";
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event);
+  const { teamId } = await resolveTeamId(event);
   const db = useDB();
   const memberId = getRouterParam(event, "memberId");
 
@@ -17,7 +19,12 @@ export default defineEventHandler(async (event) => {
   const [updated] = await db
     .update(schema.teamMembers)
     .set({ role })
-    .where(eq(schema.teamMembers.id, memberId))
+    .where(
+      and(
+        eq(schema.teamMembers.id, memberId),
+        eq(schema.teamMembers.team_id, teamId),
+      ),
+    )
     .returning();
 
   if (!updated) {

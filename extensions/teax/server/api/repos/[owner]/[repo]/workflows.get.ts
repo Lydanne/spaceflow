@@ -1,6 +1,4 @@
-import { eq } from "drizzle-orm";
 import { parse as parseYaml } from "yaml";
-import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
 import { createServiceGiteaClient } from "~~/server/utils/gitea";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
@@ -58,17 +56,6 @@ function extractInputs(doc: Record<string, unknown>): Record<string, WorkflowInp
 export default defineEventHandler(async (event) => {
   const { repoId, orgId, owner, repo } = await resolveRepoId(event);
   await requirePermission(event, orgId, "actions:view", repoId);
-
-  const db = useDB();
-  const [project] = await db
-    .select()
-    .from(schema.repositories)
-    .where(eq(schema.repositories.id, repoId))
-    .limit(1);
-
-  if (!project) {
-    throw createError({ statusCode: 404, message: "Project not found" });
-  }
 
   const gitea = await createServiceGiteaClient();
 

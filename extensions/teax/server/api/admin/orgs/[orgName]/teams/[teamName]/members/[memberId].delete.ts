@@ -1,9 +1,11 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireAdmin } from "~~/server/utils/auth";
+import { resolveTeamId } from "~~/server/utils/resolve-team";
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event);
+  const { teamId } = await resolveTeamId(event);
   const db = useDB();
   const memberId = getRouterParam(event, "memberId");
 
@@ -13,7 +15,12 @@ export default defineEventHandler(async (event) => {
 
   const [deleted] = await db
     .delete(schema.teamMembers)
-    .where(eq(schema.teamMembers.id, memberId))
+    .where(
+      and(
+        eq(schema.teamMembers.id, memberId),
+        eq(schema.teamMembers.team_id, teamId),
+      ),
+    )
     .returning();
 
   if (!deleted) {

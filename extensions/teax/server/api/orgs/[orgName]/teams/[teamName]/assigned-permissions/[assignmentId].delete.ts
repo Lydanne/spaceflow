@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireTeamOwnerOrAdmin } from "~~/server/utils/team-owner";
 import { resolveTeamId } from "~~/server/utils/resolve-team";
@@ -16,7 +16,12 @@ export default defineEventHandler(async (event) => {
 
   const [deleted] = await db
     .delete(schema.teamPermissions)
-    .where(eq(schema.teamPermissions.id, assignmentId))
+    .where(
+      and(
+        eq(schema.teamPermissions.id, assignmentId),
+        eq(schema.teamPermissions.team_id, teamId),
+      ),
+    )
     .returning({ id: schema.teamPermissions.id });
 
   if (!deleted) {

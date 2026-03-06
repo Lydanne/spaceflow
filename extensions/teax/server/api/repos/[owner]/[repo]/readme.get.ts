@@ -31,10 +31,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Project not found" });
   }
 
-  if (!owner || !repo) {
-    throw createError({ statusCode: 500, message: "Invalid project fullName" });
-  }
-
   const gitea = await createServiceGiteaClient();
   const branch = project.default_branch || "main";
 
