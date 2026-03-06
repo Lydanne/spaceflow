@@ -5,6 +5,7 @@ import {
   sendFeishuChatCardMessage,
   type FeishuInteractiveCard,
 } from "~~/server/utils/feishu";
+import type { NotifyRule, NotifyEvent } from "~~/server/shared/dto/repository.dto";
 
 // ─── 通知类型 ─────────────────────────────────────────────
 
@@ -229,36 +230,82 @@ export function buildAgentResultCard(params: {
   };
 }
 
-// ─── 分支过滤 ─────────────────────────────────────────
+// ─── 通配符匹配 ─────────────────────────────────────────
 
 /**
- * 检查分支名是否匹配 notifyBranches 过滤规则。
- * 支持简单通配符（如 release/*）。
- * 空数组表示不过滤（所有分支都通知）。
+ * 检查字符串是否匹配通配符模式列表。
+ * 空数组表示不过滤（匹配所有）。
  */
-export function matchBranch(branch: string, patterns: string[]): boolean {
+export function matchPattern(value: string, patterns: string[]): boolean {
   if (!patterns || patterns.length === 0) return true;
   return patterns.some((p) => {
     if (p.includes("*")) {
       const regex = new RegExp("^" + p.replace(/\*/g, ".*") + "$");
-      return regex.test(branch);
+      return regex.test(value);
     }
-    return p === branch;
+    return p === value;
   });
 }
 
+/** 向后兼容别名 */
+export const matchBranch = matchPattern;
+
+// ─── 规则匹配引擎 ─────────────────────────────────────────
+
+export interface RepoNotifySettings {
+  notifyRules?: NotifyRule[];
+  notifyOnSuccess?: boolean;
+  notifyOnFailure?: boolean;
+  approvalRequired?: boolean;
+  // 向后兼容旧字段
+  feishuChatId?: string;
+  notifyBranches?: string[];
+}
+
 /**
- * 发送通知卡片：优先发送到飞书群，否则私信组织成员。
+ * 根据事件类型、分支、workflow 文件名匹配 notifyRules，返回命中的 chatId 列表。
  */
-async function sendNotification(
+export function matchRules(
+  rules: NotifyRule[],
+  event: NotifyEvent,
+  branch?: string,
+  workflowFile?: string,
+): string[] {
+  const chatIds: string[] = [];
+  for (const rule of rules) {
+    if (!rule.events.includes(event)) continue;
+    if (branch && !matchPattern(branch, rule.branches)) continue;
+    if (workflowFile && !matchPattern(workflowFile, rule.workflows)) continue;
+    chatIds.push(rule.chatId);
+  }
+  return [...new Set(chatIds)];
+}
+
+/**
+ * 基于通知规则分发卡片。
+ * 如果有匹配规则 → 发到对应群；否则 fallback 到私信组织成员。
+ */
+async function dispatchByRules(
   card: FeishuInteractiveCard,
-  feishuChatId: string | undefined,
+  settings: RepoNotifySettings,
   organizationId: string,
+  event: NotifyEvent,
   notifyType: NotificationType,
+  branch?: string,
+  workflowFile?: string,
 ): Promise<void> {
-  if (feishuChatId) {
-    await sendFeishuChatCardMessage(feishuChatId, card);
-    console.log(`[notification] sent to chat ${feishuChatId}`);
+  const rules = settings.notifyRules || [];
+  const chatIds = rules.length > 0
+    ? matchRules(rules, event, branch, workflowFile)
+    : settings.feishuChatId ? [settings.feishuChatId] : [];
+
+  if (chatIds.length > 0) {
+    await Promise.allSettled(
+      chatIds.map(async (chatId) => {
+        await sendFeishuChatCardMessage(chatId, card);
+        console.log(`[notification] sent to chat ${chatId}`);
+      }),
+    );
   } else {
     const targets = await getNotifyTargets(organizationId, notifyType);
     if (targets.length === 0) return;
@@ -318,7 +365,8 @@ export async function getNotifyTargets(
 // ─── 通知发送入口 ─────────────────────────────────────────
 
 /**
- * 发送 Workflow Run 完成通知到组织成员。
+ * 发送 Workflow Run 完成通知。
+ * 基于 notifyRules 匹配事件 + 分支 + workflow 进行分发。
  */
 export async function notifyWorkflowRunComplete(
   ctx: NotifyContext,
@@ -333,24 +381,23 @@ export async function notifyWorkflowRunComplete(
     started_at: string;
     completed_at: string | null;
     html_url: string;
+    workflow_name?: string;
   },
-  repoSettings: {
-    notifyOnSuccess?: boolean;
-    notifyOnFailure?: boolean;
-    feishuChatId?: string;
-    notifyBranches?: string[];
-  },
+  repoSettings: RepoNotifySettings,
 ): Promise<void> {
   const isSuccess = run.conclusion === "success";
   const isFailure = run.conclusion === "failure";
 
-  // 根据项目设置判断是否发送
-  if (isSuccess && !repoSettings.notifyOnSuccess) return;
-  if (isFailure && !repoSettings.notifyOnFailure) return;
+  // 旧字段兼容：notifyOnSuccess / notifyOnFailure
+  if (isSuccess && repoSettings.notifyOnSuccess === false) return;
+  if (isFailure && repoSettings.notifyOnFailure === false) return;
   if (!isSuccess && !isFailure) return;
 
-  // 分支过滤
-  if (!matchBranch(run.head_branch, repoSettings.notifyBranches || [])) return;
+  // 旧字段兼容：分支过滤
+  const hasRules = (repoSettings.notifyRules || []).length > 0;
+  if (!hasRules && !matchPattern(run.head_branch, repoSettings.notifyBranches || [])) return;
+
+  const event: NotifyEvent = isSuccess ? "workflow_success" : "workflow_failure";
 
   try {
     const config = useRuntimeConfig();
@@ -367,14 +414,17 @@ export async function notifyWorkflowRunComplete(
       appUrl: config.public.appUrl,
     });
 
-    await sendNotification(card, repoSettings.feishuChatId, ctx.organizationId, "publish");
+    await dispatchByRules(
+      card, repoSettings, ctx.organizationId, event, "publish",
+      run.head_branch, run.workflow_name,
+    );
   } catch (err) {
     console.error("[notification] Failed to send workflow run notification:", err);
   }
 }
 
 /**
- * 发送 Push 事件通知到组织成员。
+ * 发送 Push 事件通知。
  */
 export async function notifyPushEvent(
   ctx: NotifyContext,
@@ -384,13 +434,11 @@ export async function notifyPushEvent(
     commits: Array<{ id: string; message: string }>;
     compareUrl: string;
   },
-  repoSettings?: {
-    feishuChatId?: string;
-    notifyBranches?: string[];
-  },
+  repoSettings: RepoNotifySettings = {},
 ): Promise<void> {
-  // 分支过滤
-  if (!matchBranch(push.branch, repoSettings?.notifyBranches || [])) return;
+  // 旧字段兼容
+  const hasRules = (repoSettings.notifyRules || []).length > 0;
+  if (!hasRules && !matchPattern(push.branch, repoSettings.notifyBranches || [])) return;
 
   try {
     const config = useRuntimeConfig();
@@ -403,7 +451,10 @@ export async function notifyPushEvent(
       appUrl: config.public.appUrl,
     });
 
-    await sendNotification(card, repoSettings?.feishuChatId, ctx.organizationId, "publish");
+    await dispatchByRules(
+      card, repoSettings, ctx.organizationId, "push", "publish",
+      push.branch,
+    );
   } catch (err) {
     console.error("[notification] Failed to send push notification:", err);
   }
@@ -421,10 +472,15 @@ export async function notifyAgentResult(
     summary?: string;
     prUrl?: string;
   },
-  repoSettings?: {
-    feishuChatId?: string;
-  },
+  repoSettings: RepoNotifySettings = {},
 ): Promise<void> {
+  const eventMap: Record<string, NotifyEvent> = {
+    completed: "agent_completed",
+    failed: "agent_failed",
+    stopped: "agent_failed",
+  };
+  const event = eventMap[agent.status] || "agent_completed";
+
   try {
     const config = useRuntimeConfig();
     const card = buildAgentResultCard({
@@ -433,7 +489,9 @@ export async function notifyAgentResult(
       appUrl: config.public.appUrl,
     });
 
-    await sendNotification(card, repoSettings?.feishuChatId, ctx.organizationId, "agent");
+    await dispatchByRules(
+      card, repoSettings, ctx.organizationId, event, "agent",
+    );
   } catch (err) {
     console.error("[notification] Failed to send agent notification:", err);
   }

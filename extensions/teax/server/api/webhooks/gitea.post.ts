@@ -5,6 +5,7 @@ import {
   notifyPushEvent,
   notifyWorkflowRunComplete,
   type NotifyContext,
+  type RepoNotifySettings,
 } from "~~/server/services/notification.service";
 
 interface GiteaWebhookPayload {
@@ -82,10 +83,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, message: "Invalid webhook signature" });
   }
 
-  const settings = (project.settings || {}) as {
-    notifyOnSuccess?: boolean;
-    notifyOnFailure?: boolean;
-  };
+  const settings = (project.settings || {}) as RepoNotifySettings;
 
   const [owner, repoName] = project.full_name.split("/");
   const ctx: NotifyContext = {
@@ -105,7 +103,7 @@ export default defineEventHandler(async (event) => {
       pusher: payload.pusher?.login || payload.sender?.login || "unknown",
       commits: (payload.commits || []).map((c) => ({ id: c.id, message: c.message })),
       compareUrl: payload.compare_url || "",
-    }).catch((err) => console.error("[webhook] push notify error:", err));
+    }, settings).catch((err) => console.error("[webhook] push notify error:", err));
 
     return {
       received: true,
@@ -120,6 +118,9 @@ export default defineEventHandler(async (event) => {
     const run = payload.workflow_run;
 
     // 异步发送通知，不阻塞 webhook 响应
+    // 从 path 提取 workflow 文件名（如 .gitea/workflows/deploy.yml → deploy.yml）
+    const workflowName = run.path ? run.path.split("/").pop() : undefined;
+
     notifyWorkflowRunComplete(ctx, {
       run_number: run.run_number,
       display_title: run.display_title,
@@ -131,6 +132,7 @@ export default defineEventHandler(async (event) => {
       started_at: run.started_at,
       completed_at: run.completed_at,
       html_url: run.html_url,
+      workflow_name: workflowName,
     }, settings).catch((err) => console.error("[webhook] workflow_run notify error:", err));
 
     return {

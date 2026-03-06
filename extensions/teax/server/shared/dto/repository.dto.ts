@@ -31,12 +31,34 @@ export const triggerWorkflowBodySchema = z.object({
 });
 export type TriggerWorkflowBody = z.infer<typeof triggerWorkflowBodySchema>;
 
+// ─── 通知规则 ─────────────────────────────────────────────
+export const NOTIFY_EVENTS = [
+  "workflow_success",
+  "workflow_failure",
+  "push",
+  "agent_completed",
+  "agent_failed",
+] as const;
+export type NotifyEvent = (typeof NOTIFY_EVENTS)[number];
+
+export const notifyRuleSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1).max(100),
+  chatId: z.string().min(1).max(255),
+  events: z.array(z.enum(NOTIFY_EVENTS)).min(1),
+  branches: z.array(z.string().max(255)).max(20).default([]),
+  workflows: z.array(z.string().max(255)).max(20).default([]),
+});
+export type NotifyRule = z.infer<typeof notifyRuleSchema>;
+
 // ─── 更新仓库设置 request body（JSONB 内部保持 camelCase）──
 export const updateRepoSettingsBodySchema = z.object({
   notifyOnSuccess: z.boolean().optional(),
   notifyOnFailure: z.boolean().optional(),
-  feishuChatId: z.string().max(255).optional(),
   approvalRequired: z.boolean().optional(),
+  notifyRules: z.array(notifyRuleSchema).max(20).optional(),
+  // 向后兼容（旧字段，逐步废弃）
+  feishuChatId: z.string().max(255).optional(),
   notifyBranches: z.array(z.string().max(255)).max(20).optional(),
 });
 export type UpdateRepoSettingsBody = z.infer<typeof updateRepoSettingsBodySchema>;

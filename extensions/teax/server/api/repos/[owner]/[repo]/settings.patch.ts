@@ -26,8 +26,10 @@ export default defineEventHandler(async (event) => {
 
   if (body.notifyOnSuccess !== undefined) newSettings.notifyOnSuccess = body.notifyOnSuccess;
   if (body.notifyOnFailure !== undefined) newSettings.notifyOnFailure = body.notifyOnFailure;
-  if (body.feishuChatId !== undefined) newSettings.feishuChatId = body.feishuChatId;
   if (body.approvalRequired !== undefined) newSettings.approvalRequired = body.approvalRequired;
+  if (body.notifyRules !== undefined) newSettings.notifyRules = body.notifyRules;
+  // 向后兼容旧字段
+  if (body.feishuChatId !== undefined) newSettings.feishuChatId = body.feishuChatId;
   if (body.notifyBranches !== undefined) newSettings.notifyBranches = body.notifyBranches;
 
   const [updated] = await db
