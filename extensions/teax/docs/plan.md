@@ -132,6 +132,19 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)    Phase 6 (Week 11-13)
 | 审计日志系统（writeAuditLog + 管理页面） | P1 | 4h | ✅ |
 | 权限校验中间件（基础版：认证 + 组织访问控制） | P0 | 4h | ✅ |
 
+#### Week 4+: Actions Run 详情 + 日志查看
+
+| 任务 | 优先级 | 预估 | 状态 |
+| ---- | ------ | ---- | ---- |
+| 代理 API：Run 详情（`GET /api/repos/:owner/:repo/actions/runs/:runId`） | P2 | 1h | ⬜ |
+| 代理 API：Run 下 Jobs 列表（`GET /api/repos/:owner/:repo/actions/runs/:runId/jobs`） | P2 | 1h | ⬜ |
+| 代理 API：Job 日志下载（`GET /api/repos/:owner/:repo/actions/jobs/:jobId/logs`） | P2 | 1h | ⬜ |
+| Run 详情页面布局（`/:owner/:repo/actions/:runId`，左侧 Jobs 列表 + 右侧日志面板） | P2 | 4h | ⬜ |
+| Job 日志组件（ANSI 颜色渲染 + Step 折叠展开） | P2 | 4h | ⬜ |
+| Actions Tab 列表项点击跳转到 Run 详情页 | P2 | 2h | ⬜ |
+
+> **Gitea API 依赖**：基于 Gitea 1.25.4 Actions API（`/api/v1/repos/{owner}/{repo}/actions/runs`、`jobs`、`jobs/{id}/logs`）。日志为纯文本格式（含 ANSI 转义码），前端需 `ansi-to-html` 渲染。
+
 #### Week 4+: 权限组管理（从 Week 9 提前）
 
 | 任务 | 优先级 | 预估 | 状态 |
@@ -156,6 +169,7 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)    Phase 6 (Week 11-13)
 - [x] 基础权限中间件（requireAuth / requireAdmin / requireOrgAccess）
 - [x] 权限组管理（CRUD + 团队分配 + 细粒度校验）
 - [x] 首页统计卡片（我的组织/项目总数/仓库总数/今日构建）
+- [ ] Actions Run 详情 + Job 日志查看（P2 补充）
 
 ### 验收标准
 
@@ -169,6 +183,8 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)    Phase 6 (Week 11-13)
 8. 非管理员无法访问 /admin 路由，未授权用户访问 API 返回 403
 9. 管理员和组织 Owner/Admin 可创建/编辑/删除权限组
 10. 团队 Owner 可管理所属团队的权限组绑定
+11. 点击 Actions Run 可查看 Run 详情页（Jobs 列表 + 状态）
+12. 点击 Job 可展开查看日志（含 ANSI 颜色渲染、Step 折叠）
 
 ---
 
