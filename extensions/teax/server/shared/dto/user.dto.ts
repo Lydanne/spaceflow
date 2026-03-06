@@ -1,6 +1,6 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
 import { users, userFeishu } from "~~/server/db/schema/user";
-import type { z } from "zod";
+import { z } from "zod";
 
 // ─── users ───────────────────────────────────────────────
 export const insertUserSchema = createInsertSchema(users);
@@ -19,3 +19,12 @@ export const updateUserFeishuSchema = createUpdateSchema(userFeishu);
 export type InsertUserFeishu = z.infer<typeof insertUserFeishuSchema>;
 export type SelectUserFeishu = z.infer<typeof selectUserFeishuSchema>;
 export type UpdateUserFeishu = z.infer<typeof updateUserFeishuSchema>;
+
+// ─── 通知偏好更新 request body ───────────────────────────
+export const updateNotifyPreferencesBodySchema = z.object({
+  notify_publish: z.boolean().optional(),
+  notify_approval: z.boolean().optional(),
+  notify_agent: z.boolean().optional(),
+  notify_system: z.boolean().optional(),
+});
+export type UpdateNotifyPreferencesBody = z.infer<typeof updateNotifyPreferencesBodySchema>;
