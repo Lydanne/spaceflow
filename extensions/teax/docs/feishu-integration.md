@@ -4,30 +4,45 @@
 
 ## 目录
 
-- [前置条件](#前置条件)
-- [环境变量配置](#环境变量配置)
-- [消息通知](#消息通知)
-  - [通知类型](#通知类型)
-  - [通知流程](#通知流程)
-  - [通知偏好设置](#通知偏好设置)
-- [飞书机器人](#飞书机器人)
-  - [Webhook 配置](#webhook-配置)
-  - [支持的指令](#支持的指令)
-  - [权限校验](#权限校验)
-- [审批流程](#审批流程)
-  - [审批流程概览](#审批流程概览)
-  - [创建审批](#创建审批)
-  - [审批状态同步](#审批状态同步)
-- [管理设置](#管理设置)
-  - [仓库级设置](#仓库级设置)
-  - [组织级设置](#组织级设置)
-  - [全局管理](#全局管理)
-- [用户飞书绑定](#用户飞书绑定)
-  - [绑定方式](#绑定方式)
-  - [解绑操作](#解绑操作)
-- [API 参考](#api-参考)
-- [数据库表结构](#数据库表结构)
-- [架构概览](#架构概览)
+- [飞书集成指南](#飞书集成指南)
+  - [目录](#目录)
+  - [前置条件](#前置条件)
+  - [环境变量配置](#环境变量配置)
+  - [消息通知](#消息通知)
+    - [通知类型](#通知类型)
+    - [通知规则](#通知规则)
+      - [NotifyRule 数据结构](#notifyrule-数据结构)
+      - [事件类型](#事件类型)
+      - [过滤器](#过滤器)
+      - [规则配置层级](#规则配置层级)
+    - [通知分发流程](#通知分发流程)
+    - [通知偏好设置](#通知偏好设置)
+  - [飞书机器人](#飞书机器人)
+    - [Webhook 配置](#webhook-配置)
+    - [安全机制](#安全机制)
+    - [支持的指令](#支持的指令)
+    - [权限校验](#权限校验)
+  - [审批流程](#审批流程)
+    - [审批流程概览](#审批流程概览)
+    - [创建审批](#创建审批)
+    - [审批状态同步](#审批状态同步)
+  - [管理设置](#管理设置)
+    - [仓库级设置](#仓库级设置)
+    - [组织级设置](#组织级设置)
+    - [全局管理](#全局管理)
+  - [用户飞书绑定](#用户飞书绑定)
+    - [绑定方式](#绑定方式)
+    - [解绑操作](#解绑操作)
+  - [API 参考](#api-参考)
+    - [用户相关](#用户相关)
+    - [审批相关](#审批相关)
+    - [管理设置相关](#管理设置相关)
+    - [Webhook 接收](#webhook-接收)
+  - [数据库表结构](#数据库表结构)
+    - [user\_feishu（飞书绑定）](#user_feishu飞书绑定)
+    - [approval\_requests（审批记录）](#approval_requests审批记录)
+  - [架构概览](#架构概览)
+    - [文件清单](#文件清单)
 
 ---
 
@@ -84,41 +99,89 @@ runtimeConfig: {
 
 ### 通知类型
 
-| 类型 | 触发场景 | 卡片样式 |
-|------|----------|----------|
-| **构建通知** (`publish`) | Gitea Workflow Run 完成（成功/失败） | 绿色/红色卡片，含状态、分支、耗时、详情按钮 |
-| **Push 通知** (`publish`) | Git Push 事件 | 蓝色卡片，含分支、提交列表、对比按钮 |
-| **Agent 通知** (`agent`) | AI Agent 运行完成/失败 | 绿色/红色卡片，含 Agent 名称、Session ID、PR 链接 |
-| **审批通知** (`approval`) | 审批结果变更（通过/拒绝） | 绿色/红色卡片，含标题、类型、状态 |
-| **系统通知** (`system`) | 系统维护、版本更新（预留） | — |
+| 类型                      | 触发场景                              | 卡片样式                                              |
+| ------------------------- | ------------------------------------- | ----------------------------------------------------- |
+| **构建通知** (`publish`)  | Gitea Workflow Run 完成（成功/失败）  | 绿色/红色卡片，含状态、分支、耗时、详情按钮           |
+| **Push 通知** (`publish`) | Git Push 事件                         | 蓝色卡片，含分支、提交列表、对比按钮                  |
+| **Agent 通知** (`agent`)  | AI Agent 运行完成/失败                | 绿色/红色卡片，含 Agent 名称、Session ID、PR 链接     |
+| **审批通知** (`approval`) | 审批结果变更（通过/拒绝）             | 绿色/红色卡片，含标题、类型、状态                     |
+| **系统通知** (`system`)   | 系统维护、版本更新（预留）            | —                                                     |
 
-### 通知流程
+### 通知规则
+
+通知系统采用**规则列表**进行配置，每条规则指定「什么事件 + 什么条件 → 发到哪个群」。
+
+#### NotifyRule 数据结构
+
+```ts
+interface NotifyRule {
+  id: string;          // UUID，前端自动生成
+  name: string;        // 规则名称，如"生产告警"
+  chatId: string;      // 目标飞书群 Chat ID
+  events: string[];    // 触发事件类型（多选）
+  branches: string[];  // 分支过滤，留空匹配所有，支持通配符
+  workflows: string[]; // Workflow 文件名过滤，留空匹配所有
+}
+```
+
+#### 事件类型
+
+| 事件值               | 说明             |
+| -------------------- | ---------------- |
+| `workflow_success` | Actions 运行成功 |
+| `workflow_failure` | Actions 运行失败 |
+| `push` | 代码推送 |
+| `agent_completed` | Agent 执行完成 |
+| `agent_failed` | Agent 执行失败 |
+
+#### 过滤器
+
+- **分支过滤**：支持精确匹配和 `*` 通配符（如 `release/*`、`main`），留空匹配所有分支
+- **Workflow 过滤**：按 workflow 文件名过滤（如 `deploy.yml`、`ci.yml`），留空匹配所有 workflow
+
+#### 规则配置层级
+
+通知规则支持两级配置：
+
+| 层级       | 配置位置                               | 说明                             |
+| ---------- | -------------------------------------- | -------------------------------- |
+| **仓库级** | `/{owner}/{repo}/settings`             | 针对单个仓库的通知规则           |
+| **组织级** | `/org/{orgName}/settings/feishu`       | 组织默认规则，仓库未配置时使用   |
+
+### 通知分发流程
 
 ```text
 Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
                                           │
-                                          ├─ matchBranch() ─ 分支过滤（支持通配符）
-                                          │
                                           ├─ buildWorkflowRunCard() / buildPushCard()
                                           │
-                                          └─ sendNotification(card, chatId, orgId, type)
-                                               ├─ 有 chatId → sendFeishuChatCardMessage()
-                                               └─ 无 chatId → getNotifyTargets() → sendBatchMessage()
+                                          └─ dispatchByRules(card, settings, orgId, event, branch, workflow)
+                                               │
+                                               ├─ 1. 仓库 notifyRules → matchRules()
+                                               │      匹配事件 + 分支 + workflow → chatIds
+                                               │
+                                               ├─ 2. 无仓库规则 → 查组织 notifyRules → matchRules()
+                                               │
+                                               ├─ 3. 无组织规则 → 旧 feishuChatId（向后兼容）
+                                               │
+                                               └─ 4. 都没有 → getNotifyTargets() → 私信组织成员
 ```
 
 **关键设计**：
 
 - 通知发送是**异步非阻塞**的，不影响 Webhook 响应速度
-- **群通知优先**：仓库配置了 `feishuChatId` 时发送到群，否则私信通知组织成员
-- **分支过滤**：通过 `notifyBranches` 配置，支持 `release/*` 等通配符
-- 使用 `Promise.allSettled` 批量发送，单个用户发送失败不影响其他用户
+- **四级 fallback**：仓库规则 → 组织默认规则 → 旧 `feishuChatId` → 私信组织成员
+- **多群分发**：一次事件可能匹配多条规则，发送到多个不同群
+- **通配符匹配**：分支和 workflow 过滤器支持 `*` 通配符（`matchPattern()`）
+- 使用 `Promise.allSettled` 并行发送，单个目标失败不影响其他目标
+- 飞书机器人必须**先被添加到目标群聊**中，才能通过 `chat_id` 发送消息
 
 ### 通知偏好设置
 
 每个用户可在 `/user/settings` 页面独立控制四种通知类型的开关：
 
-| 偏好字段 | 说明 | 默认值 |
-|----------|------|--------|
+| 偏好字段           | 说明                     | 默认值  |
+| ------------------ | ------------------------ | ------- |
 | `notify_publish` | 构建成功/失败 + Push 事件 | `true` |
 | `notify_approval` | 审批请求和结果 | `true` |
 | `notify_agent` | Agent 运行结果 | `true` |
@@ -143,7 +206,7 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 
 1. 在飞书开放平台 → 应用 → 事件订阅中，设置请求地址：
 
-   ```
+   ```text
    https://your-teax-domain/api/webhooks/feishu
    ```
 
@@ -159,8 +222,8 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 
 ### 支持的指令
 
-| 指令 | 别名 | 说明 | 示例 |
-|------|------|------|------|
+| 指令                                          | 别名   | 说明                            | 示例                                  |
+| --------------------------------------------- | ------ | ------------------------------- | ------------------------------------- |
 | `/help` | `帮助` | 查看所有可用指令 | `/help` |
 | `/status <owner/repo>` | `状态` | 查询仓库最近 5 次构建状态 | `/status myorg/myrepo` |
 | `/deploy <owner/repo> [branch] [workflow]` | `部署` | 触发 workflow_dispatch 部署 | `/deploy myorg/myrepo main deploy.yml` |
@@ -227,11 +290,11 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 
 **审批类型**：
 
-| 类型 | 说明 |
-|------|------|
-| `deploy` | 部署审批 |
-| `rollback` | 回滚审批 |
-| `custom` | 自定义审批 |
+| 类型       | 说明       |
+| ---------- | ---------- |
+| `deploy`   | 部署审批   |
+| `rollback` | 回滚审批   |
+| `custom`   | 自定义审批 |
 
 ### 审批状态同步
 
@@ -240,8 +303,8 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 1. **飞书事件回调**（实时）：飞书审批状态变更时自动推送到 `/api/webhooks/feishu`
 2. **主动查询**（按需）：调用 `syncApprovalStatus(approvalId)` 从飞书 API 拉取最新状态
 
-| 飞书状态 | Teax 状态 |
-|----------|-----------|
+| 飞书状态               | Teax 状态   |
+| ---------------------- | ----------- |
 | `PENDING` | `pending` |
 | `APPROVED` | `approved` |
 | `REJECTED` | `rejected` |
@@ -253,41 +316,61 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 
 ### 仓库级设置
 
-在仓库设置页面（`/{owner}/{repo}/settings`）的「飞书集成」卡片中配置：
+在仓库设置页面（`/{owner}/{repo}/settings`）的「飞书通知规则」卡片中配置：
 
-| 设置项 | 字段名 | 说明 |
-| --- | --- | --- |
-| 飞书群 Chat ID | `feishuChatId` | 配置后通知发送到飞书群，留空则私信组织成员 |
-| 通知分支过滤 | `notifyBranches` | 多个分支逗号分隔，支持 `release/*` 通配符，留空表示所有分支 |
-| 部署审批 | `approvalRequired` | 开启后通过飞书机器人 `/deploy` 时需先审批 |
-| 成功通知 | `notifyOnSuccess` | Actions 运行成功时发送通知 |
-| 失败通知 | `notifyOnFailure` | Actions 运行失败时发送通知 |
+| 设置项   | 字段名             | 说明                                                         |
+| -------- | ------------------ | ------------------------------------------------------------ |
+| 通知规则 | `notifyRules`      | 通知规则列表，每条规则包含事件类型、分支/workflow 过滤和目标群 |
+| 部署审批 | `approvalRequired` | 开启后通过飞书机器人 `/deploy` 时需先审批                     |
 
 **API**：`PATCH /api/repos/{owner}/{repo}/settings`
 
 ```json
 {
-  "feishuChatId": "oc_xxxxxxxxxxxxxxxx",
-  "notifyBranches": ["main", "release/*"],
-  "approvalRequired": true,
-  "notifyOnSuccess": true,
-  "notifyOnFailure": true
+  "notifyRules": [
+    {
+      "id": "uuid-1",
+      "name": "生产告警",
+      "chatId": "oc_xxxxxxxxxxxxxxxx",
+      "events": ["workflow_failure"],
+      "branches": ["main", "release/*"],
+      "workflows": ["deploy.yml"]
+    },
+    {
+      "id": "uuid-2",
+      "name": "全量通知",
+      "chatId": "oc_yyyyyyyyyyyyyyyy",
+      "events": ["workflow_success", "workflow_failure", "push"],
+      "branches": [],
+      "workflows": []
+    }
+  ],
+  "approvalRequired": true
 }
 ```
 
 ### 组织级设置
 
-在组织设置页面（`/org/{orgName}/settings`）的「飞书配置」 Tab 中配置：
+在组织设置页面（`/org/{orgName}/settings/feishu`）的「通知规则」Tab 中配置：
 
-| 设置项 | 字段名 | 说明 |
-| --- | --- | --- |
-| 默认飞书群 Chat ID | `feishuChatId` | 组织的默认通知群聊，仓库未单独配置时使用 |
+| 设置项       | 字段名        | 说明                                           |
+| ------------ | ------------- | ---------------------------------------------- |
+| 默认通知规则 | `notifyRules` | 组织的默认通知规则，仓库未配置自己的规则时使用 |
 
 **API**：`PATCH /api/orgs/{orgName}/settings`
 
 ```json
 {
-  "feishuChatId": "oc_xxxxxxxxxxxxxxxx"
+  "notifyRules": [
+    {
+      "id": "uuid-org-1",
+      "name": "组织全局告警",
+      "chatId": "oc_xxxxxxxxxxxxxxxx",
+      "events": ["workflow_failure", "agent_failed"],
+      "branches": [],
+      "workflows": []
+    }
+  ]
 }
 ```
 
@@ -329,33 +412,33 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 
 ### 用户相关
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` | `/api/user/feishu-binding` | 获取当前用户的飞书绑定状态和通知偏好 |
-| `DELETE` | `/api/user/feishu-binding` | 解绑飞书账号 |
-| `PATCH` | `/api/user/notify-preferences` | 更新通知偏好设置 |
+| 方法     | 路径                             | 说明                                 |
+| -------- | -------------------------------- | ------------------------------------ |
+| `GET`    | `/api/user/feishu-binding`       | 获取当前用户的飞书绑定状态和通知偏好 |
+| `DELETE` | `/api/user/feishu-binding`       | 解绑飞书账号                         |
+| `PATCH`  | `/api/user/notify-preferences`   | 更新通知偏好设置                     |
 
 ### 审批相关
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` | `/api/repos/{owner}/{repo}/approvals` | 获取仓库审批列表（可按 `?status=pending` 过滤） |
-| `POST` | `/api/repos/{owner}/{repo}/approvals` | 创建审批请求 |
+| 方法   | 路径                                    | 说明                                             |
+| ------ | --------------------------------------- | ------------------------------------------------ |
+| `GET`  | `/api/repos/{owner}/{repo}/approvals`   | 获取仓库审批列表（可按 `?status=pending` 过滤）  |
+| `POST` | `/api/repos/{owner}/{repo}/approvals`   | 创建审批请求                                     |
 
 ### 管理设置相关
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| `PATCH` | `/api/repos/{owner}/{repo}/settings` | 更新仓库飞书设置 |
-| `PATCH` | `/api/orgs/{orgName}/settings` | 更新组织飞书设置 |
-| `GET` | `/api/admin/feishu-status` | 获取飞书连接状态（管理员） |
+| 方法    | 路径                                   | 说明                       |
+| ------- | -------------------------------------- | -------------------------- |
+| `PATCH` | `/api/repos/{owner}/{repo}/settings`   | 更新仓库通知规则和设置     |
+| `PATCH` | `/api/orgs/{orgName}/settings`         | 更新组织默认通知规则       |
+| `GET`   | `/api/admin/feishu-status`             | 获取飞书连接状态（管理员） |
 
 ### Webhook 接收
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| `POST` | `/api/webhooks/gitea` | Gitea Webhook（push + workflow_run 事件） |
-| `POST` | `/api/webhooks/feishu` | 飞书事件回调（消息 + 审批事件） |
+| 方法   | 路径                     | 说明                                      |
+| ------ | ------------------------ | ----------------------------------------- |
+| `POST` | `/api/webhooks/gitea`    | Gitea Webhook（push + workflow_run 事件） |
+| `POST` | `/api/webhooks/feishu`   | 飞书事件回调（消息 + 审批事件）           |
 
 ---
 
@@ -363,37 +446,37 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 
 ### user_feishu（飞书绑定）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | UUID | 主键 |
-| `user_id` | UUID | 关联 users 表 |
-| `feishu_open_id` | VARCHAR | 飞书 Open ID |
-| `feishu_union_id` | VARCHAR | 飞书 Union ID |
-| `feishu_name` | VARCHAR | 飞书用户名 |
-| `feishu_avatar` | VARCHAR | 飞书头像 URL |
-| `access_token` | VARCHAR | OAuth access_token |
-| `token_expires_at` | TIMESTAMP | Token 过期时间 |
-| `notify_publish` | BOOLEAN | 构建通知开关（默认 true） |
-| `notify_approval` | BOOLEAN | 审批通知开关（默认 true） |
-| `notify_agent` | BOOLEAN | Agent 通知开关（默认 true） |
-| `notify_system` | BOOLEAN | 系统通知开关（默认 false） |
+| 字段               | 类型      | 说明                        |
+| ------------------ | --------- | --------------------------- |
+| `id`               | UUID      | 主键                        |
+| `user_id`          | UUID      | 关联 users 表               |
+| `feishu_open_id`   | VARCHAR   | 飞书 Open ID                |
+| `feishu_union_id`  | VARCHAR   | 飞书 Union ID               |
+| `feishu_name`      | VARCHAR   | 飞书用户名                  |
+| `feishu_avatar`    | VARCHAR   | 飞书头像 URL                |
+| `access_token`     | VARCHAR   | OAuth access_token          |
+| `token_expires_at` | TIMESTAMP | Token 过期时间              |
+| `notify_publish`   | BOOLEAN   | 构建通知开关（默认 true）   |
+| `notify_approval`  | BOOLEAN   | 审批通知开关（默认 true）   |
+| `notify_agent`     | BOOLEAN   | Agent 通知开关（默认 true） |
+| `notify_system`    | BOOLEAN   | 系统通知开关（默认 false）  |
 
 ### approval_requests（审批记录）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | UUID | 主键 |
-| `organization_id` | UUID | 所属组织 |
-| `repository_id` | UUID | 关联仓库（可空） |
-| `requester_id` | UUID | 发起人 |
-| `type` | VARCHAR | 审批类型（deploy/rollback/custom） |
-| `status` | VARCHAR | 审批状态（pending/approved/rejected/cancelled） |
-| `feishu_instance_code` | VARCHAR | 飞书审批实例 Code |
-| `title` | VARCHAR | 审批标题 |
-| `description` | TEXT | 审批描述 |
-| `metadata` | JSONB | 关联信息（branch、workflow 等） |
-| `approver_open_id` | VARCHAR | 审批人飞书 Open ID |
-| `approver_comment` | TEXT | 审批人备注 |
+| 字段                   | 类型    | 说明                                            |
+| ---------------------- | ------- | ----------------------------------------------- |
+| `id`                   | UUID    | 主键                                            |
+| `organization_id`      | UUID    | 所属组织                                        |
+| `repository_id`        | UUID    | 关联仓库（可空）                                |
+| `requester_id`         | UUID    | 发起人                                          |
+| `type`                 | VARCHAR | 审批类型（deploy/rollback/custom）              |
+| `status`               | VARCHAR | 审批状态（pending/approved/rejected/cancelled） |
+| `feishu_instance_code` | VARCHAR | 飞书审批实例 Code                               |
+| `title`                | VARCHAR | 审批标题                                        |
+| `description`          | TEXT    | 审批描述                                        |
+| `metadata`             | JSONB   | 关联信息（branch、workflow 等）                 |
+| `approver_open_id`     | VARCHAR | 审批人飞书 Open ID                              |
+| `approver_comment`     | TEXT    | 审批人备注                                      |
 
 ---
 
@@ -441,13 +524,13 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 
 ### 文件清单
 
-```
+```text
 server/
 ├── utils/
 │   └── feishu.ts                          # 飞书 API 封装（token/消息/审批/验证）
 ├── services/
 │   ├── feishu.service.ts                  # 飞书用户绑定 DB 操作
-│   ├── notification.service.ts            # 通知编排（卡片构建 + 对象查找 + 发送）
+│   ├── notification.service.ts            # 通知编排（规则匹配 + 多级分发 + 卡片构建）
 │   ├── bot-command.service.ts             # 机器人指令解析和执行
 │   └── approval.service.ts               # 审批流程（创建 + 同步 + 回调）
 ├── api/
@@ -458,21 +541,26 @@ server/
 │   │   ├── feishu-binding.get.ts          # 获取飞书绑定状态
 │   │   ├── feishu-binding.delete.ts       # 解绑飞书
 │   │   └── notify-preferences.patch.ts    # 更新通知偏好
-│   └── repos/[owner]/[repo]/
-│       └── approvals/
-│           ├── index.get.ts               # 审批列表
-│           └── index.post.ts              # 创建审批
+│   ├── repos/[owner]/[repo]/
+│   │   ├── settings.patch.ts              # 仓库设置（含 notifyRules）
+│   │   └── approvals/
+│   │       ├── index.get.ts               # 审批列表
+│   │       └── index.post.ts              # 创建审批
+│   └── orgs/[orgName]/
+│       └── settings.patch.ts              # 组织设置（含 notifyRules）
 ├── db/schema/
 │   └── approval.ts                        # approval_requests 表定义
 └── shared/dto/
+    ├── repository.dto.ts                  # notifyRuleSchema + NotifyRule 类型
     ├── user.dto.ts                        # updateNotifyPreferencesBodySchema
     └── approval.dto.ts                    # createApprovalBodySchema
 
 app/
 ├── components/project/
-│   └── ProjectSettingsTab.vue             # 仓库设置（飞书集成卡片）
+│   └── ProjectSettingsTab.vue             # 仓库设置（通知规则列表 CRUD）
 └── pages/
     ├── user/settings.vue                  # 用户设置页（飞书绑定 + 通知偏好）
-    ├── org/[orgName]/settings.vue         # 组织设置页（飞书配置 Tab）
+    ├── org/[orgName]/settings.vue         # 组织设置页（子路由布局）
+    ├── org/[orgName]/settings/feishu.vue  # 通知规则子页面
     └── -/admin/settings.vue               # 管理后台（飞书连接状态）
 ```

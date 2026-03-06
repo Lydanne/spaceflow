@@ -282,8 +282,26 @@ export function matchRules(
 }
 
 /**
+ * 查询组织的默认通知规则（从 organizations.settings.notifyRules 获取）。
+ */
+async function getOrgNotifyRules(organizationId: string): Promise<NotifyRule[]> {
+  try {
+    const db = useDB();
+    const [org] = await db
+      .select({ settings: schema.organizations.settings })
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, organizationId))
+      .limit(1);
+    const settings = (org?.settings || {}) as { notifyRules?: NotifyRule[] };
+    return settings.notifyRules || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * 基于通知规则分发卡片。
- * 如果有匹配规则 → 发到对应群；否则 fallback 到私信组织成员。
+ * 优先级：仓库规则 → 组织默认规则 → 旧 feishuChatId → 私信组织成员。
  */
 async function dispatchByRules(
   card: FeishuInteractiveCard,
@@ -294,10 +312,22 @@ async function dispatchByRules(
   branch?: string,
   workflowFile?: string,
 ): Promise<void> {
-  const rules = settings.notifyRules || [];
-  const chatIds = rules.length > 0
-    ? matchRules(rules, event, branch, workflowFile)
-    : settings.feishuChatId ? [settings.feishuChatId] : [];
+  let chatIds: string[] = [];
+
+  // 1. 仓库级规则
+  const repoRules = settings.notifyRules || [];
+  if (repoRules.length > 0) {
+    chatIds = matchRules(repoRules, event, branch, workflowFile);
+  } else {
+    // 2. 组织级默认规则
+    const orgRules = await getOrgNotifyRules(organizationId);
+    if (orgRules.length > 0) {
+      chatIds = matchRules(orgRules, event, branch, workflowFile);
+    } else if (settings.feishuChatId) {
+      // 3. 旧字段兼容
+      chatIds = [settings.feishuChatId];
+    }
+  }
 
   if (chatIds.length > 0) {
     await Promise.allSettled(
@@ -307,6 +337,7 @@ async function dispatchByRules(
       }),
     );
   } else {
+    // 4. 最终 fallback：私信组织成员
     const targets = await getNotifyTargets(organizationId, notifyType);
     if (targets.length === 0) return;
     const result = await sendFeishuBatchMessage(targets, card);
