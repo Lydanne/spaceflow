@@ -566,12 +566,10 @@ function workflowFileName(path: string): string {
           v-if="filteredRuns.length > 0"
           class="space-y-3"
         >
-          <a
+          <NuxtLink
             v-for="run in filteredRuns"
             :key="run.id"
-            :href="run.htmlUrl"
-            target="_blank"
-            rel="noopener noreferrer"
+            :to="`/${props.owner}/${props.repo}/actions/runs/${run.id}`"
             class="block"
           >
             <UCard class="hover:ring-1 hover:ring-primary-500 transition-all">
@@ -672,14 +670,14 @@ function workflowFileName(path: string): string {
                     </span>
                   </div>
                 </div>
-                <!-- 外链图标 -->
+                <!-- 箭头图标 -->
                 <UIcon
-                  name="i-lucide-external-link"
+                  name="i-lucide-chevron-right"
                   class="w-4 h-4 text-gray-400 shrink-0 mt-0.5"
                 />
               </div>
             </UCard>
-          </a>
+          </NuxtLink>
         </div>
 
         <!-- 空状态 -->

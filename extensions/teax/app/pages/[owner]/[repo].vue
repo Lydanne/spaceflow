@@ -39,7 +39,7 @@ const tabs = computed(() =>
 
 const activeTab = computed(() => {
   const path = route.path;
-  if (path.endsWith("/actions")) return "actions";
+  if (path.includes("/actions")) return "actions";
   if (path.endsWith("/agents")) return "agents";
   if (path.endsWith("/pages")) return "pages";
   if (path.endsWith("/settings")) return "settings";

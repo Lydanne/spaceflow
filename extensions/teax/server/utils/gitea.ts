@@ -132,6 +132,38 @@ export interface GiteaWorkflowsList {
   workflows: GiteaWorkflow[];
 }
 
+export interface GiteaWorkflowRunDetail extends GiteaWorkflowRun {
+  workflow_id: number;
+  repository?: { id: number; full_name: string };
+}
+
+export interface GiteaWorkflowJobStep {
+  name: string;
+  number: number;
+  status: string;
+  conclusion: string;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface GiteaWorkflowJob {
+  id: number;
+  run_id: number;
+  name: string;
+  status: string;
+  conclusion: string;
+  started_at: string;
+  completed_at: string | null;
+  steps: GiteaWorkflowJobStep[] | null;
+  runner_name?: string;
+  labels?: string[];
+}
+
+export interface GiteaWorkflowJobsList {
+  total_count: number;
+  jobs: GiteaWorkflowJob[];
+}
+
 export interface GiteaAccessToken {
   id: number;
   name: string;
@@ -338,6 +370,43 @@ export class GiteaService {
 
   async deleteAccessToken(username: string, tokenId: number): Promise<void> {
     await this.fetch(`/users/${username}/tokens/${tokenId}`, "DELETE");
+  }
+
+  async getWorkflowRun(
+    owner: string,
+    repo: string,
+    runId: number,
+  ): Promise<GiteaWorkflowRunDetail> {
+    return this.fetch(
+      `/repos/${owner}/${repo}/actions/runs/${runId}`,
+    ) as Promise<GiteaWorkflowRunDetail>;
+  }
+
+  async getWorkflowRunJobs(
+    owner: string,
+    repo: string,
+    runId: number,
+  ): Promise<GiteaWorkflowJobsList> {
+    return this.fetch(
+      `/repos/${owner}/${repo}/actions/runs/${runId}/jobs`,
+    ) as Promise<GiteaWorkflowJobsList>;
+  }
+
+  async getWorkflowJobLogs(
+    owner: string,
+    repo: string,
+    jobId: number,
+  ): Promise<string> {
+    const url = `${this.baseUrl}/api/v1/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `token ${this.accessToken}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch job logs: ${response.status}`);
+    }
+    return response.text();
   }
 }
 
