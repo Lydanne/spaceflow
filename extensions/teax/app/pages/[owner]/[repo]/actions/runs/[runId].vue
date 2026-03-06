@@ -434,7 +434,7 @@ function eventLabel(event: string): string {
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <UButton
+            <!-- <UButton
               v-if="isRunActive"
               icon="i-lucide-square"
               color="error"
@@ -455,7 +455,7 @@ function eventLabel(event: string): string {
               @click="rerunRun"
             >
               重新运行
-            </UButton>
+            </UButton> -->
             <a
               :href="runData.htmlUrl"
               target="_blank"
