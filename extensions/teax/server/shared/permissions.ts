@@ -10,7 +10,7 @@ export interface PermissionDefinition {
 }
 
 export const PERMISSION_GROUPS = [
-  { key: "project", label: "项目" },
+  { key: "repo", label: "仓库" },
   { key: "actions", label: "Actions" },
   { key: "agent", label: "Agent" },
   { key: "page", label: "Pages" },
@@ -20,10 +20,10 @@ export const PERMISSION_GROUPS = [
 ] as const;
 
 export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
-  { key: "project:view", label: "查看项目", group: "project" },
-  { key: "project:create", label: "创建项目", group: "project" },
-  { key: "project:delete", label: "删除项目", group: "project" },
-  { key: "project:settings", label: "项目设置", group: "project" },
+  { key: "repo:view", label: "查看仓库", group: "repo" },
+  { key: "repo:create", label: "创建仓库", group: "repo" },
+  { key: "repo:delete", label: "删除仓库", group: "repo" },
+  { key: "repo:settings", label: "仓库设置", group: "repo" },
   { key: "actions:view", label: "查看 Actions", group: "actions" },
   { key: "actions:trigger", label: "触发 Workflow", group: "actions" },
   { key: "agent:start", label: "启动 Agent", group: "agent" },

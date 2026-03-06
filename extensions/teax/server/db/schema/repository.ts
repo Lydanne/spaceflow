@@ -12,8 +12,8 @@ import { organizations } from "./organization";
 import { users } from "./user";
 import { baseColumns } from "./base";
 
-export const projects = pgTable(
-  "projects",
+export const repositories = pgTable(
+  "repositories",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     organizationId: uuid("organization_id")
@@ -32,7 +32,7 @@ export const projects = pgTable(
     ...baseColumns(),
   },
   (table) => [
-    unique("projects_org_repo").on(table.organizationId, table.giteaRepoId),
-    index("idx_projects_org").on(table.organizationId),
+    unique("repositories_org_repo").on(table.organizationId, table.giteaRepoId),
+    index("idx_repositories_org").on(table.organizationId),
   ],
 );

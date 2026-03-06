@@ -10,23 +10,23 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: "Missing orgId or projectId" });
   }
 
-  await requirePermission(event, orgId, "project:view", projectId);
+  await requirePermission(event, orgId, "repo:view", projectId);
   const db = useDB();
 
   const [project] = await db
     .select({
-      fullName: schema.projects.fullName,
-      name: schema.projects.name,
-      description: schema.projects.description,
-      defaultBranch: schema.projects.defaultBranch,
-      cloneUrl: schema.projects.cloneUrl,
-      createdAt: schema.projects.createdAt,
+      fullName: schema.repositories.fullName,
+      name: schema.repositories.name,
+      description: schema.repositories.description,
+      defaultBranch: schema.repositories.defaultBranch,
+      cloneUrl: schema.repositories.cloneUrl,
+      createdAt: schema.repositories.createdAt,
     })
-    .from(schema.projects)
+    .from(schema.repositories)
     .where(
       and(
-        eq(schema.projects.id, projectId),
-        eq(schema.projects.organizationId, orgId),
+        eq(schema.repositories.id, projectId),
+        eq(schema.repositories.organizationId, orgId),
       ),
     )
     .limit(1);

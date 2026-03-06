@@ -1,7 +1,7 @@
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import { useDB, schema } from "../../../../db";
 import { requireAuth } from "../../../../utils/auth";
-import { getVisibleProjectIds } from "../../../../utils/permission";
+import { getVisibleRepositoryIds } from "../../../../utils/permission";
 
 export default defineEventHandler(async (event) => {
   const orgId = getRouterParam(event, "orgId");
@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   const db = useDB();
 
   // 获取可见项目 ID（null=全部可见）
-  const visibleIds = await getVisibleProjectIds(session.user.id, orgId, !!session.user.isAdmin);
+  const visibleIds = await getVisibleRepositoryIds(session.user.id, orgId, !!session.user.isAdmin);
 
   // 用户没有任何 project:view 权限 → 空列表
   if (visibleIds !== null && visibleIds.length === 0) {
@@ -25,34 +25,34 @@ export default defineEventHandler(async (event) => {
   const offset = (page - 1) * limit;
 
   const whereConditions = visibleIds === null
-    ? eq(schema.projects.organizationId, orgId)
-    : and(eq(schema.projects.organizationId, orgId), inArray(schema.projects.id, visibleIds));
+    ? eq(schema.repositories.organizationId, orgId)
+    : and(eq(schema.repositories.organizationId, orgId), inArray(schema.repositories.id, visibleIds));
 
   const projectList = await db
     .select({
-      id: schema.projects.id,
-      organizationId: schema.projects.organizationId,
-      giteaRepoId: schema.projects.giteaRepoId,
-      name: schema.projects.name,
-      fullName: schema.projects.fullName,
-      description: schema.projects.description,
-      defaultBranch: schema.projects.defaultBranch,
-      cloneUrl: schema.projects.cloneUrl,
-      webhookId: schema.projects.webhookId,
-      settings: schema.projects.settings,
-      createdBy: schema.projects.createdBy,
-      createdAt: schema.projects.createdAt,
-      updatedAt: schema.projects.updatedAt,
+      id: schema.repositories.id,
+      organizationId: schema.repositories.organizationId,
+      giteaRepoId: schema.repositories.giteaRepoId,
+      name: schema.repositories.name,
+      fullName: schema.repositories.fullName,
+      description: schema.repositories.description,
+      defaultBranch: schema.repositories.defaultBranch,
+      cloneUrl: schema.repositories.cloneUrl,
+      webhookId: schema.repositories.webhookId,
+      settings: schema.repositories.settings,
+      createdBy: schema.repositories.createdBy,
+      createdAt: schema.repositories.createdAt,
+      updatedAt: schema.repositories.updatedAt,
     })
-    .from(schema.projects)
+    .from(schema.repositories)
     .where(whereConditions)
-    .orderBy(desc(schema.projects.updatedAt))
+    .orderBy(desc(schema.repositories.updatedAt))
     .limit(limit)
     .offset(offset);
 
   const totalResult = await db
     .select({ count: sql<number>`COUNT(*)` })
-    .from(schema.projects)
+    .from(schema.repositories)
     .where(whereConditions);
 
   const total = Number(totalResult[0]?.count ?? 0);

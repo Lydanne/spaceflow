@@ -1032,7 +1032,7 @@ interface Organization {
   id: string;
   giteaOrgId: number;           // Gitea Organization ID
   name: string;                 // 组织名称
-  displayName?: string;
+  fullName?: string;
   avatarUrl?: string;
   syncedAt: Date;               // 最后同步时间
   createdAt: Date;
@@ -1071,19 +1071,22 @@ interface TeamMember {
 interface PermissionGroup {
   id: string;
   organizationId: string;       // 所属组织
+  type: 'default' | 'custom';   // 权限组类型
   name: string;                 // 权限组名称
   description?: string;
-  permissions: Permission[];    // 权限列表
+  permissions: string[];         // 权限 key 列表，如 ["repo:view", "actions:view"]
+  repositoryIds: string[] | null; // null=全部仓库, ["id1"]=指定仓库
   createdAt: Date;
+  updatedAt: Date;
 }
 
 type Permission =
-  | 'project:create'
-  | 'project:delete'
-  | 'project:settings'
-  | 'publish:trigger'
-  | 'publish:approve'
-  | 'publish:rollback'
+  | 'repo:view'
+  | 'repo:create'
+  | 'repo:delete'
+  | 'repo:settings'
+  | 'actions:view'
+  | 'actions:trigger'
   | 'agent:start'
   | 'agent:stop'
   | 'page:deploy'
@@ -1105,55 +1108,31 @@ interface TeamPermission {
 
 ---
 
-### 项目相关
+### 仓库相关
 
-#### Project（项目）
+#### Repository（仓库）
 
 ```typescript
-interface Project {
+interface Repository {
   id: string;
   organizationId: string;       // 所属组织
   giteaRepoId: number;          // Gitea 仓库 ID
-  name: string;                 // 项目名称 (org/repo)
-  fullName: string;             // 完整名称
+  name: string;                 // 仓库名称
+  fullName: string;             // 完整名称 (owner/repo)
   description?: string;
   defaultBranch: string;        // 默认分支
   cloneUrl: string;             // Git clone 地址
   webhookId?: number;           // Gitea Webhook ID
-  settings: ProjectSettings;
+  webhookSecret?: string;       // Webhook 签名密钥
+  settings: RepositorySettings;
+  createdBy?: string;           // 创建者 User.id
   createdAt: Date;
   updatedAt: Date;
 }
 
-interface ProjectSettings {
-  autoDeploy: boolean;          // 自动部署
-  deployBranches: string[];     // 触发部署的分支
+interface RepositorySettings {
   notifyOnSuccess: boolean;     // 成功时通知
   notifyOnFailure: boolean;     // 失败时通知
-  approvalRequired: boolean;    // 需要审批
-}
-```
-
-#### PublishTask（发布任务）
-
-```typescript
-interface PublishTask {
-  id: string;
-  projectId: string;
-  branch: string;               // 发布分支
-  commitSha: string;            // 提交 SHA
-  commitMessage?: string;
-  triggeredBy: string;          // 触发者 User.id
-  triggerType: 'manual' | 'webhook' | 'feishu';
-  status: 'pending' | 'approved' | 'running' | 'success' | 'failed' | 'cancelled';
-  approvedBy?: string;          // 审批者 User.id
-  approvedAt?: Date;
-  startedAt?: Date;
-  finishedAt?: Date;
-  duration?: number;            // 耗时（秒）
-  logUrl?: string;              // 完整日志 S3 URL（任务完成后归档）
-  createdAt: Date;
-  // 实时日志通过 publish_task_logs 表流式写入，不内联在主实体
 }
 ```
 
@@ -1162,7 +1141,7 @@ interface PublishTask {
 ```typescript
 interface Action {
   id: string;
-  projectId: string;
+  repositoryId: string;
   name: string;                 // 流水线名称
   trigger: ActionTrigger;
   steps: ActionStep[];
@@ -1196,7 +1175,7 @@ Agent 由 **`@opencode-ai/sdk`** 驱动执行，通过配置 systemPrompt + LLM 
 ```typescript
 interface Agent {
   id: string;
-  projectId: string;
+  repositoryId: string;
   name: string;
   description?: string;
 
@@ -1252,7 +1231,7 @@ interface AgentToolConfig {
 ```typescript
 interface AgentSecret {
   id: string;
-  projectId: string;
+  repositoryId: string;
   name: string;                  // 密钥名称，如 "OPENAI_API_KEY"
   encryptedValue: string;        // AES-256-GCM 加密后的值
   createdBy: string;             // 创建者 User.id
@@ -1266,7 +1245,7 @@ interface AgentSecret {
 ```typescript
 interface AgentSession {
   id: string;
-  projectId: string;
+  repositoryId: string;
   agentId: string;              // Agent 定义 ID
   agentName: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'stopped';
@@ -1301,7 +1280,7 @@ interface AgentSession {
 ```typescript
 interface Page {
   id: string;
-  projectId: string;
+  repositoryId: string;
   name: string;                 // 页面名称
   domain?: string;              // 自定义域名
   subdomain: string;            // 子域名
@@ -1320,7 +1299,7 @@ interface Page {
 ```typescript
 interface MiniAppCode {
   id: string;
-  projectId: string;
+  repositoryId: string;
   type: 'preview' | 'experience' | 'release';
   version: string;
   qrcodeUrl: string;            // 二维码图片 URL
@@ -1692,7 +1671,7 @@ CREATE TABLE organizations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   gitea_org_id INTEGER UNIQUE NOT NULL,
   name VARCHAR(255) NOT NULL,
-  display_name VARCHAR(255),
+  full_name VARCHAR(255),
   avatar_url TEXT,
   synced_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -1714,14 +1693,17 @@ CREATE TABLE teams (
 CREATE TABLE permission_groups (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  type VARCHAR(32) NOT NULL DEFAULT 'custom',  -- default | custom
   name VARCHAR(255) NOT NULL,
   description TEXT,
-  permissions JSONB DEFAULT '[]',
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  permissions JSONB DEFAULT '[]',              -- ["repo:view", "actions:view", ...]
+  repository_ids JSONB,                        -- null=全部仓库, ["id1","id2"]=指定仓库
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 项目表
-CREATE TABLE projects (
+-- 仓库表
+CREATE TABLE repositories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
   gitea_repo_id INTEGER NOT NULL,
@@ -1731,7 +1713,9 @@ CREATE TABLE projects (
   default_branch VARCHAR(255) DEFAULT 'main',
   clone_url TEXT NOT NULL,
   webhook_id INTEGER,
+  webhook_secret VARCHAR(255),
   settings JSONB DEFAULT '{}',
+  created_by UUID REFERENCES users(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(organization_id, gitea_repo_id)
@@ -1756,39 +1740,10 @@ CREATE TABLE team_permissions (
   UNIQUE(team_id, permission_group_id)
 );
 
--- 发布任务表
-CREATE TABLE publish_tasks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-  branch VARCHAR(255) NOT NULL,
-  commit_sha VARCHAR(40) NOT NULL,
-  commit_message TEXT,
-  triggered_by UUID REFERENCES users(id),
-  trigger_type VARCHAR(50) NOT NULL,  -- manual | webhook | feishu
-  status VARCHAR(50) DEFAULT 'pending',
-  approved_by UUID REFERENCES users(id),
-  approved_at TIMESTAMPTZ,
-  started_at TIMESTAMPTZ,
-  finished_at TIMESTAMPTZ,
-  duration INTEGER,
-  log_url TEXT,                       -- 完整日志存储于 S3
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 发布任务日志表（实时追加，独立表避免主表行膝胀）
-CREATE TABLE publish_task_logs (
-  id BIGSERIAL PRIMARY KEY,
-  task_id UUID REFERENCES publish_tasks(id) ON DELETE CASCADE,
-  timestamp TIMESTAMPTZ DEFAULT NOW(),
-  level VARCHAR(10) NOT NULL,         -- info | warn | error
-  step VARCHAR(100),
-  message TEXT NOT NULL
-);
-
 -- Agent 定义表（open-code 驱动）
 CREATE TABLE agents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  repository_id UUID REFERENCES repositories(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
   description TEXT,
   system_prompt TEXT NOT NULL,        -- Agent 系统提示词
@@ -1805,19 +1760,19 @@ CREATE TABLE agents (
 -- Agent 密钥表（LLM API Key 等，AES-256-GCM 加密存储）
 CREATE TABLE agent_secrets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  repository_id UUID REFERENCES repositories(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,         -- 如 "OPENAI_API_KEY"
   encrypted_value TEXT NOT NULL,      -- AES-256-GCM 加密后的值
   created_by UUID REFERENCES users(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(project_id, name)
+  UNIQUE(repository_id, name)
 );
 
 -- Agent Session 表
 CREATE TABLE agent_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  repository_id UUID REFERENCES repositories(id) ON DELETE CASCADE,
   agent_id UUID REFERENCES agents(id),
   agent_name VARCHAR(255) NOT NULL,
   status VARCHAR(50) DEFAULT 'pending', -- pending | running | completed | failed | stopped
@@ -1852,7 +1807,7 @@ CREATE TABLE audit_logs (
   user_id UUID REFERENCES users(id),
   organization_id UUID REFERENCES organizations(id),
   action VARCHAR(100) NOT NULL,       -- 如 publish.trigger, agent.stop, permission.update
-  resource_type VARCHAR(50),          -- project | publish_task | agent_session | permission_group
+  resource_type VARCHAR(50),          -- repository | agent_session | permission_group
   resource_id UUID,
   ip_address INET,
   user_agent TEXT,
@@ -1861,15 +1816,12 @@ CREATE TABLE audit_logs (
 );
 
 -- 索引
-CREATE INDEX idx_projects_org ON projects(organization_id);
+CREATE INDEX idx_repositories_org ON repositories(organization_id);
 CREATE INDEX idx_team_members_team ON team_members(team_id);
 CREATE INDEX idx_team_members_user ON team_members(user_id);
-CREATE INDEX idx_publish_tasks_project ON publish_tasks(project_id);
-CREATE INDEX idx_publish_tasks_status ON publish_tasks(status);
-CREATE INDEX idx_publish_task_logs_task ON publish_task_logs(task_id);
-CREATE INDEX idx_agent_sessions_project ON agent_sessions(project_id);
+CREATE INDEX idx_agent_sessions_repo ON agent_sessions(repository_id);
 CREATE INDEX idx_session_logs_session ON session_logs(session_id);
-CREATE INDEX idx_agent_secrets_project ON agent_secrets(project_id);
+CREATE INDEX idx_agent_secrets_repo ON agent_secrets(repository_id);
 CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
 CREATE INDEX idx_audit_logs_org ON audit_logs(organization_id);
 CREATE INDEX idx_audit_logs_created ON audit_logs(created_at DESC);

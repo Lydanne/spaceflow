@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PermissionGroup, PermissionDef } from "~/types/admin";
 
-interface ProjectItem {
+interface RepositoryItem {
   id: string;
   name: string;
   fullName: string;
@@ -11,9 +11,9 @@ const props = withDefaults(defineProps<{
   orgId: string;
   allGroups: PermissionGroup[];
   availablePermissions: PermissionDef[];
-  showProjectScope?: boolean;
+  showRepoScope?: boolean;
 }>(), {
-  showProjectScope: true,
+  showRepoScope: true,
 });
 
 const emit = defineEmits<{
@@ -28,11 +28,11 @@ const formName = ref("");
 const formDescription = ref("");
 const formPermissions = ref<string[]>([]);
 const formScopeAll = ref(true);
-const formProjectIds = ref<string[]>([]);
+const formRepositoryIds = ref<string[]>([]);
 const formLoading = ref(false);
 
-const { data: projectsData } = useFetch<{ data: ProjectItem[] }>(`/api/orgs/${props.orgId}/projects?limit=100`);
-const projectList = computed(() => projectsData.value?.data ?? []);
+const { data: reposData } = useFetch<{ data: RepositoryItem[] }>(`/api/orgs/${props.orgId}/projects?limit=100`);
+const repoList = computed(() => reposData.value?.data ?? []);
 
 function openCreateGroup() {
   editingGroup.value = null;
@@ -40,7 +40,7 @@ function openCreateGroup() {
   formDescription.value = "";
   formPermissions.value = [];
   formScopeAll.value = true;
-  formProjectIds.value = [];
+  formRepositoryIds.value = [];
   showGroupForm.value = true;
 }
 
@@ -49,8 +49,8 @@ function openEditGroup(group: PermissionGroup) {
   formName.value = group.name;
   formDescription.value = group.description || "";
   formPermissions.value = [...(group.permissions || [])];
-  formScopeAll.value = !props.showProjectScope || group.projectIds === null;
-  formProjectIds.value = group.projectIds ? [...group.projectIds] : [];
+  formScopeAll.value = !props.showRepoScope || group.repositoryIds === null;
+  formRepositoryIds.value = group.repositoryIds ? [...group.repositoryIds] : [];
   showGroupForm.value = true;
 }
 
@@ -68,17 +68,17 @@ function togglePermission(key: string) {
   }
 }
 
-function toggleProject(id: string) {
-  const idx = formProjectIds.value.indexOf(id);
+function toggleRepo(id: string) {
+  const idx = formRepositoryIds.value.indexOf(id);
   if (idx >= 0) {
-    formProjectIds.value.splice(idx, 1);
+    formRepositoryIds.value.splice(idx, 1);
   } else {
-    formProjectIds.value.push(id);
+    formRepositoryIds.value.push(id);
   }
 }
 
 const permissionGroupDefs: { key: string; label: string }[] = [
-  { key: "project", label: "项目" },
+  { key: "repo", label: "仓库" },
   { key: "actions", label: "Actions" },
   { key: "agent", label: "Agent" },
   { key: "page", label: "Pages" },
@@ -134,7 +134,7 @@ async function saveGroup() {
             name: formName.value,
             description: formDescription.value,
             permissions: formPermissions.value,
-            projectIds: formScopeAll.value ? null : formProjectIds.value,
+            repositoryIds: formScopeAll.value ? null : formRepositoryIds.value,
           },
         },
       );
@@ -146,7 +146,7 @@ async function saveGroup() {
           name: formName.value,
           description: formDescription.value,
           permissions: formPermissions.value,
-          projectIds: formScopeAll.value ? null : formProjectIds.value,
+          repositoryIds: formScopeAll.value ? null : formRepositoryIds.value,
         },
       });
       toast.add({ title: "权限组已创建", color: "success" });
@@ -214,13 +214,13 @@ function getPermissionLabel(key: string) {
               {{ group.description }}
             </p>
             <div class="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
-              <template v-if="showProjectScope">
+              <template v-if="showRepoScope">
                 <UIcon
                   name="i-lucide-folder"
                   class="w-3.5 h-3.5"
                 />
-                <span v-if="group.projectIds === null">全部项目</span>
-                <span v-else>{{ group.projectIds.length }} 个项目</span>
+                <span v-if="group.repositoryIds === null">全部仓库</span>
+                <span v-else>{{ group.repositoryIds.length }} 个仓库</span>
                 <span class="mx-1">·</span>
               </template>
               <span>{{ (group.permissions || []).length }} 项权限</span>
@@ -311,8 +311,8 @@ function getPermissionLabel(key: string) {
               />
             </div>
 
-            <div v-if="showProjectScope">
-              <label class="block text-sm font-medium mb-2">项目范围</label>
+            <div v-if="showRepoScope">
+              <label class="block text-sm font-medium mb-2">仓库范围</label>
               <div class="space-y-2">
                 <button
                   type="button"
@@ -324,7 +324,7 @@ function getPermissionLabel(key: string) {
                     :name="formScopeAll ? 'i-lucide-circle-dot' : 'i-lucide-circle'"
                     class="w-4 h-4 shrink-0"
                   />
-                  全部项目
+                  全部仓库
                 </button>
                 <button
                   type="button"
@@ -336,30 +336,30 @@ function getPermissionLabel(key: string) {
                     :name="!formScopeAll ? 'i-lucide-circle-dot' : 'i-lucide-circle'"
                     class="w-4 h-4 shrink-0"
                   />
-                  指定项目
+                  指定仓库
                 </button>
                 <div
                   v-if="!formScopeAll"
                   class="pl-6 space-y-1 max-h-48 overflow-y-auto"
                 >
                   <button
-                    v-for="project in projectList"
-                    :key="project.id"
+                    v-for="repo in repoList"
+                    :key="repo.id"
                     type="button"
                     class="flex items-center gap-2 p-1.5 rounded text-sm w-full text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-900"
-                    @click="toggleProject(project.id)"
+                    @click="toggleRepo(repo.id)"
                   >
                     <UIcon
-                      :name="formProjectIds.includes(project.id) ? 'i-lucide-check-square' : 'i-lucide-square'"
+                      :name="formRepositoryIds.includes(repo.id) ? 'i-lucide-check-square' : 'i-lucide-square'"
                       class="w-4 h-4 shrink-0"
                     />
-                    {{ project.fullName || project.name }}
+                    {{ repo.fullName || repo.name }}
                   </button>
                   <p
-                    v-if="projectList.length === 0"
+                    v-if="repoList.length === 0"
                     class="text-sm text-gray-400"
                   >
-                    暂无项目
+                    暂无仓库
                   </p>
                 </div>
               </div>

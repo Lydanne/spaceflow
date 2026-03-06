@@ -4,9 +4,9 @@ const { user } = useUserSession();
 interface OrgItem {
   id: string;
   name: string;
-  displayName: string | null;
+  fullName: string | null;
   avatarUrl: string | null;
-  projectCount: number;
+  repoCount: number;
 }
 
 const { data: orgsData, status } = await useFetch<{ data: OrgItem[] }>(
@@ -14,8 +14,8 @@ const { data: orgsData, status } = await useFetch<{ data: OrgItem[] }>(
   { key: "home-orgs" },
 );
 const orgs = computed(() => orgsData.value?.data ?? []);
-const totalProjects = computed(() =>
-  orgs.value.reduce((sum, o) => sum + Number(o.projectCount || 0), 0),
+const totalRepos = computed(() =>
+  orgs.value.reduce((sum, o) => sum + Number(o.repoCount || 0), 0),
 );
 
 const { data: repoCountData } = await useFetch<{ count: number }>(
@@ -76,7 +76,7 @@ function timeAgo(dateStr: string) {
             项目总数
           </p>
           <p class="text-3xl font-bold mt-1">
-            {{ totalProjects }}
+            {{ totalRepos }}
           </p>
         </div>
       </UCard>
@@ -125,10 +125,10 @@ function timeAgo(dateStr: string) {
               />
               <div>
                 <p class="font-semibold">
-                  {{ org.displayName || org.name }}
+                  {{ org.fullName || org.name }}
                 </p>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                  {{ org.projectCount || 0 }} 个项目
+                  {{ org.repoCount || 0 }} 个仓库
                 </p>
               </div>
             </div>

@@ -6,7 +6,7 @@ export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
   giteaOrgId: integer("gitea_org_id").unique().notNull(),
   name: varchar("name", { length: 255 }).notNull(),
-  displayName: varchar("display_name", { length: 255 }),
+  fullName: varchar("full_name", { length: 255 }),
   avatarUrl: text("avatar_url"),
   syncedAt: timestamp("synced_at", { withTimezone: true }),
   ...baseColumns(),

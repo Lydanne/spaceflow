@@ -5,7 +5,7 @@ const orgName = route.params.orgName as string;
 const { data: org, status: orgStatus } = await useFetch<{
   id: string;
   name: string;
-  displayName: string | null;
+  fullName: string | null;
   avatarUrl: string | null;
 }>(`/api/resolve/${orgName}`);
 

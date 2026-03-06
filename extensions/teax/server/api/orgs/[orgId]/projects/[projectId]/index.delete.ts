@@ -12,13 +12,13 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: "Missing orgId or projectId" });
   }
 
-  const session = await requirePermission(event, orgId, "project:delete", projectId);
+  const session = await requirePermission(event, orgId, "repo:delete", projectId);
   const db = useDB();
 
   const [project] = await db
     .select()
-    .from(schema.projects)
-    .where(and(eq(schema.projects.id, projectId), eq(schema.projects.organizationId, orgId)))
+    .from(schema.repositories)
+    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organizationId, orgId)))
     .limit(1);
 
   if (!project) {
@@ -39,8 +39,8 @@ export default defineEventHandler(async (event) => {
   }
 
   await db
-    .delete(schema.projects)
-    .where(and(eq(schema.projects.id, projectId), eq(schema.projects.organizationId, orgId)));
+    .delete(schema.repositories)
+    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organizationId, orgId)));
 
   await writeAuditLog(event, {
     userId: session.user.id,

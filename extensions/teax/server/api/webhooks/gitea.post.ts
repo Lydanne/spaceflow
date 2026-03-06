@@ -58,8 +58,8 @@ export default defineEventHandler(async (event) => {
 
   const [project] = await db
     .select()
-    .from(schema.projects)
-    .where(eq(schema.projects.giteaRepoId, repoId))
+    .from(schema.repositories)
+    .where(eq(schema.repositories.giteaRepoId, repoId))
     .limit(1);
 
   // 验证签名：无论项目是否存在都返回统一的 401，避免泄漏项目存在性

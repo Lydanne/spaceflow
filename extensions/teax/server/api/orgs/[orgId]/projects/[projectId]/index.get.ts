@@ -8,27 +8,27 @@ export default defineEventHandler(async (event) => {
   if (!orgId || !projectId) {
     throw createError({ statusCode: 400, message: "Missing orgId or projectId" });
   }
-  await requirePermission(event, orgId, "project:view", projectId);
+  await requirePermission(event, orgId, "repo:view", projectId);
   const db = useDB();
 
   const [project] = await db
     .select({
-      id: schema.projects.id,
-      organizationId: schema.projects.organizationId,
-      giteaRepoId: schema.projects.giteaRepoId,
-      name: schema.projects.name,
-      fullName: schema.projects.fullName,
-      description: schema.projects.description,
-      defaultBranch: schema.projects.defaultBranch,
-      cloneUrl: schema.projects.cloneUrl,
-      webhookId: schema.projects.webhookId,
-      settings: schema.projects.settings,
-      createdBy: schema.projects.createdBy,
-      createdAt: schema.projects.createdAt,
-      updatedAt: schema.projects.updatedAt,
+      id: schema.repositories.id,
+      organizationId: schema.repositories.organizationId,
+      giteaRepoId: schema.repositories.giteaRepoId,
+      name: schema.repositories.name,
+      fullName: schema.repositories.fullName,
+      description: schema.repositories.description,
+      defaultBranch: schema.repositories.defaultBranch,
+      cloneUrl: schema.repositories.cloneUrl,
+      webhookId: schema.repositories.webhookId,
+      settings: schema.repositories.settings,
+      createdBy: schema.repositories.createdBy,
+      createdAt: schema.repositories.createdAt,
+      updatedAt: schema.repositories.updatedAt,
     })
-    .from(schema.projects)
-    .where(and(eq(schema.projects.id, projectId), eq(schema.projects.organizationId, orgId)))
+    .from(schema.repositories)
+    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organizationId, orgId)))
     .limit(1);
 
   if (!project) {

@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
       id: schema.organizations.id,
       giteaOrgId: schema.organizations.giteaOrgId,
       name: schema.organizations.name,
-      displayName: schema.organizations.displayName,
+      fullName: schema.organizations.fullName,
       avatarUrl: schema.organizations.avatarUrl,
       syncedAt: schema.organizations.syncedAt,
       createdAt: schema.organizations.createdAt,

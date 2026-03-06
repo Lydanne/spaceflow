@@ -27,7 +27,7 @@ export interface PermissionGroup {
   name: string;
   description: string | null;
   permissions: string[];
-  projectIds: string[] | null;
+  repositoryIds: string[] | null;
 }
 
 export interface TeamPermissionAssignment {

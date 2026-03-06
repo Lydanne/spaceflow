@@ -62,8 +62,8 @@ export default defineEventHandler(async (event) => {
   const db = useDB();
   const [project] = await db
     .select()
-    .from(schema.projects)
-    .where(eq(schema.projects.id, projectId))
+    .from(schema.repositories)
+    .where(eq(schema.repositories.id, projectId))
     .limit(1);
 
   if (!project) {

@@ -10,12 +10,12 @@ export default defineEventHandler(async (event) => {
     id: schema.organizations.id,
     giteaOrgId: schema.organizations.giteaOrgId,
     name: schema.organizations.name,
-    displayName: schema.organizations.displayName,
+    fullName: schema.organizations.fullName,
     avatarUrl: schema.organizations.avatarUrl,
     syncedAt: schema.organizations.syncedAt,
-    projectCount:
-      sql<number>`(SELECT COUNT(*)::int FROM projects WHERE projects.organization_id = "organizations"."id")`.as(
-        "project_count",
+    repoCount:
+      sql<number>`(SELECT COUNT(*)::int FROM repositories WHERE repositories.organization_id = "organizations"."id")`.as(
+        "repo_count",
       ),
   };
 

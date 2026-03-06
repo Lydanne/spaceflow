@@ -2,7 +2,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { useDB, schema } from "../../db";
 import { requireAuth, createGiteaServiceWithRefresh } from "../../utils/auth";
 import type { GiteaCommit } from "../../utils/gitea";
-import { getVisibleProjectIds } from "../../utils/permission";
+import { getVisibleRepositoryIds } from "../../utils/permission";
 
 interface CommitItem {
   sha: string;
@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
   const allProjects: { fullName: string; name: string }[] = [];
 
   for (const org of orgs) {
-    const visibleIds = await getVisibleProjectIds(
+    const visibleIds = await getVisibleRepositoryIds(
       session.user.id,
       org.id,
       !!session.user.isAdmin,
@@ -38,18 +38,18 @@ export default defineEventHandler(async (event) => {
     if (visibleIds !== null && visibleIds.length === 0) continue;
 
     const where = visibleIds === null
-      ? eq(schema.projects.organizationId, org.id)
+      ? eq(schema.repositories.organizationId, org.id)
       : and(
-          eq(schema.projects.organizationId, org.id),
-          inArray(schema.projects.id, visibleIds),
+          eq(schema.repositories.organizationId, org.id),
+          inArray(schema.repositories.id, visibleIds),
         );
 
     const projects = await db
       .select({
-        fullName: schema.projects.fullName,
-        name: schema.projects.name,
+        fullName: schema.repositories.fullName,
+        name: schema.repositories.name,
       })
-      .from(schema.projects)
+      .from(schema.repositories)
       .where(where);
 
     allProjects.push(...projects);

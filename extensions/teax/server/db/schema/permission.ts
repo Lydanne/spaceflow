@@ -9,7 +9,7 @@ export const permissionGroups = pgTable("permission_groups", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   permissions: jsonb("permissions").default([]),
-  projectIds: jsonb("project_ids"),
+  repositoryIds: jsonb("repository_ids"),
   ...baseColumns(),
 });
 

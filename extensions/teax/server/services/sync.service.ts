@@ -5,7 +5,7 @@ import { createServiceGiteaClient } from "../utils/gitea";
 const DEFAULT_GROUP_NAME = "默认权限";
 
 const DEFAULT_PERMISSIONS = [
-  "project:view",
+  "repo:view",
   "actions:view",
 ];
 
@@ -21,7 +21,7 @@ export async function syncUserOrgsAndTeams(username: string) {
       .values({
         giteaOrgId: org.id,
         name: org.name,
-        displayName: org.full_name || org.name,
+        fullName: org.full_name || org.name,
         avatarUrl: org.avatar_url,
         syncedAt: new Date(),
       })
@@ -29,7 +29,7 @@ export async function syncUserOrgsAndTeams(username: string) {
         target: schema.organizations.giteaOrgId,
         set: {
           name: org.name,
-          displayName: org.full_name || org.name,
+          fullName: org.full_name || org.name,
           avatarUrl: org.avatar_url,
           syncedAt: new Date(),
         },
@@ -100,7 +100,7 @@ export async function syncUserOrgsAndTeams(username: string) {
 
 /**
  * 确保组织有一个默认权限组。
- * projectIds=null 表示全部项目可见，permissions 包含所有已定义的权限。
+ * repositoryIds=null 表示全部仓库可见，permissions 包含所有已定义的权限。
  */
 async function ensureDefaultPermissionGroup(db: ReturnType<typeof useDB>, orgId: string) {
   const [existing] = await db
@@ -122,9 +122,9 @@ async function ensureDefaultPermissionGroup(db: ReturnType<typeof useDB>, orgId:
       organizationId: orgId,
       type: "default",
       name: DEFAULT_GROUP_NAME,
-      description: "默认权限组，仅含查看权限，对全部项目可见",
+      description: "默认权限组，仅含查看权限，对全部仓库可见",
       permissions: DEFAULT_PERMISSIONS,
-      projectIds: null,
+      repositoryIds: null,
     })
     .returning();
 

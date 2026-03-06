@@ -9,13 +9,13 @@ export default defineEventHandler(async (event) => {
   if (!orgId || !projectId) {
     throw createError({ statusCode: 400, message: "Missing orgId or projectId" });
   }
-  await requirePermission(event, orgId, "project:view", projectId);
+  await requirePermission(event, orgId, "repo:view", projectId);
   const db = useDB();
 
   const [project] = await db
     .select()
-    .from(schema.projects)
-    .where(and(eq(schema.projects.id, projectId), eq(schema.projects.organizationId, orgId)))
+    .from(schema.repositories)
+    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organizationId, orgId)))
     .limit(1);
 
   if (!project) {

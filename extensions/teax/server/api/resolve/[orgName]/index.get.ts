@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
     .select({
       id: schema.organizations.id,
       name: schema.organizations.name,
-      displayName: schema.organizations.displayName,
+      fullName: schema.organizations.fullName,
       avatarUrl: schema.organizations.avatarUrl,
     })
     .from(schema.organizations)

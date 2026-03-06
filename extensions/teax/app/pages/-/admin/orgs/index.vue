@@ -8,7 +8,7 @@ interface OrgItem {
   id: string;
   giteaOrgId: number;
   name: string;
-  displayName: string | null;
+  fullName: string | null;
   avatarUrl: string | null;
   syncedAt: string | null;
   createdAt: string;
@@ -96,7 +96,7 @@ function formatDate(date: string | null) {
                 :to="`/-/admin/orgs/${org.id}`"
                 class="font-semibold hover:text-primary-500 transition-colors"
               >
-                {{ org.displayName || org.name }}
+                {{ org.fullName || org.name }}
               </NuxtLink>
               <div
                 class="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-0.5"

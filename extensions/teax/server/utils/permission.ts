@@ -6,7 +6,7 @@ import { VALID_PERMISSION_KEYS } from "../shared/permissions";
 
 interface PermissionGroupRow {
   permissions: unknown;
-  projectIds: unknown;
+  repositoryIds: unknown;
 }
 
 /**
@@ -18,7 +18,7 @@ async function queryUserPermissionGroups(userId: string, orgId: string): Promise
   return db
     .select({
       permissions: schema.permissionGroups.permissions,
-      projectIds: schema.permissionGroups.projectIds,
+      repositoryIds: schema.permissionGroups.repositoryIds,
     })
     .from(schema.teamMembers)
     .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
@@ -33,23 +33,23 @@ async function queryUserPermissionGroups(userId: string, orgId: string): Promise
 }
 
 /**
- * 检查权限组行是否授予指定权限（含 projectId scope 检查）。
- * - projectIds 为 null → 全部项目
- * - projectIds 为数组 → 仅当 projectId 在数组中
+ * 检查权限组行是否授予指定权限（含 repositoryId scope 检查）。
+ * - repositoryIds 为 null → 全部仓库
+ * - repositoryIds 为数组 → 仅当 repositoryId 在数组中
  */
-function rowGrantsPermission(row: PermissionGroupRow, permission: string, projectId?: string): boolean {
+function rowGrantsPermission(row: PermissionGroupRow, permission: string, repositoryId?: string): boolean {
   const perms = row.permissions;
   if (!Array.isArray(perms) || !perms.includes(permission)) return false;
 
-  // 不需要项目级 scope 检查
-  if (!projectId) return true;
+  // 不需要仓库级 scope 检查
+  if (!repositoryId) return true;
 
-  // projectIds 为 null 表示全部项目
-  if (row.projectIds === null || row.projectIds === undefined) return true;
+  // repositoryIds 为 null 表示全部仓库
+  if (row.repositoryIds === null || row.repositoryIds === undefined) return true;
 
-  // projectIds 为数组则检查包含关系
-  if (Array.isArray(row.projectIds)) {
-    return row.projectIds.includes(projectId);
+  // repositoryIds 为数组则检查包含关系
+  if (Array.isArray(row.repositoryIds)) {
+    return row.repositoryIds.includes(repositoryId);
   }
 
   return false;
@@ -65,9 +65,9 @@ function rowGrantsPermission(row: PermissionGroupRow, permission: string, projec
  * 3. 查询用户所在团队 → 团队已分配的权限组 → 权限组中包含目标权限 + scope 匹配 → 放行
  * 4. 否则 → 403
  *
- * @param projectId - 可选，传入时会额外检查权限组的 projectIds scope
+ * @param repositoryId - 可选，传入时会额外检查权限组的 repositoryIds scope
  */
-export async function requirePermission(event: H3Event, orgId: string, permission: string, projectId?: string) {
+export async function requirePermission(event: H3Event, orgId: string, permission: string, repositoryId?: string) {
   if (!VALID_PERMISSION_KEYS.has(permission)) {
     throw createError({
       statusCode: 500,
@@ -84,7 +84,7 @@ export async function requirePermission(event: H3Event, orgId: string, permissio
 
   const rows = await queryUserPermissionGroups(session.user.id, orgId);
 
-  const hasPermission = rows.some((row) => rowGrantsPermission(row, permission, projectId));
+  const hasPermission = rows.some((row) => rowGrantsPermission(row, permission, repositoryId));
 
   if (!hasPermission) {
     throw createError({
@@ -119,11 +119,11 @@ export async function getUserPermissions(userId: string, orgId: string): Promise
 }
 
 /**
- * 获取用户在指定组织中可见的项目 ID 列表。
- * 返回 null 表示全部项目可见（管理员或权限组 projectIds=null）。
- * 返回 string[] 表示只能看到这些项目。
+ * 获取用户在指定组织中可见的仓库 ID 列表。
+ * 返回 null 表示全部仓库可见（管理员或权限组 repositoryIds=null）。
+ * 返回 string[] 表示只能看到这些仓库。
  */
-export async function getVisibleProjectIds(userId: string, orgId: string, isAdmin: boolean): Promise<string[] | null> {
+export async function getVisibleRepositoryIds(userId: string, orgId: string, isAdmin: boolean): Promise<string[] | null> {
   if (isAdmin) return null;
 
   const rows = await queryUserPermissionGroups(userId, orgId);
@@ -132,13 +132,13 @@ export async function getVisibleProjectIds(userId: string, orgId: string, isAdmi
 
   for (const row of rows) {
     const perms = row.permissions;
-    if (!Array.isArray(perms) || !perms.includes("project:view")) continue;
+    if (!Array.isArray(perms) || !perms.includes("repo:view")) continue;
 
-    // projectIds=null → 全部可见
-    if (row.projectIds === null || row.projectIds === undefined) return null;
+    // repositoryIds=null → 全部可见
+    if (row.repositoryIds === null || row.repositoryIds === undefined) return null;
 
-    if (Array.isArray(row.projectIds)) {
-      for (const id of row.projectIds) {
+    if (Array.isArray(row.repositoryIds)) {
+      for (const id of row.repositoryIds) {
         if (typeof id === "string") visibleIds.add(id);
       }
     }

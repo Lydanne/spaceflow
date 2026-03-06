@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: "Missing orgId or projectId" });
   }
 
-  await requirePermission(event, orgId, "project:settings", projectId);
+  await requirePermission(event, orgId, "repo:settings", projectId);
   const db = useDB();
 
   const body = await readBody<{
@@ -19,9 +19,9 @@ export default defineEventHandler(async (event) => {
   }>(event);
 
   const [project] = await db
-    .select({ settings: schema.projects.settings })
-    .from(schema.projects)
-    .where(and(eq(schema.projects.id, projectId), eq(schema.projects.organizationId, orgId)))
+    .select({ settings: schema.repositories.settings })
+    .from(schema.repositories)
+    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organizationId, orgId)))
     .limit(1);
 
   if (!project) {
@@ -35,13 +35,13 @@ export default defineEventHandler(async (event) => {
   if (body.notifyOnFailure !== undefined) newSettings.notifyOnFailure = body.notifyOnFailure;
 
   const [updated] = await db
-    .update(schema.projects)
+    .update(schema.repositories)
     .set({ settings: newSettings, updatedAt: new Date() })
-    .where(and(eq(schema.projects.id, projectId), eq(schema.projects.organizationId, orgId)))
+    .where(and(eq(schema.repositories.id, projectId), eq(schema.repositories.organizationId, orgId)))
     .returning({
-      id: schema.projects.id,
-      settings: schema.projects.settings,
-      updatedAt: schema.projects.updatedAt,
+      id: schema.repositories.id,
+      settings: schema.repositories.settings,
+      updatedAt: schema.repositories.updatedAt,
     });
 
   return { data: updated };
