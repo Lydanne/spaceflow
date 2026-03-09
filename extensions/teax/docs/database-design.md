@@ -144,6 +144,8 @@
   id: uuid (PK),
   repository_id: uuid (FK -> repositories.id),
   name: string (unique, 全局唯一),
+  type: enum('ci', 'project', 'personal'), // 工作区类型
+  visibility: enum('project', 'personal'),  // 可见性：project=项目级，personal=用户级
   branch: string,
   container_id: string (nullable),
   container_host: string (default: 'localhost'),
@@ -156,6 +158,15 @@
   row_creator: string
 }
 ```
+
+**字段说明：**
+- `type`: 工作区类型
+  - `ci`: CI 工作区（系统自动创建，不可删除）
+  - `project`: 项目工作区（项目成员创建，所有成员可见）
+  - `personal`: 个人工作区（用户创建，仅自己可见）
+- `visibility`: 可见性级别
+  - `project`: 项目级 - 所有项目成员可见和访问
+  - `personal`: 用户级 - 仅创建者可见（管理员和 Owner 例外）
 
 ### Agent 系统
 
