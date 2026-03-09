@@ -28,19 +28,19 @@ const projectBase = `/${owner}/${repo}`;
 const baseTabs = [
   { label: "README", value: "readme", icon: "i-lucide-file-text", to: projectBase },
   { label: "Actions", value: "actions", icon: "i-lucide-zap", to: `${projectBase}/actions` },
-  { label: "Agents", value: "agents", icon: "i-lucide-bot-message-square", to: `${projectBase}/agents` },
+  { label: "Workspaces", value: "workspaces", icon: "i-lucide-container", to: `${projectBase}/workspaces` },
   { label: "Pages", value: "pages", icon: "i-lucide-earth", to: `${projectBase}/pages` },
 ];
 const tabs = computed(() =>
   isOwnerOrAdmin.value
-    ? [...baseTabs, { label: "设置", value: "settings", icon: "i-lucide-settings", to: `${projectBase}/settings` }]
+    ? [...baseTabs, { label: "Settings", value: "settings", icon: "i-lucide-settings", to: `${projectBase}/settings` }]
     : baseTabs,
 );
 
 const activeTab = computed(() => {
   const path = route.path;
   if (path.includes("/actions")) return "actions";
-  if (path.endsWith("/agents")) return "agents";
+  if (path.includes("/workspaces")) return "workspaces";
   if (path.endsWith("/pages")) return "pages";
   if (path.endsWith("/settings")) return "settings";
   return "readme";
