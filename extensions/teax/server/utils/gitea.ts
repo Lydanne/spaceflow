@@ -356,6 +356,79 @@ export class GiteaService {
     await this.fetch(`/repos/${owner}/${repo}/hooks/${hookId}`, "DELETE");
   }
 
+  // System Hooks (Admin only)
+  async listSystemHooks(): Promise<GiteaWebhook[]> {
+    return this.fetch("/admin/hooks") as Promise<GiteaWebhook[]>;
+  }
+
+  async createSystemHook(
+    url: string,
+    secret: string,
+    events: string[] = [
+      "create",
+      "delete",
+      "fork",
+      "push",
+      "issues",
+      "issue_assign",
+      "issue_label",
+      "issue_milestone",
+      "issue_comment",
+      "pull_request",
+      "pull_request_assign",
+      "pull_request_label",
+      "pull_request_milestone",
+      "pull_request_comment",
+      "pull_request_review_approved",
+      "pull_request_review_rejected",
+      "pull_request_review_comment",
+      "pull_request_sync",
+      "wiki",
+      "repository",
+      "release",
+      "package",
+      "status",
+      "workflow_run",
+      "workflow_job",
+    ],
+  ): Promise<GiteaWebhook> {
+    return this.fetch("/admin/hooks", "POST", {
+      type: "gitea",
+      branch_filter: "*",
+      config: {
+        url,
+        content_type: "json",
+        secret,
+        is_system_webhook: true, // 创建系统钩子而不是默认钩子
+      },
+      events,
+      active: true,
+    }) as Promise<GiteaWebhook>;
+  }
+
+  async getSystemHook(hookId: number): Promise<GiteaWebhook> {
+    return this.fetch(`/admin/hooks/${hookId}`) as Promise<GiteaWebhook>;
+  }
+
+  async updateSystemHook(
+    hookId: number,
+    data: {
+      active?: boolean;
+      events?: string[];
+      config?: {
+        url?: string;
+        content_type?: string;
+        secret?: string;
+      };
+    },
+  ): Promise<GiteaWebhook> {
+    return this.fetch(`/admin/hooks/${hookId}`, "PATCH", data) as Promise<GiteaWebhook>;
+  }
+
+  async deleteSystemHook(hookId: number): Promise<void> {
+    await this.fetch(`/admin/hooks/${hookId}`, "DELETE");
+  }
+
   async getRepoWorkflowRuns(
     owner: string,
     repo: string,
