@@ -18,6 +18,13 @@ useSeoMeta({
 const userMenuItems = computed(() => {
   const items: unknown[][] = [
     [{ label: user.value?.username || "", type: "label" as const }],
+    [
+      {
+        label: "个人设置",
+        icon: "i-lucide-settings",
+        onSelect: () => navigateTo("/user/settings"),
+      },
+    ],
   ];
   if (user.value?.is_admin) {
     items.push([

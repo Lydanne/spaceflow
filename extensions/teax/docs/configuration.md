@@ -325,7 +325,23 @@ FEISHU_APPROVAL_CODE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
    **审批**（可选）
    - `approval:approval` - 审批流程管理
 
-4. **配置事件订阅**
+4. **配置 OAuth 重定向 URL**
+
+   进入应用详情 → 安全设置 → 重定向 URL：
+
+   **开发环境**
+   ```
+   http://localhost:3000/api/auth/callback/feishu
+   ```
+
+   **生产环境**
+   ```
+   https://your-domain.com/api/auth/callback/feishu
+   ```
+
+   > ⚠️ **重要**：必须预先配置所有可能的回调地址，协议、域名、端口、路径必须完全匹配
+
+5. **配置事件订阅**
 
    进入应用详情 → 事件订阅，选择以下**任一**模式：
 

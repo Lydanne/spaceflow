@@ -25,9 +25,15 @@ export default defineEventHandler(async (event) => {
       return sendRedirect(event, "/auth/login?error=feishu_not_bound");
     }
 
-    // 更新绑定信息
+    // 更新绑定信息,包括访问令牌和刷新令牌
     const tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
-    await bindFeishuToUser(user.id, feishuUser, tokenData.access_token, tokenExpiresAt);
+    await bindFeishuToUser(
+      user.id,
+      feishuUser,
+      tokenData.access_token,
+      tokenExpiresAt,
+      tokenData.refresh_token,
+    );
 
     // 创建 session
     const sessionId = generateSessionId();

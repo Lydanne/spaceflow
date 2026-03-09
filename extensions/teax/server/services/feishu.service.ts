@@ -38,6 +38,7 @@ export async function bindFeishuToUser(
   feishuUser: FeishuUserInfo,
   accessToken: string,
   tokenExpiresAt: Date,
+  refreshToken?: string,
 ) {
   const db = useDB();
 
@@ -55,6 +56,7 @@ export async function bindFeishuToUser(
         feishu_avatar: feishuUser.avatar_url,
         feishu_union_id: feishuUser.union_id,
         access_token: accessToken,
+        refresh_token: refreshToken,
         token_expires_at: tokenExpiresAt,
       })
       .where(eq(schema.userFeishu.feishu_open_id, feishuUser.open_id));
@@ -70,6 +72,7 @@ export async function bindFeishuToUser(
       feishu_name: feishuUser.name,
       feishu_avatar: feishuUser.avatar_url,
       access_token: accessToken,
+      refresh_token: refreshToken,
       token_expires_at: tokenExpiresAt,
     })
     .returning();

@@ -19,6 +19,7 @@ export const userFeishu = pgTable("user_feishu", {
   feishu_name: varchar("feishu_name", { length: 255 }).notNull(),
   feishu_avatar: text("feishu_avatar"),
   access_token: text("access_token"),
+  refresh_token: text("refresh_token"),
   token_expires_at: timestamp("token_expires_at", { withTimezone: true }),
   notify_publish: boolean("notify_publish").default(true),
   notify_approval: boolean("notify_approval").default(true),

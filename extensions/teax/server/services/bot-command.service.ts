@@ -64,6 +64,51 @@ registerCommand({
   },
 });
 
+// ─── /list ────────────────────────────────────────────────
+
+registerCommand({
+  name: "list",
+  aliases: ["/list", "列表"],
+  description: "查看工作流列表",
+  usage: "/list",
+  handler: async (ctx) => {
+    const lines = commands.map(
+      (c) => `**${c.usage}** — ${c.description}`,
+    );
+    const card: FeishuInteractiveCard = {
+      header: {
+        title: { tag: "plain_text", content: "📋 工作流列表" },
+        template: "blue",
+      },
+      elements: [
+        {
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: lines.join("\n"),
+          },
+        },
+      ],
+    };
+
+    await replyFeishuCardMessage(ctx.messageId, card);
+  },
+});
+
+// ─── /account ─────────────────────────────────────────────
+
+registerCommand({
+  name: "account",
+  aliases: ["/account", "账户", "我的账户"],
+  description: "查看账户信息和飞书绑定状态",
+  usage: "/account",
+  handler: async (ctx) => {
+    const { generateAccountCard } = await import("~~/server/services/account.service");
+    const card = await generateAccountCard(ctx.senderOpenId);
+    await replyFeishuCardMessage(ctx.messageId, card);
+  },
+});
+
 // ─── /status <owner/repo> ────────────────────────────────
 
 registerCommand({
@@ -297,6 +342,24 @@ export async function handleCardAction(ctx: CardActionContext): Promise<void> {
     const { updateCardMessage } = await import("~~/server/utils/feishu-sdk");
 
     const newCard = await handleControlPanelAction(ctx.openId, actionValue as Record<string, unknown>);
+    if (newCard) {
+      await updateCardMessage(ctx.token, newCard);
+    }
+    return;
+  }
+
+  // 检查是否是账户相关的交互
+  const accountActions = [
+    "refresh_account",
+    "unbind_feishu",
+    "view_binding_guide",
+  ];
+
+  if (actionType && actionValue && accountActions.includes(actionType)) {
+    const { handleAccountAction } = await import("~~/server/services/account.service");
+    const { updateCardMessage } = await import("~~/server/utils/feishu-sdk");
+
+    const newCard = await handleAccountAction(ctx.openId, actionValue as Record<string, unknown>);
     if (newCard) {
       await updateCardMessage(ctx.token, newCard);
     }

@@ -243,24 +243,43 @@ export async function exchangeFeishuCode(code: string): Promise<{
   refresh_token: string;
   expires_in: number;
 }> {
-  const client = getFeishuClient();
+  const config = useRuntimeConfig();
+  const redirectUri = `${config.public.appUrl}/api/auth/callback/feishu`;
 
-  const res = await client.authen.oidcAccessToken.create({
-    data: {
+  // 使用飞书 OAuth 2.0 获取 user_access_token
+  // 文档: https://open.feishu.cn/document/authentication-management/access-token/get-user-access-token
+  const response = await fetch("https://open.feishu.cn/open-apis/authen/v2/oauth/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
       grant_type: "authorization_code",
       code,
-    },
+      client_id: config.feishuAppId,
+      client_secret: config.feishuAppSecret,
+      redirect_uri: redirectUri,
+    }),
   });
 
-  if (res.code !== 0) {
-    console.error("Feishu exchange code error:", res.code, res.msg);
-    throw new Error(`Failed to exchange code: ${res.msg}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Feishu exchange code HTTP error:", response.status, errorText);
+    throw new Error(`Failed to exchange code: ${response.statusText}`);
   }
 
+  const result = await response.json();
+
+  if (result.code !== 0) {
+    console.error("Feishu exchange code error:", result.code, result.error, result.error_description, result);
+    throw new Error(`Failed to exchange code: ${result.error_description || result.error || result.code}`);
+  }
+
+  // OAuth v2 API 直接返回 access_token,不在 data 字段中
   return {
-    access_token: res.data?.access_token || "",
-    refresh_token: res.data?.refresh_token || "",
-    expires_in: res.data?.expires_in || 0,
+    access_token: result.access_token || "",
+    refresh_token: result.refresh_token || "",
+    expires_in: result.expires_in || 0,
   };
 }
 
@@ -274,28 +293,37 @@ export async function getFeishuUserInfo(accessToken: string): Promise<{
   email: string;
   mobile: string;
 }> {
-  const client = getFeishuClient();
-
-  const res = await client.authen.userInfo.get({
+  // 使用 HTTP API 获取用户信息
+  // 文档: https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/authen-v1/user_info/get
+  const response = await fetch("https://open.feishu.cn/open-apis/authen/v1/user_info", {
+    method: "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
   });
 
-  if (res.code !== 0) {
-    console.error("Feishu get user info error:", res.code, res.msg);
-    throw new Error(`Failed to get user info: ${res.msg}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Feishu get user info HTTP error:", response.status, errorText);
+    throw new Error(`Failed to get user info: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+
+  if (result.code !== 0) {
+    console.error("Feishu get user info error:", result.code, result.msg, result);
+    throw new Error(`Failed to get user info: ${result.msg || result.code}`);
   }
 
   return {
-    open_id: res.data?.open_id || "",
-    union_id: res.data?.union_id || "",
-    user_id: res.data?.user_id || "",
-    name: res.data?.name || "",
-    en_name: res.data?.en_name || "",
-    avatar_url: res.data?.avatar_url || "",
-    email: res.data?.email || "",
-    mobile: res.data?.mobile || "",
+    open_id: result.data?.open_id || "",
+    union_id: result.data?.union_id || "",
+    user_id: result.data?.user_id || "",
+    name: result.data?.name || "",
+    en_name: result.data?.en_name || "",
+    avatar_url: result.data?.avatar_url || "",
+    email: result.data?.email || "",
+    mobile: result.data?.mobile || "",
   };
 }
 
