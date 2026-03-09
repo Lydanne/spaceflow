@@ -23,6 +23,7 @@ const emit = defineEmits<{
 const toast = useToast();
 
 const showGroupForm = ref(false);
+const showPermissionBuilder = ref(false);
 const editingGroup = ref<PermissionGroup | null>(null);
 const formName = ref("");
 const formDescription = ref("");
@@ -30,6 +31,16 @@ const formPermissions = ref<string[]>([]);
 const formScopeAll = ref(true);
 const formRepositoryIds = ref<string[]>([]);
 const formLoading = ref(false);
+
+// 保存编辑 Modal 的状态，用于从权限构建器返回时恢复
+const savedFormState = ref<{
+  editing: PermissionGroup | null;
+  name: string;
+  description: string;
+  permissions: string[];
+  scopeAll: boolean;
+  repositoryIds: string[];
+} | null>(null);
 
 const { data: reposData } = useFetch<{ data: RepositoryItem[] }>(`/api/orgs/${props.orgName}/projects?limit=100`);
 const repoList = computed(() => reposData.value?.data ?? []);
@@ -180,6 +191,48 @@ async function deleteGroup(group: PermissionGroup) {
 function getPermissionLabel(key: string) {
   return props.availablePermissions.find((p) => p.key === key)?.label || key;
 }
+
+function openPermissionBuilder() {
+  // 保存当前表单状态
+  savedFormState.value = {
+    editing: editingGroup.value,
+    name: formName.value,
+    description: formDescription.value,
+    permissions: [...formPermissions.value],
+    scopeAll: formScopeAll.value,
+    repositoryIds: [...formRepositoryIds.value],
+  };
+  // 临时关闭编辑 Modal
+  showGroupForm.value = false;
+  // 打开权限构建器
+  showPermissionBuilder.value = true;
+}
+
+function handleAddPermission(permission: string) {
+  showPermissionBuilder.value = false;
+
+  // 恢复编辑 Modal
+  if (savedFormState.value) {
+    editingGroup.value = savedFormState.value.editing;
+    formName.value = savedFormState.value.name;
+    formDescription.value = savedFormState.value.description;
+    formPermissions.value = [...savedFormState.value.permissions];
+    formScopeAll.value = savedFormState.value.scopeAll;
+    formRepositoryIds.value = [...savedFormState.value.repositoryIds];
+
+    // 添加新权限（在恢复状态之后）
+    if (!formPermissions.value.includes(permission)) {
+      formPermissions.value.push(permission);
+    }
+
+    showGroupForm.value = true;
+    savedFormState.value = null;
+  }
+}
+
+function removePermission(index: number) {
+  formPermissions.value.splice(index, 1);
+}
 </script>
 
 <template>
@@ -285,6 +338,15 @@ function getPermissionLabel(key: string) {
       </div>
     </div>
 
+    <!-- 权限构建器 Modal -->
+    <UModal v-model:open="showPermissionBuilder">
+      <template #content>
+        <div class="p-6">
+          <PermissionBuilder @add="handleAddPermission" />
+        </div>
+      </template>
+    </UModal>
+
     <!-- 权限组 创建/编辑 Modal -->
     <UModal v-model:open="showGroupForm">
       <template #content>
@@ -367,6 +429,48 @@ function getPermissionLabel(key: string) {
 
             <div>
               <label class="block text-sm font-medium mb-2">权限</label>
+
+              <!-- 权限构建器按钮 -->
+              <div class="mb-3">
+                <UButton
+                  size="sm"
+                  variant="outline"
+                  icon="i-lucide-wand-2"
+                  @click="openPermissionBuilder"
+                >
+                  使用权限构建器
+                </UButton>
+              </div>
+
+              <!-- 已选权限列表（可视化展示） -->
+              <div
+                v-if="formPermissions.length > 0"
+                class="mb-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+              >
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                  已选权限 ({{ formPermissions.length }})
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <UBadge
+                    v-for="(perm, idx) in formPermissions"
+                    :key="idx"
+                    size="lg"
+                    variant="subtle"
+                    color="primary"
+                  >
+                    <div class="flex items-center gap-2">
+                      <PermissionBadge :permission="perm" />
+                      <UButton
+                        icon="i-lucide-x"
+                        size="xs"
+                        variant="ghost"
+                        @click="removePermission(idx)"
+                      />
+                    </div>
+                  </UBadge>
+                </div>
+              </div>
+
               <div class="space-y-3 max-h-64 overflow-y-auto">
                 <div
                   v-for="group in groupedPermissions"

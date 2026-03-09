@@ -2,7 +2,8 @@ import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import type { H3Event } from "h3";
 import { requireAuth } from "./auth";
-import { VALID_PERMISSION_KEYS } from "~~/server/shared/permissions";
+import { isValidPermissionFormat } from "~~/server/shared/permissions";
+import { matchPermission } from "./permission-matcher";
 
 interface PermissionGroupRow {
   permissions: unknown;
@@ -36,10 +37,19 @@ async function queryUserPermissionGroups(userId: string, orgId: string): Promise
  * 检查权限组行是否授予指定权限（含 repositoryId scope 检查）。
  * - repositoryIds 为 null → 全部仓库
  * - repositoryIds 为数组 → 仅当 repositoryId 在数组中
+ * - 支持 glob 模式匹配（如 actions:trigger:test-* 匹配 actions:trigger:test-unit）
  */
 function rowGrantsPermission(row: PermissionGroupRow, permission: string, repositoryId?: string): boolean {
   const perms = row.permissions;
-  if (!Array.isArray(perms) || !perms.includes(permission)) return false;
+  if (!Array.isArray(perms)) return false;
+
+  // 使用 glob 模式匹配检查权限
+  const hasMatchingPermission = perms.some((granted) => {
+    if (typeof granted !== "string") return false;
+    return matchPermission(permission, granted);
+  });
+
+  if (!hasMatchingPermission) return false;
 
   // 不需要仓库级 scope 检查
   if (!repositoryId) return true;
@@ -60,7 +70,7 @@ function rowGrantsPermission(row: PermissionGroupRow, permission: string, reposi
  * 检查用户在指定组织中是否拥有给定权限。
  *
  * 判定逻辑：
- * 1. 权限 key 不合法 → 500
+ * 1. 权限 key 格式不合法 → 500
  * 2. 系统管理员 → 直接放行
  * 3. 查询用户所在团队 → 团队已分配的权限组 → 权限组中包含目标权限 + scope 匹配 → 放行
  * 4. 否则 → 403
@@ -68,10 +78,10 @@ function rowGrantsPermission(row: PermissionGroupRow, permission: string, reposi
  * @param repositoryId - 可选，传入时会额外检查权限组的 repositoryIds scope
  */
 export async function requirePermission(event: H3Event, orgId: string, permission: string, repositoryId?: string) {
-  if (!VALID_PERMISSION_KEYS.has(permission)) {
+  if (!isValidPermissionFormat(permission)) {
     throw createError({
       statusCode: 500,
-      message: `Invalid permission key: ${permission}`,
+      message: `Invalid permission format: ${permission}`,
     });
   }
 
