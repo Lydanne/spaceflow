@@ -134,15 +134,144 @@ GITEA_SERVICE_TOKEN=your-gitea-service-token
 
 ### Webhook 配置
 
-Teax 会自动为绑定的仓库创建 Webhook，但需要确保：
+**重要说明：** Teax 的 **Action 成功推送** 功能依赖 Gitea Webhook。当你在 Teax 中创建项目时，系统会自动在对应的 Gitea 仓库中注册 Webhook。
 
-1. **Gitea 可以访问 Teax**
-   - 如果 Teax 在内网，确保 Gitea 可以访问
-   - 生产环境建议使用公网域名
+#### Webhook 生命周期管理
 
-2. **Webhook 密钥**
-   - Teax 会自动生成并验证 Webhook 签名
-   - 使用 HMAC-SHA256 算法
+**何时创建 Webhook？**
+
+Webhook 在以下时机**自动创建**：
+
+1. **创建项目时**
+   - 在 Teax 中点击"新建项目"并选择 Gitea 仓库
+   - 提交创建表单后，Teax 立即执行以下操作：
+     - 使用 `GITEA_SERVICE_TOKEN` 调用 Gitea API
+     - 在选中的仓库中创建 Webhook
+     - Webhook URL: `https://your-teax-domain.com/api/webhooks/gitea`
+     - 自动生成随机的 Webhook 密钥（32字节）
+     - 订阅所有事件 (`*`)
+     - 将 Webhook ID 和密钥保存到 Teax 数据库
+
+2. **创建流程**
+   ```
+   用户点击"新建项目" 
+   → 选择 Gitea 仓库
+   → Teax 验证仓库未被绑定
+   → 调用 Gitea API 创建 Webhook
+   → 保存项目信息到数据库
+   → 创建完成
+   ```
+
+**何时删除 Webhook？**
+
+Webhook 在以下时机**自动删除**：
+
+1. **删除项目时**
+   - 在 Teax 项目设置中点击"删除项目"
+   - 确认删除后，Teax 执行以下操作：
+     - 使用 `GITEA_SERVICE_TOKEN` 调用 Gitea API
+     - 删除仓库中的 Webhook（使用保存的 webhook_id）
+     - 从 Teax 数据库中删除项目记录
+     - 删除相关的通知规则和配置
+
+2. **删除流程**
+   ```
+   用户点击"删除项目"
+   → 确认删除操作
+   → Teax 调用 Gitea API 删除 Webhook
+   → 删除数据库中的项目记录
+   → 删除完成
+   ```
+
+**重要说明：**
+
+- ✅ **完全自动化** - 你不需要手动在 Gitea 中创建或删除 Webhook
+- ✅ **幂等性** - 如果 Webhook 创建失败，项目仍会创建，但不会收到事件通知
+- ✅ **清理保证** - 删除项目时会自动清理 Gitea 中的 Webhook，不会留下垃圾数据
+- ⚠️ **权限要求** - `GITEA_SERVICE_TOKEN` 必须有 `admin:repo_hook` 权限
+
+2. **订阅的事件**
+
+   Teax 自动订阅以下所有 Gitea 事件类型：
+
+   - **仓库事件**: `create`、`delete`、`fork`、`push`
+   - **Issues 事件**: `issues`、`issue_assign`、`issue_label`、`issue_milestone`、`issue_comment`
+   - **Pull Request 事件**: `pull_request`、`pull_request_assign`、`pull_request_label`、`pull_request_milestone`、`pull_request_comment`、`pull_request_review_approved`、`pull_request_review_rejected`、`pull_request_review_comment`、`pull_request_sync`
+   - **工作流事件**: `status`、`workflow_run`、`workflow_job`（**Actions 推送的关键**）
+   - **其他事件**: `wiki`、`repository`、`release`、`package`
+
+   在 Teax 内部通过配置控制实际处理哪些事件
+
+3. **Webhook 触发流程**
+   ```text
+   Gitea 事件触发（如 Workflow 完成）
+   → Gitea 发送事件到 Teax Webhook
+   → Teax 验证 HMAC-SHA256 签名
+   → 根据事件类型和配置决定是否处理
+   → 匹配通知规则
+   → 发送飞书卡片通知
+   ```
+
+#### 必需条件
+
+要让 Webhook 正常工作，需要确保：
+
+1. **网络连通性**
+   - Gitea 必须能够访问 Teax 的 Webhook 接收地址
+   - 如果 Teax 在内网，确保 Gitea 可以访问（同一内网或配置端口转发）
+   - **生产环境强烈建议使用公网域名和 HTTPS**
+
+2. **服务令牌权限**
+   - `GITEA_SERVICE_TOKEN` 必须有 `admin:repo_hook` 权限
+   - 用于自动创建和管理 Webhook
+
+3. **Webhook 密钥验证**
+   - Teax 会自动生成 Webhook 密钥并保存到数据库
+   - 每次接收 Webhook 时使用 HMAC-SHA256 验证签名
+   - 防止伪造的 Webhook 请求
+
+#### 手动检查 Webhook
+
+如果 Action 推送不工作，可以手动检查：
+
+1. **在 Gitea 仓库中查看 Webhook**
+   - 进入仓库 → 设置 → Webhooks
+   - 应该能看到一个指向 Teax 的 Webhook
+   - URL 格式：`https://your-teax-domain.com/api/webhooks/gitea`
+
+2. **查看 Webhook 推送历史**
+   - 点击 Webhook 查看推送记录
+   - 检查是否有推送失败的记录
+   - 查看失败原因（网络超时、签名验证失败等）
+
+3. **测试 Webhook**
+   - 在 Webhook 详情页点击"测试推送"
+   - 选择 `workflow_run` 事件类型
+   - 查看 Teax 日志确认是否收到
+
+#### 常见问题
+
+**Q: 创建项目后没有自动创建 Webhook？**
+
+A: 检查：
+- `GITEA_SERVICE_TOKEN` 是否配置正确
+- 令牌是否有 `admin:repo_hook` 权限
+- Teax 日志中是否有创建 Webhook 的错误信息
+
+**Q: Webhook 推送失败？**
+
+A: 检查：
+- Gitea 是否能访问 Teax（网络连通性）
+- Teax 的 Webhook 接收地址是否正确
+- 查看 Gitea Webhook 推送日志中的错误信息
+
+**Q: 收到 Webhook 但没有飞书通知？**
+
+A: 检查：
+- 项目是否配置了通知规则或飞书群聊 ID
+- 通知规则是否匹配（分支、Workflow 文件名）
+- 飞书应用配置是否正确
+- Teax 日志中是否有发送通知的错误
 
 ## 飞书配置
 

@@ -145,6 +145,68 @@ async function saveSettings() {
   }
 }
 
+// ─── Webhook 管理 ──────────────────────────────────────
+interface WebhookStatus {
+  exists: boolean;
+  active: boolean;
+  events?: string[];
+  url?: string;
+  webhookId?: number;
+  message?: string;
+}
+
+const webhookStatus = ref<WebhookStatus | null>(null);
+const loadingWebhook = ref(false);
+const togglingWebhook = ref(false);
+const recreatingWebhook = ref(false);
+
+async function checkWebhookStatus() {
+  loadingWebhook.value = true;
+  try {
+    webhookStatus.value = await $fetch(`/api/repos/${props.owner}/${props.repo}/webhook/status`);
+  } catch {
+    toast.add({ title: "获取 Webhook 状态失败", color: "error" });
+  } finally {
+    loadingWebhook.value = false;
+  }
+}
+
+async function toggleWebhook() {
+  if (!webhookStatus.value) return;
+  togglingWebhook.value = true;
+  try {
+    const result = await $fetch(`/api/repos/${props.owner}/${props.repo}/webhook/toggle`, {
+      method: "POST",
+      body: { active: !webhookStatus.value.active },
+    });
+    toast.add({ title: result.message, color: "success" });
+    await checkWebhookStatus();
+  } catch {
+    toast.add({ title: "切换 Webhook 状态失败", color: "error" });
+  } finally {
+    togglingWebhook.value = false;
+  }
+}
+
+async function recreateWebhook() {
+  recreatingWebhook.value = true;
+  try {
+    const result = await $fetch(`/api/repos/${props.owner}/${props.repo}/webhook/recreate`, {
+      method: "POST",
+    });
+    toast.add({ title: result.message, color: "success" });
+    await checkWebhookStatus();
+  } catch {
+    toast.add({ title: "重新创建 Webhook 失败", color: "error" });
+  } finally {
+    recreatingWebhook.value = false;
+  }
+}
+
+onMounted(() => {
+  checkWebhookStatus();
+});
+
 // ─── 删除项目 ──────────────────────────────────────────
 const deleting = ref(false);
 const confirmDeleteName = ref("");
@@ -212,6 +274,148 @@ async function deleteProject() {
             }}
           </p>
         </div>
+      </div>
+    </UCard>
+
+    <!-- Webhook 管理 -->
+    <UCard>
+      <template #header>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <UIcon
+              name="i-lucide-webhook"
+              class="w-4 h-4"
+            />
+            <h3 class="font-semibold">
+              Webhook 管理
+            </h3>
+          </div>
+          <UButton
+            icon="i-lucide-refresh-cw"
+            size="xs"
+            variant="ghost"
+            :loading="loadingWebhook"
+            @click="checkWebhookStatus"
+          >
+            刷新状态
+          </UButton>
+        </div>
+      </template>
+
+      <div
+        v-if="loadingWebhook"
+        class="text-center py-8 text-gray-400"
+      >
+        <UIcon
+          name="i-lucide-loader-2"
+          class="w-8 h-8 mx-auto mb-2 animate-spin"
+        />
+        <p>正在检查 Webhook 状态...</p>
+      </div>
+
+      <div
+        v-else-if="webhookStatus"
+        class="space-y-3"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <div
+                :class="[
+                  'w-2 h-2 rounded-full',
+                  webhookStatus.exists
+                    ? (webhookStatus.active ? 'bg-green-500' : 'bg-yellow-500')
+                    : 'bg-gray-400',
+                ]"
+              />
+              <span class="text-sm font-medium">
+                {{
+                  webhookStatus.exists
+                    ? (webhookStatus.active ? '运行中' : '已暂停')
+                    : '未配置'
+                }}
+              </span>
+              <span
+                v-if="webhookStatus.exists && webhookStatus.events"
+                class="text-xs text-gray-400"
+              >
+                {{ webhookStatus.events.length }} 个事件
+              </span>
+            </div>
+            <p
+              v-if="webhookStatus.message"
+              class="text-xs text-gray-500"
+            >
+              {{ webhookStatus.message }}
+            </p>
+            <p
+              v-else
+              class="text-xs text-gray-500"
+            >
+              接收 Gitea 事件通知，包括 Actions、代码推送等
+            </p>
+          </div>
+
+          <div class="flex gap-2 flex-shrink-0">
+            <UButton
+              v-if="webhookStatus.exists"
+              :color="webhookStatus.active ? 'warning' : 'primary'"
+              size="xs"
+              variant="ghost"
+              :loading="togglingWebhook"
+              @click="toggleWebhook"
+            >
+              {{ webhookStatus.active ? '暂停' : '启用' }}
+            </UButton>
+
+            <UButton
+              color="neutral"
+              size="xs"
+              variant="ghost"
+              :loading="recreatingWebhook"
+              @click="recreateWebhook"
+            >
+              {{ webhookStatus.exists ? '重建' : '创建' }}
+            </UButton>
+          </div>
+        </div>
+
+        <details
+          v-if="webhookStatus.exists"
+          class="group"
+        >
+          <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 select-none">
+            <span class="inline-flex items-center gap-1">
+              详细信息
+            </span>
+          </summary>
+          <div class="mt-2 pl-4 space-y-1.5 text-xs text-gray-500">
+            <div
+              v-if="webhookStatus.url"
+              class="font-mono break-all"
+            >
+              {{ webhookStatus.url }}
+            </div>
+            <div
+              v-if="webhookStatus.webhookId"
+              class="font-mono"
+            >
+              ID: {{ webhookStatus.webhookId }}
+            </div>
+            <div
+              v-if="webhookStatus.events"
+              class="flex flex-wrap gap-1 pt-1"
+            >
+              <span
+                v-for="event in webhookStatus.events"
+                :key="event"
+                class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono"
+              >
+                {{ event }}
+              </span>
+            </div>
+          </div>
+        </details>
       </div>
     </UCard>
 

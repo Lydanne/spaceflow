@@ -77,6 +77,11 @@ export interface GiteaWebhook {
   url: string;
   active: boolean;
   events: string[];
+  config: {
+    url: string;
+    content_type: string;
+    secret: string;
+  };
 }
 
 export interface GiteaCommit {
@@ -286,7 +291,33 @@ export class GiteaService {
     repo: string,
     url: string,
     secret: string,
-    events: string[] = ["push"],
+    events: string[] = [
+      "create",
+      "delete",
+      "fork",
+      "push",
+      "issues",
+      "issue_assign",
+      "issue_label",
+      "issue_milestone",
+      "issue_comment",
+      "pull_request",
+      "pull_request_assign",
+      "pull_request_label",
+      "pull_request_milestone",
+      "pull_request_comment",
+      "pull_request_review_approved",
+      "pull_request_review_rejected",
+      "pull_request_review_comment",
+      "pull_request_sync",
+      "wiki",
+      "repository",
+      "release",
+      "package",
+      "status",
+      "workflow_run",
+      "workflow_job",
+    ], // 默认订阅所有 Gitea 支持的事件（使用 Gitea 源码中的小写下划线格式）
   ): Promise<GiteaWebhook> {
     return this.fetch(`/repos/${owner}/${repo}/hooks`, "POST", {
       type: "gitea",
@@ -298,6 +329,27 @@ export class GiteaService {
       events,
       active: true,
     }) as Promise<GiteaWebhook>;
+  }
+
+  async getWebhook(owner: string, repo: string, hookId: number): Promise<GiteaWebhook> {
+    return this.fetch(`/repos/${owner}/${repo}/hooks/${hookId}`) as Promise<GiteaWebhook>;
+  }
+
+  async updateWebhook(
+    owner: string,
+    repo: string,
+    hookId: number,
+    data: {
+      active?: boolean;
+      events?: string[];
+      config?: {
+        url?: string;
+        content_type?: string;
+        secret?: string;
+      };
+    },
+  ): Promise<GiteaWebhook> {
+    return this.fetch(`/repos/${owner}/${repo}/hooks/${hookId}`, "PATCH", data) as Promise<GiteaWebhook>;
   }
 
   async deleteWebhook(owner: string, repo: string, hookId: number): Promise<void> {

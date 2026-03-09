@@ -45,7 +45,8 @@ export default defineEventHandler(async (event) => {
 
   let webhookIdValue: number | undefined;
   try {
-    const webhook = await gitea.createWebhook(owner!, repo!, webhookUrl, webhookSecret, ["push"]);
+    // 订阅所有事件（["*"]），在 Teax 内部通过配置控制处理哪些事件
+    const webhook = await gitea.createWebhook(owner!, repo!, webhookUrl, webhookSecret);
     webhookIdValue = webhook.id;
   } catch (err: unknown) {
     console.error("Failed to create webhook:", err);
