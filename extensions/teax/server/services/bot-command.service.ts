@@ -7,7 +7,6 @@ import {
 } from "~~/server/services/messaging";
 import { createServiceGiteaClient } from "~~/server/utils/gitea";
 import { startWorkflowAction } from "~~/server/services/workflow-action-machine";
-import { updateUserBotMenu } from "~~/server/services/bot-menu.service";
 
 // ─── 指令上下文 ─────────────────────────────────────────
 
@@ -292,11 +291,6 @@ export async function handleBotCommand(ctx: BotCommandContext): Promise<void> {
   const parts = ctx.text.trim().split(/\s+/);
   const cmdText = parts[0]?.toLowerCase() || "";
   const args = parts.slice(1);
-
-  // 异步更新用户菜单(不阻塞指令处理)
-  updateUserBotMenu(ctx.senderOpenId).catch((e) => {
-    console.error("[bot-command] Failed to update user menu:", e);
-  });
 
   // 匹配指令
   const matched = commands.find(

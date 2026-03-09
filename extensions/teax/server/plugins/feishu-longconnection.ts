@@ -52,10 +52,6 @@ export default defineNitroPlugin(async () => {
         approval_instance: async (data: Parameters<typeof handleApprovalEvent>[0]) => {
           await handleApprovalEvent(data);
         },
-        // 菜单点击事件
-        "application.bot.menu_v6": async (data: Parameters<typeof handleMenuClickEvent>[0]) => {
-          await handleMenuClickEvent(data);
-        },
       }),
     });
 
@@ -213,37 +209,6 @@ async function handleApprovalEvent(data: {
     });
   } catch (error) {
     console.error("[feishu-ws] Error handling approval:", error);
-  }
-}
-
-/**
- * 处理菜单点击事件
- */
-async function handleMenuClickEvent(data: {
-  operator?: {
-    operator_name?: string;
-    operator_id?: {
-      union_id?: string;
-      user_id?: string;
-      open_id?: string;
-    };
-  };
-  event_key?: string;
-}): Promise<void> {
-  try {
-    const operator = data.operator;
-    const eventKey = data.event_key;
-
-    if (!operator?.operator_id?.open_id || !eventKey) {
-      return;
-    }
-
-    console.log(`[feishu-ws] 📱 Menu clicked: ${eventKey} by ${operator.operator_id.open_id}`);
-
-    const { handleMenuClick } = await import("~~/server/services/bot-menu.service");
-    await handleMenuClick(operator.operator_id.open_id, eventKey);
-  } catch (error) {
-    console.error("[feishu-ws] Error handling menu click:", error);
   }
 }
 

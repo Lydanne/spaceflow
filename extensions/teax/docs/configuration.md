@@ -327,17 +327,29 @@ FEISHU_APPROVAL_CODE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 4. **配置事件订阅**
 
-   进入应用详情 → 事件订阅：
+   进入应用详情 → 事件订阅，选择以下**任一**模式：
 
-   - **请求地址配置**
-     - 请求地址：`https://your-domain.com/api/webhooks/feishu`
-     - 加密策略：选择 "加密"
-     - 复制 `Encrypt Key` 和 `Verification Token` 到环境变量
+   **方式一：长连接模式（推荐）**
+   - 优势：无需公网 IP、本地开发友好、实时性更强
+   - 配置步骤：
+     1. 选择 "订阅方式" → "使用长连接接收事件/回调"
+     2. 订阅以下事件：
+        - `im.message.receive_v1` - 接收消息（用于机器人指令）
+        - `card.action.trigger` - 卡片交互
+        - `approval_instance` - 审批事件（可选）
+     3. 无需配置请求地址，Teax 启动时会自动建立长连接
 
-   - **订阅事件**
-     - `im.message.receive_v1` - 接收消息（用于机器人指令）
-     - `approval.instance.create_v1` - 审批创建
-     - `approval.instance.update_v1` - 审批更新
+   **方式二：Webhook 模式（传统）**
+   - 优势：支持多实例部署、易于审计
+   - 配置步骤：
+     1. 选择 "订阅方式" → "请求网址配置"
+     2. 请求地址：`https://your-domain.com/api/webhooks/feishu`
+     3. 加密策略：选择 "加密"
+     4. 复制 `Encrypt Key` 和 `Verification Token` 到环境变量
+     5. 订阅相同的事件（同上）
+     6. 禁用长连接：设置环境变量 `FEISHU_LONGCONNECTION_DISABLED=true`
+
+   > 💡 **建议**：开发环境使用长连接，生产环境根据部署架构选择
 
 5. **获取凭证**
    - 进入应用详情 → 凭证与基础信息
