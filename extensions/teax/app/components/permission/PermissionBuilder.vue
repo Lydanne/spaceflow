@@ -97,7 +97,10 @@
           </div>
 
           <!-- 模式配置面板 -->
-          <div v-if="patternType === 'pattern'" class="space-y-4">
+          <div
+            v-if="patternType === 'pattern'"
+            class="space-y-4"
+          >
             <!-- 常用模板 -->
             <div v-if="patternTemplates.length > 0">
               <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
