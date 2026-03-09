@@ -16,17 +16,34 @@ export default defineEventHandler(async (event) => {
   try {
     const tokenData = await exchangeFeishuCode(code);
     const feishuUser = await getFeishuUserInfo(tokenData.access_token);
+    const tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
 
-    // 查找已绑定的 Teax 用户
+    // 检查当前用户是否已登录
+    const session = await getUserSession(event);
+
+    if (session.user) {
+      // 用户已登录,直接绑定飞书账号到当前用户
+      await bindFeishuToUser(
+        session.user.id,
+        feishuUser,
+        tokenData.access_token,
+        tokenExpiresAt,
+        tokenData.refresh_token,
+      );
+
+      // 绑定成功,跳转回设置页面
+      return sendRedirect(event, "/user/settings?success=feishu_bound");
+    }
+
+    // 用户未登录,查找是否已有绑定记录
     const user = await findUserByFeishuOpenId(feishuUser.open_id);
 
     if (!user) {
-      // 未绑定 Gitea 账号，跳转到登录页提示需先绑定
+      // 未绑定 Gitea 账号,跳转到登录页提示需先绑定
       return sendRedirect(event, "/auth/login?error=feishu_not_bound");
     }
 
-    // 更新绑定信息,包括访问令牌和刷新令牌
-    const tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+    // 已有绑定记录,更新绑定信息并登录
     await bindFeishuToUser(
       user.id,
       feishuUser,
