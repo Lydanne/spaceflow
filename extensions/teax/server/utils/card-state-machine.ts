@@ -6,8 +6,6 @@
 import { updateCardMessage } from "~~/server/utils/feishu-sdk";
 import type { FeishuInteractiveCard } from "~~/server/utils/feishu-sdk";
 
-export type { FeishuInteractiveCard };
-
 // ─── 状态机类型定义 ─────────────────────────────────────────
 
 export interface CardState {
