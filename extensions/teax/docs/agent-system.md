@@ -1,10 +1,17 @@
-# Agent 系统文档
+# OpenCode 集成文档
 
-> AI Agent 执行架构和 open-code 集成
+> 工作区的 AI 辅助编辑功能 - 基于 @opencode-ai/sdk
+
+## 概述
+
+OpenCode 是工作区的 **AI 辅助编辑功能**，作为 Web VSCode 的补充编辑方式。每个工作区容器内同时运行 Web VSCode 和 OpenCode 服务，用户可以选择：
+
+- **手动编辑**：通过 Web VSCode 直接编辑代码
+- **AI 辅助编辑**：通过 OpenCode 让 AI Agent 自动编辑代码
 
 ## Agent Session 概念
 
-每个 Agent 运行实例对应一个 Session，由 **`@opencode-ai/sdk`** 驱动执行。Session 包含运行状态、open-code 步骤追踪、token 消耗和实时日志流。
+每个 OpenCode 运行实例对应一个 Session，由 **`@opencode-ai/sdk`** 驱动执行。Session 包含运行状态、步骤追踪、token 消耗和实时日志流。
 
 ### Session 状态
 
@@ -105,6 +112,92 @@ AgentService (宿主)
 ```
 
 AgentService 通过 Docker SDK（`dockerode`）管理容器生命周期，容器内通过 stdio 与宿主通信传递 open-code 结果。
+
+## OpenCode API（用于 CI/CD）
+
+Teax 提供 OpenCode API 供 Gitea Actions 调用。API 内部通过 **OpenCode 客户端**（`@opencode-ai/sdk`）连接到 CI 工作区容器内运行的 **OpenCode 服务端**。
+
+### 架构说明
+
+```text
+Gitea Actions
+    ↓ HTTP Request
+Teax API (/api/repos/{owner}/{repo}/opencode/sessions)
+    ↓ OpenCode Client SDK
+CI 工作区容器
+    ├── OpenCode 服务端（监听端口 3100）
+    ├── 项目代码仓库
+    └── 开发工具链
+```
+
+### API 端点
+
+```typescript
+// 创建 OpenCode Session
+POST /api/repos/{owner}/{repo}/opencode/sessions
+Body: {
+  prompt: string;           // AI 任务描述
+  systemPrompt?: string;    // 系统提示词
+  model?: string;           // LLM 模型（默认使用项目配置）
+  branch?: string;          // 工作分支（默认 main）
+}
+Response: {
+  sessionId: string;
+  status: 'running';
+  workspaceId: string;      // CI 工作区 ID
+}
+
+// 获取 Session 状态
+GET /api/repos/{owner}/{repo}/opencode/sessions/{sessionId}
+Response: {
+  sessionId: string;
+  status: 'running' | 'completed' | 'failed';
+  steps: number;
+  tokensUsed: number;
+  cost: number;
+  prUrl?: string;           // 创建的 PR 链接
+  errorMessage?: string;
+}
+
+// 获取 Session 日志（SSE 流式）
+GET /api/repos/{owner}/{repo}/opencode/sessions/{sessionId}/logs
+Response: Server-Sent Events
+  event: log
+  data: { type: 'stdout' | 'tool' | 'reasoning', content: string }
+
+// 停止 Session
+POST /api/repos/{owner}/{repo}/opencode/sessions/{sessionId}/stop
+```
+
+### Gitea Actions 使用示例
+
+```yaml
+name: AI Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger OpenCode Review
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.TEAX_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "prompt": "Review this PR and suggest improvements",
+              "branch": "${{ github.head_ref }}"
+            }' \
+            https://teax.example.com/api/repos/${{ github.repository }}/opencode/sessions
+```
+
+### 权限控制
+
+- **认证**：需要 Gitea Personal Access Token 或 Teax API Token
+- **授权**：调用者需要对仓库有写权限
+- **限流**：每个项目每小时最多 10 个并发 Session
 
 ## 安全考虑
 

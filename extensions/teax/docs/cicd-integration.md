@@ -15,6 +15,72 @@
 
 > **Actions Tab 说明**：CI/CD 完全由 Gitea Actions（`.gitea/workflows/*.yml`）驱动。Teax 通过 Gitea API 代理展示 workflow runs 列表，提供飞书通知等增值功能。不再维护独立的 PublishTask 发布系统。
 
+## OpenCode 集成（AI 辅助 CI/CD）
+
+Teax 提供 OpenCode API 供 Gitea Actions 调用。API 内部通过 OpenCode 客户端连接到 CI 工作区容器内的 OpenCode 服务端，执行 AI 自动化代码操作。
+
+**架构流程：**
+```text
+Gitea Actions → Teax API → OpenCode Client → OpenCode Server (容器内) → 执行 AI 操作
+```
+
+### 使用场景
+
+| 场景 | 说明 | 示例 |
+| ---- | ---- | ---- |
+| **代码审查** | PR 自动审查并提出改进建议 | AI 检查代码质量、安全漏洞、性能问题 |
+| **自动修复** | CI 失败时自动修复代码 | 测试失败时 AI 分析并修复 bug |
+| **文档生成** | 自动生成或更新文档 | 根据代码变更更新 API 文档 |
+| **代码重构** | 自动化代码优化 | 应用最佳实践、移除冗余代码 |
+| **依赖更新** | 自动升级依赖并修复兼容性 | 升级 npm 包并修复破坏性变更 |
+
+### Workflow 示例
+
+```yaml
+name: AI Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: AI Review PR
+        run: |
+          SESSION_ID=$(curl -s -X POST \
+            -H "Authorization: token ${{ secrets.TEAX_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "prompt": "Review this PR: ${{ github.event.pull_request.html_url }}. Check for bugs, security issues, and suggest improvements.",
+              "branch": "${{ github.head_ref }}"
+            }' \
+            https://teax.example.com/api/repos/${{ github.repository }}/opencode/sessions | jq -r '.sessionId')
+          
+          echo "Session ID: $SESSION_ID"
+          
+          # 等待完成
+          while true; do
+            STATUS=$(curl -s \
+              -H "Authorization: token ${{ secrets.TEAX_TOKEN }}" \
+              https://teax.example.com/api/repos/${{ github.repository }}/opencode/sessions/$SESSION_ID | jq -r '.status')
+            
+            if [ "$STATUS" = "completed" ]; then
+              echo "AI review completed"
+              break
+            elif [ "$STATUS" = "failed" ]; then
+              echo "AI review failed"
+              exit 1
+            fi
+            
+            sleep 5
+          done
+```
+
+### API 端点
+
+详见 [OpenCode 集成文档](./agent-system.md#opencode-api用于-cicd)
+
 ## Workflow 信息卡片
 
 选中具体 workflow 时，在 runs 列表上方展示信息卡片：

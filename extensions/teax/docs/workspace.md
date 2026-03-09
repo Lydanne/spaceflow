@@ -4,17 +4,65 @@
 
 ## 概述
 
-工作区是 **与项目仓库绑定的容器化开发环境**。每个工作区对应一个 Docker 容器，容器内预装 openvscode-server + Git + Node.js 等开发工具链。用户通过 Web 端 VSCode 或 VSCode Remote 进入容器，进行代码编辑、提交和测试环境部署。
+工作区是 **与项目仓库绑定的容器化开发环境**。每个工作区对应一个 Docker 容器，提供 **两种代码编辑方式**：
+
+### 双编辑模式
 
 ```text
-创建工作区 → 启动容器（clone 仓库 + openvscode-server）
+创建工作区 → 启动容器（clone 仓库 + Web VSCode + OpenCode）
     │
-    ├── Web VSCode：       /workspace/{name}/ide/     → 反向代理到容器内 openvscode-server
-    ├── 测试环境预览：     /workspace/{name}/          → 反向代理到容器内应用端口
-    ├── VSCode Remote：    SSH 连接容器（端口映射）
+    ├── 编辑方式 1：Web VSCode（手动编辑）
+    │   ├── /workspace/{name}/ide/ → 反向代理到容器内 openvscode-server
+    │   └── 用户通过浏览器直接编辑代码
+    │
+    ├── 编辑方式 2：OpenCode（AI 辅助编辑）
+    │   ├── 基于 @opencode-ai/sdk
+    │   ├── 容器内运行 OpenCode 服务
+    │   ├── 支持多种 LLM（OpenAI、Claude、私有部署等）
+    │   └── AI Agent 自动编辑代码、执行命令、提交 PR
+    │
+    ├── 测试环境预览：/workspace/{name}/ → 反向代理到容器内应用端口
     │
     └── 删除工作区 → 容器销毁 + 清理存储卷
 ```
+
+### 核心特性
+
+- **双编辑模式**：用户可选择手动编辑（Web VSCode）或 AI 辅助编辑（OpenCode）
+- **容器隔离**：每个工作区独立容器，互不干扰
+- **持久化存储**：工作区数据保存在 Docker Volume，停止后可恢复
+- **实时预览**：支持测试环境预览，直接访问容器内运行的应用
+- **CI 集成**：默认 CI 工作区暴露 OpenCode API，供 Gitea Actions 调用
+
+## 工作区类型
+
+### 1. 用户工作区
+
+用户手动创建的开发环境，用于日常开发：
+
+- **创建方式**：用户在项目页面手动创建
+- **访问方式**：通过 Web VSCode 或 OpenCode 界面
+- **生命周期**：用户控制启动/停止/删除
+- **用途**：日常开发、调试、测试
+
+### 2. CI 工作区（默认）
+
+每个项目自动创建的默认工作区，专门用于 CI/CD：
+
+- **创建时机**：项目创建时自动创建
+- **命名规则**：`{owner}-{repo}-ci`（如 `myorg-myproject-ci`）
+- **容器内服务**：
+  - **OpenCode 服务端**：监听容器内端口（如 3100），等待客户端连接
+  - **Web VSCode**：openvscode-server
+  - **应用服务**：测试环境
+- **访问方式**：
+  - **Teax API**：`/api/repos/{owner}/{repo}/opencode/*`（Teax 后端通过 OpenCode 客户端连接容器内服务端）
+  - **Web 界面**：`/workspace/{owner}-{repo}-ci`
+- **生命周期**：默认保持运行，自动重启
+- **用途**：
+  - Gitea Actions 中调用 Teax API，由 Teax 连接 OpenCode 服务端执行 AI 操作
+  - CI/CD 流程中的自动化代码修改
+  - 自动化测试和代码审查
 
 ## 容器生命周期
 

@@ -58,24 +58,12 @@ Gitea Actions 集成、Workflow 管理和执行流程。
 - Workflows API
 - 触发 Workflow 弹窗
 
-#### 5. [Agent 系统](./agent-system.md) 🤖
+#### 5. [工作区系统](./workspace.md) 💻
 
-AI Agent 执行架构和 open-code 集成。
-
-**包含内容：**
-- Agent Session 概念和状态
-- 整体执行流程
-- open-code 配置构建
-- 支持的 LLM 供应商
-- 日志流映射
-- 工具执行隔离
-
-#### 6. [工作区系统](./workspace.md) 💻
-
-容器化开发环境和 Web IDE 集成。
+容器化开发环境，提供 Web VSCode 和 OpenCode 两种编辑方式。
 
 **包含内容：**
-- 工作区概述
+- 工作区概述和双编辑模式
 - 容器生命周期和状态机
 - 容器运行时抽象
 - Docker 实现
@@ -83,6 +71,19 @@ AI Agent 执行架构和 open-code 集成。
 - 网关代理
 - 端口分配策略
 - 安全考虑
+
+#### 6. [OpenCode 集成](./agent-system.md) 🤖
+
+工作区的 AI 辅助编辑功能，基于 @opencode-ai/sdk。
+
+**包含内容：**
+- OpenCode 概述（工作区的 AI 编辑模式）
+- Agent Session 概念和状态
+- 整体执行流程
+- open-code 配置构建
+- 支持的 LLM 供应商
+- 日志流映射
+- 工具执行隔离
 
 #### 7. [飞书集成](./feishu-integration.md) 📱
 
