@@ -475,7 +475,10 @@ function eventLabel(event: string): string {
       </div>
 
       <!-- Jobs + 日志面板 -->
-      <div class="flex gap-4" style="min-height: 400px">
+      <div
+        class="flex gap-4"
+        style="min-height: 400px"
+      >
         <!-- 左侧: Jobs 列表 -->
         <div class="w-64 shrink-0">
           <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">

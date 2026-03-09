@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     console.error("Failed to create system hook:", err);
     // 打印详细的错误信息
     if (err && typeof err === "object" && "data" in err) {
-      console.error("Gitea error response:", JSON.stringify((err as any).data, null, 2));
+      console.error("Gitea error response:", JSON.stringify((err as Record<string, unknown>).data, null, 2));
     }
     throw createError({
       statusCode: 500,
