@@ -277,7 +277,33 @@ export interface CardActionContext {
 }
 
 export async function handleCardAction(ctx: CardActionContext): Promise<void> {
-  // 使用状态机路由处理卡片交互
+  const actionValue = ctx.action.value as Record<string, unknown> | undefined;
+  const actionType = actionValue?.action as string | undefined;
+
+  // 检查是否是控制面板的交互
+  const controlPanelActions = [
+    "select_org",
+    "select_repo",
+    "back_to_home",
+    "back_to_org",
+    "open_actions",
+    "open_agents",
+    "open_pages",
+    "open_settings",
+  ];
+
+  if (actionType && actionValue && controlPanelActions.includes(actionType)) {
+    const { handleControlPanelAction } = await import("~~/server/services/control-panel.service");
+    const { updateCardMessage } = await import("~~/server/utils/feishu-sdk");
+
+    const newCard = await handleControlPanelAction(ctx.openId, actionValue as Record<string, unknown>);
+    if (newCard) {
+      await updateCardMessage(ctx.token, newCard);
+    }
+    return;
+  }
+
+  // 否则调用状态机处理其他卡片交互
   const { routeCardAction } = await import("~~/server/utils/card-state-machine");
   await routeCardAction({
     action: ctx.action,
@@ -288,7 +314,17 @@ export async function handleCardAction(ctx: CardActionContext): Promise<void> {
 // ─── 指令分发 ─────────────────────────────────────────────
 
 export async function handleBotCommand(ctx: BotCommandContext): Promise<void> {
-  const parts = ctx.text.trim().split(/\s+/);
+  const text = ctx.text.trim();
+
+  // 如果只是 @ 机器人,没有输入任何内容,显示控制面板
+  if (!text || text === "") {
+    const { generateControlPanelHome } = await import("~~/server/services/control-panel.service");
+    const card = await generateControlPanelHome(ctx.senderOpenId);
+    await replyFeishuCardMessage(ctx.messageId, card);
+    return;
+  }
+
+  const parts = text.split(/\s+/);
   const cmdText = parts[0]?.toLowerCase() || "";
   const args = parts.slice(1);
 
@@ -302,14 +338,15 @@ export async function handleBotCommand(ctx: BotCommandContext): Promise<void> {
       await matched.handler(ctx, args);
     } catch (err) {
       console.error(`[bot-command] ${matched.name} error:`, err);
-      await replyFeishuMessage(ctx.messageId, "❌ 指令执行出错，请稍后重试").catch(() => {});
+      await replyFeishuMessage(ctx.messageId, "❌ 指令执行失败,请稍后重试");
     }
-    return;
+  } else {
+    // 未知指令,显示帮助
+    const helpCmd = commands.find((c) => c.name === "help");
+    if (helpCmd) {
+      await helpCmd.handler(ctx, []);
+    } else {
+      await replyFeishuMessage(ctx.messageId, "❌ 未知指令,请使用 /help 查看可用指令");
+    }
   }
-
-  // 未匹配到指令时返回帮助提示
-  await replyFeishuMessage(
-    ctx.messageId,
-    `🤖 不认识的指令: ${cmdText}\n发送 /help 查看可用指令`,
-  );
 }

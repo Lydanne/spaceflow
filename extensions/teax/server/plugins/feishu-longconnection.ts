@@ -128,13 +128,9 @@ async function handleMessageEvent(data: {
     // 去除 @bot 的 mention 前缀
     textContent = textContent.replace(/@_user_\d+\s*/g, "").trim();
 
-    if (!textContent) {
-      return;
-    }
+    console.log(`[feishu-ws] 📨 Message from ${senderId}: ${textContent || "(empty)"}`);
 
-    console.log(`[feishu-ws] 📨 Message from ${senderId}: ${textContent}`);
-
-    // 调用指令处理
+    // 调用指令处理(空文本也处理,用于显示控制面板)
     const { handleBotCommand } = await import("~~/server/services/bot-command.service");
     await handleBotCommand({
       messageId: message.message_id,
