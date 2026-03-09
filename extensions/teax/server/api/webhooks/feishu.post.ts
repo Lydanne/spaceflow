@@ -1,5 +1,5 @@
 import { verifyFeishuEventSignature } from "~~/server/utils/feishu-sdk";
-import { handleBotCommand } from "~~/server/services/bot-command.service";
+import { handleBotCommand, handleCardAction } from "~~/server/services/bot-command.service";
 import { handleFeishuApprovalEvent } from "~~/server/services/approval.service";
 
 interface FeishuEventPayload {
@@ -31,6 +31,13 @@ interface FeishuEventPayload {
       message_type: string;
       content: string;
     };
+    // 卡片交互事件
+    action?: Record<string, unknown>;
+    operator?: {
+      open_id?: string;
+      user_id?: string;
+    };
+    token?: string;
   };
   // v1 URL 验证
   challenge?: string;
@@ -134,6 +141,23 @@ export default defineEventHandler(async (event) => {
           text: textContent,
         }).catch((e: unknown) => console.error("[feishu-bot] command error:", e));
       }
+    }
+
+    return { code: 0, msg: "ok" };
+  }
+
+  // ─── 处理卡片交互事件 ─────────────────────────────────────
+  if (eventType === "card.action.trigger") {
+    const action = payload.event?.action;
+    const openId = payload.event?.operator?.open_id;
+    const token = payload.event?.token;
+
+    if (action && openId && token) {
+      handleCardAction({
+        action: action as Record<string, unknown>,
+        openId,
+        token,
+      }).catch((e: unknown) => console.error("[feishu-bot] card action error:", e));
     }
 
     return { code: 0, msg: "ok" };

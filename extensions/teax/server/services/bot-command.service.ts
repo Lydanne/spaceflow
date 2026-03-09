@@ -6,6 +6,7 @@ import {
   type FeishuInteractiveCard,
 } from "~~/server/services/messaging";
 import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { startWorkflowAction } from "~~/server/services/workflow-action-machine";
 
 // ─── 指令上下文 ─────────────────────────────────────────
 
@@ -161,181 +162,32 @@ registerCommand({
   },
 });
 
-// ─── /deploy <owner/repo> [branch] [workflow] ────────────
+// ─── /actions <owner/repo> ──────────────────────────────
 
 registerCommand({
-  name: "deploy",
-  aliases: ["/deploy", "部署"],
-  description: "触发仓库部署（workflow dispatch）",
-  usage: "/deploy <owner/repo> [branch] [workflow]",
+  name: "actions",
+  aliases: ["/actions", "工作流"],
+  description: "触发仓库工作流(交互式)",
+  usage: "/actions <owner/repo>",
   handler: async (ctx, args) => {
     const repoFullName = args[0];
     if (!repoFullName || !repoFullName.includes("/")) {
-      await replyFeishuMessage(ctx.messageId, "用法: /deploy <owner/repo> [branch] [workflow]\n例如: /deploy myorg/myrepo main deploy.yml");
-      return;
-    }
-
-    const deployParts = repoFullName.split("/");
-    const owner = deployParts[0] || "";
-    const repo = deployParts[1] || "";
-
-    // 验证用户绑定
-    const db = useDB();
-    const [binding] = await db
-      .select({ user_id: schema.userFeishu.user_id })
-      .from(schema.userFeishu)
-      .where(eq(schema.userFeishu.feishu_open_id, ctx.senderOpenId))
-      .limit(1);
-
-    if (!binding?.user_id) {
-      await replyFeishuMessage(ctx.messageId, "❌ 请先在 Teax 中绑定飞书账号");
-      return;
-    }
-
-    // 验证仓库
-    const [repoRecord] = await db
-      .select({
-        id: schema.repositories.id,
-        full_name: schema.repositories.full_name,
-        default_branch: schema.repositories.default_branch,
-        settings: schema.repositories.settings,
-      })
-      .from(schema.repositories)
-      .where(eq(schema.repositories.full_name, repoFullName))
-      .limit(1);
-
-    if (!repoRecord) {
-      await replyFeishuMessage(ctx.messageId, `❌ 仓库 ${repoFullName} 未在 Teax 中注册`);
-      return;
-    }
-
-    const branch = args[1] || repoRecord.default_branch || "main";
-    const workflowFile = args[2] || "deploy.yml";
-
-    // 审批前置检查
-    const repoSettings = (repoRecord.settings || {}) as Record<string, unknown>;
-    if (repoSettings.approvalRequired) {
-      const card: FeishuInteractiveCard = {
-        header: {
-          title: { tag: "plain_text", content: "⚠️ 需要审批" },
-          template: "orange",
-        },
-        elements: [
-          {
-            tag: "div",
-            text: {
-              tag: "lark_md",
-              content: `**仓库**: ${repoFullName}\n**分支**: ${branch}\n**Workflow**: ${workflowFile}\n\n该仓库已开启部署审批，请在 Teax 中发起审批后再部署。`,
-            },
-          },
-        ],
-      };
-      await replyFeishuCardMessage(ctx.messageId, card);
+      await replyFeishuMessage(ctx.messageId, "用法: /actions <owner/repo>\n例如: /actions myorg/myrepo");
       return;
     }
 
     try {
-      const gitea = await createServiceGiteaClient();
-      await gitea.dispatchWorkflow(owner, repo, workflowFile, branch);
-
-      const card: FeishuInteractiveCard = {
-        header: {
-          title: { tag: "plain_text", content: `🚀 部署已触发` },
-          template: "green",
-        },
-        elements: [
-          {
-            tag: "div",
-            text: {
-              tag: "lark_md",
-              content: `**仓库**: ${repoFullName}\n**分支**: ${branch}\n**Workflow**: ${workflowFile}`,
-            },
-          },
-        ],
-      };
+      const card = await startWorkflowAction({
+        messageId: ctx.messageId,
+        openId: ctx.senderOpenId,
+        repoFullName,
+      });
 
       await replyFeishuCardMessage(ctx.messageId, card);
     } catch (err) {
-      console.error("[bot-command] deploy error:", err);
-      const msg = (err as { data?: { message?: string } })?.data?.message || "触发部署失败";
-      await replyFeishuMessage(ctx.messageId, `❌ ${msg}\n请检查 workflow 文件是否存在且分支名是否正确`);
-    }
-  },
-});
-
-// ─── /rollback <owner/repo> [branch] ─────────────────────
-
-registerCommand({
-  name: "rollback",
-  aliases: ["/rollback", "回滚"],
-  description: "触发回滚 workflow",
-  usage: "/rollback <owner/repo> [branch]",
-  handler: async (ctx, args) => {
-    const repoFullName = args[0];
-    if (!repoFullName || !repoFullName.includes("/")) {
-      await replyFeishuMessage(ctx.messageId, "用法: /rollback <owner/repo> [branch]\n例如: /rollback myorg/myrepo main");
-      return;
-    }
-
-    const rollbackParts = repoFullName.split("/");
-    const owner = rollbackParts[0] || "";
-    const repo = rollbackParts[1] || "";
-
-    // 验证用户绑定
-    const db = useDB();
-    const [binding] = await db
-      .select({ user_id: schema.userFeishu.user_id })
-      .from(schema.userFeishu)
-      .where(eq(schema.userFeishu.feishu_open_id, ctx.senderOpenId))
-      .limit(1);
-
-    if (!binding?.user_id) {
-      await replyFeishuMessage(ctx.messageId, "❌ 请先在 Teax 中绑定飞书账号");
-      return;
-    }
-
-    // 验证仓库
-    const [repoRecord] = await db
-      .select({
-        id: schema.repositories.id,
-        default_branch: schema.repositories.default_branch,
-      })
-      .from(schema.repositories)
-      .where(eq(schema.repositories.full_name, repoFullName))
-      .limit(1);
-
-    if (!repoRecord) {
-      await replyFeishuMessage(ctx.messageId, `❌ 仓库 ${repoFullName} 未在 Teax 中注册`);
-      return;
-    }
-
-    const branch = args[1] || repoRecord.default_branch || "main";
-
-    try {
-      const gitea = await createServiceGiteaClient();
-      await gitea.dispatchWorkflow(owner, repo, "rollback.yml", branch);
-
-      const card: FeishuInteractiveCard = {
-        header: {
-          title: { tag: "plain_text", content: `⏪ 回滚已触发` },
-          template: "orange",
-        },
-        elements: [
-          {
-            tag: "div",
-            text: {
-              tag: "lark_md",
-              content: `**仓库**: ${repoFullName}\n**分支**: ${branch}\n**Workflow**: rollback.yml`,
-            },
-          },
-        ],
-      };
-
-      await replyFeishuCardMessage(ctx.messageId, card);
-    } catch (err) {
-      console.error("[bot-command] rollback error:", err);
-      const msg = (err as { data?: { message?: string } })?.data?.message || "触发回滚失败";
-      await replyFeishuMessage(ctx.messageId, `❌ ${msg}\n请检查 rollback.yml 是否存在`);
+      console.error("[bot-command] actions error:", err);
+      const msg = (err as Error).message || "获取工作流列表失败,请稍后重试";
+      await replyFeishuMessage(ctx.messageId, `❌ ${msg}`);
     }
   },
 });
@@ -415,6 +267,23 @@ registerCommand({
     await replyFeishuCardMessage(ctx.messageId, card);
   },
 });
+
+// ─── 卡片交互处理 ─────────────────────────────────────────
+
+export interface CardActionContext {
+  action: Record<string, unknown>;
+  openId: string;
+  token: string;
+}
+
+export async function handleCardAction(ctx: CardActionContext): Promise<void> {
+  // 使用状态机路由处理卡片交互
+  const { routeCardAction } = await import("~~/server/utils/card-state-machine");
+  await routeCardAction({
+    action: ctx.action,
+    openId: ctx.openId,
+  });
+}
 
 // ─── 指令分发 ─────────────────────────────────────────────
 
