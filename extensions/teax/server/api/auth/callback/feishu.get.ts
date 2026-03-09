@@ -1,4 +1,4 @@
-import { exchangeFeishuCode, getFeishuUserInfo } from "~~/server/utils/feishu";
+import { exchangeFeishuCode, getFeishuUserInfo } from "~~/server/utils/feishu-sdk";
 import { findUserByFeishuOpenId, bindFeishuToUser } from "~~/server/services/feishu.service";
 import { generateSessionId, registerSession } from "~~/server/utils/session";
 

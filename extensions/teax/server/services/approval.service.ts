@@ -5,7 +5,7 @@ import {
   getFeishuApprovalInstance,
   sendFeishuCardMessage,
   type FeishuInteractiveCard,
-} from "~~/server/utils/feishu";
+} from "~~/server/services/messaging";
 
 // ─── 创建审批请求 ─────────────────────────────────────────
 
@@ -56,7 +56,7 @@ export async function createApprovalRequest(params: CreateApprovalParams): Promi
   let feishuInstanceCode: string | null = null;
   if (config.feishuApprovalCode && params.requesterOpenId) {
     try {
-      feishuInstanceCode = await createFeishuApprovalInstance({
+      const instanceCode = await createFeishuApprovalInstance({
         approval_code: config.feishuApprovalCode,
         open_id: params.requesterOpenId,
         form: [
@@ -66,6 +66,7 @@ export async function createApprovalRequest(params: CreateApprovalParams): Promi
           { id: "approval_id", type: "input", value: record.id },
         ],
       });
+      feishuInstanceCode = instanceCode || null;
 
       // 回写 instance_code
       await db
@@ -131,6 +132,10 @@ export async function syncApprovalStatus(approvalId: string): Promise<{
   try {
     const feishuResult = await getFeishuApprovalInstance(record.feishu_instance_code);
 
+    if (!feishuResult) {
+      return { status: record.status, updated: false };
+    }
+
     // 飞书审批状态映射
     const statusMap: Record<string, string> = {
       PENDING: "pending",
@@ -140,7 +145,7 @@ export async function syncApprovalStatus(approvalId: string): Promise<{
       DELETED: "cancelled",
     };
 
-    const newStatus = statusMap[feishuResult.status] || record.status;
+    const newStatus = statusMap[feishuResult.status] || "unknown";
 
     if (newStatus !== record.status) {
       await db
@@ -249,7 +254,7 @@ async function notifyApprovalResult(
       ],
     };
 
-    await sendFeishuCardMessage(binding.feishu_open_id, card);
+    await sendFeishuCardMessage(binding.feishu_open_id, card, "open_id");
   } catch (err) {
     console.error("[approval] Failed to notify approval result:", err);
   }

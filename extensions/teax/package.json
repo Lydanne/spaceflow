@@ -21,6 +21,7 @@
   "dependencies": {
     "@iconify-json/lucide": "^1.2.90",
     "@iconify-json/simple-icons": "^1.2.70",
+    "@larksuiteoapi/node-sdk": "^1.59.0",
     "@nuxt/ui": "^4.4.0",
     "@nuxtjs/mdc": "^0.20.2",
     "@spaceflow/core": "workspace:*",

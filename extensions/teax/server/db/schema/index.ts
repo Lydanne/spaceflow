@@ -4,3 +4,4 @@ export * from "./permission";
 export * from "./repository";
 export * from "./audit";
 export * from "./approval";
+export * from "./card-interaction";

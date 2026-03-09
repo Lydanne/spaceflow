@@ -4,7 +4,7 @@ import {
   replyFeishuMessage,
   replyFeishuCardMessage,
   type FeishuInteractiveCard,
-} from "~~/server/utils/feishu";
+} from "~~/server/services/messaging";
 import { createServiceGiteaClient } from "~~/server/utils/gitea";
 
 // ─── 指令上下文 ─────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { verifyFeishuEventSignature } from "~~/server/utils/feishu";
+import { verifyFeishuEventSignature } from "~~/server/utils/feishu-sdk";
 import { handleBotCommand } from "~~/server/services/bot-command.service";
 import { handleFeishuApprovalEvent } from "~~/server/services/approval.service";
 

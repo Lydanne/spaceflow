@@ -1,6 +1,16 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import type { FeishuUserInfo } from "~~/server/utils/feishu";
+
+interface FeishuUserInfo {
+  open_id: string;
+  union_id: string;
+  user_id: string;
+  name: string;
+  en_name: string;
+  avatar_url: string;
+  email: string;
+  mobile: string;
+}
 
 export async function findUserByFeishuOpenId(openId: string) {
   const db = useDB();

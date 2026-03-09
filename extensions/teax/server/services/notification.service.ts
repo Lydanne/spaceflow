@@ -4,7 +4,7 @@ import {
   sendFeishuBatchMessage,
   sendFeishuChatCardMessage,
   type FeishuInteractiveCard,
-} from "~~/server/utils/feishu";
+} from "~~/server/services/messaging";
 import type { NotifyRule, NotifyEvent } from "~~/server/shared/dto/repository.dto";
 
 // ─── 通知类型 ─────────────────────────────────────────────
@@ -223,7 +223,7 @@ export function buildAgentResultCard(params: {
 
   return {
     header: {
-      title: { tag: "plain_text", content: `🤖 ${params.repoFullName} Agent ${statusMap[params.status]}` },
+      title: { tag: "plain_text", content: `🤖 Agent ${statusMap[params.status]}` },
       template,
     },
     elements,

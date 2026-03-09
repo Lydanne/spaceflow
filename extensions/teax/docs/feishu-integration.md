@@ -58,6 +58,60 @@
    - `im.message.receive_v1` — 接收消息事件
    - `approval_instance` — 审批状态变更事件（可选）
 4. **Gitea 实例**：已配置 Webhook 的 Gitea 仓库
+5. **飞书 SDK**：`@larksuiteoapi/node-sdk@^1.59.0` — 官方 Node.js SDK
+
+---
+
+## 技术架构
+
+Teax 使用飞书官方 Node.js SDK (`@larksuiteoapi/node-sdk`) 进行 API 调用，相比手动 `$fetch` 实现具有以下优势：
+
+- ✅ **自动 token 管理** — SDK 内置缓存，无需手动维护 token 过期时间
+- ✅ **类型安全** — 完整的 TypeScript 类型定义
+- ✅ **官方维护** — API 更新自动同步，减少维护成本
+- ✅ **错误处理** — 统一的错误码和错误信息格式
+
+**核心封装文件**：`server/utils/feishu-sdk.ts`
+
+```typescript
+import * as lark from "@larksuiteoapi/node-sdk";
+
+// 单例 SDK 客户端
+export function getFeishuClient(): lark.Client {
+  if (!client) {
+    const config = useRuntimeConfig();
+    client = new lark.Client({
+      appId: config.feishuAppId,
+      appSecret: config.feishuAppSecret,
+    });
+  }
+  return client;
+}
+
+// 封装的 API 函数示例
+export async function sendFeishuCardMessage(
+  receiveId: string,
+  card: FeishuInteractiveCard,
+  receiveIdType = "open_id"
+): Promise<{ message_id?: string }> {
+  const client = getFeishuClient();
+  const res = await client.im.message.create({
+    params: { receive_id_type: receiveIdType },
+    data: {
+      receive_id: receiveId,
+      msg_type: "interactive",
+      content: JSON.stringify(card),
+    },
+  });
+  
+  if (res.code !== 0) {
+    console.error("Feishu send card message error:", res.code, res.msg);
+    return {};
+  }
+  
+  return { message_id: res.data?.message_id };
+}
+```
 
 ---
 
@@ -505,9 +559,9 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 │          │                       │                              │
 │          ▼                       ▼                              │
 │  ┌─────────────────────────────────────────┐                   │
-│  │           feishu.ts (Utils)             │                   │
+│  │        feishu-sdk.ts (Utils)            │                   │
 │  │                                         │                   │
-│  │ • tenant_access_token 缓存              │                   │
+│  │ • getFeishuClient (单例 SDK 客户端)     │                   │
 │  │ • sendMessage / sendCardMessage         │                   │
 │  │ • replyMessage / replyCardMessage       │                   │
 │  │ • sendBatchMessage                      │                   │
@@ -515,6 +569,9 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 │  │ • getApprovalInstance                   │                   │
 │  │ • verifyEventSignature                  │                   │
 │  └──────────────────┬──────────────────────┘                   │
+│                     │                                           │
+│                     ▼                                           │
+│         @larksuiteoapi/node-sdk (官方 SDK)                      │
 │                     │                                           │
 │                     ▼                                           │
 │            飞书 Open API                                        │
@@ -527,7 +584,7 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 ```text
 server/
 ├── utils/
-│   └── feishu.ts                          # 飞书 API 封装（token/消息/审批/验证）
+│   └── feishu-sdk.ts                      # 飞书 SDK 封装（基于 @larksuiteoapi/node-sdk）
 ├── services/
 │   ├── feishu.service.ts                  # 飞书用户绑定 DB 操作
 │   ├── notification.service.ts            # 通知编排（规则匹配 + 多级分发 + 卡片构建）

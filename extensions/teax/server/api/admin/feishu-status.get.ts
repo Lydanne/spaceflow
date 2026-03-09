@@ -1,5 +1,5 @@
 import { requireAdmin } from "~~/server/utils/auth";
-import { getFeishuTenantAccessToken } from "~~/server/utils/feishu";
+import { getFeishuClient } from "~~/server/utils/feishu-sdk";
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event);
@@ -25,7 +25,13 @@ export default defineEventHandler(async (event) => {
   let error: string | null = null;
 
   try {
-    await getFeishuTenantAccessToken();
+    const client = getFeishuClient();
+    await client.auth.tenantAccessToken.internal({
+      data: {
+        app_id: config.feishuAppId,
+        app_secret: config.feishuAppSecret,
+      },
+    });
     connected = true;
   } catch (err: unknown) {
     error = err instanceof Error ? err.message : "获取 tenant_access_token 失败";
