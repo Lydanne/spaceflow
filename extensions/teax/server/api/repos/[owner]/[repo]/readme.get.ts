@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
 export default defineEventHandler(async (event) => {
@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Project not found" });
   }
 
-  const gitea = await createServiceGiteaClient();
+  const gitea = await useGiteaSdk(event).role("user");
   const branch = project.default_branch || "main";
 
   // 优先 TEAX.md，其次 README.md

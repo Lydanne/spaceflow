@@ -1,3 +1,5 @@
+import type { H3Event } from "h3";
+
 export interface GiteaUser {
   id: number;
   login: string;
@@ -598,20 +600,69 @@ export async function refreshGiteaToken(refreshToken: string): Promise<GiteaOAut
   return response;
 }
 
+// ─── Gitea SDK 统一入口 ─────────────────────────────────────────
+
+type GiteaRole = "admin" | "user";
+
+interface GiteaSdkContext {
+  event?: H3Event;
+}
+
+interface GiteaSdk {
+  /**
+   * 选择角色创建 GiteaService
+   * - 'admin': 使用 Service Token（后台操作、webhook、同步等）
+   * - 'user': 使用当前用户的 OAuth Token（需要传入 event）
+   */
+  role(role: GiteaRole): Promise<GiteaService>;
+}
+
 /**
- * 使用全局 service token 创建 GiteaService。
- * 从环境变量 GITEA_SERVICE_TOKEN 读取 Gitea PAT。
- * 未配置时抛出 503 错误。
+ * 创建 Gitea SDK 入口
+ * @example
+ * // 使用管理员 token
+ * const gitea = await useGiteaSdk().role('admin');
+ * await gitea.listSystemHooks();
+ *
+ * // 使用用户 token
+ * const gitea = await useGiteaSdk(event).role('user');
+ * await gitea.dispatchWorkflow(owner, repo, workflowId, ref);
  */
-export async function createServiceGiteaClient(): Promise<GiteaService> {
-  const config = useRuntimeConfig();
+export function useGiteaSdk(event?: H3Event): GiteaSdk {
+  const ctx: GiteaSdkContext = { event };
 
-  if (!config.giteaServiceToken) {
-    throw createError({
-      statusCode: 503,
-      message: "GITEA_SERVICE_TOKEN is not configured.",
-    });
-  }
+  return {
+    async role(role: GiteaRole): Promise<GiteaService> {
+      if (role === "admin") {
+        const config = useRuntimeConfig();
+        if (!config.giteaServiceToken) {
+          throw createError({
+            statusCode: 503,
+            message: "GITEA_SERVICE_TOKEN is not configured.",
+          });
+        }
+        return createGiteaService(config.giteaServiceToken);
+      }
 
-  return createGiteaService(config.giteaServiceToken);
+      // role === 'user'
+      if (!ctx.event) {
+        throw createError({
+          statusCode: 500,
+          message: "useGiteaSdk: event is required for user role",
+        });
+      }
+
+      const session = await getUserSession(ctx.event);
+      const giteaAccessToken = (session as { giteaAccessToken?: string })?.giteaAccessToken;
+
+      if (!giteaAccessToken) {
+        throw createError({
+          statusCode: 401,
+          message: "User not authenticated or missing Gitea token",
+        });
+      }
+
+      return createGiteaService(giteaAccessToken);
+    },
+  };
 }

@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import { generateWebhookSecret } from "~~/server/utils/webhook-verify";
 import { writeAuditLog } from "~~/server/utils/audit";
 import { createProjectBodySchema } from "~~/server/shared/dto";
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const parts = repo_full_name.split("/");
   const owner = parts[0]!;
   const repo = parts[1]!;
-  const gitea = await createServiceGiteaClient();
+  const gitea = await useGiteaSdk().role("admin");
 
   // 获取仓库信息
   let giteaRepo;

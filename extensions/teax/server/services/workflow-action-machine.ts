@@ -5,7 +5,7 @@
 
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import type { FeishuInteractiveCard } from "~~/server/utils/feishu-sdk";
 import {
   CardStateMachine,
@@ -127,7 +127,7 @@ const selectWorkflowStep: StepConfig = {
     }
 
     // 获取工作流文件内容并解析
-    const gitea = await createServiceGiteaClient();
+    const gitea = await useGiteaSdk().role("admin");
     const workflowContent = await gitea.getFileContent(
       data.owner!,
       data.repo!,
@@ -349,7 +349,7 @@ const fillParamsStep: StepConfig = {
     }
 
     // 触发工作流
-    const gitea = await createServiceGiteaClient();
+    const gitea = await useGiteaSdk().role("admin");
     await gitea.dispatchWorkflow(
       data.owner!,
       data.repo!,
@@ -441,7 +441,7 @@ export async function startWorkflowAction(params: {
   }
 
   // 获取工作流列表
-  const gitea = await createServiceGiteaClient();
+  const gitea = await useGiteaSdk().role("admin");
   const workflowsResult = await gitea.getRepoWorkflows(owner, repo);
   const workflows = workflowsResult.workflows || [];
 

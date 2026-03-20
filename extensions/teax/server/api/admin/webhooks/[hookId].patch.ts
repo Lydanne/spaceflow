@@ -1,5 +1,5 @@
 import { requireAdmin } from "~~/server/utils/auth";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event);
@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
   }>(event);
 
   try {
-    const gitea = await createServiceGiteaClient();
+    const gitea = await useGiteaSdk().role("admin");
 
     // 先获取当前配置
     const currentHook = await gitea.getSystemHook(hookId);

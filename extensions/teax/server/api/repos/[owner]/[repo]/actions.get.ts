@@ -1,5 +1,5 @@
 import { requirePermission } from "~~/server/utils/permission";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
 export default defineEventHandler(async (event) => {
@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const page = Number(query.page) || 1;
   const limit = Number(query.limit) || 20;
 
-  const gitea = await createServiceGiteaClient();
+  const gitea = await useGiteaSdk(event).role("user");
 
   try {
     const result = await gitea.getRepoWorkflowRuns(owner, repo, page, limit);

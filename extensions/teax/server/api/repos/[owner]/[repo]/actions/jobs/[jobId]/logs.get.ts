@@ -1,5 +1,5 @@
 import { requirePermission } from "~~/server/utils/permission";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
 export default defineEventHandler(async (event) => {
@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: "Invalid job ID" });
   }
 
-  const gitea = await createServiceGiteaClient();
+  const gitea = await useGiteaSdk(event).role("user");
 
   try {
     const logs = await gitea.getWorkflowJobLogs(owner, repo, jobId);

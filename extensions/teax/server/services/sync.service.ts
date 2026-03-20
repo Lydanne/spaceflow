@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 
 const DEFAULT_GROUP_NAME = "默认权限";
 
@@ -10,7 +10,7 @@ const DEFAULT_PERMISSIONS = [
 ];
 
 export async function syncUserOrgsAndTeams(username: string) {
-  const gitea = await createServiceGiteaClient();
+  const gitea = await useGiteaSdk().role("admin");
   const db = useDB();
 
   const orgs = await gitea.getUserOrgsByUsername(username);

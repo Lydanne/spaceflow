@@ -5,7 +5,7 @@ import {
   replyFeishuCardMessage,
   type FeishuInteractiveCard,
 } from "~~/server/services/messaging";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import { startWorkflowAction } from "~~/server/services/workflow-action-machine";
 
 // ─── 指令上下文 ─────────────────────────────────────────
@@ -153,7 +153,7 @@ registerCommand({
     }
 
     try {
-      const gitea = await createServiceGiteaClient();
+      const gitea = await useGiteaSdk().role("admin");
       const result = await gitea.getRepoWorkflowRuns(owner, repo, 1, 5);
       const runs = result.workflow_runs || [];
 

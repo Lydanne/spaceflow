@@ -1,7 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import { writeAuditLog } from "~~/server/utils/audit";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
   // 尝试删除 Gitea Webhook
   if (project.webhook_id) {
     try {
-      const gitea = await createServiceGiteaClient();
+      const gitea = await useGiteaSdk(event).role("user");
       await gitea.deleteWebhook(owner, repo, project.webhook_id);
     } catch (err: unknown) {
       console.warn("Failed to delete webhook on Gitea:", err);

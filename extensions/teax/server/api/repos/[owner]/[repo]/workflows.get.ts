@@ -1,6 +1,6 @@
 import { parse as parseYaml } from "yaml";
 import { requirePermission } from "~~/server/utils/permission";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
 interface WorkflowInput {
@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
   const { repoId, orgId, owner, repo } = await resolveRepoId(event);
   await requirePermission(event, orgId, "actions:view", repoId);
 
-  const gitea = await createServiceGiteaClient();
+  const gitea = await useGiteaSdk(event).role("user");
 
   try {
     const result = await gitea.getRepoWorkflows(owner, repo);

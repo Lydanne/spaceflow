@@ -1,5 +1,5 @@
 import { requireOrgAccess } from "~~/server/utils/org-access";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolveOrgId } from "~~/server/utils/resolve-org";
 
 export default defineEventHandler(async (event) => {
@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(50, Math.max(1, Number(query.limit) || 20));
 
-  const gitea = await createServiceGiteaClient();
+  const gitea = await useGiteaSdk(event).role("user");
 
   const repos = search
     ? await gitea.searchRepos(orgName, search, limit)

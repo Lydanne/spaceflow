@@ -1,7 +1,7 @@
 import { eq, and, notInArray } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireAdmin } from "~~/server/utils/auth";
-import { createServiceGiteaClient } from "~~/server/utils/gitea";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolveOrgId } from "~~/server/utils/resolve-org";
 
 export default defineEventHandler(async (event) => {
@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const { orgId, orgName } = await resolveOrgId(event);
   const db = useDB();
 
-  const gitea = await createServiceGiteaClient();
+  const gitea = await useGiteaSdk().role("admin");
 
   try {
     const teams = await gitea.getOrgTeamsAll(orgName);
