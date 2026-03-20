@@ -23,6 +23,7 @@ export const workflowPresets = pgTable(
     inputs: jsonb("inputs").default({}).$type<Record<string, string | boolean | number>>(),
     share_token: varchar("share_token", { length: 32 }).notNull().unique(),
     current_run_id: bigint("current_run_id", { mode: "number" }),
+    last_triggered_by: uuid("last_triggered_by").references(() => users.id),
     created_by: uuid("created_by")
       .notNull()
       .references(() => users.id),

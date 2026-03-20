@@ -12,33 +12,43 @@ export default defineEventHandler(async (event) => {
   // 检查权限
   await requirePermission(event, repo.organization_id, "actions:view", repo.id);
 
-  // 从数据库读取 current_run_id
+  // 从数据库读取 current_run_id 和 last_triggered_by
   const runId = preset.current_run_id;
+  const lastTriggeredById = preset.last_triggered_by;
+
+  // 查询触发者信息
+  let triggeredBy: { id: string; name: string; avatar_url: string | null } | null = null;
+  if (lastTriggeredById) {
+    const db = useDB();
+    const [user] = await db
+      .select({
+        id: schema.users.id,
+        name: schema.users.gitea_username,
+        avatar_url: schema.users.avatar_url,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, lastTriggeredById))
+      .limit(1);
+    if (user) {
+      triggeredBy = user;
+    }
+  }
 
   if (!runId) {
-    return { hasRunning: false, run: null };
+    return { hasRunning: false, run: null, triggeredBy };
   }
 
   const gitea = await useGiteaSdk(event).role("user");
-  const db = useDB();
 
   // 通过 runId 查询特定运行
   try {
     const userRun = await gitea.getWorkflowRun(owner, repoName, runId);
 
     if (!userRun) {
-      return { hasRunning: false, run: null };
+      return { hasRunning: false, run: null, triggeredBy };
     }
 
-    const isRunning = userRun.status === "running" || userRun.status === "waiting" || userRun.status === "queued";
-
-    // 如果运行已完成，清除数据库中的 current_run_id
-    if (!isRunning) {
-      await db
-        .update(schema.workflowPresets)
-        .set({ current_run_id: null })
-        .where(eq(schema.workflowPresets.id, preset.id));
-    }
+    const isRunning = userRun.status === "running" || userRun.status === "waiting" || userRun.status === "queued" || userRun.status === "in_progress";
 
     // 获取 jobs 信息用于阶段显示
     let jobs: Array<{
@@ -75,10 +85,12 @@ export default defineEventHandler(async (event) => {
         conclusion: userRun.conclusion,
         started_at: userRun.started_at,
         completed_at: userRun.completed_at,
+        html_url: userRun.html_url,
         jobs,
       },
+      triggeredBy,
     };
   } catch {
-    return { hasRunning: false, run: null };
+    return { hasRunning: false, run: null, triggeredBy };
   }
 });

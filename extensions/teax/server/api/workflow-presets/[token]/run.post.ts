@@ -6,7 +6,7 @@ import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolvePresetByToken } from "~~/server/utils/resolve-preset";
 
 export default defineEventHandler(async (event) => {
-  await requireAuth(event);
+  const session = await requireAuth(event);
   const { preset, repo, owner, repoName } = await resolvePresetByToken(event);
 
   // 检查权限
@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
   if (preset.current_run_id) {
     try {
       const currentRun = await gitea.getWorkflowRun(owner, repoName, preset.current_run_id);
-      const isRunning = currentRun?.status === "running" || currentRun?.status === "waiting" || currentRun?.status === "queued";
+      const isRunning = currentRun?.status === "running" || currentRun?.status === "waiting" || currentRun?.status === "queued" || currentRun?.status === "in_progress";
       if (isRunning) {
         throw createError({
           statusCode: 409,
@@ -28,12 +28,7 @@ export default defineEventHandler(async (event) => {
           data: { runId: currentRun.id, runNumber: currentRun.run_number },
         });
       }
-      // 如果已完成，清除 current_run_id
-      const db = useDB();
-      await db
-        .update(schema.workflowPresets)
-        .set({ current_run_id: null })
-        .where(eq(schema.workflowPresets.id, preset.id));
+      // 已完成，允许继续触发新的工作流（会覆盖 current_run_id）
     } catch (err: unknown) {
       if ((err as { statusCode?: number })?.statusCode === 409) {
         throw err;
@@ -97,7 +92,7 @@ export default defineEventHandler(async (event) => {
     const db = useDB();
     await db
       .update(schema.workflowPresets)
-      .set({ current_run_id: newRunId })
+      .set({ current_run_id: newRunId, last_triggered_by: session.user.id })
       .where(eq(schema.workflowPresets.id, preset.id));
     console.log("[run.post] Saved current_run_id:", newRunId);
   } else {

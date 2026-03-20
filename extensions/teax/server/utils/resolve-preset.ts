@@ -13,6 +13,7 @@ export interface ResolvedPreset {
     share_token: string;
     created_by: string;
     current_run_id: number | null;
+    last_triggered_by: string | null;
   };
   repo: {
     id: string;
@@ -48,6 +49,7 @@ export async function resolvePresetByToken(event: H3Event): Promise<ResolvedPres
       share_token: schema.workflowPresets.share_token,
       created_by: schema.workflowPresets.created_by,
       current_run_id: schema.workflowPresets.current_run_id,
+      last_triggered_by: schema.workflowPresets.last_triggered_by,
     })
     .from(schema.workflowPresets)
     .where(eq(schema.workflowPresets.share_token, token))

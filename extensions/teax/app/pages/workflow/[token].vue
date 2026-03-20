@@ -32,6 +32,7 @@ interface RunStatus {
     conclusion: string | null;
     started_at: string | null;
     completed_at: string | null;
+    html_url: string | null;
     jobs: Array<{
       id: number;
       name: string;
@@ -41,6 +42,11 @@ interface RunStatus {
       completed_at: string | null;
     }>;
   } | null;
+  triggeredBy: {
+    id: string;
+    name: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 // 获取预设信息
@@ -49,7 +55,7 @@ const { data: presetData, error: presetError, status: presetStatus } = useLazyFe
 );
 
 // 获取运行状态（从数据库读取 current_run_id）
-const { data: statusData, refresh: refreshStatus } = useLazyFetch<RunStatus>(
+const { data: statusData, refresh: refreshStatus } = useFetch<RunStatus>(
   () => `/api/workflow-presets/${token.value}/status`,
 );
 
@@ -288,12 +294,36 @@ function formatDuration(startedAt: string | null, completedAt: string | null): s
                 {{ overallStatusLabel(statusData.run.status, statusData.run.conclusion) }}
               </UBadge>
             </div>
-            <span
-              v-if="formatDuration(statusData.run.started_at, statusData.run.completed_at)"
-              class="text-sm text-gray-400"
+            <div
+              v-if="statusData.triggeredBy"
+              class="flex items-center gap-2 text-sm text-gray-500"
             >
-              {{ formatDuration(statusData.run.started_at, statusData.run.completed_at) }}
-            </span>
+              <UAvatar
+                :src="statusData.triggeredBy.avatar_url || undefined"
+                :alt="statusData.triggeredBy.name"
+                size="xs"
+              />
+              <span>{{ statusData.triggeredBy.name }} 触发</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span
+                v-if="formatDuration(statusData.run.started_at, statusData.run.completed_at)"
+                class="text-sm text-gray-400"
+              >
+                {{ formatDuration(statusData.run.started_at, statusData.run.completed_at) }}
+              </span>
+              <UButton
+                v-if="statusData.run.html_url"
+                :to="statusData.run.html_url"
+                external
+                target="_blank"
+                variant="ghost"
+                size="xs"
+                icon="i-lucide-external-link"
+              >
+                查看详情
+              </UButton>
+            </div>
           </div>
 
           <!-- Jobs 阶段 -->
