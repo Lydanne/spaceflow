@@ -97,6 +97,12 @@ async function handleMessageEvent(data: {
     chat_type: string;
     message_type: string;
     content: string;
+    mentions?: Array<{
+      key: string;
+      id: { open_id?: string; user_id?: string; union_id?: string };
+      name: string;
+      tenant_key?: string;
+    }>;
   };
 }): Promise<void> {
   try {
@@ -114,6 +120,15 @@ async function handleMessageEvent(data: {
 
     const senderId = sender.sender_id?.open_id;
     if (!senderId) {
+      return;
+    }
+
+    // 群聊中必须 @ 机器人才响应
+    const isGroupChat = message.chat_type === "group";
+    const isMentioned = data.message.mentions?.some((m) => m.name === "Teax" || m.name === "TeaxBot");
+
+    if (isGroupChat && !isMentioned) {
+      // 群聊中没有 @ 机器人，忽略
       return;
     }
 

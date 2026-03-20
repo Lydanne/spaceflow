@@ -30,6 +30,12 @@ interface FeishuEventPayload {
       chat_type: string;
       message_type: string;
       content: string;
+      mentions?: Array<{
+        key: string;
+        id: { open_id?: string; user_id?: string; union_id?: string };
+        name: string;
+        tenant_key?: string;
+      }>;
     };
     // 卡片交互事件
     action?: Record<string, unknown>;
@@ -120,6 +126,16 @@ export default defineEventHandler(async (event) => {
 
     // 只处理文本消息
     if (msg.message_type === "text" && senderId) {
+      // 群聊中必须 @ 机器人才响应
+      const isGroupChat = msg.chat_type === "group";
+      const botAppId = config.feishuAppId;
+      const isMentioned = msg.mentions?.some((m) => m.id.open_id === botAppId || m.name === "Teax" || m.name === "TeaxBot");
+
+      if (isGroupChat && !isMentioned) {
+        // 群聊中没有 @ 机器人，忽略
+        return { code: 0, msg: "ok" };
+      }
+
       let textContent = "";
       try {
         const parsed = JSON.parse(msg.content) as { text?: string };
@@ -131,16 +147,14 @@ export default defineEventHandler(async (event) => {
       // 去除 @bot 的 mention 前缀
       textContent = textContent.replace(/@_user_\d+\s*/g, "").trim();
 
-      if (textContent) {
-        // 异步处理指令，不阻塞回调响应
-        handleBotCommand({
-          messageId: msg.message_id,
-          chatId: msg.chat_id,
-          chatType: msg.chat_type,
-          senderOpenId: senderId,
-          text: textContent,
-        }).catch((e: unknown) => console.error("[feishu-bot] command error:", e));
-      }
+      // 异步处理指令，不阻塞回调响应（空文本也处理，显示控制面板）
+      handleBotCommand({
+        messageId: msg.message_id,
+        chatId: msg.chat_id,
+        chatType: msg.chat_type,
+        senderOpenId: senderId,
+        text: textContent,
+      }).catch((e: unknown) => console.error("[feishu-bot] command error:", e));
     }
 
     return { code: 0, msg: "ok" };
