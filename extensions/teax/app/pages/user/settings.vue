@@ -2,6 +2,51 @@
 const { user } = useUserSession();
 const toast = useToast();
 
+// ─── 工作流预设管理 ─────────────────────────────────────────
+
+interface WorkflowPreset {
+  id: string;
+  name: string;
+  workflow_path: string;
+  branch: string;
+  share_token: string;
+  allow_input_override: boolean | null;
+  allow_branch_override: boolean | null;
+  created_at: string;
+  repository: {
+    id: string;
+    full_name: string;
+  };
+}
+
+const { data: presetsData, refresh: refreshPresets } = await useFetch<{ data: WorkflowPreset[] }>(
+  "/api/user/workflow-presets",
+  { key: "user-workflow-presets" },
+);
+const presets = computed(() => presetsData.value?.data ?? []);
+
+const deletingPresetId = ref<string | null>(null);
+async function deletePreset(preset: WorkflowPreset) {
+  if (!confirm(`确定删除预设「${preset.name}」？删除后分享链接将失效。`)) return;
+  deletingPresetId.value = preset.id;
+  try {
+    await $fetch(`/api/user/workflow-presets/${preset.id}`, { method: "DELETE" });
+    toast.add({ title: "预设已删除", color: "success" });
+    await refreshPresets();
+  } catch (err: unknown) {
+    const msg = (err as { data?: { message?: string } })?.data?.message || "删除失败";
+    toast.add({ title: msg, color: "error" });
+  } finally {
+    deletingPresetId.value = null;
+  }
+}
+
+function copyShareUrl(preset: WorkflowPreset) {
+  const url = `${window.location.origin}/workflows/${preset.share_token}`;
+  navigator.clipboard.writeText(url);
+  toast.add({ title: "链接已复制", color: "success" });
+}
+
 // ─── 飞书绑定状态 ─────────────────────────────────────────
 
 interface FeishuBinding {
@@ -236,6 +281,119 @@ async function savePreferences() {
         >
           绑定飞书账号
         </UButton>
+      </div>
+    </UCard>
+
+    <!-- 工作流预设 -->
+    <UCard class="mb-6">
+      <template #header>
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">
+            工作流预设
+          </h2>
+          <UBadge
+            color="neutral"
+            variant="subtle"
+          >
+            {{ presets.length }} 个预设
+          </UBadge>
+        </div>
+      </template>
+
+      <div
+        v-if="presets.length === 0"
+        class="text-center py-6"
+      >
+        <UIcon
+          name="i-lucide-share-2"
+          class="w-10 h-10 mx-auto mb-3 text-gray-400"
+        />
+        <p class="text-gray-500 dark:text-gray-400">
+          暂无工作流预设
+        </p>
+        <p class="text-sm text-gray-400 mt-1">
+          在项目 Actions 页面触发 Workflow 时可保存为预设
+        </p>
+      </div>
+
+      <div
+        v-else
+        class="space-y-3"
+      >
+        <div
+          v-for="preset in presets"
+          :key="preset.id"
+          class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+        >
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-medium truncate">{{ preset.name }}</span>
+              <UBadge
+                v-if="preset.allow_input_override"
+                color="info"
+                variant="subtle"
+                size="xs"
+              >
+                可改参数
+              </UBadge>
+              <UBadge
+                v-if="preset.allow_branch_override"
+                color="info"
+                variant="subtle"
+                size="xs"
+              >
+                可改分支
+              </UBadge>
+            </div>
+            <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
+              <span class="flex items-center gap-1">
+                <UIcon
+                  name="i-lucide-folder-git-2"
+                  class="w-3.5 h-3.5"
+                />
+                {{ preset.repository.full_name }}
+              </span>
+              <span class="flex items-center gap-1">
+                <UIcon
+                  name="i-lucide-git-branch"
+                  class="w-3.5 h-3.5"
+                />
+                {{ preset.branch }}
+              </span>
+              <span class="font-mono truncate max-w-[200px]">
+                {{ preset.workflow_path.split('/').pop() }}
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 ml-3">
+            <UButton
+              icon="i-lucide-copy"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              title="复制分享链接"
+              @click="copyShareUrl(preset)"
+            />
+            <UButton
+              icon="i-lucide-external-link"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              title="打开预设页面"
+              :to="`/workflows/${preset.share_token}`"
+              target="_blank"
+            />
+            <UButton
+              icon="i-lucide-trash-2"
+              color="error"
+              variant="ghost"
+              size="xs"
+              title="删除预设"
+              :loading="deletingPresetId === preset.id"
+              @click="deletePreset(preset)"
+            />
+          </div>
+        </div>
       </div>
     </UCard>
 
