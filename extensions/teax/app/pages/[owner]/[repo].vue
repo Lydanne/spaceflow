@@ -39,7 +39,7 @@ const tabs = computed(() =>
 
 const activeTab = computed(() => {
   const path = route.path;
-  if (path.includes("/actions")) return "actions";
+  if (path.includes("/actions") || path.includes("/workflows")) return "actions";
   if (path.includes("/workspaces")) return "workspaces";
   if (path.endsWith("/pages")) return "pages";
   if (path.endsWith("/settings")) return "settings";
