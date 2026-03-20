@@ -300,12 +300,43 @@ function eventLabel(event: string): string {
   return map[event] || event;
 }
 
-function cronToReadable(cron: string): string {
+function cronToLocalReadable(cron: string): string {
   try {
-    return cronstrue.toString(cron, {
-      locale: "zh_CN",
-      use24HourTimeFormat: true,
-    });
+    // cron 格式: minute hour day month weekday
+    const parts = cron.trim().split(/\s+/);
+    if (parts.length < 5) {
+      return cronstrue.toString(cron, { locale: "zh_CN", use24HourTimeFormat: true });
+    }
+
+    const [minutePart, hourPart, dayPart, monthPart, weekdayPart] = parts;
+
+    // 只转换固定时间的 cron（hour 和 minute 都是数字）
+    if (hourPart && minutePart && /^\d+$/.test(hourPart) && /^\d+$/.test(minutePart)) {
+      const utcDate = new Date();
+      utcDate.setUTCHours(parseInt(hourPart, 10), parseInt(minutePart, 10), 0, 0);
+
+      const localHour = utcDate.getHours();
+      const localMinute = utcDate.getMinutes();
+
+      // 处理跨天的情况（UTC 转本地可能导致日期变化）
+      let adjustedWeekday = weekdayPart || "*";
+      if (weekdayPart && weekdayPart !== "*" && /^\d+$/.test(weekdayPart)) {
+        const utcDay = utcDate.getUTCDay();
+        const localDay = utcDate.getDay();
+        if (localDay !== utcDay) {
+          // 需要调整星期
+          const weekdayNum = parseInt(weekdayPart, 10);
+          const diff = localDay - utcDay;
+          adjustedWeekday = String((weekdayNum + diff + 7) % 7);
+        }
+      }
+
+      const localCron = `${localMinute} ${localHour} ${dayPart || "*"} ${monthPart || "*"} ${adjustedWeekday}`;
+      return cronstrue.toString(localCron, { locale: "zh_CN", use24HourTimeFormat: true });
+    }
+
+    // 复杂表达式直接显示（标注 UTC）
+    return cronstrue.toString(cron, { locale: "zh_CN", use24HourTimeFormat: true }) + " (UTC)";
   } catch {
     return cron;
   }
@@ -522,7 +553,7 @@ function workflowFileName(path: string): string {
                 class="text-xs"
                 :title="cron"
               >
-                {{ cronToReadable(cron) }}
+                {{ cronToLocalReadable(cron) }}
               </span>
             </div>
             <!-- 文件路径 -->

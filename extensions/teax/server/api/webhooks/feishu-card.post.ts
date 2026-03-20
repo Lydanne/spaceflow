@@ -102,11 +102,15 @@ async function handleCardAction(
 }
 
 async function handleDeployApproval(
-  _approvalId: string,
+  _approvalId: string | null,
   action: CardActionValue,
 ) {
   const db = useDB();
   const [actionType, id] = (action.action || "").split(":");
+
+  if (!id) {
+    return { error: "Missing approval ID" };
+  }
 
   if (actionType === "approve") {
     await db
@@ -137,7 +141,7 @@ async function handleDeployApproval(
   return { success: true };
 }
 
-async function handleConfigForm(_formId: string, _formValue?: Record<string, unknown>) {
+async function handleConfigForm(_formId: string | null, _formValue?: Record<string, unknown>) {
   return {
     toast: {
       type: "success",
@@ -146,7 +150,7 @@ async function handleConfigForm(_formId: string, _formValue?: Record<string, unk
   };
 }
 
-async function handleAgentConfirm(_sessionId: string, action: CardActionValue) {
+async function handleAgentConfirm(_sessionId: string | null, action: CardActionValue) {
   const [actionType] = (action.action || "").split(":");
 
   if (actionType === "start_agent") {
