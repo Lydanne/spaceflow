@@ -166,6 +166,7 @@ const inputValues = reactive<Record<string, string>>({});
 // 保存预设
 const showSavePresetModal = ref(false);
 const presetName = ref("");
+const allowInputOverride = ref(false);
 const savingPreset = ref(false);
 
 // 当前选中 workflow 的信息（用于 dispatch modal）
@@ -256,6 +257,7 @@ async function savePreset() {
           workflow_path: selectedWorkflow.value,
           branch: selectedBranch.value,
           inputs: { ...inputValues },
+          allow_input_override: allowInputOverride.value,
         },
       },
     );
@@ -819,49 +821,11 @@ function workflowFileName(path: string): string {
                 >
                   Workflow Inputs
                 </p>
-                <div class="space-y-3">
-                  <div
-                    v-for="(def, key) in currentInputs"
-                    :key="key"
-                  >
-                    <label class="block text-sm font-medium mb-1">
-                      {{ key }}
-                      <span
-                        v-if="def.required"
-                        class="text-red-500"
-                      >*</span>
-                    </label>
-                    <p
-                      v-if="def.description"
-                      class="text-xs text-gray-400 mb-1"
-                    >
-                      {{ def.description }}
-                    </p>
-
-                    <USelect
-                      v-if="def.type === 'choice' && def.options"
-                      :model-value="inputValues[key]"
-                      :items="def.options.map((o) => ({ label: o, value: o }))"
-                      value-key="value"
-                      class="w-full"
-                      @update:model-value="inputValues[key] = $event"
-                    />
-                    <USwitch
-                      v-else-if="def.type === 'boolean'"
-                      :model-value="inputValues[key] === 'true'"
-                      @update:model-value="
-                        inputValues[key] = $event ? 'true' : 'false'
-                      "
-                    />
-                    <UInput
-                      v-else
-                      :model-value="inputValues[key]"
-                      :placeholder="def.default || ''"
-                      class="w-full"
-                      @update:model-value="inputValues[key] = $event"
-                    />
-                  </div>
-                </div>
+                <WorkflowInputsForm
+                  :input-defs="currentInputs"
+                  :model-value="inputValues"
+                  @update:model-value="Object.assign(inputValues, $event)"
+                />
               </div>
             </template>
 
@@ -917,6 +881,20 @@ function workflowFileName(path: string): string {
                 placeholder="如：正式发布、预发布环境"
                 class="w-full"
               />
+            </div>
+
+            <!-- 允许用户修改参数 -->
+            <div
+              v-if="Object.keys(inputValues).length > 0"
+              class="flex items-center justify-between"
+            >
+              <div>
+                <label class="text-sm font-medium">允许用户修改参数</label>
+                <p class="text-xs text-gray-400">
+                  开启后，使用分享链接的用户可以在运行前修改参数值
+                </p>
+              </div>
+              <USwitch v-model="allowInputOverride" />
             </div>
 
             <!-- 配置预览 -->

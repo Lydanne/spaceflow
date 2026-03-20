@@ -32,6 +32,7 @@
     "drizzle-zod": "^0.8.3",
     "ioredis": "^5.10.0",
     "minimatch": "^10.2.4",
+    "nanoid": "^5.1.7",
     "nuxt": "^4.3.1",
     "nuxt-auth-utils": "^0.5.29",
     "postgres": "^3.4.8",

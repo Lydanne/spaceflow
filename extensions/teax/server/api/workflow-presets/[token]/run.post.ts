@@ -9,6 +9,13 @@ export default defineEventHandler(async (event) => {
   const session = await requireAuth(event);
   const { preset, repo, owner, repoName } = await resolvePresetByToken(event);
 
+  // 读取用户提交的参数覆盖（仅当 allow_input_override 为 true 时生效）
+  const body = await readBody(event).catch(() => ({}));
+  let finalInputs = preset.inputs || {};
+  if (preset.allow_input_override && body?.inputs) {
+    finalInputs = { ...finalInputs, ...body.inputs };
+  }
+
   // 检查权限
   await requirePermission(event, repo.organization_id, "actions:trigger", repo.id);
 
@@ -52,7 +59,7 @@ export default defineEventHandler(async (event) => {
   // 触发工作流 - Gitea API 需要文件名而非完整路径
   const workflowFile = preset.workflow_path.split("/").pop() || preset.workflow_path;
   try {
-    await gitea.dispatchWorkflow(owner, repoName, workflowFile, preset.branch, preset.inputs || {});
+    await gitea.dispatchWorkflow(owner, repoName, workflowFile, preset.branch, finalInputs);
   } catch (err: unknown) {
     console.error("[dispatchWorkflow] Error:", err);
     const errObj = err as { data?: { message?: string }; message?: string; statusCode?: number };

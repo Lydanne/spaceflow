@@ -7,6 +7,14 @@ const route = useRoute();
 const token = computed(() => route.params.token as string);
 const toast = useToast();
 
+interface WorkflowInputDef {
+  description?: string;
+  required?: boolean;
+  default?: string;
+  type?: string;
+  options?: string[];
+}
+
 interface PresetData {
   preset: {
     id: string;
@@ -15,7 +23,9 @@ interface PresetData {
     workflow_name: string;
     branch: string;
     inputs: Record<string, string>;
+    allow_input_override: boolean;
   };
+  inputDefs: Record<string, WorkflowInputDef>;
   repository: {
     id: string;
     full_name: string;
@@ -93,6 +103,32 @@ onUnmounted(() => {
   stopPolling();
 });
 
+// 用户可修改的输入值（仅当 allow_input_override 为 true 时使用）
+const overrideInputs = ref<Record<string, string>>({});
+const showEditInputsModal = ref(false);
+const tempInputs = ref<Record<string, string>>({});
+
+// 初始化 overrideInputs
+watch(
+  () => presetData.value?.preset.inputs,
+  (inputs) => {
+    if (inputs) {
+      overrideInputs.value = { ...inputs };
+    }
+  },
+  { immediate: true },
+);
+
+function openEditInputsModal() {
+  tempInputs.value = { ...overrideInputs.value };
+  showEditInputsModal.value = true;
+}
+
+function saveInputs() {
+  overrideInputs.value = { ...tempInputs.value };
+  showEditInputsModal.value = false;
+}
+
 // 触发运行
 const isTriggering = ref(false);
 
@@ -104,7 +140,11 @@ async function triggerRun() {
 
   isTriggering.value = true;
   try {
-    await $fetch(`/api/workflow-presets/${token.value}/run`, { method: "POST" });
+    // 如果允许修改参数，发送用户修改后的值
+    const body = presetData.value?.preset.allow_input_override
+      ? { inputs: overrideInputs.value }
+      : {};
+    await $fetch(`/api/workflow-presets/${token.value}/run`, { method: "POST", body });
     toast.add({ title: "工作流已触发", color: "success" });
 
     // 刷新状态并开始轮询
@@ -247,9 +287,21 @@ function formatDuration(startedAt: string | null, completedAt: string | null): s
             v-if="Object.keys(presetData.preset.inputs || {}).length > 0"
             class="border-t border-gray-200 dark:border-gray-700 pt-4"
           >
-            <p class="text-xs text-gray-400 mb-3">
-              预设参数
-            </p>
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-xs text-gray-400">
+                预设参数
+              </p>
+              <UButton
+                v-if="presetData.preset.allow_input_override"
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                icon="i-lucide-pencil"
+                @click="openEditInputsModal"
+              >
+                修改
+              </UButton>
+            </div>
             <div class="space-y-2">
               <div
                 v-for="(value, key) in presetData.preset.inputs"
@@ -257,7 +309,7 @@ function formatDuration(startedAt: string | null, completedAt: string | null): s
                 class="flex items-center justify-between text-sm"
               >
                 <span class="text-gray-500">{{ key }}</span>
-                <span class="font-mono text-gray-900 dark:text-white">{{ value }}</span>
+                <span class="font-mono text-gray-900 dark:text-white">{{ overrideInputs[key] ?? value }}</span>
               </div>
             </div>
           </div>
@@ -379,5 +431,41 @@ function formatDuration(startedAt: string | null, completedAt: string | null): s
         </p>
       </div>
     </div>
+
+    <!-- 修改参数弹窗 -->
+    <UModal v-model:open="showEditInputsModal">
+      <template #content>
+        <div class="p-6 space-y-4">
+          <h3 class="text-lg font-semibold">
+            修改运行参数
+          </h3>
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            修改参数值后点击保存，下次运行将使用新的参数
+          </p>
+
+          <WorkflowInputsForm
+            v-if="presetData"
+            v-model="tempInputs"
+            :input-defs="presetData.inputDefs"
+          />
+
+          <div class="flex justify-end gap-2 pt-2">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              @click="showEditInputsModal = false"
+            >
+              取消
+            </UButton>
+            <UButton
+              color="primary"
+              @click="saveInputs"
+            >
+              保存
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

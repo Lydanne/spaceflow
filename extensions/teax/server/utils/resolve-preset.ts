@@ -14,6 +14,7 @@ export interface ResolvedPreset {
     created_by: string;
     current_run_id: number | null;
     last_triggered_by: string | null;
+    allow_input_override: boolean | null;
   };
   repo: {
     id: string;
@@ -50,6 +51,7 @@ export async function resolvePresetByToken(event: H3Event): Promise<ResolvedPres
       created_by: schema.workflowPresets.created_by,
       current_run_id: schema.workflowPresets.current_run_id,
       last_triggered_by: schema.workflowPresets.last_triggered_by,
+      allow_input_override: schema.workflowPresets.allow_input_override,
     })
     .from(schema.workflowPresets)
     .where(eq(schema.workflowPresets.share_token, token))

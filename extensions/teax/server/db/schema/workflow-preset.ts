@@ -5,6 +5,7 @@ import {
   jsonb,
   index,
   bigint,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { repositories } from "./repository";
 import { users } from "./user";
@@ -24,6 +25,7 @@ export const workflowPresets = pgTable(
     share_token: varchar("share_token", { length: 32 }).notNull().unique(),
     current_run_id: bigint("current_run_id", { mode: "number" }),
     last_triggered_by: uuid("last_triggered_by").references(() => users.id),
+    allow_input_override: boolean("allow_input_override").default(false),
     created_by: uuid("created_by")
       .notNull()
       .references(() => users.id),
