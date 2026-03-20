@@ -68,15 +68,18 @@ interface PermissionGroup {
 
 | 权限 Key | 说明 | 适用范围 |
 | -------- | ---- | -------- |
-| `project:create` | 创建项目 | 组织级 |
-| `project:delete` | 删除项目 | 项目级 |
-| `project:settings` | 修改项目设置 | 项目级 |
-| `workflow:trigger` | 手动触发 Workflow | 项目级 |
-| `workspace:create` | 创建工作区 | 项目级 |
-| `workspace:manage` | 管理工作区（启动/停止/删除） | 项目级 |
-| `agent:execute` | 执行 Agent | 项目级 |
-| `approval:create` | 创建审批请求 | 项目级 |
-| `approval:approve` | 审批通过/拒绝 | 组织级 |
+| `repo:view` | 查看仓库 | 项目级 |
+| `repo:create` | 创建仓库 | 组织级 |
+| `repo:delete` | 删除仓库 | 项目级 |
+| `repo:settings` | 仓库设置 | 项目级 |
+| `actions:view` | 查看 Actions | 项目级 |
+| `actions:trigger` | 触发 Workflow | 项目级 |
+| `agent:start` | 启动 Agent | 项目级 |
+| `agent:stop` | 停止 Agent | 项目级 |
+| `page:deploy` | 部署 Pages | 项目级 |
+| `miniapp:manage` | 小程序管理 | 项目级 |
+| `team:manage` | 团队管理 | 组织级 |
+| `settings:manage` | 组织设置 | 组织级 |
 
 ### 团队权限绑定
 
@@ -347,15 +350,18 @@ async function checkUserPermission(
   "name": "Admin",
   "description": "组织管理员，拥有所有权限",
   "permissions": [
-    "project:create",
-    "project:delete",
-    "project:settings",
-    "workflow:trigger",
-    "workspace:create",
-    "workspace:manage",
-    "agent:execute",
-    "approval:create",
-    "approval:approve"
+    "repo:view",
+    "repo:create",
+    "repo:delete",
+    "repo:settings",
+    "actions:view",
+    "actions:trigger",
+    "agent:start",
+    "agent:stop",
+    "page:deploy",
+    "miniapp:manage",
+    "team:manage",
+    "settings:manage"
   ]
 }
 ```
@@ -368,13 +374,13 @@ async function checkUserPermission(
   "name": "Developer",
   "description": "开发者，可创建项目和工作区",
   "permissions": [
-    "project:create",
-    "project:settings",
-    "workflow:trigger",
-    "workspace:create",
-    "workspace:manage",
-    "agent:execute",
-    "approval:create"
+    "repo:view",
+    "repo:create",
+    "repo:settings",
+    "actions:view",
+    "actions:trigger",
+    "agent:start",
+    "page:deploy"
   ]
 }
 ```
@@ -386,7 +392,10 @@ async function checkUserPermission(
   "type": "system",
   "name": "Viewer",
   "description": "只读访问",
-  "permissions": []
+  "permissions": [
+    "repo:view",
+    "actions:view"
+  ]
 }
 ```
 

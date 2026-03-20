@@ -58,6 +58,17 @@ Gitea Actions 集成、Workflow 管理和执行流程。
 - Workflows API
 - 触发 Workflow 弹窗
 
+#### 4.1 [Workflow 预设分享](./workflow-preset.md) 🔗
+
+Workflow 配置预设、分享链接和简化触发流程。
+
+**包含内容：**
+- 配置预设和分享链接
+- 分享页面设计
+- 运行互斥逻辑
+- 权限控制
+- API 设计
+
 #### 5. [工作区系统](./workspace.md) 💻
 
 容器化开发环境，提供 Web VSCode 和 OpenCode 两种编辑方式。

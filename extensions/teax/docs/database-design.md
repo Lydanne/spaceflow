@@ -222,6 +222,26 @@
 }
 ```
 
+### Workflow 预设
+
+#### workflow_presets - Workflow 预设表
+
+```typescript
+{
+  id: uuid (PK),
+  repository_id: uuid (FK -> repositories.id),
+  name: string,                    // 预设名称
+  workflow_path: string,           // workflow 文件路径
+  branch: string,                  // 固定分支
+  inputs: jsonb,                   // 预设的 input 值
+  share_token: string (unique),    // 分享 token（16 位 nanoid）
+  created_by: uuid (FK -> users.id),
+  created_at: timestamp,
+  updated_at: timestamp,
+  row_creator: string
+}
+```
+
 ### 审批系统
 
 #### approval_requests - 审批请求表
@@ -347,6 +367,7 @@ repositories
   ├─ workspaces (repository_id)
   ├─ agent_sessions (repository_id)
   ├─ agent_secrets (repository_id)
+  ├─ workflow_presets (repository_id)
   └─ approval_requests (repository_id)
 
 agent_sessions
