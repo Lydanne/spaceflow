@@ -263,7 +263,7 @@ async function savePreset() {
         },
       },
     );
-    const shareUrl = `${window.location.origin}/workflow/${result.share_token}`;
+    const shareUrl = `${window.location.origin}/workflows/${result.share_token}`;
     await navigator.clipboard.writeText(shareUrl);
     toast.add({ title: "预设已保存，链接已复制到剪贴板", color: "success" });
     showSavePresetModal.value = false;
