@@ -1,9 +1,10 @@
 import { useDB, schema } from "~~/server/db";
-import { requireAuth, createGiteaServiceWithRefresh } from "~~/server/utils/auth";
+import { requireAuth } from "~~/server/utils/auth";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 
 export default defineEventHandler(async (event) => {
-  const session = await requireAuth(event);
-  const gitea = await createGiteaServiceWithRefresh(event, session);
+  await requireAuth(event);
+  const gitea = await useGiteaSdk(event).role("user");
   const db = useDB();
 
   // 获取用户所有组织名称

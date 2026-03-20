@@ -631,20 +631,79 @@ interface GiteaSdk {
 export function useGiteaSdk(event?: H3Event): GiteaSdk {
   const ctx: GiteaSdkContext = { event };
 
+  // 获取用户 token 并验证/刷新
+  async function getUserGiteaService(): Promise<GiteaService | null> {
+    if (!ctx.event) return null;
+
+    const session = await getUserSession(ctx.event);
+    const giteaAccessToken = (session as Record<string, unknown>)?.giteaAccessToken as string | undefined;
+    const giteaRefreshToken = (session as Record<string, unknown>)?.giteaRefreshToken as string | undefined;
+
+    if (!giteaAccessToken) return null;
+
+    const gitea = createGiteaService(giteaAccessToken);
+
+    // 尝试验证 token 是否有效
+    try {
+      await gitea.getCurrentUser();
+      return gitea;
+    } catch (err: unknown) {
+      const status =
+        (err as { statusCode?: number })?.statusCode ||
+        (err as { status?: number })?.status;
+
+      // 非 401 错误，直接抛出
+      if (status !== 401) {
+        throw err;
+      }
+
+      // 无 refresh token，返回 null
+      if (!giteaRefreshToken) {
+        return null;
+      }
+    }
+
+    // Token 过期，尝试刷新
+    try {
+      const tokenResponse = await refreshGiteaToken(giteaRefreshToken);
+
+      // 更新 session（保留原有字段，只更新 token）
+      await setUserSession(ctx.event, {
+        ...(session as Record<string, unknown>),
+        giteaAccessToken: tokenResponse.access_token,
+        giteaRefreshToken: tokenResponse.refresh_token,
+      } as Parameters<typeof setUserSession>[1]);
+
+      return createGiteaService(tokenResponse.access_token);
+    } catch {
+      return null;
+    }
+  }
+
+  // 获取 service token
+  function getServiceGiteaService(): GiteaService {
+    const config = useRuntimeConfig();
+    if (!config.giteaServiceToken) {
+      throw createError({
+        statusCode: 503,
+        message: "GITEA_SERVICE_TOKEN is not configured.",
+      });
+    }
+    return createGiteaService(config.giteaServiceToken);
+  }
+
   return {
     async role(role: GiteaRole): Promise<GiteaService> {
       if (role === "admin") {
-        const config = useRuntimeConfig();
-        if (!config.giteaServiceToken) {
-          throw createError({
-            statusCode: 503,
-            message: "GITEA_SERVICE_TOKEN is not configured.",
-          });
+        // admin 角色：有 event 时优先用户 token（维护刷新），fallback 到 service token
+        if (ctx.event) {
+          const userGitea = await getUserGiteaService();
+          if (userGitea) return userGitea;
         }
-        return createGiteaService(config.giteaServiceToken);
+        return getServiceGiteaService();
       }
 
-      // role === 'user'
+      // role === 'user'：必须有 event，必须有用户 token
       if (!ctx.event) {
         throw createError({
           statusCode: 500,
@@ -652,17 +711,15 @@ export function useGiteaSdk(event?: H3Event): GiteaSdk {
         });
       }
 
-      const session = await getUserSession(ctx.event);
-      const giteaAccessToken = (session as { giteaAccessToken?: string })?.giteaAccessToken;
-
-      if (!giteaAccessToken) {
+      const userGitea = await getUserGiteaService();
+      if (!userGitea) {
         throw createError({
           statusCode: 401,
-          message: "User not authenticated or missing Gitea token",
+          message: "User not authenticated or Gitea token expired",
         });
       }
 
-      return createGiteaService(giteaAccessToken);
+      return userGitea;
     },
   };
 }

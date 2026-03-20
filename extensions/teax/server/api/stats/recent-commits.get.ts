@@ -1,6 +1,7 @@
 import { eq, and, inArray } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { requireAuth, createGiteaServiceWithRefresh } from "~~/server/utils/auth";
+import { requireAuth } from "~~/server/utils/auth";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import type { GiteaCommit } from "~~/server/utils/gitea";
 import { getVisibleRepositoryIds } from "~~/server/utils/permission";
 
@@ -17,7 +18,7 @@ interface CommitItem {
 
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event);
-  const gitea = await createGiteaServiceWithRefresh(event, session);
+  const gitea = await useGiteaSdk(event).role("user");
   const db = useDB();
 
   // 获取用户所有组织
