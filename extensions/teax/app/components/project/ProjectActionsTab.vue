@@ -186,10 +186,13 @@ watch(selectedWorkflow, () => {
   }
 });
 
+// 当 branchesData 加载完成后，设置默认分支
 watch(
-  defaultBranch,
+  () => branchesData.value?.default_branch,
   (val) => {
-    if (!selectedBranch.value) selectedBranch.value = val;
+    if (val) {
+      selectedBranch.value = val;
+    }
   },
   { immediate: true },
 );
