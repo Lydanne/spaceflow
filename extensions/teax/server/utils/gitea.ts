@@ -472,11 +472,19 @@ export class GiteaService {
     repo: string,
     workflowId: string,
     ref: string,
-    inputs?: Record<string, string>,
+    inputs?: Record<string, string | boolean | number>,
   ): Promise<void> {
+    // Gitea API 要求 inputs 值必须是 string，自动转换 boolean/number
+    const stringifiedInputs: Record<string, string> = {};
+    if (inputs) {
+      for (const [key, value] of Object.entries(inputs)) {
+        stringifiedInputs[key] = String(value);
+      }
+    }
+
     await this.fetch(`/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`, "POST", {
       ref,
-      inputs: inputs || {},
+      inputs: stringifiedInputs,
     });
   }
 

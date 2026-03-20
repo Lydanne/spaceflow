@@ -1,0 +1,113 @@
+import { eq } from "drizzle-orm";
+import { useDB, schema } from "~~/server/db";
+import { requireAuth } from "~~/server/utils/auth";
+import { requirePermission } from "~~/server/utils/permission";
+import { useGiteaSdk } from "~~/server/utils/gitea";
+import { resolvePresetByToken } from "~~/server/utils/resolve-preset";
+
+export default defineEventHandler(async (event) => {
+  await requireAuth(event);
+  const { preset, repo, owner, repoName } = await resolvePresetByToken(event);
+
+  // 检查权限
+  await requirePermission(event, repo.organization_id, "actions:trigger", repo.id);
+
+  const gitea = await useGiteaSdk(event).role("user");
+  const workflowFileName = preset.workflow_path.replace(/^.*\//, "");
+
+  // 检查 preset 是否已有运行中的工作流（全局互斥，不区分用户）
+  console.log("[run.post] preset.current_run_id:", preset.current_run_id);
+  if (preset.current_run_id) {
+    try {
+      const currentRun = await gitea.getWorkflowRun(owner, repoName, preset.current_run_id);
+      const isRunning = currentRun?.status === "running" || currentRun?.status === "waiting" || currentRun?.status === "queued";
+      if (isRunning) {
+        throw createError({
+          statusCode: 409,
+          message: "当前有一个正在运行的工作流，请等待完成后再试",
+          data: { runId: currentRun.id, runNumber: currentRun.run_number },
+        });
+      }
+      // 如果已完成，清除 current_run_id
+      const db = useDB();
+      await db
+        .update(schema.workflowPresets)
+        .set({ current_run_id: null })
+        .where(eq(schema.workflowPresets.id, preset.id));
+    } catch (err: unknown) {
+      if ((err as { statusCode?: number })?.statusCode === 409) {
+        throw err;
+      }
+      // 其他错误忽略（可能是 run 已被删除）
+    }
+  }
+
+  // 获取触发前的最新 run ID（用于后续比对）
+  let latestRunId = 0;
+  try {
+    const runs = await gitea.getRepoWorkflowRuns(owner, repoName, 1, 5);
+    const latestRun = runs.workflow_runs?.find((run) => run.path?.includes(workflowFileName));
+    if (latestRun) {
+      latestRunId = latestRun.id;
+    }
+  } catch {
+    // 忽略错误
+  }
+
+  // 触发工作流 - Gitea API 需要文件名而非完整路径
+  const workflowFile = preset.workflow_path.split("/").pop() || preset.workflow_path;
+  try {
+    await gitea.dispatchWorkflow(owner, repoName, workflowFile, preset.branch, preset.inputs || {});
+  } catch (err: unknown) {
+    console.error("[dispatchWorkflow] Error:", err);
+    const errObj = err as { data?: { message?: string }; message?: string; statusCode?: number };
+    const msg = errObj?.data?.message || errObj?.message || "触发工作流失败";
+    throw createError({ statusCode: 502, message: msg });
+  }
+
+  // 轮询获取新创建的 run ID（最多等待 10 秒）
+  let newRunId: number | null = null;
+  let newRunNumber: number | null = null;
+  const maxAttempts = 10;
+  const delay = 1000;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    try {
+      const runs = await gitea.getRepoWorkflowRuns(owner, repoName, 1, 5);
+      const newRun = runs.workflow_runs?.find((run) => {
+        const isSameWorkflow = run.path?.includes(workflowFileName);
+        const isNewRun = run.id > latestRunId;
+        return isSameWorkflow && isNewRun;
+      });
+
+      if (newRun) {
+        newRunId = newRun.id;
+        newRunNumber = newRun.run_number;
+        break;
+      }
+    } catch {
+      // 忽略错误，继续轮询
+    }
+  }
+
+  // 保存 runId 到数据库
+  if (newRunId) {
+    const db = useDB();
+    await db
+      .update(schema.workflowPresets)
+      .set({ current_run_id: newRunId })
+      .where(eq(schema.workflowPresets.id, preset.id));
+    console.log("[run.post] Saved current_run_id:", newRunId);
+  } else {
+    console.log("[run.post] No newRunId found after polling");
+  }
+
+  return {
+    success: true,
+    message: "工作流已触发",
+    runId: newRunId,
+    runNumber: newRunNumber,
+  };
+});

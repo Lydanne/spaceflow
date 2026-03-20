@@ -27,7 +27,7 @@ export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
 export const triggerWorkflowBodySchema = z.object({
   workflow_id: z.string().min(1),
   ref: z.string().min(1),
-  inputs: z.record(z.string(), z.string()).optional(),
+  inputs: z.record(z.string(), z.union([z.string(), z.boolean(), z.number()])).optional(),
 });
 export type TriggerWorkflowBody = z.infer<typeof triggerWorkflowBodySchema>;
 

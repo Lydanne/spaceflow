@@ -163,6 +163,11 @@ const selectedBranch = ref("");
 const dispatching = ref(false);
 const inputValues = reactive<Record<string, string>>({});
 
+// 保存预设
+const showSavePresetModal = ref(false);
+const presetName = ref("");
+const savingPreset = ref(false);
+
 // 当前选中 workflow 的信息（用于 dispatch modal）
 const selectedWorkflowItem = computed(
   () => workflows.value.find((w) => w.path === selectedWorkflow.value) ?? null,
@@ -235,6 +240,37 @@ async function dispatchWorkflow() {
     toast.add({ title: msg, color: "error" });
   } finally {
     dispatching.value = false;
+  }
+}
+
+async function savePreset() {
+  if (!selectedWorkflow.value || !selectedBranch.value || !presetName.value.trim()) return;
+  savingPreset.value = true;
+  try {
+    const result = await $fetch<{ share_token: string }>(
+      `/api/repos/${props.owner}/${props.repo}/workflow-presets`,
+      {
+        method: "POST",
+        body: {
+          name: presetName.value.trim(),
+          workflow_path: selectedWorkflow.value,
+          branch: selectedBranch.value,
+          inputs: { ...inputValues },
+        },
+      },
+    );
+    const shareUrl = `${window.location.origin}/workflow/${result.share_token}`;
+    await navigator.clipboard.writeText(shareUrl);
+    toast.add({ title: "预设已保存，链接已复制到剪贴板", color: "success" });
+    showSavePresetModal.value = false;
+    showDispatchModal.value = false;
+    presetName.value = "";
+  } catch (err: unknown) {
+    const msg =
+      (err as { data?: { message?: string } })?.data?.message || "保存失败";
+    toast.add({ title: msg, color: "error" });
+  } finally {
+    savingPreset.value = false;
   }
 }
 
@@ -829,22 +865,98 @@ function workflowFileName(path: string): string {
               </div>
             </template>
 
+            <div class="flex justify-between items-center pt-2">
+              <UButton
+                icon="i-lucide-share-2"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :disabled="!selectedWorkflow || !selectedBranch"
+                @click="showSavePresetModal = true"
+              >
+                保存为预设
+              </UButton>
+              <div class="flex gap-2">
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  @click="showDispatchModal = false"
+                >
+                  取消
+                </UButton>
+                <UButton
+                  icon="i-lucide-play"
+                  color="primary"
+                  :loading="dispatching"
+                  :disabled="!selectedWorkflow || !selectedBranch"
+                  @click="dispatchWorkflow"
+                >
+                  触发
+                </UButton>
+              </div>
+            </div>
+          </div>
+        </template>
+      </UModal>
+
+      <!-- 保存预设 Modal -->
+      <UModal v-model:open="showSavePresetModal">
+        <template #content>
+          <div class="p-6 space-y-4">
+            <h3 class="text-lg font-semibold">
+              保存为预设
+            </h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              保存当前配置为预设，生成分享链接供他人使用
+            </p>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">预设名称</label>
+              <UInput
+                v-model="presetName"
+                placeholder="如：正式发布、预发布环境"
+                class="w-full"
+              />
+            </div>
+
+            <!-- 配置预览 -->
+            <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-500">Workflow</span>
+                <span class="font-medium">{{ selectedWorkflowItem?.name }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-500">分支</span>
+                <span class="font-mono">{{ selectedBranch }}</span>
+              </div>
+              <template v-if="Object.keys(inputValues).length > 0">
+                <div
+                  v-for="(value, key) in inputValues"
+                  :key="key"
+                  class="flex justify-between"
+                >
+                  <span class="text-gray-500">{{ key }}</span>
+                  <span class="font-mono">{{ value || '-' }}</span>
+                </div>
+              </template>
+            </div>
+
             <div class="flex justify-end gap-2 pt-2">
               <UButton
                 color="neutral"
                 variant="ghost"
-                @click="showDispatchModal = false"
+                @click="showSavePresetModal = false"
               >
                 取消
               </UButton>
               <UButton
-                icon="i-lucide-play"
+                icon="i-lucide-share-2"
                 color="primary"
-                :loading="dispatching"
-                :disabled="!selectedWorkflow || !selectedBranch"
-                @click="dispatchWorkflow"
+                :loading="savingPreset"
+                :disabled="!presetName.trim()"
+                @click="savePreset"
               >
-                触发
+                保存并复制链接
               </UButton>
             </div>
           </div>
