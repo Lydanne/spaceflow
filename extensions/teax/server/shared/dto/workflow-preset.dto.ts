@@ -8,10 +8,12 @@ export const createWorkflowPresetBodySchema = z.object({
   branch: z.string().min(1).max(255),
   inputs: inputsSchema.optional().default({}),
   allow_input_override: z.boolean().optional().default(false),
+  allow_branch_override: z.boolean().optional().default(false),
 });
 
 export const updateWorkflowPresetBodySchema = z.object({
   name: z.string().min(1).max(255).optional(),
   inputs: inputsSchema.optional(),
   allow_input_override: z.boolean().optional(),
+  allow_branch_override: z.boolean().optional(),
 });

@@ -24,8 +24,10 @@ interface PresetData {
     branch: string;
     inputs: Record<string, string>;
     allow_input_override: boolean;
+    allow_branch_override: boolean;
   };
   inputDefs: Record<string, WorkflowInputDef>;
+  branches: string[];
   repository: {
     id: string;
     full_name: string;
@@ -108,12 +110,16 @@ const overrideInputs = ref<Record<string, string>>({});
 const showEditInputsModal = ref(false);
 const tempInputs = ref<Record<string, string>>({});
 
-// 初始化 overrideInputs
+// 用户可修改的分支（仅当 allow_branch_override 为 true 时使用）
+const overrideBranch = ref("");
+
+// 初始化 overrideInputs 和 overrideBranch
 watch(
-  () => presetData.value?.preset.inputs,
-  (inputs) => {
-    if (inputs) {
-      overrideInputs.value = { ...inputs };
+  () => presetData.value?.preset,
+  (preset) => {
+    if (preset) {
+      overrideInputs.value = { ...preset.inputs };
+      overrideBranch.value = preset.branch;
     }
   },
   { immediate: true },
@@ -140,10 +146,14 @@ async function triggerRun() {
 
   isTriggering.value = true;
   try {
-    // 如果允许修改参数，发送用户修改后的值
-    const body = presetData.value?.preset.allow_input_override
-      ? { inputs: overrideInputs.value }
-      : {};
+    // 构建请求体，包含用户修改的参数和分支
+    const body: { inputs?: Record<string, string>; branch?: string } = {};
+    if (presetData.value?.preset.allow_input_override) {
+      body.inputs = overrideInputs.value;
+    }
+    if (presetData.value?.preset.allow_branch_override) {
+      body.branch = overrideBranch.value;
+    }
     await $fetch(`/api/workflow-presets/${token.value}/run`, { method: "POST", body });
     toast.add({ title: "工作流已触发", color: "success" });
 
@@ -272,11 +282,21 @@ function formatDuration(startedAt: string | null, completedAt: string | null): s
               name="i-lucide-git-branch"
               class="w-5 h-5 text-gray-400 shrink-0"
             />
-            <div>
-              <p class="text-xs text-gray-400">
+            <div class="flex-1">
+              <p class="text-xs text-gray-400 mb-1">
                 分支
               </p>
-              <p class="font-medium font-mono">
+              <USelect
+                v-if="presetData.preset.allow_branch_override && presetData.branches.length > 0"
+                v-model="overrideBranch"
+                :items="presetData.branches.map((b) => ({ label: b, value: b }))"
+                value-key="value"
+                class="w-full"
+              />
+              <p
+                v-else
+                class="font-medium font-mono"
+              >
                 {{ presetData.preset.branch }}
               </p>
             </div>

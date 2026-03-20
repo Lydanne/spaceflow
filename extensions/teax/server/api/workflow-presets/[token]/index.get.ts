@@ -41,6 +41,7 @@ export default defineEventHandler(async (event) => {
 
   let workflowName = preset.workflow_path;
   let inputDefs: Record<string, WorkflowInputDef> = {};
+  let branches: string[] = [];
 
   try {
     const result = await gitea.getRepoWorkflows(owner, repoName);
@@ -56,6 +57,12 @@ export default defineEventHandler(async (event) => {
         }
       }
     }
+
+    // 如果允许修改分支，获取分支列表
+    if (preset.allow_branch_override) {
+      const branchesResult = await gitea.getRepoBranches(owner, repoName);
+      branches = branchesResult.map((b) => b.name);
+    }
   } catch {
     // 忽略错误
   }
@@ -69,8 +76,10 @@ export default defineEventHandler(async (event) => {
       branch: preset.branch,
       inputs: preset.inputs,
       allow_input_override: preset.allow_input_override ?? false,
+      allow_branch_override: preset.allow_branch_override ?? false,
     },
     inputDefs,
+    branches,
     repository: {
       id: repo.id,
       full_name: repo.full_name,

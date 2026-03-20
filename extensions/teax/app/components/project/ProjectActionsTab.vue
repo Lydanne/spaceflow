@@ -167,6 +167,7 @@ const inputValues = reactive<Record<string, string>>({});
 const showSavePresetModal = ref(false);
 const presetName = ref("");
 const allowInputOverride = ref(false);
+const allowBranchOverride = ref(false);
 const savingPreset = ref(false);
 
 // 当前选中 workflow 的信息（用于 dispatch modal）
@@ -258,6 +259,7 @@ async function savePreset() {
           branch: selectedBranch.value,
           inputs: { ...inputValues },
           allow_input_override: allowInputOverride.value,
+          allow_branch_override: allowBranchOverride.value,
         },
       },
     );
@@ -895,6 +897,17 @@ function workflowFileName(path: string): string {
                 </p>
               </div>
               <USwitch v-model="allowInputOverride" />
+            </div>
+
+            <!-- 允许用户修改分支 -->
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-sm font-medium">允许用户修改分支</label>
+                <p class="text-xs text-gray-400">
+                  开启后，使用分享链接的用户可以选择其他分支运行
+                </p>
+              </div>
+              <USwitch v-model="allowBranchOverride" />
             </div>
 
             <!-- 配置预览 -->

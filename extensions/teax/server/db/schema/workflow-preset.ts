@@ -26,6 +26,7 @@ export const workflowPresets = pgTable(
     current_run_id: bigint("current_run_id", { mode: "number" }),
     last_triggered_by: uuid("last_triggered_by").references(() => users.id),
     allow_input_override: boolean("allow_input_override").default(false),
+    allow_branch_override: boolean("allow_branch_override").default(false),
     created_by: uuid("created_by")
       .notNull()
       .references(() => users.id),
