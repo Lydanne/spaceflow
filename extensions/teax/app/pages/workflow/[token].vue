@@ -322,14 +322,21 @@ function formatDuration(startedAt: string | null, completedAt: string | null): s
                 修改
               </UButton>
             </div>
-            <div class="space-y-2">
+            <div class="space-y-3">
               <div
                 v-for="(value, key) in presetData.preset.inputs"
                 :key="key"
-                class="flex items-center justify-between text-sm"
               >
-                <span class="text-gray-500">{{ key }}</span>
-                <span class="font-mono text-gray-900 dark:text-white">{{ overrideInputs[key] ?? value }}</span>
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-gray-500">{{ key }}</span>
+                  <span class="font-mono text-gray-900 dark:text-white">{{ overrideInputs[key] ?? value }}</span>
+                </div>
+                <p
+                  v-if="presetData.inputDefs[key]?.description"
+                  class="text-xs text-gray-400 mt-0.5"
+                >
+                  {{ presetData.inputDefs[key].description }}
+                </p>
               </div>
             </div>
           </div>
