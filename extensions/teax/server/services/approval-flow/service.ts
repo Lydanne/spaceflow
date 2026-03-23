@@ -11,6 +11,38 @@ import type { ApprovalStrategy } from "./types";
 const DEFAULT_EXPIRE_DAYS = 7;
 
 /**
+ * 获取申请人的显示信息
+ * 优先使用飞书 @ 格式，否则使用用户名
+ */
+async function getRequesterDisplayInfo(requesterId: string): Promise<string> {
+  const db = useDB();
+
+  // 查询用户信息和飞书绑定
+  const [user] = await db
+    .select({
+      gitea_username: schema.users.gitea_username,
+      feishu_open_id: schema.userFeishu.feishu_open_id,
+      feishu_name: schema.userFeishu.feishu_name,
+    })
+    .from(schema.users)
+    .leftJoin(schema.userFeishu, eq(schema.users.id, schema.userFeishu.user_id))
+    .where(eq(schema.users.id, requesterId))
+    .limit(1);
+
+  if (!user) {
+    return "未知用户";
+  }
+
+  // 如果绑定了飞书，使用 @ 格式
+  if (user.feishu_open_id) {
+    return `<at id=${user.feishu_open_id}></at>`;
+  }
+
+  // 否则使用飞书名称或 Gitea 用户名
+  return user.feishu_name || user.gitea_username || "未知用户";
+}
+
+/**
  * 创建审批流程
  */
 export async function createApprovalFlow<TPayload extends Record<string, unknown>>(
@@ -284,6 +316,10 @@ async function sendApprovalCard(
     flow,
     flow.payload as Record<string, unknown>,
   );
+
+  // 添加申请人信息
+  const requesterInfo = await getRequesterDisplayInfo(flow.requester_id);
+  fields.unshift({ label: "申请人", value: requesterInfo });
 
   // 添加申请理由
   if (flow.reason) {
