@@ -331,7 +331,7 @@ function getStatusText(preset: SubPreset): string {
         <div
           v-for="preset in groupData.presets"
           :key="preset.id"
-          class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm"
+          class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm flex flex-col"
         >
           <!-- 卡片头部 -->
           <div class="flex items-center justify-between mb-3">
@@ -382,7 +382,7 @@ function getStatusText(preset: SubPreset): string {
           </div>
 
           <!-- 操作按钮 -->
-          <div class="flex gap-2 flex-wrap">
+          <div class="flex gap-2 flex-wrap mt-auto pt-4">
             <!-- 未锁定状态 -->
             <template v-if="!preset.locked_by">
               <UButton
