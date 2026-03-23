@@ -164,6 +164,27 @@ function isLockedByMe(preset: SubPreset): boolean {
   return preset.locked_by === user.value?.id;
 }
 
+// 申请解锁
+const requestingUnlockIndex = ref<number | null>(null);
+
+async function requestUnlock(index: number) {
+  requestingUnlockIndex.value = index;
+  try {
+    await $fetch(`/api/workflow-preset-groups/${token.value}/presets/${index}/request-unlock`, {
+      method: "POST",
+    });
+    toast.add({ title: "已发送解锁申请", color: "success" });
+  } catch (err) {
+    console.error("Failed to request unlock:", err);
+    toast.add({
+      title: (err as { data?: { message?: string } })?.data?.message || "申请失败",
+      color: "error",
+    });
+  } finally {
+    requestingUnlockIndex.value = null;
+  }
+}
+
 // 打开添加子预设模态框
 function openAddPresetModal() {
   newPresetName.value = `子预设 ${(groupData.value?.presets.length || 0) + 1}`;
@@ -457,10 +478,12 @@ function getStatusText(preset: SubPreset): string {
                 打开
               </UButton>
               <UButton
-                color="neutral"
+                v-if="loggedIn"
+                color="warning"
                 variant="outline"
                 size="sm"
-                disabled
+                :loading="requestingUnlockIndex === preset.preset_index"
+                @click="requestUnlock(preset.preset_index)"
               >
                 <UIcon name="i-lucide-hand" class="w-4 h-4 mr-1" />
                 申请解锁
