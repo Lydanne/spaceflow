@@ -321,9 +321,39 @@ export interface CardActionContext {
   token: string;
 }
 
-export async function handleCardAction(ctx: CardActionContext): Promise<void> {
-  const actionValue = ctx.action.value as Record<string, unknown> | undefined;
-  const actionType = actionValue?.action as string | undefined;
+export async function handleCardAction(ctx: CardActionContext): Promise<Record<string, unknown> | undefined> {
+  const actionValue = ctx.action.value as Record<string, unknown> | string | undefined;
+
+  // value 可能是双重 JSON 编码的字符串，需要解析
+  let parsedValue: Record<string, unknown> | undefined;
+  if (typeof actionValue === "string") {
+    try {
+      // 第一次解析
+      let parsed = JSON.parse(actionValue);
+      // 如果解析结果还是字符串，再解析一次（双重编码）
+      if (typeof parsed === "string") {
+        parsed = JSON.parse(parsed);
+      }
+      parsedValue = parsed as Record<string, unknown>;
+    } catch {
+      // 如果不是 JSON，可能是简单的 action 字符串如 "approval_flow:approve:xxx"
+      if (actionValue.startsWith("approval_flow:")) {
+        const { handleApprovalFlowCardAction } = await import("~~/server/services/approval-flow/card-handler");
+        return await handleApprovalFlowCardAction(ctx.openId, ctx.token, actionValue);
+      }
+      parsedValue = undefined;
+    }
+  } else {
+    parsedValue = actionValue;
+  }
+
+  const actionType = parsedValue?.action as string | undefined;
+
+  // 检查是否是审批流程的交互 (格式: approval_flow:approve:flowId)
+  if (actionType?.startsWith("approval_flow:")) {
+    const { handleApprovalFlowCardAction } = await import("~~/server/services/approval-flow/card-handler");
+    return await handleApprovalFlowCardAction(ctx.openId, ctx.token, actionType);
+  }
 
   // 检查是否是控制面板的交互
   const controlPanelActions = [
@@ -339,13 +369,8 @@ export async function handleCardAction(ctx: CardActionContext): Promise<void> {
 
   if (actionType && actionValue && controlPanelActions.includes(actionType)) {
     const { handleControlPanelAction } = await import("~~/server/services/control-panel.service");
-    const { updateCardMessage } = await import("~~/server/utils/feishu-sdk");
-
     const newCard = await handleControlPanelAction(ctx.openId, actionValue as Record<string, unknown>);
-    if (newCard) {
-      await updateCardMessage(ctx.token, newCard);
-    }
-    return;
+    return newCard as Record<string, unknown> | undefined;
   }
 
   // 检查是否是账户相关的交互
@@ -357,13 +382,8 @@ export async function handleCardAction(ctx: CardActionContext): Promise<void> {
 
   if (actionType && actionValue && accountActions.includes(actionType)) {
     const { handleAccountAction } = await import("~~/server/services/account.service");
-    const { updateCardMessage } = await import("~~/server/utils/feishu-sdk");
-
     const newCard = await handleAccountAction(ctx.openId, actionValue as Record<string, unknown>);
-    if (newCard) {
-      await updateCardMessage(ctx.token, newCard);
-    }
-    return;
+    return newCard as Record<string, unknown> | undefined;
   }
 
   // 否则调用状态机处理其他卡片交互
@@ -372,6 +392,8 @@ export async function handleCardAction(ctx: CardActionContext): Promise<void> {
     action: ctx.action,
     openId: ctx.openId,
   });
+
+  return undefined;
 }
 
 // ─── 指令分发 ─────────────────────────────────────────────

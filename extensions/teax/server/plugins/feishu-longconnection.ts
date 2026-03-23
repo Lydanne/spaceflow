@@ -46,7 +46,7 @@ export default defineNitroPlugin(async () => {
         },
         // 卡片交互事件
         "card.action.trigger": async (data: Parameters<typeof handleCardActionEvent>[0]) => {
-          await handleCardActionEvent(data);
+          return await handleCardActionEvent(data);
         },
         // 审批事件
         approval_instance: async (data: Parameters<typeof handleApprovalEvent>[0]) => {
@@ -161,6 +161,7 @@ async function handleMessageEvent(data: {
 
 /**
  * 处理卡片交互事件
+ * 返回值会被飞书用于更新卡片
  */
 async function handleCardActionEvent(data: {
   action?: Record<string, unknown>;
@@ -169,11 +170,15 @@ async function handleCardActionEvent(data: {
     user_id?: string;
   };
   token?: string;
-}): Promise<void> {
+  open_message_id?: string;
+}): Promise<Record<string, unknown> | undefined> {
   try {
     const action = data.action;
     const operator = data.operator;
     const token = data.token;
+    const openMessageId = data.open_message_id;
+
+    console.log(`[feishu-ws] 🎯 Card action data:`, JSON.stringify({ token, openMessageId }, null, 2));
 
     if (!action || !operator || !token) {
       return;
@@ -187,11 +192,24 @@ async function handleCardActionEvent(data: {
     console.log(`[feishu-ws] 🎯 Card action from ${openId}`);
 
     const { handleCardAction } = await import("~~/server/services/bot-command.service");
-    await handleCardAction({
+    const result = await handleCardAction({
       action: action as Record<string, unknown>,
       openId,
       token,
     });
+
+    // 如果返回了卡片更新内容，需要通过 API 更新卡片
+    if (result && openMessageId) {
+      const { updateCardMessage } = await import("~~/server/utils/feishu-sdk");
+      try {
+        await updateCardMessage(openMessageId, result);
+        console.log(`[feishu-ws] ✅ Card updated for message ${openMessageId}`);
+      } catch (e) {
+        console.error("[feishu-ws] Failed to update card:", e);
+      }
+    }
+
+    return result;
   } catch (error) {
     console.error("[feishu-ws] Error handling card action:", error);
   }
