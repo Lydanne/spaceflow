@@ -71,7 +71,7 @@ export async function handleApprovalFlowCardAction(
 
     // 使用 message_id 更新卡片（不返回卡片，避免被飞书长连接覆盖）
     if (messageId) {
-      // 延迟 100ms 再更新，确保飞书长连接的响应先处理完
+      // 延迟 500ms 再更新，确保飞书长连接的响应先处理完
       setTimeout(async () => {
         try {
           await updateCardMessage(messageId, resultCard);
@@ -79,7 +79,7 @@ export async function handleApprovalFlowCardAction(
         } catch (e) {
           console.error("[ApprovalFlow] Failed to update card:", e);
         }
-      }, 100);
+      }, 500);
     }
 
     // 不返回卡片内容，让飞书保持原卡片，然后我们通过 API 更新
