@@ -52,7 +52,7 @@
 interface PermissionGroup {
   id: string;
   organization_id: string;
-  type: 'system' | 'custom';  // 系统预设 or 自定义
+  type: 'default' | 'custom' | 'scene';  // 默认/自定义/场景
   name: string;
   description: string;
   permissions: string[];      // 权限 key 列表
@@ -61,6 +61,91 @@ interface PermissionGroup {
   updated_at: Date;
 }
 ```
+
+### 权限组类型说明
+
+| type | 说明 | 创建方式 | 可否删除 |
+| ---- | ---- | -------- | -------- |
+| `default` | 组织同步时自动创建的默认权限组 | 系统自动 | ❌ 禁止 |
+| `custom` | 管理员手动创建的权限组 | 管理员创建 | ✅ 允许 |
+| `scene` | 用户申请时自动创建/复用的场景权限组 | 审批通过时自动 | ✅ 允许 |
+
+**场景权限组特点**：
+
+- 用户申请权限时，描述场景名称和所需权限
+- 系统按场景名称查找 `scene` 类型权限组
+- 找到则复用，未找到则自动创建
+- 审批通过后绑定到申请人所在团队
+
+### 场景权限系统
+
+场景权限提供了一套完整的权限检查和申请流程封装，简化前后端使用。
+
+#### 架构
+
+```text
+shared/
+└── scene-permissions.ts          # 场景定义 + 权限映射（前后端共享）
+
+server/
+└── utils/scene-permission.ts     # requireScenePermission() 后端工具
+
+app/
+└── composables/useScenePermission.ts  # 前端 composable
+```
+
+#### 预定义场景
+
+在 `shared/scene-permissions.ts` 中定义：
+
+```typescript
+export const SCENE_REGISTRY = {
+  "preset-workflow": {
+    key: "preset-workflow",
+    name: "预设工作流",
+    description: "使用预设工作流触发 CI/CD 流程",
+    permissions: ["actions:trigger"],
+  },
+  // 添加更多场景...
+};
+```
+
+#### 后端使用
+
+```typescript
+import { requireScenePermission } from "~~/server/utils/scene-permission";
+
+export default defineEventHandler(async (event) => {
+  // 一行代码检查场景权限
+  await requireScenePermission(event, "preset-workflow", orgId, repoId);
+  
+  // 权限通过，继续业务逻辑...
+});
+```
+
+权限不足时自动抛出 403 错误，包含申请所需的完整信息。
+
+#### 前端使用
+
+```typescript
+const { handlePermissionError } = useScenePermission();
+
+const { data, error } = await useFetch('/api/xxx');
+
+// 自动处理权限错误，跳转到申请页面
+watch(error, (err) => {
+  handlePermissionError(err);
+}, { immediate: true });
+```
+
+#### 完整流程
+
+1. 用户访问需要权限的页面
+2. 后端 `requireScenePermission` 检查权限
+3. 权限不足 → 返回 403 + 场景信息
+4. 前端 `handlePermissionError` 自动跳转到 `/request-permission`
+5. 用户提交申请 → 等待审批
+6. 审批通过 → 跳转回原页面
 
 ### 权限定义
 

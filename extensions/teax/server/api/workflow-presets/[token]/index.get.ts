@@ -1,5 +1,5 @@
 import { parse as parseYaml } from "yaml";
-import { requirePermission } from "~~/server/utils/permission";
+import { requireScenePermission } from "~~/server/utils/scene-permission";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolvePresetByToken } from "~~/server/utils/resolve-preset";
 
@@ -34,8 +34,8 @@ function extractInputs(doc: Record<string, unknown>): Record<string, WorkflowInp
 export default defineEventHandler(async (event) => {
   const { preset, repo, owner, repoName } = await resolvePresetByToken(event);
 
-  // 检查权限
-  await requirePermission(event, repo.organization_id, "actions:trigger", repo.id);
+  // 检查场景权限
+  await requireScenePermission(event, "preset-workflow", repo.organization_id!, repo.id);
 
   const gitea = await useGiteaSdk(event).role("user");
 

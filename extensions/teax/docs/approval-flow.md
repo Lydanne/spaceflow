@@ -8,7 +8,7 @@
 
 | 场景 | 申请内容 | 审批后操作 |
 | ---- | -------- | ---------- |
-| **权限申请** | 加入团队、申请权限组、申请仓库访问 | 创建 team_members / team_permissions |
+| **场景权限申请** | 描述场景名称和所需权限 | 查找/创建 scene 类型权限组，绑定团队 |
 | **部署审批** | 生产环境部署 | 触发 Gitea workflow dispatch |
 | **配置变更** | 修改敏感配置 | 更新配置项 |
 | **资源申请** | 申请工作区、申请更多配额 | 创建资源 |
@@ -127,8 +127,8 @@ export const approvalFlows = pgTable(
     // ─── 审批类型 ───────────────────────────────────────────
     // 用于路由到对应的 Strategy
     flow_type: varchar("flow_type", { length: 100 }).notNull(),
-    // 例如: 'permission:join_team', 'permission:request_group', 
-    //       'deploy:production', 'config:sensitive', 'resource:workspace'
+    // 例如: 'permission:scene', 'deploy:production', 
+    //       'config:sensitive', 'resource:workspace'
 
     // ─── 状态 ───────────────────────────────────────────────
     status: varchar("status", { length: 50 }).notNull().default("pending"),
@@ -700,210 +700,110 @@ import type { ApprovalStrategy } from "../types";
 import type { ApprovalFlow } from "~~/server/db/schema/approval-flow";
 
 // Payload 类型定义
-interface JoinTeamPayload {
-  targetTeamId: string;
+interface ScenePermissionPayload {
+  sceneName: string;          // 场景名称，如 "部署生产环境"
+  permissions: string[];      // 该场景需要的权限
+  repositoryIds?: string[];   // 仓库范围（空=全部）
+  teamId: string;             // 申请人所在的团队
 }
-
-interface RequestPermissionPayload {
-  targetPermissionGroupId: string;
-  teamId: string; // 申请人所在的团队
-}
-
-interface RequestRepoAccessPayload {
-  targetRepositoryId: string;
-  teamId: string;
-}
-
-type PermissionRequestPayload =
-  | JoinTeamPayload
-  | RequestPermissionPayload
-  | RequestRepoAccessPayload;
 
 /**
- * 加入团队策略
+ * 场景权限申请策略
+ * 
+ * 用户描述场景名称和所需权限，系统自动查找/创建 scene 类型权限组
  */
-export const joinTeamStrategy: ApprovalStrategy<JoinTeamPayload> = {
-  flowType: "permission:join_team",
+export const scenePermissionStrategy: ApprovalStrategy<ScenePermissionPayload> = {
+  flowType: "permission:scene",
 
   async validateRequest(event, payload, organizationId) {
-    const db = useDB();
-    const user = event.context.user;
-
-    // 检查团队是否存在
-    const [team] = await db
-      .select()
-      .from(schema.teams)
-      .where(eq(schema.teams.id, payload.targetTeamId))
-      .limit(1);
-
-    if (!team) {
-      throw createError({ statusCode: 404, message: "Team not found" });
+    // 校验权限列表非空
+    if (!payload.permissions?.length) {
+      throw createError({ statusCode: 400, message: "权限列表不能为空" });
     }
-
-    // 检查用户是否已在团队中
-    const [existing] = await db
-      .select()
-      .from(schema.teamMembers)
-      .where(
-        and(
-          eq(schema.teamMembers.team_id, payload.targetTeamId),
-          eq(schema.teamMembers.user_id, user.id),
-        ),
-      )
-      .limit(1);
-
-    if (existing) {
-      throw createError({ statusCode: 400, message: "Already a team member" });
+    // 校验场景名称非空
+    if (!payload.sceneName?.trim()) {
+      throw createError({ statusCode: 400, message: "场景名称不能为空" });
     }
-
-    // 检查是否有重复的待处理申请
-    const [pendingFlow] = await db
-      .select()
-      .from(schema.approvalFlows)
-      .where(
-        and(
-          eq(schema.approvalFlows.flow_type, "permission:join_team"),
-          eq(schema.approvalFlows.requester_id, user.id),
-          eq(schema.approvalFlows.status, "pending"),
-        ),
-      )
-      .limit(1);
-
-    if (pendingFlow) {
-      throw createError({ statusCode: 400, message: "Duplicate pending request" });
-    }
+    // 校验团队存在且用户是成员
+    // ... 实现略
   },
 
   async buildTitle(payload) {
-    const db = useDB();
-    const [team] = await db
-      .select()
-      .from(schema.teams)
-      .where(eq(schema.teams.id, payload.targetTeamId))
-      .limit(1);
-
-    return `申请加入团队「${team?.name || "未知"}」`;
+    return `申请场景权限「${payload.sceneName}」`;
   },
 
-  async findApprovers(organizationId, payload) {
+  async findApprovers(organizationId) {
+    // 返回组织 Owner/Admin 的飞书 open_id
     const db = useDB();
-    const approverOpenIds: string[] = [];
-
-    // 1. 团队 Owner
-    const teamOwners = await db
+    const admins = await db
       .select({ openId: schema.users.feishu_open_id })
       .from(schema.teamMembers)
-      .innerJoin(schema.users, eq(schema.teamMembers.user_id, schema.users.id))
+      .innerJoin(schema.teams, eq(schema.teams.id, schema.teamMembers.team_id))
+      .innerJoin(schema.users, eq(schema.users.id, schema.teamMembers.user_id))
       .where(
         and(
-          eq(schema.teamMembers.team_id, payload.targetTeamId),
+          eq(schema.teams.organization_id, organizationId),
           eq(schema.teamMembers.role, "owner"),
         ),
       );
-
-    approverOpenIds.push(
-      ...teamOwners.map((o) => o.openId).filter((id): id is string => !!id),
-    );
-
-    // 2. 组织 Owner/Admin
-    if (organizationId) {
-      const orgAdmins = await db
-        .select({ openId: schema.users.feishu_open_id })
-        .from(schema.teamMembers)
-        .innerJoin(schema.teams, eq(schema.teamMembers.team_id, schema.teams.id))
-        .innerJoin(schema.users, eq(schema.teamMembers.user_id, schema.users.id))
-        .where(
-          and(
-            eq(schema.teams.organization_id, organizationId),
-            eq(schema.teamMembers.role, "owner"),
-          ),
-        );
-
-      approverOpenIds.push(
-        ...orgAdmins.map((o) => o.openId).filter((id): id is string => !!id),
-      );
-    }
-
-    return [...new Set(approverOpenIds)];
+    return admins.map((a) => a.openId).filter(Boolean) as string[];
   },
 
   async buildCardFields(flow, payload) {
-    const db = useDB();
-
-    const [team] = await db
-      .select()
-      .from(schema.teams)
-      .where(eq(schema.teams.id, payload.targetTeamId))
-      .limit(1);
-
-    const [requester] = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.id, flow.requester_id))
-      .limit(1);
-
     return [
-      { label: "申请人", value: requester?.gitea_username || "未知" },
-      { label: "目标团队", value: team?.name || "未知" },
-      { label: "申请理由", value: flow.reason || "无" },
+      { label: "场景名称", value: payload.sceneName },
+      { label: "申请权限", value: payload.permissions.join(", ") },
+      ...(payload.repositoryIds?.length
+        ? [{ label: "仓库范围", value: `${payload.repositoryIds.length} 个仓库` }]
+        : [{ label: "仓库范围", value: "全部仓库" }]),
     ];
   },
 
   async onApproved(flow, payload, approverId) {
     const db = useDB();
 
-    // 添加用户到团队
-    await db.insert(schema.teamMembers).values({
-      team_id: payload.targetTeamId,
-      user_id: flow.requester_id,
-      role: "member",
-    });
-  },
-};
-
-/**
- * 申请权限组策略
- */
-export const requestPermissionStrategy: ApprovalStrategy<RequestPermissionPayload> = {
-  flowType: "permission:request_group",
-
-  async validateRequest(event, payload, organizationId) {
-    // 校验权限组存在且属于同一组织
-    // 校验用户所在团队未绑定该权限组
-    // 校验无重复待处理申请
-    // ... 实现略
-  },
-
-  async buildTitle(payload) {
-    const db = useDB();
-    const [group] = await db
+    // 1. 查找匹配的场景权限组（同名 + 同权限 + 同仓库范围）
+    const existingGroups = await db
       .select()
       .from(schema.permissionGroups)
-      .where(eq(schema.permissionGroups.id, payload.targetPermissionGroupId))
-      .limit(1);
+      .where(
+        and(
+          eq(schema.permissionGroups.organization_id, flow.organization_id),
+          eq(schema.permissionGroups.type, "scene"),
+          eq(schema.permissionGroups.name, payload.sceneName),
+        ),
+      );
 
-    return `申请权限组「${group?.name || "未知"}」`;
-  },
+    // 精确匹配权限和仓库范围
+    let groupId = existingGroups.find((g) => {
+      const permsMatch = JSON.stringify((g.permissions as string[]).sort()) === 
+                         JSON.stringify(payload.permissions.sort());
+      const repoMatch = JSON.stringify(g.repository_ids?.sort() || null) === 
+                        JSON.stringify(payload.repositoryIds?.sort() || null);
+      return permsMatch && repoMatch;
+    })?.id;
 
-  async findApprovers(organizationId) {
-    // 返回组织 Owner/Admin 的飞书 open_id
-    // ... 实现略
-    return [];
-  },
+    // 2. 未找到则创建新的场景权限组
+    if (!groupId) {
+      const [newGroup] = await db.insert(schema.permissionGroups).values({
+        organization_id: flow.organization_id,
+        type: "scene",
+        name: payload.sceneName,
+        description: `场景权限：${payload.sceneName}`,
+        permissions: payload.permissions,
+        repository_ids: payload.repositoryIds || null,
+      }).returning();
+      groupId = newGroup.id;
+    }
 
-  async buildCardFields(flow, payload) {
-    // ... 实现略
-    return [];
-  },
-
-  async onApproved(flow, payload, approverId) {
-    const db = useDB();
-
-    // 为用户所在团队绑定权限组
-    await db.insert(schema.teamPermissions).values({
-      team_id: payload.teamId,
-      permission_group_id: payload.targetPermissionGroupId,
-    });
+    // 3. 为团队绑定权限组（忽略重复）
+    await db
+      .insert(schema.teamPermissions)
+      .values({
+        team_id: payload.teamId,
+        permission_group_id: groupId,
+      })
+      .onConflictDoNothing();
   },
 };
 ```
@@ -1020,10 +920,15 @@ async function handleCardAction(action: FeishuCardAction) {
 # 创建审批流程
 POST /api/approval-flows
 {
-  "flowType": "permission:join_team",
+  "flowType": "permission:scene",
   "organizationId": "...",
-  "payload": { "targetTeamId": "..." },
-  "reason": "申请理由"
+  "payload": { 
+    "sceneName": "部署生产环境",
+    "permissions": ["repo:view", "actions:view", "actions:trigger"],
+    "repositoryIds": null,
+    "teamId": "..." 
+  },
+  "reason": "需要部署生产环境的权限"
 }
 
 # 查询我的申请
@@ -1068,13 +973,12 @@ POST /api/repos/{owner}/{repo}/deploy-approvals
 // server/plugins/approval-strategies.ts
 
 import { registerStrategy } from "~~/server/services/approval-flow/registry";
-import { joinTeamStrategy, requestPermissionStrategy } from "~~/server/services/approval-flow/strategies/permission-request";
+import { scenePermissionStrategy } from "~~/server/services/approval-flow/strategies/scene-permission";
 import { deployApprovalStrategy } from "~~/server/services/approval-flow/strategies/deploy-approval";
 
 export default defineNitroPlugin(() => {
-  // 注册权限申请策略
-  registerStrategy(joinTeamStrategy);
-  registerStrategy(requestPermissionStrategy);
+  // 注册场景权限申请策略
+  registerStrategy(scenePermissionStrategy);
 
   // 注册部署审批策略
   registerStrategy(deployApprovalStrategy);
@@ -1164,7 +1068,7 @@ export default defineTask({
 
 ### Phase 2：策略实现
 
-- [ ] 实现权限申请策略（join_team, request_group, request_repo）
+- [ ] 实现场景权限申请策略（permission:scene）
 - [ ] 迁移现有 `approval_requests` 到新框架
 - [ ] 实现部署审批策略
 

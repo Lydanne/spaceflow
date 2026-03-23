@@ -31,13 +31,18 @@ interface PresetData {
   };
 }
 
-const route = useRoute();
-const token = computed(() => route.params.token as string);
+const token = computed(() => useRoute().params.token as string);
+const { handlePermissionError } = useScenePermission();
 
 // 获取预设信息
 const { data: presetData, error: presetError, status: presetStatus } = useLazyFetch<PresetData>(
   () => `/api/workflow-presets/${token.value}`,
 );
+
+// 权限不足时自动跳转到申请页面
+watch(presetError, (err) => {
+  handlePermissionError(err);
+}, { immediate: true });
 
 // API URLs
 const statusUrl = computed(() => `/api/workflow-presets/${token.value}/status`);

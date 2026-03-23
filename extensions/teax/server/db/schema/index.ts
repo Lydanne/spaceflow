@@ -4,5 +4,6 @@ export * from "./permission";
 export * from "./repository";
 export * from "./audit";
 export * from "./approval";
+export * from "./approval-flow";
 export * from "./card-interaction";
 export * from "./workflow-preset";

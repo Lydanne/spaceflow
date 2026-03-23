@@ -97,9 +97,30 @@ export async function requirePermission(event: H3Event, orgId: string, permissio
   const hasPermission = rows.some((row) => rowGrantsPermission(row, permission, repositoryId));
 
   if (!hasPermission) {
+    // 获取用户所在团队（用于权限申请）
+    const db = useDB();
+    const [teamMember] = await db
+      .select({ team_id: schema.teamMembers.team_id })
+      .from(schema.teamMembers)
+      .innerJoin(schema.teams, eq(schema.teamMembers.team_id, schema.teams.id))
+      .where(
+        and(
+          eq(schema.teamMembers.user_id, session.user.id),
+          eq(schema.teams.organization_id, orgId),
+        ),
+      )
+      .limit(1);
+
     throw createError({
       statusCode: 403,
       message: `Missing permission: ${permission}`,
+      data: {
+        code: "PERMISSION_DENIED",
+        permission,
+        organization_id: orgId,
+        team_id: teamMember?.team_id,
+        repository_id: repositoryId,
+      },
     });
   }
 
