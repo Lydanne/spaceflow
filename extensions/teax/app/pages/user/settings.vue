@@ -2,6 +2,47 @@
 const { user } = useUserSession();
 const toast = useToast();
 
+// ─── 我的团队 ─────────────────────────────────────────────
+
+interface TeamMemberInfo {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  role: string | null;
+}
+
+interface PermissionGroupInfo {
+  id: string;
+  name: string;
+  type: string;
+  permissions: string[];
+}
+
+interface TeamInfo {
+  id: string;
+  name: string;
+  organization: {
+    id: string;
+    name: string;
+  };
+  role: string | null;
+  permissions: PermissionGroupInfo[];
+  members: TeamMemberInfo[];
+}
+
+const { data: teamsData } = await useFetch<{ data: TeamInfo[] }>(
+  "/api/user/teams",
+  { key: "user-teams" },
+);
+const teams = computed(() => teamsData.value?.data ?? []);
+
+// 展开的团队 ID
+const expandedTeamId = ref<string | null>(null);
+
+function toggleTeam(teamId: string) {
+  expandedTeamId.value = expandedTeamId.value === teamId ? null : teamId;
+}
+
 // ─── 工作流预设管理 ─────────────────────────────────────────
 
 interface WorkflowPreset {
@@ -188,6 +229,176 @@ async function savePreferences() {
             <p class="font-medium mt-1">
               {{ user?.username }}
             </p>
+          </div>
+        </div>
+      </div>
+    </UCard>
+
+    <!-- 我的团队 -->
+    <UCard class="mb-6">
+      <template #header>
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">
+            我的团队
+          </h2>
+          <UBadge
+            color="neutral"
+            variant="subtle"
+          >
+            {{ teams.length }} 个团队
+          </UBadge>
+        </div>
+      </template>
+
+      <div
+        v-if="teams.length === 0"
+        class="text-center py-6"
+      >
+        <UIcon
+          name="i-lucide-users"
+          class="w-10 h-10 mx-auto mb-3 text-gray-400"
+        />
+        <p class="text-gray-500 dark:text-gray-400">
+          您还未加入任何团队
+        </p>
+      </div>
+
+      <div
+        v-else
+        class="space-y-3"
+      >
+        <div
+          v-for="team in teams"
+          :key="team.id"
+          class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+        >
+          <!-- 团队头部（可点击展开） -->
+          <div
+            class="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+            @click="toggleTeam(team.id)"
+          >
+            <div class="flex items-center gap-3">
+              <UIcon
+                name="i-lucide-users"
+                class="w-5 h-5 text-primary"
+              />
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-medium">{{ team.name }}</span>
+                  <UBadge
+                    v-if="team.role === 'owner'"
+                    color="warning"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    Owner
+                  </UBadge>
+                </div>
+                <p class="text-xs text-gray-400">
+                  {{ team.organization.name }}
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <UBadge
+                color="info"
+                variant="subtle"
+                size="xs"
+              >
+                {{ team.permissions.length }} 个权限组
+              </UBadge>
+              <UBadge
+                color="neutral"
+                variant="subtle"
+                size="xs"
+              >
+                {{ team.members.length }} 人
+              </UBadge>
+              <UIcon
+                :name="expandedTeamId === team.id ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                class="w-4 h-4 text-gray-400"
+              />
+            </div>
+          </div>
+
+          <!-- 展开内容 -->
+          <div
+            v-if="expandedTeamId === team.id"
+            class="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-800/30"
+          >
+            <!-- 权限组 -->
+            <div class="mb-4">
+              <h4 class="text-sm font-medium text-gray-500 mb-2">
+                权限组
+              </h4>
+              <div
+                v-if="team.permissions.length === 0"
+                class="text-sm text-gray-400"
+              >
+                暂无权限组
+              </div>
+              <div
+                v-else
+                class="space-y-2"
+              >
+                <div
+                  v-for="pg in team.permissions"
+                  :key="pg.id"
+                  class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700"
+                >
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="font-medium text-sm">{{ pg.name }}</span>
+                    <UBadge
+                      :color="pg.type === 'scene' ? 'warning' : pg.type === 'default' ? 'info' : 'neutral'"
+                      variant="subtle"
+                      size="xs"
+                    >
+                      {{ pg.type === 'scene' ? '场景' : pg.type === 'default' ? '默认' : '自定义' }}
+                    </UBadge>
+                  </div>
+                  <div class="flex flex-wrap gap-1">
+                    <UBadge
+                      v-for="perm in pg.permissions"
+                      :key="perm"
+                      color="neutral"
+                      variant="outline"
+                      size="xs"
+                    >
+                      {{ perm }}
+                    </UBadge>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 团队成员 -->
+            <div>
+              <h4 class="text-sm font-medium text-gray-500 mb-2">
+                团队成员
+              </h4>
+              <div class="flex flex-wrap gap-2">
+                <div
+                  v-for="member in team.members"
+                  :key="member.id"
+                  class="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-full px-3 py-1.5 border border-gray-200 dark:border-gray-700"
+                >
+                  <UAvatar
+                    :src="member.avatar_url || undefined"
+                    :alt="member.username"
+                    size="2xs"
+                  />
+                  <span class="text-sm">{{ member.username }}</span>
+                  <UBadge
+                    v-if="member.role === 'owner'"
+                    color="warning"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    Owner
+                  </UBadge>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
