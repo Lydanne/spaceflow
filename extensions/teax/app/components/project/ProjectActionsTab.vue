@@ -166,9 +166,16 @@ const inputValues = reactive<Record<string, string>>({});
 // 保存预设
 const showSavePresetModal = ref(false);
 const presetName = ref("");
-const allowInputOverride = ref(false);
+const lockedInputs = ref<string[]>([]);
 const allowBranchOverride = ref(false);
 const savingPreset = ref(false);
+
+// 创建预设组
+const showCreateGroupModal = ref(false);
+const groupName = ref("");
+const groupDescription = ref("");
+const groupAutoUnlockMinutes = ref(60);
+const creatingGroup = ref(false);
 
 // 当前选中 workflow 的信息（用于 dispatch modal）
 const selectedWorkflowItem = computed(
@@ -258,7 +265,7 @@ async function savePreset() {
           workflow_path: selectedWorkflow.value,
           branch: selectedBranch.value,
           inputs: { ...inputValues },
-          allow_input_override: allowInputOverride.value,
+          locked_inputs: lockedInputs.value,
           allow_branch_override: allowBranchOverride.value,
         },
       },
@@ -275,6 +282,69 @@ async function savePreset() {
     toast.add({ title: msg, color: "error" });
   } finally {
     savingPreset.value = false;
+  }
+}
+
+// 打开创建预设组模态框
+function openCreateGroupModal() {
+  // 如果侧边栏已选中某个 workflow，默认选它
+  selectedWorkflow.value = activeWorkflowPath.value || "";
+  if (!selectedBranch.value) selectedBranch.value = defaultBranch.value;
+  clearInputValues();
+  if (selectedWorkflow.value) {
+    for (const [key, def] of Object.entries(currentInputs.value)) {
+      inputValues[key] = def.default ?? "";
+    }
+  }
+  groupName.value = "";
+  groupDescription.value = "";
+  groupAutoUnlockMinutes.value = 60;
+  showCreateGroupModal.value = true;
+}
+
+// 创建预设组
+interface CreateGroupResult {
+  success: boolean;
+  group: {
+    id: string;
+    name: string;
+    share_token: string;
+  };
+}
+
+async function createPresetGroup() {
+  if (!groupName.value.trim()) return;
+  creatingGroup.value = true;
+  try {
+    // 先获取仓库 ID
+    const repoInfo = await $fetch<{ id: string }>(`/api/repos/${props.owner}/${props.repo}`);
+
+    const result = await $fetch<CreateGroupResult>(
+      `/api/workflow-preset-groups`,
+      {
+        method: "POST",
+        body: {
+          repository_id: repoInfo.id,
+          name: groupName.value.trim(),
+          description: groupDescription.value.trim() || undefined,
+          workflow_path: selectedWorkflow.value,
+          default_branch: selectedBranch.value,
+          default_inputs: { ...inputValues },
+          auto_unlock_minutes: groupAutoUnlockMinutes.value,
+        },
+      },
+    );
+    const shareUrl = `${window.location.origin}/workflow-groups/${result.group.share_token}`;
+    await navigator.clipboard.writeText(shareUrl);
+    toast.add({ title: "预设组已创建，链接已复制，请添加子预设", color: "success" });
+    showCreateGroupModal.value = false;
+    showDispatchModal.value = false;
+  } catch (err: unknown) {
+    const msg =
+      (err as { data?: { message?: string } })?.data?.message || "创建失败";
+    toast.add({ title: msg, color: "error" });
+  } finally {
+    creatingGroup.value = false;
   }
 }
 
@@ -781,67 +851,81 @@ function workflowFileName(path: string): string {
       <!-- 触发 Workflow Modal -->
       <UModal v-model:open="showDispatchModal">
         <template #content>
-          <div class="p-6 space-y-4">
-            <h3 class="text-lg font-semibold">
+          <div class="p-6 flex flex-col max-h-[80vh]">
+            <h3 class="text-lg font-semibold mb-4">
               触发 Workflow
             </h3>
 
-            <div>
-              <label class="block text-sm font-medium mb-1">Workflow</label>
-              <USelect
-                v-model="selectedWorkflow"
-                :items="workflowOptions"
-                value-key="value"
-                class="w-full"
-                placeholder="选择 Workflow"
-              />
-            </div>
-
-            <p
-              v-if="currentDescription"
-              class="text-sm text-gray-500 dark:text-gray-400 -mt-2"
-            >
-              {{ currentDescription }}
-            </p>
-
-            <div>
-              <label class="block text-sm font-medium mb-1">分支</label>
-              <USelect
-                v-model="selectedBranch"
-                :items="branchOptions"
-                value-key="value"
-                class="w-full"
-                placeholder="选择分支"
-              />
-            </div>
-
-            <!-- workflow_dispatch inputs -->
-            <template v-if="Object.keys(currentInputs).length > 0">
-              <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-                <p
-                  class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3"
-                >
-                  Workflow Inputs
-                </p>
-                <WorkflowInputsForm
-                  :input-defs="currentInputs"
-                  :model-value="inputValues"
-                  @update:model-value="Object.assign(inputValues, $event)"
+            <div class="flex-1 overflow-y-auto space-y-4 pr-1">
+              <div>
+                <label class="block text-sm font-medium mb-1">Workflow</label>
+                <USelect
+                  v-model="selectedWorkflow"
+                  :items="workflowOptions"
+                  value-key="value"
+                  class="w-full"
+                  placeholder="选择 Workflow"
                 />
               </div>
-            </template>
 
-            <div class="flex justify-between items-center pt-2">
-              <UButton
-                icon="i-lucide-share-2"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                :disabled="!selectedWorkflow || !selectedBranch"
-                @click="showSavePresetModal = true"
+              <p
+                v-if="currentDescription"
+                class="text-sm text-gray-500 dark:text-gray-400 -mt-2"
               >
-                保存为预设
-              </UButton>
+                {{ currentDescription }}
+              </p>
+
+              <div>
+                <label class="block text-sm font-medium mb-1">分支</label>
+                <USelect
+                  v-model="selectedBranch"
+                  :items="branchOptions"
+                  value-key="value"
+                  class="w-full"
+                  placeholder="选择分支"
+                />
+              </div>
+
+              <!-- workflow_dispatch inputs -->
+              <template v-if="Object.keys(currentInputs).length > 0">
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <p
+                    class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3"
+                  >
+                    Workflow Inputs
+                  </p>
+                  <WorkflowInputsForm
+                    :input-defs="currentInputs"
+                    :model-value="inputValues"
+                    @update:model-value="Object.assign(inputValues, $event)"
+                  />
+                </div>
+              </template>
+            </div>
+
+            <div class="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
+              <div class="flex gap-2">
+                <UButton
+                  icon="i-lucide-share-2"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  :disabled="!selectedWorkflow || !selectedBranch"
+                  @click="showSavePresetModal = true"
+                >
+                  保存为预设
+                </UButton>
+                <UButton
+                  icon="i-lucide-layers"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  :disabled="!selectedWorkflow || !selectedBranch"
+                  @click="openCreateGroupModal"
+                >
+                  创建预设组
+                </UButton>
+              </div>
               <div class="flex gap-2">
                 <UButton
                   color="neutral"
@@ -868,71 +952,31 @@ function workflowFileName(path: string): string {
       <!-- 保存预设 Modal -->
       <UModal v-model:open="showSavePresetModal">
         <template #content>
-          <div class="p-6 space-y-4">
+          <div class="p-6 flex flex-col max-h-[80vh]">
             <h3 class="text-lg font-semibold">
               保存为预设
             </h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
               保存当前配置为预设，生成分享链接供他人使用
             </p>
 
-            <div>
-              <label class="block text-sm font-medium mb-1">预设名称</label>
-              <UInput
-                v-model="presetName"
-                placeholder="如：正式发布、预发布环境"
-                class="w-full"
+            <div class="flex-1 overflow-y-auto space-y-4 pr-1">
+              <WorkflowPresetConfigForm
+                v-model:name="presetName"
+                v-model:branch="selectedBranch"
+                v-model:inputs="inputValues"
+                v-model:locked-inputs="lockedInputs"
+                v-model:allow-branch-override="allowBranchOverride"
+                :input-defs="currentInputs"
+                :branch-options="branchOptions"
+                :workflow-name="selectedWorkflowItem?.name"
+                :show-override-options="true"
+                :show-preview="false"
+                name-placeholder="如：正式发布、预发布环境"
               />
             </div>
 
-            <!-- 允许用户修改参数 -->
-            <div
-              v-if="Object.keys(inputValues).length > 0"
-              class="flex items-center justify-between"
-            >
-              <div>
-                <label class="text-sm font-medium">允许用户修改参数</label>
-                <p class="text-xs text-gray-400">
-                  开启后，使用分享链接的用户可以在运行前修改参数值
-                </p>
-              </div>
-              <USwitch v-model="allowInputOverride" />
-            </div>
-
-            <!-- 允许用户修改分支 -->
-            <div class="flex items-center justify-between">
-              <div>
-                <label class="text-sm font-medium">允许用户修改分支</label>
-                <p class="text-xs text-gray-400">
-                  开启后，使用分享链接的用户可以选择其他分支运行
-                </p>
-              </div>
-              <USwitch v-model="allowBranchOverride" />
-            </div>
-
-            <!-- 配置预览 -->
-            <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-2 text-sm">
-              <div class="flex justify-between">
-                <span class="text-gray-500">Workflow</span>
-                <span class="font-medium">{{ selectedWorkflowItem?.name }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-500">分支</span>
-                <span class="font-mono">{{ selectedBranch }}</span>
-              </div>
-              <template v-if="Object.keys(inputValues).length > 0">
-                <div
-                  v-for="(value, key) in inputValues"
-                  :key="key"
-                  class="flex justify-between"
-                >
-                  <span class="text-gray-500">{{ key }}</span>
-                  <span class="font-mono">{{ value || '-' }}</span>
-                </div>
-              </template>
-            </div>
-
-            <div class="flex justify-end gap-2 pt-2">
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
               <UButton
                 color="neutral"
                 variant="ghost"
@@ -948,6 +992,71 @@ function workflowFileName(path: string): string {
                 @click="savePreset"
               >
                 保存并复制链接
+              </UButton>
+            </div>
+          </div>
+        </template>
+      </UModal>
+
+      <!-- 创建预设组 Modal -->
+      <UModal v-model:open="showCreateGroupModal">
+        <template #content>
+          <div class="p-6 space-y-4">
+            <h3 class="text-lg font-semibold">
+              创建预设组
+            </h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              创建一个预设组，包含多个子预设供团队成员抢占使用
+            </p>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">预设组名称 *</label>
+              <UInput
+                v-model="groupName"
+                placeholder="如：测试环境预设组"
+                class="w-full"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">描述</label>
+              <UTextarea
+                v-model="groupDescription"
+                placeholder="可选，描述预设组的用途"
+                class="w-full"
+                :rows="2"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium mb-1">自动解锁时间（分钟）</label>
+              <UInput
+                v-model.number="groupAutoUnlockMinutes"
+                type="number"
+                :min="1"
+                class="w-32"
+              />
+              <p class="text-xs text-gray-400 mt-1">
+                子预设被锁定后，超过此时间将自动解锁
+              </p>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                @click="showCreateGroupModal = false"
+              >
+                取消
+              </UButton>
+              <UButton
+                icon="i-lucide-layers"
+                color="primary"
+                :loading="creatingGroup"
+                :disabled="!groupName.trim()"
+                @click="createPresetGroup"
+              >
+                创建并复制链接
               </UButton>
             </div>
           </div>

@@ -20,8 +20,20 @@ interface PresetData {
     branch: string;
     inputs: Record<string, string>;
     allow_input_override: boolean;
+    locked_inputs: string[];
     allow_branch_override: boolean;
+    // 子预设锁定状态
+    locked_by?: string | null;
+    locked_at?: string | null;
+    auto_unlock_at?: string | null;
   };
+  group?: {
+    id: string;
+    name: string;
+    description: string | null;
+    auto_unlock_minutes: number | null;
+    share_token: string;
+  } | null;
   inputDefs: Record<string, WorkflowInputDef>;
   branches: string[];
   repository: {

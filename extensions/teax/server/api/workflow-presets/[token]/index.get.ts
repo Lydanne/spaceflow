@@ -1,7 +1,9 @@
+import { eq } from "drizzle-orm";
 import { parse as parseYaml } from "yaml";
 import { requireScenePermission } from "~~/server/utils/scene-permission";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolvePresetByToken } from "~~/server/utils/resolve-preset";
+import { useDB, schema } from "~~/server/db";
 
 interface WorkflowInputDef {
   description?: string;
@@ -37,6 +39,7 @@ export default defineEventHandler(async (event) => {
   // 检查场景权限
   await requireScenePermission(event, "preset-workflow", repo.organization_id!, repo.id);
 
+  const db = useDB();
   const gitea = await useGiteaSdk(event).role("user");
 
   let workflowName = preset.workflow_path;
@@ -67,6 +70,25 @@ export default defineEventHandler(async (event) => {
     // 忽略错误
   }
 
+  // 如果是子预设，查询 group 信息
+  type GroupInfo = Pick<typeof schema.workflowPresetGroups.$inferSelect, "id" | "name" | "description" | "auto_unlock_minutes" | "share_token">;
+  let group: GroupInfo | null = null;
+
+  if (preset.group_id) {
+    const [groupData] = await db
+      .select({
+        id: schema.workflowPresetGroups.id,
+        name: schema.workflowPresetGroups.name,
+        description: schema.workflowPresetGroups.description,
+        auto_unlock_minutes: schema.workflowPresetGroups.auto_unlock_minutes,
+        share_token: schema.workflowPresetGroups.share_token,
+      })
+      .from(schema.workflowPresetGroups)
+      .where(eq(schema.workflowPresetGroups.id, preset.group_id))
+      .limit(1);
+    group = groupData || null;
+  }
+
   return {
     preset: {
       id: preset.id,
@@ -76,8 +98,14 @@ export default defineEventHandler(async (event) => {
       branch: preset.branch,
       inputs: preset.inputs,
       allow_input_override: preset.allow_input_override ?? false,
+      locked_inputs: preset.locked_inputs ?? [],
       allow_branch_override: preset.allow_branch_override ?? false,
+      // 子预设锁定状态
+      locked_by: preset.locked_by,
+      locked_at: preset.locked_at,
+      auto_unlock_at: preset.auto_unlock_at,
     },
+    group,
     inputDefs,
     branches,
     repository: {

@@ -15,7 +15,14 @@ export interface ResolvedPreset {
     current_run_id: number | null;
     last_triggered_by: string | null;
     allow_input_override: boolean | null;
+    locked_inputs: string[] | null;
     allow_branch_override: boolean | null;
+    // 子预设相关
+    group_id: string | null;
+    preset_index: number | null;
+    locked_by: string | null;
+    locked_at: Date | null;
+    auto_unlock_at: Date | null;
   };
   repo: {
     id: string;
@@ -53,7 +60,14 @@ export async function resolvePresetByToken(event: H3Event): Promise<ResolvedPres
       current_run_id: schema.workflowPresets.current_run_id,
       last_triggered_by: schema.workflowPresets.last_triggered_by,
       allow_input_override: schema.workflowPresets.allow_input_override,
+      locked_inputs: schema.workflowPresets.locked_inputs,
       allow_branch_override: schema.workflowPresets.allow_branch_override,
+      // 子预设相关
+      group_id: schema.workflowPresets.group_id,
+      preset_index: schema.workflowPresets.preset_index,
+      locked_by: schema.workflowPresets.locked_by,
+      locked_at: schema.workflowPresets.locked_at,
+      auto_unlock_at: schema.workflowPresets.auto_unlock_at,
     })
     .from(schema.workflowPresets)
     .where(eq(schema.workflowPresets.share_token, token))

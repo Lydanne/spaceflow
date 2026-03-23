@@ -102,14 +102,36 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // 保存 runId 到数据库
+  // 保存 runId 到数据库，如果是子预设则同时锁定
+  const db = useDB();
   if (newRunId) {
-    const db = useDB();
+    const updateData: Record<string, unknown> = {
+      current_run_id: newRunId,
+      last_triggered_by: session.user.id,
+    };
+
+    // 如果是子预设且未被锁定，自动锁定
+    if (preset.group_id && !preset.locked_by) {
+      // 获取 group 的自动解锁时间配置
+      const [group] = await db
+        .select({ auto_unlock_minutes: schema.workflowPresetGroups.auto_unlock_minutes })
+        .from(schema.workflowPresetGroups)
+        .where(eq(schema.workflowPresetGroups.id, preset.group_id))
+        .limit(1);
+
+      const now = new Date();
+      updateData.locked_by = session.user.id;
+      updateData.locked_at = now;
+      if (group?.auto_unlock_minutes) {
+        updateData.auto_unlock_at = new Date(now.getTime() + group.auto_unlock_minutes * 60 * 1000);
+      }
+    }
+
     await db
       .update(schema.workflowPresets)
-      .set({ current_run_id: newRunId, last_triggered_by: session.user.id })
+      .set(updateData)
       .where(eq(schema.workflowPresets.id, preset.id));
-    console.log("[run.post] Saved current_run_id:", newRunId);
+    console.log("[run.post] Saved current_run_id:", newRunId, preset.group_id ? "(auto-locked)" : "");
   } else {
     console.log("[run.post] No newRunId found after polling");
   }

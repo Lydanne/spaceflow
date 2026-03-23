@@ -23,6 +23,7 @@ export default defineEventHandler(async (event) => {
       inputs: body.inputs,
       share_token: shareToken,
       allow_input_override: body.allow_input_override,
+      locked_inputs: body.locked_inputs,
       allow_branch_override: body.allow_branch_override,
       created_by: session.user.id,
     })

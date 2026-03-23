@@ -38,6 +38,13 @@ export default defineNuxtConfig({
     experimental: {
       tasks: true,
     },
+    // 定时任务调度（仅生产环境启用）
+    scheduledTasks: process.env.NODE_ENV === "production"
+      ? {
+          // 每分钟检查过期的子预设
+          "* * * * *": ["presets:unlock-expired"],
+        }
+      : {},
     typescript: {
       tsConfig: {
         include: ["../auth.d.ts"],

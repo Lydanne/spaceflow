@@ -5,6 +5,7 @@
 .nitro
 .cache
 dist
+server/db/migrations
 
 # Node dependencies
 node_modules
