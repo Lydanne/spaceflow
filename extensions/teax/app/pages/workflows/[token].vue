@@ -14,6 +14,7 @@ interface WorkflowInputDef {
 interface PresetData {
   preset: {
     id: string;
+    share_token: string;
     name: string;
     workflow_path: string;
     workflow_name: string;

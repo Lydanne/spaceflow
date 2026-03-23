@@ -92,6 +92,7 @@ export default defineEventHandler(async (event) => {
   return {
     preset: {
       id: preset.id,
+      share_token: preset.share_token,
       name: preset.name,
       workflow_path: preset.workflow_path,
       workflow_name: workflowName,

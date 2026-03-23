@@ -104,6 +104,8 @@ export default defineEventHandler(async (event) => {
 
   // 保存 runId 到数据库，如果是子预设则同时锁定
   const db = useDB();
+  let lockInfo: { locked_by: string; locked_at: string; auto_unlock_at: string | null } | null = null;
+
   if (newRunId) {
     const updateData: Record<string, unknown> = {
       current_run_id: newRunId,
@@ -120,11 +122,22 @@ export default defineEventHandler(async (event) => {
         .limit(1);
 
       const now = new Date();
+      const autoUnlockAt = group?.auto_unlock_minutes
+        ? new Date(now.getTime() + group.auto_unlock_minutes * 60 * 1000)
+        : null;
+
       updateData.locked_by = session.user.id;
       updateData.locked_at = now;
-      if (group?.auto_unlock_minutes) {
-        updateData.auto_unlock_at = new Date(now.getTime() + group.auto_unlock_minutes * 60 * 1000);
+      if (autoUnlockAt) {
+        updateData.auto_unlock_at = autoUnlockAt;
       }
+
+      // 记录锁定信息用于返回
+      lockInfo = {
+        locked_by: session.user.id,
+        locked_at: now.toISOString(),
+        auto_unlock_at: autoUnlockAt?.toISOString() || null,
+      };
     }
 
     await db
@@ -141,5 +154,6 @@ export default defineEventHandler(async (event) => {
     message: "工作流已触发",
     runId: newRunId,
     runNumber: newRunNumber,
+    lockInfo,
   };
 });

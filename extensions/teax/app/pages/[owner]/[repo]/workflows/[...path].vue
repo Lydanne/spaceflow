@@ -66,6 +66,7 @@ const presetData = computed(() => {
   return {
     preset: {
       id: "",
+      share_token: "",
       name: data.workflow.name,
       workflow_path: data.workflow.path,
       workflow_name: data.workflow.name,

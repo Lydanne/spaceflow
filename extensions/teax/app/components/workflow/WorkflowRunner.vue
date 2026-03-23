@@ -10,6 +10,7 @@ interface WorkflowInputDef {
 interface PresetData {
   preset: {
     id: string;
+    share_token: string;
     name: string;
     workflow_path: string;
     workflow_name: string;
@@ -234,7 +235,7 @@ const isLockedByMe = computed(() => {
 async function lockPreset() {
   isLocking.value = true;
   try {
-    await $fetch(`/api/workflow-presets/${props.data.preset.id}/lock`, {
+    await $fetch(`/api/workflow-presets/${props.data.preset.share_token}/lock`, {
       method: "POST",
     });
     toast.add({ title: "已锁定预设", color: "success" });
@@ -254,7 +255,7 @@ async function lockPreset() {
 async function unlockPreset() {
   isUnlocking.value = true;
   try {
-    await $fetch(`/api/workflow-presets/${props.data.preset.id}/unlock`, {
+    await $fetch(`/api/workflow-presets/${props.data.preset.share_token}/unlock`, {
       method: "POST",
     });
     toast.add({ title: "已解锁预设", color: "success" });
@@ -310,15 +311,27 @@ async function triggerRun() {
         body.branch = overrideBranch.value;
       }
     }
-    const result = await $fetch<{ success: boolean; run_id?: number }>(
-      props.runUrl,
-      { method: "POST", body },
-    );
+    const result = await $fetch<{
+      success: boolean;
+      run_id?: number;
+      lockInfo?: {
+        locked_by: string;
+        locked_at: string;
+        auto_unlock_at: string | null;
+      } | null;
+    }>(props.runUrl, { method: "POST", body });
     toast.add({ title: "工作流已触发", color: "success" });
 
     // 保存 run_id 并开始轮询
     if (result.run_id) {
       currentRunId.value = result.run_id;
+    }
+
+    // 如果返回了锁定信息，更新 UI 状态
+    if (result.lockInfo) {
+      props.data.preset.locked_by = result.lockInfo.locked_by;
+      props.data.preset.locked_at = result.lockInfo.locked_at;
+      props.data.preset.auto_unlock_at = result.lockInfo.auto_unlock_at;
     }
 
     // 刷新状态并开始轮询
