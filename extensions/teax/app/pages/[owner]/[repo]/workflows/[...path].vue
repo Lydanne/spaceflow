@@ -75,6 +75,7 @@ const presetData = computed(() => {
       allow_input_override: true,
       locked_inputs: [], // 直接触发模式下所有参数都可修改
       allow_branch_override: true,
+      allow_sync_override: false,
     },
     inputDefs: data.inputDefs,
     branches: data.branches,

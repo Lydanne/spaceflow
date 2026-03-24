@@ -1,37 +1,9 @@
 import { eq } from "drizzle-orm";
-import { parse as parseYaml } from "yaml";
 import { requireScenePermission } from "~~/server/utils/scene-permission";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolvePresetByToken } from "~~/server/utils/resolve-preset";
 import { useDB, schema } from "~~/server/db";
-
-interface WorkflowInputDef {
-  description?: string;
-  required?: boolean;
-  default?: string;
-  type?: string;
-  options?: string[];
-}
-
-function parseWorkflowYaml(yamlContent: string) {
-  try {
-    const doc = parseYaml(yamlContent);
-    if (!doc || typeof doc !== "object") return null;
-    return doc as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function extractInputs(doc: Record<string, unknown>): Record<string, WorkflowInputDef> | null {
-  const on = doc.on;
-  if (!on || typeof on !== "object") return null;
-  const dispatch = (on as Record<string, unknown>).workflow_dispatch;
-  if (!dispatch || typeof dispatch !== "object") return null;
-  const inputs = (dispatch as Record<string, unknown>).inputs;
-  if (!inputs || typeof inputs !== "object") return null;
-  return inputs as Record<string, WorkflowInputDef>;
-}
+import { parseWorkflowYaml, extractInputs, type WorkflowInputDef } from "~~/server/utils/workflow-yaml";
 
 export default defineEventHandler(async (event) => {
   const { preset, repo, owner, repoName } = await resolvePresetByToken(event);

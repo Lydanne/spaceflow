@@ -13,7 +13,7 @@ interface PermissionGroupRow {
 /**
  * 查询用户在指定组织中通过团队继承的所有权限组。
  */
-async function queryUserPermissionGroups(userId: string, orgId: string): Promise<PermissionGroupRow[]> {
+export async function queryUserPermissionGroups(userId: string, orgId: string): Promise<PermissionGroupRow[]> {
   const db = useDB();
 
   return db
@@ -39,7 +39,7 @@ async function queryUserPermissionGroups(userId: string, orgId: string): Promise
  * - repositoryIds 为数组 → 仅当 repositoryId 在数组中
  * - 支持 glob 模式匹配（如 actions:trigger:test-* 匹配 actions:trigger:test-unit）
  */
-function rowGrantsPermission(row: PermissionGroupRow, permission: string, repositoryId?: string): boolean {
+export function rowGrantsPermission(row: PermissionGroupRow, permission: string, repositoryId?: string): boolean {
   const perms = row.permissions;
   if (!Array.isArray(perms)) return false;
 

@@ -82,6 +82,31 @@ export default defineNitroPlugin(async () => {
 });
 
 /**
+ * 从飞书富文本(post)消息中提取纯文本
+ */
+function extractPostText(content: string): string {
+  try {
+    const parsed = JSON.parse(content);
+    const textParts: string[] = [];
+    const contentBlocks: unknown[][] = parsed.content || [];
+    for (const block of contentBlocks) {
+      if (Array.isArray(block)) {
+        for (const element of block) {
+          const el = element as Record<string, unknown>;
+          if (el.tag === "text" || el.tag === "a") {
+            textParts.push(String(el.text || ""));
+          }
+          // 跳过 at 标签（@mention）
+        }
+      }
+    }
+    return textParts.join("");
+  } catch {
+    return "";
+  }
+}
+
+/**
  * 处理消息事件
  */
 async function handleMessageEvent(data: {
@@ -121,8 +146,10 @@ async function handleMessageEvent(data: {
       return;
     }
 
-    // 只处理文本消息
-    if (message.message_type !== "text") {
+    // 确定消息类型：text 和 post 可处理，其他忽略
+    const isTextMessage = message.message_type === "text";
+    const isPostMessage = message.message_type === "post";
+    if (!isTextMessage && !isPostMessage) {
       return;
     }
 
@@ -142,12 +169,17 @@ async function handleMessageEvent(data: {
       return;
     }
 
+    // 提取文本内容
     let textContent = "";
-    try {
-      const parsed = JSON.parse(message.content);
-      textContent = parsed.text || "";
-    } catch {
-      textContent = message.content;
+    if (isPostMessage) {
+      textContent = extractPostText(message.content);
+    } else {
+      try {
+        const parsed = JSON.parse(message.content);
+        textContent = parsed.text || "";
+      } catch {
+        textContent = message.content;
+      }
     }
 
     // 去除 @bot 的 mention 前缀
@@ -156,6 +188,29 @@ async function handleMessageEvent(data: {
     console.log(
       `[feishu-ws] 📨 Message from ${senderId}: ${textContent || "(empty)"}`,
     );
+
+    // 1. 优先尝试链接处理器（支持 text 和 post 消息）
+    const { handleLinkMessage }
+      = await import("~~/server/utils/link-handler");
+    // 确保 link handlers 已注册（触发 bot-link-handlers 模块加载）
+    await import("~~/server/services/bot-link-handlers");
+
+    const linkHandled = await handleLinkMessage({
+      text: textContent,
+      senderOpenId: senderId,
+      messageId: message.message_id,
+      chatId: message.chat_id,
+      chatType: message.chat_type,
+    });
+
+    if (linkHandled) {
+      return;
+    }
+
+    // 2. 仅文本消息继续走命令处理
+    if (!isTextMessage) {
+      return;
+    }
 
     // 调用指令处理(空文本也处理,用于显示控制面板)
     const { handleBotCommand }

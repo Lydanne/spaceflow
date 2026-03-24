@@ -36,16 +36,10 @@ export interface ResolvedPreset {
 }
 
 /**
- * 从路由参数 token 解析出 preset 和关联的 repo 信息。
- * 路由目录为 /api/workflow-presets/[token]/...
- * 找不到时抛 404。
+ * 通过 share_token 解析出 preset 和关联的 repo 信息。
+ * 可在路由处理器外部复用（无需 H3Event）。
  */
-export async function resolvePresetByToken(event: H3Event): Promise<ResolvedPreset> {
-  const token = getRouterParam(event, "token");
-  if (!token) {
-    throw createError({ statusCode: 400, message: "Missing token" });
-  }
-
+export async function resolvePresetByShareToken(token: string): Promise<ResolvedPreset> {
   const db = useDB();
 
   const [preset] = await db
@@ -102,4 +96,17 @@ export async function resolvePresetByToken(event: H3Event): Promise<ResolvedPres
     owner: owner!,
     repoName: repoName!,
   };
+}
+
+/**
+ * 从路由参数 token 解析出 preset 和关联的 repo 信息。
+ * 路由目录为 /api/workflow-presets/[token]/...
+ * 找不到时抛 404。
+ */
+export async function resolvePresetByToken(event: H3Event): Promise<ResolvedPreset> {
+  const token = getRouterParam(event, "token");
+  if (!token) {
+    throw createError({ statusCode: 400, message: "Missing token" });
+  }
+  return resolvePresetByShareToken(token);
 }

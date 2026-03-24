@@ -125,7 +125,6 @@ function statusIconClass(status: string, conclusion: string | null): string {
 
       <div class="flex items-center gap-2">
         <USelect
-          v-if="data.branches.length > 0"
           v-model="overrideBranch"
           :items="data.branches.map((b) => ({ label: b, value: b }))"
           value-key="value"

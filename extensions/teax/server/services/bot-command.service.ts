@@ -60,16 +60,19 @@ registerCommand({
               "`/status <owner/repo>` — 查询构建状态",
               "`/actions <owner/repo>` — 触发工作流",
               "",
+              "**🚀 工作流预设**",
+              "`/run <token>` — 通过预设 Token 触发工作流",
+              "`/presets` — 查看工作流预设",
+              "",
               "**👤 账户与设置**",
               "`/account` — 查看账户信息（多账户可切换）",
               "`/notify` — 查看通知设置",
-              "`/presets` — 查看工作流预设",
               "",
               "**📝 审批**",
               "`/approvals` — 查看待处理审批",
               "",
               "**💡 提示**",
-              "直接 @ 机器人可打开控制面板",
+              "直接 @ 机器人或发送预设链接可触发工作流",
             ].join("\n"),
           },
         },
@@ -657,6 +660,37 @@ registerCommand({
   },
 });
 
+// ─── /run <token> ──────────────────────────────────────────
+
+registerCommand({
+  name: "run",
+  aliases: ["/run", "运行"],
+  description: "通过预设 Token 触发工作流",
+  usage: "/run <preset_token>",
+  handler: async (ctx, args) => {
+    const token = args[0];
+    if (!token) {
+      await replyFeishuMessage(ctx.messageId, "用法: /run <preset_token>\n\n示例:\n/run abc123\n或发送预设链接: http://your-host/workflows/abc123");
+      return;
+    }
+
+    try {
+      const { generatePresetConsoleCard } = await import("~~/server/services/preset-console.service");
+      const card = await generatePresetConsoleCard({ openId: ctx.senderOpenId, shareToken: token });
+      await replyFeishuCardMessage(ctx.messageId, card);
+    } catch (err) {
+      console.error("[bot-command] run error:", err);
+      const msg = (err as { statusCode?: number; message?: string }).message || "获取预设信息失败";
+      const status = (err as { statusCode?: number }).statusCode;
+      if (status === 404) {
+        await replyFeishuMessage(ctx.messageId, `❌ 预设不存在或已被删除`);
+      } else {
+        await replyFeishuMessage(ctx.messageId, `❌ ${msg}`);
+      }
+    }
+  },
+});
+
 // ─── 卡片交互处理 ─────────────────────────────────────────
 
 export interface CardActionContext {
@@ -739,6 +773,18 @@ export async function handleCardAction(ctx: CardActionContext): Promise<Record<s
     if (newCard && updateCard) {
       await updateCard(newCard);
     }
+    return undefined;
+  }
+
+  // 检查是否是预设控制台的触发交互
+  if (actionType === "preset_console_trigger" && parsedValue?.token) {
+    const { handlePresetConsoleTrigger } = await import("~~/server/services/preset-console.service");
+    await handlePresetConsoleTrigger({
+      openId: ctx.openId,
+      parsedValue,
+      formValue: ((ctx.action.form_value ?? ctx.action.form_values ?? {}) as Record<string, string>),
+      updateCard,
+    });
     return undefined;
   }
 
