@@ -5,6 +5,7 @@
 
 import { updateCardMessage } from "~~/server/utils/feishu-sdk";
 import type { FeishuInteractiveCard } from "~~/server/utils/feishu-sdk";
+import type { UpdateCardFn } from "~~/server/utils/feishu-card-updater";
 
 // ─── 状态机类型定义 ─────────────────────────────────────────
 
@@ -262,9 +263,6 @@ export function registerStateMachine(machine: CardStateMachine, name: string): v
 export function getStateMachine(name: string): CardStateMachine | undefined {
   return stateMachines.get(name);
 }
-
-/** 卡片更新回调类型 */
-export type UpdateCardFn = (card: Record<string, unknown>) => Promise<void>;
 
 /**
  * 从 action 中提取状态机信息并路由到对应的处理器

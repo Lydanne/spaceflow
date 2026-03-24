@@ -4,8 +4,7 @@ import { approveFlow, rejectFlow } from "./service";
 import { FeishuCardBuilder } from "~~/server/utils/feishu-card-builder";
 import { updateCardMessage } from "~~/server/utils/feishu-sdk";
 
-/** 卡片更新回调类型 */
-export type UpdateCardFn = (card: Record<string, unknown>) => Promise<void>;
+import type { UpdateCardFn } from "~~/server/utils/feishu-card-updater";
 
 /**
  * 处理审批流程卡片交互（来自飞书长连接）

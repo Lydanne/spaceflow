@@ -7,6 +7,7 @@ import { eq, inArray } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import type { FeishuInteractiveCard } from "~~/server/utils/feishu-sdk";
 import { getActiveAccountId, setActiveAccountId } from "~~/server/utils/feishu-active-account";
+import type { UpdateCardFn } from "~~/server/utils/feishu-card-updater";
 
 /**
  * 获取飞书用户当前活跃的 Teax 账户
@@ -254,9 +255,6 @@ export async function generateAccountCard(openId: string): Promise<FeishuInterac
     elements,
   };
 }
-
-/** 卡片更新回调类型 */
-export type UpdateCardFn = (card: Record<string, unknown>) => Promise<void>;
 
 /**
  * 处理账户相关的卡片交互

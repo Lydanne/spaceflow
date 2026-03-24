@@ -6,6 +6,7 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import type { FeishuInteractiveCard } from "~~/server/utils/feishu-sdk";
+import type { UpdateCardFn } from "~~/server/utils/feishu-card-updater";
 
 /**
  * 生成控制面板首页 - 显示用户的组织列表
@@ -377,9 +378,6 @@ export async function generateRepoFunctionMenu(
     ],
   };
 }
-
-/** 卡片更新回调类型 */
-export type UpdateCardFn = (card: Record<string, unknown>) => Promise<void>;
 
 /**
  * 处理控制面板的卡片交互
