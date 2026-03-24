@@ -436,7 +436,10 @@ function getStatusText(preset: SubPreset): string {
               {{ groupData.name }}
             </h1>
           </div>
-          <div v-if="canManagePresets" class="flex gap-2">
+          <div
+            v-if="canManagePresets"
+            class="flex gap-2"
+          >
             <UButton
               icon="i-lucide-plus"
               color="primary"
@@ -462,15 +465,24 @@ function getStatusText(preset: SubPreset): string {
         </p>
         <div class="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
           <span class="flex items-center gap-1">
-            <UIcon name="i-lucide-git-branch" class="w-4 h-4" />
+            <UIcon
+              name="i-lucide-git-branch"
+              class="w-4 h-4"
+            />
             {{ groupData.repository.full_name }}
           </span>
           <span class="flex items-center gap-1">
-            <UIcon name="i-lucide-file-code" class="w-4 h-4" />
+            <UIcon
+              name="i-lucide-file-code"
+              class="w-4 h-4"
+            />
             {{ groupData.workflow_path }}
           </span>
           <span class="flex items-center gap-1">
-            <UIcon name="i-lucide-user" class="w-4 h-4" />
+            <UIcon
+              name="i-lucide-user"
+              class="w-4 h-4"
+            />
             {{ groupData.creator.name }}
           </span>
         </div>
@@ -504,14 +516,20 @@ function getStatusText(preset: SubPreset): string {
           <!-- 配置信息 -->
           <div class="text-sm text-gray-600 dark:text-gray-400 mb-4 space-y-1">
             <div class="flex items-center gap-1">
-              <UIcon name="i-lucide-git-branch" class="w-3 h-3" />
+              <UIcon
+                name="i-lucide-git-branch"
+                class="w-3 h-3"
+              />
               <span>{{ preset.branch }}</span>
             </div>
             <div
               v-if="preset.auto_unlock_at"
               class="flex items-center gap-1"
             >
-              <UIcon name="i-lucide-clock" class="w-3 h-3" />
+              <UIcon
+                name="i-lucide-clock"
+                class="w-3 h-3"
+              />
               <span>自动解锁: {{ formatTime(preset.auto_unlock_at) }}</span>
             </div>
           </div>
@@ -542,7 +560,10 @@ function getStatusText(preset: SubPreset): string {
                 :loading="lockingIndex === preset.preset_index"
                 @click="lockPreset(preset.preset_index)"
               >
-                <UIcon name="i-lucide-lock" class="w-4 h-4 mr-1" />
+                <UIcon
+                  name="i-lucide-lock"
+                  class="w-4 h-4 mr-1"
+                />
                 锁定
               </UButton>
               <UButton
@@ -550,7 +571,10 @@ function getStatusText(preset: SubPreset): string {
                 size="sm"
                 @click="goToPreset(preset)"
               >
-                <UIcon name="i-lucide-external-link" class="w-4 h-4 mr-1" />
+                <UIcon
+                  name="i-lucide-external-link"
+                  class="w-4 h-4 mr-1"
+                />
                 打开
               </UButton>
               <UButton
@@ -561,7 +585,10 @@ function getStatusText(preset: SubPreset): string {
                 :loading="deletingIndex === preset.preset_index"
                 @click="deletePreset(preset.preset_index)"
               >
-                <UIcon name="i-lucide-trash-2" class="w-4 h-4" />
+                <UIcon
+                  name="i-lucide-trash-2"
+                  class="w-4 h-4"
+                />
               </UButton>
             </template>
 
@@ -573,7 +600,10 @@ function getStatusText(preset: SubPreset): string {
                 :loading="unlockingIndex === preset.preset_index"
                 @click="unlockPreset(preset.preset_index)"
               >
-                <UIcon name="i-lucide-unlock" class="w-4 h-4 mr-1" />
+                <UIcon
+                  name="i-lucide-unlock"
+                  class="w-4 h-4 mr-1"
+                />
                 解锁
               </UButton>
               <UButton
@@ -581,7 +611,10 @@ function getStatusText(preset: SubPreset): string {
                 size="sm"
                 @click="goToPreset(preset)"
               >
-                <UIcon name="i-lucide-play" class="w-4 h-4 mr-1" />
+                <UIcon
+                  name="i-lucide-play"
+                  class="w-4 h-4 mr-1"
+                />
                 触发
               </UButton>
               <UButton
@@ -592,7 +625,10 @@ function getStatusText(preset: SubPreset): string {
                 :loading="deletingIndex === preset.preset_index"
                 @click="deletePreset(preset.preset_index)"
               >
-                <UIcon name="i-lucide-trash-2" class="w-4 h-4" />
+                <UIcon
+                  name="i-lucide-trash-2"
+                  class="w-4 h-4"
+                />
               </UButton>
             </template>
 
@@ -603,7 +639,10 @@ function getStatusText(preset: SubPreset): string {
                 size="sm"
                 @click="goToPreset(preset)"
               >
-                <UIcon name="i-lucide-external-link" class="w-4 h-4 mr-1" />
+                <UIcon
+                  name="i-lucide-external-link"
+                  class="w-4 h-4 mr-1"
+                />
                 打开
               </UButton>
               <UButton
@@ -614,7 +653,10 @@ function getStatusText(preset: SubPreset): string {
                 :loading="requestingUnlockIndex === preset.preset_index"
                 @click="requestUnlock(preset.preset_index)"
               >
-                <UIcon name="i-lucide-hand" class="w-4 h-4 mr-1" />
+                <UIcon
+                  name="i-lucide-hand"
+                  class="w-4 h-4 mr-1"
+                />
                 申请解锁
               </UButton>
               <UButton
@@ -625,7 +667,10 @@ function getStatusText(preset: SubPreset): string {
                 :loading="deletingIndex === preset.preset_index"
                 @click="deletePreset(preset.preset_index)"
               >
-                <UIcon name="i-lucide-trash-2" class="w-4 h-4" />
+                <UIcon
+                  name="i-lucide-trash-2"
+                  class="w-4 h-4"
+                />
               </UButton>
             </template>
           </div>
@@ -636,7 +681,10 @@ function getStatusText(preset: SubPreset): string {
           v-if="groupData.presets.length === 0"
           class="col-span-full flex flex-col items-center justify-center py-12 text-gray-500"
         >
-          <UIcon name="i-lucide-inbox" class="w-12 h-12 mb-4" />
+          <UIcon
+            name="i-lucide-inbox"
+            class="w-12 h-12 mb-4"
+          />
           <p>暂无子预设</p>
           <UButton
             v-if="canManagePresets"
@@ -689,7 +737,10 @@ function getStatusText(preset: SubPreset): string {
               </div>
 
               <!-- 数字范围 -->
-              <div v-if="batchLoopMode === 'range'" class="flex gap-4">
+              <div
+                v-if="batchLoopMode === 'range'"
+                class="flex gap-4"
+              >
                 <div class="flex-1">
                   <label class="block text-sm font-medium mb-1">起始值</label>
                   <UInput
@@ -793,7 +844,10 @@ function getStatusText(preset: SubPreset): string {
                     :key="idx"
                     class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2"
                   >
-                    <UIcon name="i-lucide-file" class="w-3 h-3" />
+                    <UIcon
+                      name="i-lucide-file"
+                      class="w-3 h-3"
+                    />
                     <span>{{ item.name }}</span>
                   </div>
                   <div
@@ -812,7 +866,10 @@ function getStatusText(preset: SubPreset): string {
               </div>
 
               <!-- 进度条 -->
-              <div v-if="batchCreating" class="space-y-2">
+              <div
+                v-if="batchCreating"
+                class="space-y-2"
+              >
                 <div class="flex justify-between text-sm">
                   <span>创建进度</span>
                   <span>{{ batchProgress }} / {{ batchTotal }}</span>

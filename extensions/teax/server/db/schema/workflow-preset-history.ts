@@ -47,9 +47,9 @@ export const workflowPresetHistory = pgTable(
 );
 
 // 操作类型枚举
-export type PresetHistoryAction =
-  "lock" |
-  "unlock" |
-  "trigger" |
-  "config_change" |
-  "unlock_request";
+export type PresetHistoryAction
+  = | "lock"
+    | "unlock"
+    | "trigger"
+    | "config_change"
+    | "unlock_request";

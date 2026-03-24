@@ -656,9 +656,9 @@ export function useGiteaSdk(event?: H3Event): GiteaSdk {
       await gitea.getCurrentUser();
       return gitea;
     } catch (err: unknown) {
-      const status =
-        (err as { statusCode?: number })?.statusCode ||
-        (err as { status?: number })?.status;
+      const status
+        = (err as { statusCode?: number })?.statusCode
+          || (err as { status?: number })?.status;
 
       // 非 401 错误，直接抛出
       if (status !== 401) {

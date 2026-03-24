@@ -199,15 +199,15 @@ async function triggerRun() {
     }
 
     if (
-      props.statusUrl ||
-      (props.directMode && result.run_id && props.runDetailUrlPrefix)
+      props.statusUrl
+      || (props.directMode && result.run_id && props.runDetailUrlPrefix)
     ) {
       await refreshStatus();
       startPolling();
     }
   } catch (err: unknown) {
-    const msg =
-      (err as { data?: { message?: string } })?.data?.message || "触发失败";
+    const msg
+      = (err as { data?: { message?: string } })?.data?.message || "触发失败";
     toast.add({ title: msg, color: "error" });
   } finally {
     isTriggering.value = false;

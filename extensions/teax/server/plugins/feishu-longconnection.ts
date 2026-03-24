@@ -158,8 +158,8 @@ async function handleMessageEvent(data: {
     );
 
     // 调用指令处理(空文本也处理,用于显示控制面板)
-    const { handleBotCommand } =
-      await import("~~/server/services/bot-command.service");
+    const { handleBotCommand }
+      = await import("~~/server/services/bot-command.service");
     await handleBotCommand({
       messageId: message.message_id,
       chatId: message.chat_id,
@@ -203,8 +203,8 @@ async function handleCardActionEvent(data: Record<string, unknown>): Promise<Rec
       cardUpdater = createCardUpdater("long", openMessageId);
     }
 
-    const { handleCardAction } =
-      await import("~~/server/services/bot-command.service");
+    const { handleCardAction }
+      = await import("~~/server/services/bot-command.service");
 
     // handleCardAction 内部会通过 updateCard 回调更新卡片
     await handleCardAction({
@@ -238,8 +238,8 @@ async function handleApprovalEvent(data: {
   try {
     console.log("[feishu-ws] 📋 Approval event received");
 
-    const { handleFeishuApprovalEvent } =
-      await import("~~/server/services/approval.service");
+    const { handleFeishuApprovalEvent }
+      = await import("~~/server/services/approval.service");
     await handleFeishuApprovalEvent({
       instance_code: data.instance_code,
       status: data.status,

@@ -73,9 +73,9 @@ export function buildWorkflowRunCard(data: {
 
   if (data.commit) {
     builder.addDivider().addText(
-      `**提交**: ${data.commit.sha.substring(0, 7)}\n` +
-      `**消息**: ${data.commit.message}\n` +
-      `**作者**: ${data.commit.author}`,
+      `**提交**: ${data.commit.sha.substring(0, 7)}\n`
+      + `**消息**: ${data.commit.message}\n`
+      + `**作者**: ${data.commit.author}`,
       true,
     );
   }

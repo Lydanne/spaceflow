@@ -59,7 +59,10 @@ function statusIconClass(status: string, conclusion: string | null): string {
           :to="`/workflow-groups/${data.group.share_token}`"
           class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
         >
-          <UIcon name="i-lucide-arrow-left" class="w-5 h-5" />
+          <UIcon
+            name="i-lucide-arrow-left"
+            class="w-5 h-5"
+          />
         </NuxtLink>
         <div>
           <div class="flex items-center gap-2">
@@ -68,10 +71,19 @@ function statusIconClass(status: string, conclusion: string | null): string {
             </h1>
             <!-- 锁定状态徽章 -->
             <template v-if="isSubPreset && lockState">
-              <UBadge color="warning" variant="subtle">
-                <UIcon name="i-lucide-lock" class="w-3 h-3 mr-1" />
+              <UBadge
+                color="warning"
+                variant="subtle"
+              >
+                <UIcon
+                  name="i-lucide-lock"
+                  class="w-3 h-3 mr-1"
+                />
                 已锁定
-                <span v-if="lockState.auto_unlock_at" class="ml-1 opacity-75">
+                <span
+                  v-if="lockState.auto_unlock_at"
+                  class="ml-1 opacity-75"
+                >
                   ·
                   {{ new Date(lockState.auto_unlock_at).toLocaleTimeString() }}
                 </span>
@@ -145,7 +157,10 @@ function statusIconClass(status: string, conclusion: string | null): string {
           <template #header>
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <UIcon name="i-lucide-settings" class="w-4 h-4 text-gray-400" />
+                <UIcon
+                  name="i-lucide-settings"
+                  class="w-4 h-4 text-gray-400"
+                />
                 <span class="font-medium">运行参数</span>
               </div>
               <UButton
@@ -180,7 +195,10 @@ function statusIconClass(status: string, conclusion: string | null): string {
                       color="neutral"
                       size="xs"
                     >
-                      <UIcon name="i-lucide-lock" class="w-3 h-3 mr-0.5" />
+                      <UIcon
+                        name="i-lucide-lock"
+                        class="w-3 h-3 mr-0.5"
+                      />
                       锁定
                     </UBadge>
                   </div>
@@ -285,7 +303,10 @@ function statusIconClass(status: string, conclusion: string | null): string {
           </div>
 
           <!-- Jobs 列表 -->
-          <div v-if="statusData.run.jobs.length > 0" class="space-y-2">
+          <div
+            v-if="statusData.run.jobs.length > 0"
+            class="space-y-2"
+          >
             <div
               v-for="job in statusData.run.jobs"
               :key="job.id"
@@ -315,7 +336,10 @@ function statusIconClass(status: string, conclusion: string | null): string {
           <template #header>
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <UIcon name="i-lucide-history" class="w-4 h-4 text-gray-400" />
+                <UIcon
+                  name="i-lucide-history"
+                  class="w-4 h-4 text-gray-400"
+                />
                 <span class="font-medium">操作日志</span>
               </div>
               <UButton
@@ -382,7 +406,10 @@ function statusIconClass(status: string, conclusion: string | null): string {
           </div>
 
           <!-- 未加载提示 -->
-          <div v-else class="text-center text-sm text-gray-400 py-6">
+          <div
+            v-else
+            class="text-center text-sm text-gray-400 py-6"
+          >
             点击加载查看历史
           </div>
         </UCard>
@@ -391,7 +418,10 @@ function statusIconClass(status: string, conclusion: string | null): string {
         <UCard>
           <template #header>
             <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-git-fork" class="w-4 h-4 text-gray-400" />
+              <UIcon
+                name="i-lucide-git-fork"
+                class="w-4 h-4 text-gray-400"
+              />
               <span class="font-medium">仓库</span>
             </div>
           </template>

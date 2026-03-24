@@ -34,10 +34,10 @@ export function matchPermission(required: string, granted: string): boolean {
     const requiredResource = requiredParts[2];
 
     if (
-      grantedParts[0] === requiredParts[0] &&
-      grantedParts[1] === requiredParts[1] &&
-      grantedPattern &&
-      requiredResource
+      grantedParts[0] === requiredParts[0]
+      && grantedParts[1] === requiredParts[1]
+      && grantedPattern
+      && requiredResource
     ) {
       // 使用 minimatch 进行 glob 匹配
       return minimatch(requiredResource, grantedPattern);

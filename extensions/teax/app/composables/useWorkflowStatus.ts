@@ -45,9 +45,9 @@ export function useWorkflowStatus(options: UseWorkflowStatusOptions) {
       if (options.statusUrl) {
         statusData.value = await $fetch<RunStatus>(options.statusUrl);
       } else if (
-        options.directMode &&
-        currentRunId.value &&
-        options.runDetailUrlPrefix
+        options.directMode
+        && currentRunId.value
+        && options.runDetailUrlPrefix
       ) {
         const runDetail = await $fetch<WorkflowRunDetail>(
           `${options.runDetailUrlPrefix}/${currentRunId.value}`,
@@ -65,9 +65,9 @@ export function useWorkflowStatus(options: UseWorkflowStatusOptions) {
 
         statusData.value = {
           hasRunning:
-            runDetail.status === "running" ||
-            runDetail.status === "queued" ||
-            runDetail.status === "waiting",
+            runDetail.status === "running"
+            || runDetail.status === "queued"
+            || runDetail.status === "waiting",
           run: {
             id: runDetail.id,
             run_number: runDetail.run_number,

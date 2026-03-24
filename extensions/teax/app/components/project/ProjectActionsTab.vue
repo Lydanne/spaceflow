@@ -214,8 +214,8 @@ async function dispatchWorkflow() {
     showDispatchModal.value = false;
     setTimeout(() => refreshActions(), 2000);
   } catch (err: unknown) {
-    const msg =
-      (err as { data?: { message?: string } })?.data?.message || "触发失败";
+    const msg
+      = (err as { data?: { message?: string } })?.data?.message || "触发失败";
     toast.add({ title: msg, color: "error" });
   } finally {
     dispatching.value = false;
@@ -248,8 +248,8 @@ async function savePreset() {
     showDispatchModal.value = false;
     presetName.value = "";
   } catch (err: unknown) {
-    const msg =
-      (err as { data?: { message?: string } })?.data?.message || "保存失败";
+    const msg
+      = (err as { data?: { message?: string } })?.data?.message || "保存失败";
     toast.add({ title: msg, color: "error" });
   } finally {
     savingPreset.value = false;
@@ -311,8 +311,8 @@ async function createPresetGroup() {
     showCreateGroupModal.value = false;
     showDispatchModal.value = false;
   } catch (err: unknown) {
-    const msg =
-      (err as { data?: { message?: string } })?.data?.message || "创建失败";
+    const msg
+      = (err as { data?: { message?: string } })?.data?.message || "创建失败";
     toast.add({ title: msg, color: "error" });
   } finally {
     creatingGroup.value = false;

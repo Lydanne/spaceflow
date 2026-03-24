@@ -12,11 +12,11 @@ export default defineEventHandler(async (event) => {
   const nonce = getHeader(event, "x-lark-request-nonce");
 
   if (
-    signature &&
-    timestamp &&
-    nonce &&
-    config.feishuEncryptKey &&
-    !verifyFeishuEventSignature(
+    signature
+    && timestamp
+    && nonce
+    && config.feishuEncryptKey
+    && !verifyFeishuEventSignature(
       timestamp,
       nonce,
       config.feishuEncryptKey,

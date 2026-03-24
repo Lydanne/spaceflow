@@ -55,8 +55,8 @@ export const scenePermissionStrategy: ApprovalStrategy<ScenePermissionPayload> =
     if (existingFlow) {
       const existingPayload = existingFlow.payload as ScenePermissionPayload;
       if (
-        existingPayload.sceneName === payload.sceneName &&
-        existingPayload.teamId === payload.teamId
+        existingPayload.sceneName === payload.sceneName
+        && existingPayload.teamId === payload.teamId
       ) {
         throw createError({
           statusCode: 400,
@@ -138,8 +138,8 @@ export const scenePermissionStrategy: ApprovalStrategy<ScenePermissionPayload> =
       const mergedPerms = [...new Set([...existingPerms, ...payload.permissions])];
 
       // 只有权限有变化时才更新
-      if (mergedPerms.length !== existingPerms.length ||
-        !mergedPerms.every((p) => existingPerms.includes(p))) {
+      if (mergedPerms.length !== existingPerms.length
+        || !mergedPerms.every((p) => existingPerms.includes(p))) {
         await db
           .update(schema.permissionGroups)
           .set({
