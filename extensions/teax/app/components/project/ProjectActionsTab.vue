@@ -349,9 +349,9 @@ function runStatusIcon(status: string, conclusion: string | null): string {
 }
 
 function formatDuration(startedAt: string | null, completedAt: string | null): string {
-  if (!completedAt) return "";
+  if (!startedAt || !completedAt) return "";
   const seconds = Math.round(
-    (new Date(completedAt).getTime() - new Date(startedAt!).getTime()) / 1000,
+    (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000,
   );
   if (seconds < 0) return "";
   if (seconds < 60) return `${seconds}s`;
