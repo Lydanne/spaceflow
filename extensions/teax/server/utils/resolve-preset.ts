@@ -17,6 +17,7 @@ export interface ResolvedPreset {
     allow_input_override: boolean | null;
     locked_inputs: string[] | null;
     allow_branch_override: boolean | null;
+    allow_sync_override: boolean | null;
     // 子预设相关
     group_id: string | null;
     preset_index: number | null;
@@ -62,6 +63,7 @@ export async function resolvePresetByToken(event: H3Event): Promise<ResolvedPres
       allow_input_override: schema.workflowPresets.allow_input_override,
       locked_inputs: schema.workflowPresets.locked_inputs,
       allow_branch_override: schema.workflowPresets.allow_branch_override,
+      allow_sync_override: schema.workflowPresets.allow_sync_override,
       // 子预设相关
       group_id: schema.workflowPresets.group_id,
       preset_index: schema.workflowPresets.preset_index,

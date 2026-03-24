@@ -118,9 +118,11 @@ async function saveInputs() {
 
 // 同步用户修改到数据库
 async function syncOverrideToDb() {
+  console.log("[syncOverrideToDb] allow_sync_override:", props.data.preset.allow_sync_override);
   if (!props.data.preset.allow_sync_override) return;
 
   try {
+    console.log("[syncOverrideToDb] syncing...", { branch: overrideBranch.value, inputs: overrideInputs.value });
     await $fetch(`/api/workflow-presets/${props.data.preset.share_token}/sync`, {
       method: "POST",
       body: {
@@ -128,6 +130,7 @@ async function syncOverrideToDb() {
         inputs: overrideInputs.value,
       },
     });
+    console.log("[syncOverrideToDb] sync success");
   } catch (err) {
     console.error("Failed to sync override:", err);
   }
