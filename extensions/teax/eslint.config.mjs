@@ -2,7 +2,7 @@
 import withNuxt from "./.nuxt/eslint.config.mjs";
 
 export default withNuxt({
-  ignores: ["src/**", "dist/**"],
+  ignores: ["src/**", "dist/**", ".opencode/**", "node_modules/**"],
 }, {
   rules: {
     // ─── Stylistic 规则 ─────────────────────────────────────
