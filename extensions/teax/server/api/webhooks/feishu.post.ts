@@ -170,18 +170,11 @@ export default defineEventHandler(async (event) => {
       : undefined;
 
     if (action && openId && token) {
-      // 构造卡片更新回调
-      let updateCard: ((card: Record<string, unknown>) => Promise<void>) | undefined;
+      // 使用卡片更新器
+      let cardUpdater: Awaited<ReturnType<typeof import("~~/server/utils/feishu-card-updater").createCardUpdater>> | undefined;
       if (openMessageId) {
-        const { updateCardMessage } = await import("~~/server/utils/feishu-sdk");
-        updateCard = async (card: Record<string, unknown>) => {
-          try {
-            await updateCardMessage(openMessageId, card);
-            console.log(`[feishu-bot] ✅ Card updated for message ${openMessageId}`);
-          } catch (e) {
-            console.error("[feishu-bot] Failed to update card:", e);
-          }
-        };
+        const { createCardUpdater } = await import("~~/server/utils/feishu-card-updater");
+        cardUpdater = createCardUpdater("post", openMessageId);
       }
 
       try {
@@ -190,8 +183,13 @@ export default defineEventHandler(async (event) => {
           action: action as Record<string, unknown>,
           openId,
           token,
-          updateCard,
+          updateCard: cardUpdater?.updateCard,
         });
+
+        // 等待卡片更新完成后再返回
+        if (cardUpdater) {
+          return await cardUpdater.waitForUpdate();
+        }
       } catch (e) {
         console.error("[feishu-bot] card action error:", e);
       }

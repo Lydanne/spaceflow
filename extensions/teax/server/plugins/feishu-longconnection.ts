@@ -196,24 +196,11 @@ async function handleCardActionEvent(data: Record<string, unknown>): Promise<Rec
 
     console.log(`[feishu-ws] 🎯 Card action from ${openId}`);
 
-    // 构造卡片更新回调
-    let updateCard:
-      | ((card: Record<string, unknown>) => Promise<void>)
-      | undefined;
+    // 使用卡片更新器
+    let cardUpdater: Awaited<ReturnType<typeof import("~~/server/utils/feishu-card-updater").createCardUpdater>> | undefined;
     if (openMessageId) {
-      const { updateCardMessage } = await import("~~/server/utils/feishu-sdk");
-      updateCard = async (card: Record<string, unknown>) => {
-        setTimeout(async () => {
-          try {
-            await updateCardMessage(openMessageId, card);
-            console.log(
-              `[feishu-ws] ✅ Card updated for message ${openMessageId}`,
-            );
-          } catch (e) {
-            console.error("[feishu-ws] Failed to update card:", e);
-          }
-        }, 500);
-      };
+      const { createCardUpdater } = await import("~~/server/utils/feishu-card-updater");
+      cardUpdater = createCardUpdater("long", openMessageId);
     }
 
     const { handleCardAction } =
@@ -224,10 +211,14 @@ async function handleCardActionEvent(data: Record<string, unknown>): Promise<Rec
       action: action as Record<string, unknown>,
       openId,
       token,
-      updateCard,
+      updateCard: cardUpdater?.updateCard,
     });
 
-    // 不通过返回值更新卡片
+    // // 等待卡片更新完成后再返回
+    // if (cardUpdater) {
+    //   return await cardUpdater.waitForUpdate();
+    // }
+
     return undefined;
   } catch (error) {
     console.error("[feishu-ws] Error handling card action:", error);
