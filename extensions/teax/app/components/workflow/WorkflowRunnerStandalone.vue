@@ -139,15 +139,6 @@ function statusIconClass(status: string, conclusion: string | null): string {
       <div class="lg:col-span-2 space-y-6">
         <!-- 分支配置 -->
         <UCard>
-          <template #header>
-            <div class="flex items-center gap-2">
-              <UIcon
-                name="i-lucide-git-branch"
-                class="w-4 h-4 text-gray-400"
-              />
-              <span class="font-medium">分支</span>
-            </div>
-          </template>
           <div>
             <USelect
               v-if="data.preset.allow_branch_override && data.branches.length > 0"
@@ -159,7 +150,7 @@ function statusIconClass(status: string, conclusion: string | null): string {
             />
             <div
               v-else
-              class="flex items-center gap-2 py-2"
+              class="flex items-center gap-2"
             >
               <UIcon
                 name="i-lucide-git-branch"
@@ -324,36 +315,6 @@ function statusIconClass(status: string, conclusion: string | null): string {
 
       <!-- 右侧：状态/日志区 (1/3) -->
       <div class="space-y-6">
-        <!-- 快速状态卡片 -->
-        <UCard
-          :class="{
-            'border-l-4 border-l-blue-500': !statusData?.run,
-            'border-l-4 border-l-amber-500': statusData?.run && statusData.hasRunning,
-            'border-l-4 border-l-green-500': statusData?.run && statusData.run.conclusion === 'success',
-            'border-l-4 border-l-red-500': statusData?.run && statusData.run.conclusion === 'failure',
-          }"
-        >
-          <div class="text-center py-2">
-            <UIcon
-              v-if="!statusData?.run"
-              name="i-lucide-circle-dot"
-              class="w-8 h-8 text-gray-300 mx-auto mb-2"
-            />
-            <UIcon
-              v-else
-              :name="jobStatusIcon(statusData.run.status, statusData.run.conclusion)"
-              class="w-8 h-8 mx-auto mb-2"
-              :class="statusIconClass(statusData.run.status, statusData.run.conclusion)"
-            />
-            <p class="text-sm font-medium text-gray-900 dark:text-white">
-              {{ statusData?.run ? overallStatusLabel(statusData.run.status, statusData.run.conclusion) : '就绪' }}
-            </p>
-            <p class="text-xs text-gray-400 mt-1">
-              {{ statusData?.run ? `运行 #${statusData.run.run_number}` : '等待触发' }}
-            </p>
-          </div>
-        </UCard>
-
         <!-- 操作日志 -->
         <UCard v-if="isSubPreset">
           <template #header>
