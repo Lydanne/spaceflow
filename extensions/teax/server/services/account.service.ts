@@ -3,28 +3,28 @@
  * 处理账户信息查看和飞书绑定
  */
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import type { FeishuInteractiveCard } from "~~/server/utils/feishu-sdk";
 
 /**
- * 生成账户信息卡片
+ * 生成账户信息卡片（支持多账户绑定）
  */
 export async function generateAccountCard(openId: string): Promise<FeishuInteractiveCard> {
   const db = useDB();
 
-  // 查询飞书绑定信息
-  const [binding] = await db
+  // 查询所有飞书绑定信息
+  const bindings = await db
     .select({
+      id: schema.userFeishu.id,
       user_id: schema.userFeishu.user_id,
       feishu_name: schema.userFeishu.feishu_name,
       created_at: schema.userFeishu.created_at,
     })
     .from(schema.userFeishu)
-    .where(eq(schema.userFeishu.feishu_open_id, openId))
-    .limit(1);
+    .where(eq(schema.userFeishu.feishu_open_id, openId));
 
-  if (!binding) {
+  if (bindings.length === 0) {
     // 未绑定账号
     return {
       header: {
@@ -69,8 +69,9 @@ export async function generateAccountCard(openId: string): Promise<FeishuInterac
     };
   }
 
-  // 查询用户详细信息
-  const [user] = await db
+  // 查询所有绑定用户的详细信息
+  const userIds = bindings.map((b) => b.user_id!);
+  const users = await db
     .select({
       id: schema.users.id,
       gitea_username: schema.users.gitea_username,
@@ -79,10 +80,9 @@ export async function generateAccountCard(openId: string): Promise<FeishuInterac
       created_at: schema.users.created_at,
     })
     .from(schema.users)
-    .where(eq(schema.users.id, binding.user_id!))
-    .limit(1);
+    .where(inArray(schema.users.id, userIds));
 
-  if (!user) {
+  if (users.length === 0) {
     return {
       header: {
         title: { tag: "plain_text", content: "❌ 错误" },
@@ -100,76 +100,93 @@ export async function generateAccountCard(openId: string): Promise<FeishuInterac
     };
   }
 
-  // 查询用户所属组织数量
-  const orgCount = await db
-    .selectDistinct({ org_id: schema.organizations.id })
-    .from(schema.teamMembers)
-    .innerJoin(schema.teams, eq(schema.teamMembers.team_id, schema.teams.id))
-    .innerJoin(schema.organizations, eq(schema.teams.organization_id, schema.organizations.id))
-    .where(eq(schema.teamMembers.user_id, user.id));
+  // 构建用户信息映射
+  const userMap = new Map(users.map((u) => [u.id, u]));
+  const feishuName = bindings[0]?.feishu_name || "未知";
 
-  // 构建账户信息
-  const accountInfo = [
-    `**用户名**: ${user.gitea_username}`,
-    `**邮箱**: ${user.email}`,
-    `**角色**: ${user.is_admin ? "管理员" : "普通用户"}`,
-    `**所属组织**: ${orgCount.length} 个`,
-    `**注册时间**: ${user.created_at ? new Date(user.created_at).toLocaleDateString("zh-CN") : "未知"}`,
-  ].join("\n");
+  // 构建卡片元素
+  const elements: FeishuInteractiveCard["elements"] = [
+    {
+      tag: "div",
+      text: {
+        tag: "lark_md",
+        content: `**飞书账号**: ${feishuName}\n**绑定账户数**: ${bindings.length} 个`,
+      },
+    },
+    {
+      tag: "hr",
+    },
+  ];
 
-  const feishuInfo = [
-    `**飞书名称**: ${binding.feishu_name}`,
-    `**绑定时间**: ${binding.created_at ? new Date(binding.created_at).toLocaleDateString("zh-CN") : "未知"}`,
-  ].join("\n");
+  // 为每个绑定的账户生成信息块
+  for (const binding of bindings) {
+    const user = userMap.get(binding.user_id!);
+    if (!user) continue;
+
+    const accountInfo = [
+      `**用户名**: ${user.gitea_username}`,
+      `**邮箱**: ${user.email}`,
+      `**角色**: ${user.is_admin ? "管理员" : "普通用户"}`,
+      `**绑定时间**: ${binding.created_at ? new Date(binding.created_at).toLocaleDateString("zh-CN") : "未知"}`,
+    ].join("\n");
+
+    elements.push({
+      tag: "div",
+      text: {
+        tag: "lark_md",
+        content: accountInfo,
+      },
+    });
+
+    // 每个账户单独的解绑按钮
+    elements.push({
+      tag: "action",
+      actions: [
+        {
+          tag: "button",
+          text: { tag: "plain_text", content: `🔓 解绑 ${user.gitea_username}` },
+          type: "danger",
+          value: JSON.stringify({
+            action: "unbind_feishu",
+            binding_id: binding.id,
+            username: user.gitea_username,
+          }),
+        },
+      ],
+    });
+
+    elements.push({ tag: "hr" });
+  }
+
+  // 刷新按钮
+  elements.push({
+    tag: "action",
+    actions: [
+      {
+        tag: "button",
+        text: { tag: "plain_text", content: "🔄 刷新" },
+        type: "default",
+        value: JSON.stringify({
+          action: "refresh_account",
+        }),
+      },
+      {
+        tag: "button",
+        text: { tag: "plain_text", content: "➕ 绑定更多账户" },
+        type: "primary",
+        value: JSON.stringify({
+          action: "view_binding_guide",
+        }),
+      },
+    ],
+  });
 
   return {
     header: {
       title: { tag: "plain_text", content: "👤 账户信息" },
       template: "blue",
     },
-    elements: [
-      {
-        tag: "div",
-        text: {
-          tag: "lark_md",
-          content: "**Teax 账户**\n\n" + accountInfo,
-        },
-      },
-      {
-        tag: "hr",
-      },
-      {
-        tag: "div",
-        text: {
-          tag: "lark_md",
-          content: "**飞书绑定**\n\n" + feishuInfo,
-        },
-      },
-      {
-        tag: "hr",
-      },
-      {
-        tag: "action",
-        actions: [
-          {
-            tag: "button",
-            text: { tag: "plain_text", content: "🔓 解除绑定" },
-            type: "danger",
-            value: JSON.stringify({
-              action: "unbind_feishu",
-            }),
-          },
-          {
-            tag: "button",
-            text: { tag: "plain_text", content: "🔄 刷新" },
-            type: "default",
-            value: JSON.stringify({
-              action: "refresh_account",
-            }),
-          },
-        ],
-      },
-    ],
+    elements,
   };
 }
 
@@ -193,12 +210,34 @@ export async function handleAccountAction(
 
     case "unbind_feishu": {
       const db = useDB();
+      const bindingId = action.binding_id as string | undefined;
+      const username = action.username as string | undefined;
 
-      // 删除绑定
-      await db
-        .delete(schema.userFeishu)
-        .where(eq(schema.userFeishu.feishu_open_id, openId));
+      if (bindingId) {
+        // 按 binding_id 解绑单个账户
+        await db
+          .delete(schema.userFeishu)
+          .where(eq(schema.userFeishu.id, bindingId));
+      } else {
+        // 兼容旧逻辑：解绑所有
+        await db
+          .delete(schema.userFeishu)
+          .where(eq(schema.userFeishu.feishu_open_id, openId));
+      }
 
+      // 检查是否还有其他绑定
+      const remaining = await db
+        .select({ id: schema.userFeishu.id })
+        .from(schema.userFeishu)
+        .where(eq(schema.userFeishu.feishu_open_id, openId))
+        .limit(1);
+
+      if (remaining.length > 0) {
+        // 还有其他绑定，返回更新后的账户卡片
+        return await generateAccountCard(openId);
+      }
+
+      // 所有绑定都已解除
       return {
         header: {
           title: { tag: "plain_text", content: "✅ 解除绑定成功" },
@@ -209,7 +248,9 @@ export async function handleAccountAction(
             tag: "div",
             text: {
               tag: "lark_md",
-              content: "已成功解除飞书账号绑定\n\n您可以重新绑定其他账号",
+              content: username
+                ? `已成功解除与 **${username}** 的绑定`
+                : "已成功解除飞书账号绑定\n\n您可以重新绑定其他账号",
             },
           },
           {
