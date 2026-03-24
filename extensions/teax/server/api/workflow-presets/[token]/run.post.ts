@@ -4,6 +4,7 @@ import { requireAuth } from "~~/server/utils/auth";
 import { requirePermission } from "~~/server/utils/permission";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolvePresetByToken } from "~~/server/utils/resolve-preset";
+import { recordAutoLockHistory, recordTriggerHistory } from "~~/server/services/preset-lock.service";
 
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event);
@@ -145,6 +146,21 @@ export default defineEventHandler(async (event) => {
       .set(updateData)
       .where(eq(schema.workflowPresets.id, preset.id));
     console.log("[run.post] Saved current_run_id:", newRunId, preset.group_id ? "(auto-locked)" : "");
+
+    // 写入历史记录（仅子预设）
+    if (preset.group_id) {
+      await recordTriggerHistory(preset.id, session.user.id, {
+        run_id: newRunId,
+        run_number: newRunNumber,
+        branch: finalBranch,
+        inputs: finalInputs,
+      });
+
+      // 如果自动锁定了，也记录锁定历史
+      if (lockInfo) {
+        await recordAutoLockHistory(preset.id, session.user.id, lockInfo.auto_unlock_at);
+      }
+    }
   } else {
     console.log("[run.post] No newRunId found after polling");
   }

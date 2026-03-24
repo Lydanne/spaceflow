@@ -1,7 +1,6 @@
-import { eq } from "drizzle-orm";
-import { useDB, schema } from "~~/server/db";
 import { requireScenePermission } from "~~/server/utils/scene-permission";
 import { resolvePresetByToken } from "~~/server/utils/resolve-preset";
+import { unlockPreset } from "~~/server/services/preset-lock.service";
 
 export default defineEventHandler(async (event) => {
   const { preset, repo } = await resolvePresetByToken(event);
@@ -24,17 +23,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, message: "只有锁定者才能解锁" });
   }
 
-  const db = useDB();
-
-  // 解锁预设
-  await db
-    .update(schema.workflowPresets)
-    .set({
-      locked_by: null,
-      locked_at: null,
-      auto_unlock_at: null,
-    })
-    .where(eq(schema.workflowPresets.id, preset.id));
+  await unlockPreset(preset.id, session.user.id, "manual");
 
   return { success: true };
 });

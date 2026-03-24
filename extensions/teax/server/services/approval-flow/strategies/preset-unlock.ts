@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import type { ApprovalStrategy } from "../types";
+import { unlockPreset } from "~~/server/services/preset-lock.service";
 
 /**
  * 预设解锁申请 Payload
@@ -101,25 +102,8 @@ export const presetUnlockStrategy: ApprovalStrategy<PresetUnlockPayload> = {
   },
 
   async onApproved(_flow, payload, _approverId) {
-    const db = useDB();
-
-    // 解锁预设
-    await db
-      .update(schema.workflowPresets)
-      .set({
-        locked_by: null,
-        locked_at: null,
-        auto_unlock_at: null,
-      })
-      .where(eq(schema.workflowPresets.id, payload.presetId));
-
-    // 记录历史
-    await db.insert(schema.workflowPresetHistory).values({
-      preset_id: payload.presetId,
-      action: "unlock",
-      actor_id: payload.lockedBy,
-      details: { reason: "approval_granted" },
-    });
+    // 使用服务解锁预设（包含历史记录）
+    await unlockPreset(payload.presetId, payload.lockedBy, "approved");
   },
 
   async getRequesterNotification(_flow, payload, result) {

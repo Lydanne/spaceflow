@@ -68,6 +68,16 @@ interface RunStatus {
   } | null;
 }
 
+interface HistoryItem {
+  id: string;
+  action: string;
+  actor_id: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+  actor_name: string | null;
+  actor_avatar: string | null;
+}
+
 const props = defineProps<{
   data: PresetData;
   statusUrl?: string;
@@ -401,6 +411,82 @@ const hasEditableInputs = computed(() => {
   // 如果有任何参数未被锁定，则可以编辑
   return inputKeys.some((key) => !lockedInputs.includes(key));
 });
+
+// 操作历史
+const historyData = ref<HistoryItem[]>([]);
+const loadingHistory = ref(false);
+const showHistory = ref(false);
+
+async function loadHistory() {
+  if (!isSubPreset.value) return;
+  loadingHistory.value = true;
+  try {
+    const result = await $fetch<{ history: HistoryItem[] }>(
+      `/api/workflow-presets/${props.data.preset.share_token}/history`,
+    );
+    historyData.value = result.history;
+  } catch (err) {
+    console.error("Failed to load history:", err);
+  } finally {
+    loadingHistory.value = false;
+  }
+}
+
+function toggleHistory() {
+  showHistory.value = !showHistory.value;
+  if (showHistory.value && historyData.value.length === 0) {
+    loadHistory();
+  }
+}
+
+// 操作类型的显示文本和图标
+function actionLabel(action: string): string {
+  switch (action) {
+    case "lock": return "锁定";
+    case "unlock": return "解锁";
+    case "trigger": return "触发运行";
+    case "create": return "创建";
+    case "update": return "更新配置";
+    default: return action;
+  }
+}
+
+function actionIcon(action: string): string {
+  switch (action) {
+    case "lock": return "i-lucide-lock";
+    case "unlock": return "i-lucide-unlock";
+    case "trigger": return "i-lucide-play";
+    case "create": return "i-lucide-plus";
+    case "update": return "i-lucide-pencil";
+    default: return "i-lucide-activity";
+  }
+}
+
+function actionColor(action: string): string {
+  switch (action) {
+    case "lock": return "text-amber-500";
+    case "unlock": return "text-green-500";
+    case "trigger": return "text-blue-500";
+    case "create": return "text-purple-500";
+    case "update": return "text-gray-500";
+    default: return "text-gray-400";
+  }
+}
+
+function formatHistoryTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "刚刚";
+  if (diffMins < 60) return `${diffMins} 分钟前`;
+  if (diffHours < 24) return `${diffHours} 小时前`;
+  if (diffDays < 7) return `${diffDays} 天前`;
+  return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+}
 </script>
 
 <template>
@@ -713,6 +799,73 @@ const hasEditableInputs = computed(() => {
       <p v-if="statusData?.hasRunning" class="text-sm text-gray-400 mt-2">
         请等待当前运行完成
       </p>
+    </div>
+
+    <!-- 操作日志 - 仅子预设显示 -->
+    <div v-if="isSubPreset && !embedded" class="mt-6">
+      <UButton
+        variant="ghost"
+        color="neutral"
+        size="sm"
+        class="w-full"
+        @click="toggleHistory"
+      >
+        <UIcon
+          :name="showHistory ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+          class="w-4 h-4 mr-1"
+        />
+        操作日志
+      </UButton>
+
+      <div v-if="showHistory" class="mt-4">
+        <!-- 加载中 -->
+        <div
+          v-if="loadingHistory"
+          class="flex items-center justify-center py-8"
+        >
+          <UIcon name="i-lucide-loader" class="w-5 h-5 animate-spin text-gray-400" />
+        </div>
+
+        <!-- 历史列表 -->
+        <div v-else-if="historyData.length > 0" class="space-y-3">
+          <div
+            v-for="item in historyData"
+            :key="item.id"
+            class="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800"
+          >
+            <UIcon
+              :name="actionIcon(item.action)"
+              class="w-4 h-4 mt-0.5 shrink-0"
+              :class="actionColor(item.action)"
+            />
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium">{{ actionLabel(item.action) }}</span>
+                <span class="text-xs text-gray-400">{{ formatHistoryTime(item.created_at) }}</span>
+              </div>
+              <div
+                v-if="item.actor_name"
+                class="flex items-center gap-1.5 mt-1"
+              >
+                <UAvatar
+                  :src="item.actor_avatar || undefined"
+                  :alt="item.actor_name"
+                  size="2xs"
+                />
+                <span class="text-xs text-gray-500">{{ item.actor_name }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div
+          v-else
+          class="text-center text-sm text-gray-400 py-8"
+        >
+          暂无操作记录
+        </div>
+      </div>
     </div>
 
     <!-- 修改参数弹窗 -->

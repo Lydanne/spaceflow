@@ -1,9 +1,7 @@
-import { and, isNotNull, lte, eq } from "drizzle-orm";
+import { and, isNotNull, lte } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { withTaskLogging } from "~~/server/utils/task-logger";
-
-// 系统用户 ID，用于记录自动解锁操作
-const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000";
+import { unlockPreset, SYSTEM_USER_ID } from "~~/server/services/preset-lock.service";
 
 /**
  * 子预设自动解锁任务
@@ -43,26 +41,7 @@ export default defineTask({
 
       for (const preset of expired) {
         try {
-          await db.transaction(async (tx) => {
-            // 解锁子预设
-            await tx
-              .update(schema.workflowPresets)
-              .set({
-                locked_by: null,
-                locked_at: null,
-                auto_unlock_at: null,
-              })
-              .where(eq(schema.workflowPresets.id, preset.id));
-
-            // 记录历史
-            await tx.insert(schema.workflowPresetHistory).values({
-              preset_id: preset.id,
-              action: "unlock",
-              actor_id: SYSTEM_USER_ID,
-              details: { reason: "timeout" },
-            });
-          });
-
+          await unlockPreset(preset.id, SYSTEM_USER_ID, "timeout");
           unlockedIds.push(preset.id);
           console.log(`[presets:unlock-expired] Unlocked preset: ${preset.name} (${preset.id})`);
         } catch (error) {
