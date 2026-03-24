@@ -674,10 +674,6 @@ export function useGiteaSdk(event?: H3Event): GiteaSdk {
     // Token 过期，尝试刷新
     try {
       const tokenResponse = await refreshGiteaToken(giteaRefreshToken);
-      const newService = createGiteaService(tokenResponse.access_token);
-
-      // 验证新 token 是否有效
-      await newService.getCurrentUser();
 
       // 更新 session（保留原有字段，只更新 token）
       await setUserSession(ctx.event, {
@@ -686,17 +682,8 @@ export function useGiteaSdk(event?: H3Event): GiteaSdk {
         giteaRefreshToken: tokenResponse.refresh_token,
       } as Parameters<typeof setUserSession>[1]);
 
-      return newService;
-    } catch (refreshErr) {
-      console.error("[gitea] Failed to refresh Gitea token:", refreshErr);
-
-      // 清除失效的 Gitea token，避免重复尝试
-      await setUserSession(ctx.event, {
-        ...(session as Record<string, unknown>),
-        giteaAccessToken: undefined,
-        giteaRefreshToken: undefined,
-      } as Parameters<typeof setUserSession>[1]);
-
+      return createGiteaService(tokenResponse.access_token);
+    } catch {
       return null;
     }
   }
