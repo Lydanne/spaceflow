@@ -79,6 +79,50 @@ const newPresetAllowBranchOverride = ref(false);
 const newPresetAllowSyncOverride = ref(false);
 const addingPreset = ref(false);
 
+// 批量创建子预设
+const showBatchCreateModal = ref(false);
+const batchLoopMode = ref<"range" | "list">("range");
+const batchRangeStart = ref(1);
+const batchRangeEnd = ref(5);
+const batchCustomList = ref(""); // 逗号分隔的名称列表
+const batchNameTemplate = ref("子预设 {i}"); // 支持 {i} 和 {name} 占位符
+const batchBranch = ref("");
+const batchInputs = ref<Record<string, string>>({});
+const batchLockedInputs = ref<string[]>([]);
+const batchAllowBranchOverride = ref(false);
+const batchAllowSyncOverride = ref(false);
+const batchCreating = ref(false);
+const batchProgress = ref(0);
+const batchTotal = ref(0);
+
+// 批量创建预览列表
+const batchPreviewList = computed(() => {
+  const list: Array<{ name: string; index: number | string }> = [];
+  if (batchLoopMode.value === "range") {
+    const start = Math.max(1, batchRangeStart.value);
+    const end = Math.min(100, batchRangeEnd.value); // 限制最多100个
+    for (let i = start; i <= end; i++) {
+      const name = batchNameTemplate.value
+        .replace(/\{i\}/g, String(i))
+        .replace(/\{name\}/g, String(i));
+      list.push({ name, index: i });
+    }
+  } else {
+    const names = batchCustomList.value
+      .split(/[,，\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 100); // 限制最多100个
+    names.forEach((n, idx) => {
+      const name = batchNameTemplate.value
+        .replace(/\{i\}/g, String(idx + 1))
+        .replace(/\{name\}/g, n);
+      list.push({ name, index: n });
+    });
+  }
+  return list;
+});
+
 // 是否是创建者或管理员
 const isCreator = computed(() => {
   return groupData.value?.created_by === user.value?.id;
@@ -206,6 +250,76 @@ function openAddPresetModal() {
   showAddPresetModal.value = true;
 }
 
+// 打开批量创建模态框
+function openBatchCreateModal() {
+  const existingCount = groupData.value?.presets.length || 0;
+  batchLoopMode.value = "range";
+  batchRangeStart.value = existingCount + 1;
+  batchRangeEnd.value = existingCount + 5;
+  batchCustomList.value = "";
+  batchNameTemplate.value = "子预设 {i}";
+  batchBranch.value = groupData.value?.default_branch || "main";
+  // 初始化 inputs
+  const defaultInputs = groupData.value?.default_inputs || {};
+  const inputDefs = groupData.value?.workflow_inputs || {};
+  const initialInputs: Record<string, string> = {};
+  for (const [key, def] of Object.entries(inputDefs)) {
+    const val = (defaultInputs as Record<string, string | boolean | number>)[key] ?? def.default ?? "";
+    initialInputs[key] = String(val);
+  }
+  batchInputs.value = initialInputs;
+  batchLockedInputs.value = [];
+  batchAllowBranchOverride.value = false;
+  batchAllowSyncOverride.value = false;
+  batchProgress.value = 0;
+  batchTotal.value = 0;
+  showBatchCreateModal.value = true;
+}
+
+// 批量创建子预设
+async function batchCreatePresets() {
+  const presets = batchPreviewList.value;
+  if (presets.length === 0) return;
+
+  batchCreating.value = true;
+  batchTotal.value = presets.length;
+  batchProgress.value = 0;
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const preset of presets) {
+    try {
+      await $fetch(`/api/workflow-preset-groups/${token.value}/presets`, {
+        method: "POST",
+        body: {
+          name: preset.name,
+          branch: batchBranch.value || groupData.value?.default_branch,
+          inputs: { ...batchInputs.value },
+          locked_inputs: batchLockedInputs.value,
+          allow_branch_override: batchAllowBranchOverride.value,
+          allow_sync_override: batchAllowSyncOverride.value,
+        },
+      });
+      successCount++;
+    } catch (err) {
+      console.error("Failed to create preset:", preset.name, err);
+      failCount++;
+    }
+    batchProgress.value++;
+  }
+
+  batchCreating.value = false;
+  showBatchCreateModal.value = false;
+  await refresh();
+
+  if (failCount === 0) {
+    toast.add({ title: `成功创建 ${successCount} 个子预设`, color: "success" });
+  } else {
+    toast.add({ title: `创建完成：${successCount} 成功，${failCount} 失败`, color: "warning" });
+  }
+}
+
 // 添加子预设
 async function addPreset() {
   if (!newPresetName.value.trim()) return;
@@ -322,14 +436,23 @@ function getStatusText(preset: SubPreset): string {
               {{ groupData.name }}
             </h1>
           </div>
-          <UButton
-            v-if="canManagePresets"
-            icon="i-lucide-plus"
-            color="primary"
-            @click="openAddPresetModal"
-          >
-            添加子预设
-          </UButton>
+          <div v-if="canManagePresets" class="flex gap-2">
+            <UButton
+              icon="i-lucide-plus"
+              color="primary"
+              @click="openAddPresetModal"
+            >
+              添加子预设
+            </UButton>
+            <UButton
+              icon="i-lucide-copy-plus"
+              color="neutral"
+              variant="outline"
+              @click="openBatchCreateModal"
+            >
+              批量创建
+            </UButton>
+          </div>
         </div>
         <p
           v-if="groupData.description"
@@ -527,6 +650,203 @@ function getStatusText(preset: SubPreset): string {
           </UButton>
         </div>
       </div>
+
+      <!-- 批量创建子预设 Modal -->
+      <UModal v-model:open="showBatchCreateModal">
+        <template #content>
+          <div class="p-6 flex flex-col max-h-[85vh]">
+            <h3 class="text-lg font-semibold">
+              批量创建子预设
+            </h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              通过模板快速创建多个子预设
+            </p>
+
+            <div class="flex-1 overflow-y-auto space-y-4 pr-1">
+              <!-- 循环模式选择 -->
+              <div>
+                <label class="block text-sm font-medium mb-2">循环模式</label>
+                <div class="flex gap-4">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input
+                      v-model="batchLoopMode"
+                      type="radio"
+                      value="range"
+                      class="text-primary-500"
+                    >
+                    <span class="text-sm">数字范围</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input
+                      v-model="batchLoopMode"
+                      type="radio"
+                      value="list"
+                      class="text-primary-500"
+                    >
+                    <span class="text-sm">自定义列表</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 数字范围 -->
+              <div v-if="batchLoopMode === 'range'" class="flex gap-4">
+                <div class="flex-1">
+                  <label class="block text-sm font-medium mb-1">起始值</label>
+                  <UInput
+                    v-model.number="batchRangeStart"
+                    type="number"
+                    :min="1"
+                    class="w-full"
+                  />
+                </div>
+                <div class="flex-1">
+                  <label class="block text-sm font-medium mb-1">结束值</label>
+                  <UInput
+                    v-model.number="batchRangeEnd"
+                    type="number"
+                    :min="batchRangeStart"
+                    :max="batchRangeStart + 99"
+                    class="w-full"
+                  />
+                </div>
+              </div>
+
+              <!-- 自定义列表 -->
+              <div v-else>
+                <label class="block text-sm font-medium mb-1">名称列表</label>
+                <UTextarea
+                  v-model="batchCustomList"
+                  placeholder="输入名称，用逗号或换行分隔&#10;例如：测试环境, 预发环境, 生产环境"
+                  :rows="3"
+                  class="w-full"
+                />
+              </div>
+
+              <!-- 名称模板 -->
+              <div>
+                <label class="block text-sm font-medium mb-1">名称模板</label>
+                <UInput
+                  v-model="batchNameTemplate"
+                  placeholder="子预设 {i}"
+                  class="w-full"
+                />
+                <p class="text-xs text-gray-400 mt-1">
+                  支持占位符：<code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">{i}</code> 序号，
+                  <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">{name}</code> 列表项名称
+                </p>
+              </div>
+
+              <!-- 分支 -->
+              <div>
+                <label class="block text-sm font-medium mb-1">分支</label>
+                <UInput
+                  v-model="batchBranch"
+                  :placeholder="groupData?.default_branch || 'main'"
+                  class="w-full"
+                />
+              </div>
+
+              <!-- Workflow Inputs -->
+              <template v-if="Object.keys(groupData?.workflow_inputs || {}).length > 0">
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                    工作流参数（所有预设共用）
+                  </p>
+                  <WorkflowInputsForm
+                    :input-defs="groupData?.workflow_inputs || {}"
+                    :model-value="batchInputs"
+                    :locked-inputs="batchLockedInputs"
+                    :show-lock-button="true"
+                    @update:model-value="batchInputs = $event"
+                    @update:locked-inputs="batchLockedInputs = $event"
+                  />
+                </div>
+              </template>
+
+              <!-- 覆盖选项 -->
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <label class="text-sm font-medium">允许用户修改分支</label>
+                  </div>
+                  <USwitch v-model="batchAllowBranchOverride" />
+                </div>
+                <div class="flex items-center justify-between">
+                  <div>
+                    <label class="text-sm font-medium">允许同步用户修改</label>
+                  </div>
+                  <USwitch v-model="batchAllowSyncOverride" />
+                </div>
+              </div>
+
+              <!-- 预览 -->
+              <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <p class="text-sm font-medium mb-2">
+                  预览（将创建 {{ batchPreviewList.length }} 个子预设）
+                </p>
+                <div
+                  v-if="batchPreviewList.length > 0"
+                  class="max-h-32 overflow-y-auto bg-gray-50 dark:bg-gray-800 rounded-lg p-2 space-y-1"
+                >
+                  <div
+                    v-for="(item, idx) in batchPreviewList.slice(0, 20)"
+                    :key="idx"
+                    class="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2"
+                  >
+                    <UIcon name="i-lucide-file" class="w-3 h-3" />
+                    <span>{{ item.name }}</span>
+                  </div>
+                  <div
+                    v-if="batchPreviewList.length > 20"
+                    class="text-xs text-gray-400 pl-5"
+                  >
+                    ... 还有 {{ batchPreviewList.length - 20 }} 个
+                  </div>
+                </div>
+                <div
+                  v-else
+                  class="text-sm text-gray-400"
+                >
+                  请配置循环参数
+                </div>
+              </div>
+
+              <!-- 进度条 -->
+              <div v-if="batchCreating" class="space-y-2">
+                <div class="flex justify-between text-sm">
+                  <span>创建进度</span>
+                  <span>{{ batchProgress }} / {{ batchTotal }}</span>
+                </div>
+                <UProgress
+                  :value="batchProgress"
+                  :max="batchTotal"
+                  color="primary"
+                />
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                :disabled="batchCreating"
+                @click="showBatchCreateModal = false"
+              >
+                取消
+              </UButton>
+              <UButton
+                icon="i-lucide-copy-plus"
+                color="primary"
+                :loading="batchCreating"
+                :disabled="batchPreviewList.length === 0"
+                @click="batchCreatePresets"
+              >
+                创建 {{ batchPreviewList.length }} 个
+              </UButton>
+            </div>
+          </div>
+        </template>
+      </UModal>
 
       <!-- 添加子预设 Modal -->
       <UModal v-model:open="showAddPresetModal">
