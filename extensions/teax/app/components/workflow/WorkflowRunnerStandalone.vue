@@ -59,10 +59,7 @@ function statusIconClass(status: string, conclusion: string | null): string {
           :to="`/workflow-groups/${data.group.share_token}`"
           class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
         >
-          <UIcon
-            name="i-lucide-arrow-left"
-            class="w-5 h-5"
-          />
+          <UIcon name="i-lucide-arrow-left" class="w-5 h-5" />
         </NuxtLink>
         <div>
           <div class="flex items-center gap-2">
@@ -71,22 +68,41 @@ function statusIconClass(status: string, conclusion: string | null): string {
             </h1>
             <!-- 锁定状态徽章 -->
             <template v-if="isSubPreset && lockState">
-              <UBadge
-                color="warning"
-                variant="subtle"
-              >
-                <UIcon
-                  name="i-lucide-lock"
-                  class="w-3 h-3 mr-1"
-                />
+              <UBadge color="warning" variant="subtle">
+                <UIcon name="i-lucide-lock" class="w-3 h-3 mr-1" />
                 已锁定
-                <span
-                  v-if="lockState.auto_unlock_at"
-                  class="ml-1 opacity-75"
-                >
-                  · {{ new Date(lockState.auto_unlock_at).toLocaleTimeString() }}
+                <span v-if="lockState.auto_unlock_at" class="ml-1 opacity-75">
+                  ·
+                  {{ new Date(lockState.auto_unlock_at).toLocaleTimeString() }}
                 </span>
               </UBadge>
+            </template>
+            <!-- 锁定/解锁按钮 -->
+            <template v-if="isSubPreset">
+              <UButton
+                v-if="lockState"
+                variant="outline"
+                color="warning"
+                icon="i-lucide-unlock"
+                class="whitespace-nowrap"
+                :loading="isUnlocking"
+                size="xs"
+                @click="unlockPreset"
+              >
+                解锁
+              </UButton>
+              <UButton
+                v-else
+                variant="outline"
+                color="neutral"
+                icon="i-lucide-lock"
+                class="whitespace-nowrap"
+                :loading="isLocking"
+                size="xs"
+                @click="lockPreset"
+              >
+                锁定
+              </UButton>
             </template>
           </div>
           <p class="text-sm text-gray-500 font-mono mt-0.5">
@@ -96,29 +112,20 @@ function statusIconClass(status: string, conclusion: string | null): string {
       </div>
 
       <div class="flex items-center gap-2">
-        <!-- 锁定/解锁按钮 -->
-        <template v-if="isSubPreset">
-          <UButton
-            v-if="lockState"
-            variant="outline"
-            color="warning"
-            icon="i-lucide-unlock"
-            :loading="isUnlocking"
-            @click="unlockPreset"
-          >
-            解锁
-          </UButton>
-          <UButton
-            v-else
-            variant="outline"
-            color="neutral"
-            icon="i-lucide-lock"
-            :loading="isLocking"
-            @click="lockPreset"
-          >
-            锁定
-          </UButton>
-        </template>
+        <USelect
+          v-if="data.preset.allow_branch_override && data.branches.length > 0"
+          v-model="overrideBranch"
+          :items="data.branches.map((b) => ({ label: b, value: b }))"
+          value-key="value"
+          size="lg"
+        />
+        <div v-else class="flex items-center gap-2">
+          <UIcon name="i-lucide-git-branch" class="w-4 h-4 text-gray-400" />
+          <span class="font-mono text-gray-900 dark:text-white">
+            {{ data.preset.branch }}
+          </span>
+          <UBadge variant="subtle" color="neutral" size="xs"> 固定 </UBadge>
+        </div>
         <!-- 运行按钮 -->
         <UButton
           size="lg"
@@ -126,6 +133,7 @@ function statusIconClass(status: string, conclusion: string | null): string {
           :icon="statusData?.hasRunning ? 'i-lucide-loader' : 'i-lucide-play'"
           :loading="isTriggering"
           :disabled="statusData?.hasRunning"
+          class="whitespace-nowrap"
           @click="triggerRun"
         >
           {{ statusData?.hasRunning ? "运行中..." : "运行工作流" }}
@@ -138,47 +146,34 @@ function statusIconClass(status: string, conclusion: string | null): string {
       <!-- 左侧：配置区 (2/3) -->
       <div class="lg:col-span-2 space-y-6">
         <!-- 分支配置 -->
-        <UCard>
+        <!-- <UCard>
           <div>
             <USelect
-              v-if="data.preset.allow_branch_override && data.branches.length > 0"
+              v-if="
+                data.preset.allow_branch_override && data.branches.length > 0
+              "
               v-model="overrideBranch"
               :items="data.branches.map((b) => ({ label: b, value: b }))"
               value-key="value"
               size="lg"
               class="w-full"
             />
-            <div
-              v-else
-              class="flex items-center gap-2"
-            >
-              <UIcon
-                name="i-lucide-git-branch"
-                class="w-4 h-4 text-gray-400"
-              />
+            <div v-else class="flex items-center gap-2">
+              <UIcon name="i-lucide-git-branch" class="w-4 h-4 text-gray-400" />
               <span class="font-mono text-gray-900 dark:text-white">
                 {{ data.preset.branch }}
               </span>
-              <UBadge
-                variant="subtle"
-                color="neutral"
-                size="xs"
-              >
-                固定
-              </UBadge>
+              <UBadge variant="subtle" color="neutral" size="xs"> 固定 </UBadge>
             </div>
           </div>
-        </UCard>
+        </UCard> -->
 
         <!-- 参数配置 -->
         <UCard v-if="Object.keys(data.preset.inputs || {}).length > 0">
           <template #header>
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <UIcon
-                  name="i-lucide-settings"
-                  class="w-4 h-4 text-gray-400"
-                />
+                <UIcon name="i-lucide-settings" class="w-4 h-4 text-gray-400" />
                 <span class="font-medium">运行参数</span>
               </div>
               <UButton
@@ -202,7 +197,9 @@ function statusIconClass(status: string, conclusion: string | null): string {
               <div class="flex items-start justify-between gap-4">
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <span
+                      class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
                       {{ key }}
                     </span>
                     <UBadge
@@ -211,10 +208,7 @@ function statusIconClass(status: string, conclusion: string | null): string {
                       color="neutral"
                       size="xs"
                     >
-                      <UIcon
-                        name="i-lucide-lock"
-                        class="w-3 h-3 mr-0.5"
-                      />
+                      <UIcon name="i-lucide-lock" class="w-3 h-3 mr-0.5" />
                       锁定
                     </UBadge>
                   </div>
@@ -225,7 +219,9 @@ function statusIconClass(status: string, conclusion: string | null): string {
                     {{ data.inputDefs[key].description }}
                   </p>
                 </div>
-                <code class="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-sm font-mono text-gray-900 dark:text-white max-w-[200px] truncate">
+                <code
+                  class="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-sm font-mono text-gray-900 dark:text-white max-w-[200px] truncate"
+                >
                   {{ overrideInputs[key] ?? value }}
                 </code>
               </div>
@@ -239,24 +235,54 @@ function statusIconClass(status: string, conclusion: string | null): string {
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <UIcon
-                  :name="jobStatusIcon(statusData.run.status, statusData.run.conclusion)"
+                  :name="
+                    jobStatusIcon(
+                      statusData.run.status,
+                      statusData.run.conclusion,
+                    )
+                  "
                   class="w-5 h-5"
-                  :class="statusIconClass(statusData.run.status, statusData.run.conclusion)"
+                  :class="
+                    statusIconClass(
+                      statusData.run.status,
+                      statusData.run.conclusion,
+                    )
+                  "
                 />
                 <span class="font-medium">运行 #{{ statusData.run.run_number }}</span>
                 <UBadge
-                  :color="jobStatusColor(statusData.run.status, statusData.run.conclusion) as any"
+                  :color="
+                    jobStatusColor(
+                      statusData.run.status,
+                      statusData.run.conclusion,
+                    ) as any
+                  "
                   variant="subtle"
                 >
-                  {{ overallStatusLabel(statusData.run.status, statusData.run.conclusion) }}
+                  {{
+                    overallStatusLabel(
+                      statusData.run.status,
+                      statusData.run.conclusion,
+                    )
+                  }}
                 </UBadge>
               </div>
               <div class="flex items-center gap-3">
                 <span
-                  v-if="formatDuration(statusData.run.started_at, statusData.run.completed_at)"
+                  v-if="
+                    formatDuration(
+                      statusData.run.started_at,
+                      statusData.run.completed_at,
+                    )
+                  "
                   class="text-sm text-gray-400"
                 >
-                  {{ formatDuration(statusData.run.started_at, statusData.run.completed_at) }}
+                  {{
+                    formatDuration(
+                      statusData.run.started_at,
+                      statusData.run.completed_at,
+                    )
+                  }}
                 </span>
                 <UButton
                   v-if="statusData.run.html_url"
@@ -287,10 +313,7 @@ function statusIconClass(status: string, conclusion: string | null): string {
           </div>
 
           <!-- Jobs 列表 -->
-          <div
-            v-if="statusData.run.jobs.length > 0"
-            class="space-y-2"
-          >
+          <div v-if="statusData.run.jobs.length > 0" class="space-y-2">
             <div
               v-for="job in statusData.run.jobs"
               :key="job.id"
@@ -320,10 +343,7 @@ function statusIconClass(status: string, conclusion: string | null): string {
           <template #header>
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <UIcon
-                  name="i-lucide-history"
-                  class="w-4 h-4 text-gray-400"
-                />
+                <UIcon name="i-lucide-history" class="w-4 h-4 text-gray-400" />
                 <span class="font-medium">操作日志</span>
               </div>
               <UButton
@@ -366,9 +386,13 @@ function statusIconClass(status: string, conclusion: string | null): string {
               />
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5">
-                  <span class="text-sm font-medium">{{ actionLabel(item.action) }}</span>
+                  <span class="text-sm font-medium">{{
+                    actionLabel(item.action)
+                  }}</span>
                 </div>
-                <div class="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
+                <div
+                  class="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5"
+                >
                   <span v-if="item.actor_name">{{ item.actor_name }}</span>
                   <span>·</span>
                   <span>{{ formatHistoryTime(item.created_at) }}</span>
@@ -386,10 +410,7 @@ function statusIconClass(status: string, conclusion: string | null): string {
           </div>
 
           <!-- 未加载提示 -->
-          <div
-            v-else
-            class="text-center text-sm text-gray-400 py-6"
-          >
+          <div v-else class="text-center text-sm text-gray-400 py-6">
             点击加载查看历史
           </div>
         </UCard>
@@ -398,10 +419,7 @@ function statusIconClass(status: string, conclusion: string | null): string {
         <UCard>
           <template #header>
             <div class="flex items-center gap-2">
-              <UIcon
-                name="i-lucide-git-fork"
-                class="w-4 h-4 text-gray-400"
-              />
+              <UIcon name="i-lucide-git-fork" class="w-4 h-4 text-gray-400" />
               <span class="font-medium">仓库</span>
             </div>
           </template>
