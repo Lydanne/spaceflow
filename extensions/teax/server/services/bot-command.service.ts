@@ -505,29 +505,75 @@ registerCommand({
   description: "查看我的工作流预设",
   usage: "/presets",
   handler: async (ctx) => {
-    // 验证用户绑定：使用当前活跃账户
     const activeUser = await getActiveAccount(ctx.senderOpenId);
     if (!activeUser) {
       await replyFeishuMessage(ctx.messageId, "❌ 请先在 Teax 中绑定飞书账号");
       return;
     }
 
-    // 查询用户的预设组
     const db = useDB();
+    const config = useRuntimeConfig();
+    const baseUrl = config.public.appUrl;
+
     const groups = await db
       .select({
         id: schema.workflowPresetGroups.id,
         name: schema.workflowPresetGroups.name,
+        description: schema.workflowPresetGroups.description,
         share_token: schema.workflowPresetGroups.share_token,
       })
       .from(schema.workflowPresetGroups)
       .where(eq(schema.workflowPresetGroups.created_by, activeUser.id))
       .limit(10);
 
-    if (groups.length === 0) {
-      const config = useRuntimeConfig();
-      const baseUrl = config.public.appUrl;
+    const groupIds = groups.map((g) => g.id);
+    let groupPresets: Array<{
+      id: string;
+      name: string;
+      branch: string;
+      group_id: string | null;
+    }> = [];
+    if (groupIds.length > 0) {
+      const { inArray } = await import("drizzle-orm");
+      groupPresets = await db
+        .select({
+          id: schema.workflowPresets.id,
+          name: schema.workflowPresets.name,
+          branch: schema.workflowPresets.branch,
+          group_id: schema.workflowPresets.group_id,
+        })
+        .from(schema.workflowPresets)
+        .where(inArray(schema.workflowPresets.group_id, groupIds))
+        .limit(50);
+    }
 
+    const presetsByGroup = new Map<string, typeof groupPresets>();
+    for (const p of groupPresets) {
+      if (!p.group_id) continue;
+      const list = presetsByGroup.get(p.group_id) ?? [];
+      list.push(p);
+      presetsByGroup.set(p.group_id, list);
+    }
+
+    const standalonePresets = await db
+      .select({
+        id: schema.workflowPresets.id,
+        name: schema.workflowPresets.name,
+        branch: schema.workflowPresets.branch,
+        share_token: schema.workflowPresets.share_token,
+        repository: {
+          full_name: schema.repositories.full_name,
+        },
+      })
+      .from(schema.workflowPresets)
+      .innerJoin(
+        schema.repositories,
+        eq(schema.workflowPresets.repository_id, schema.repositories.id),
+      )
+      .where(eq(schema.workflowPresets.created_by, activeUser.id))
+      .limit(10);
+
+    if (groups.length === 0 && standalonePresets.length === 0) {
       const card: FeishuInteractiveCard = {
         header: {
           title: { tag: "plain_text", content: "📦 工作流预设" },
@@ -557,19 +603,43 @@ registerCommand({
       return;
     }
 
-    const config = useRuntimeConfig();
-    const baseUrl = config.public.appUrl;
+    const contentParts: string[] = [];
 
-    const lines = groups.map((g) => {
-      const shareUrl = g.share_token ? `${baseUrl}/workflow-groups/${g.share_token}` : "";
-      return shareUrl
-        ? `• **${g.name}** — [分享链接](${shareUrl})`
-        : `• **${g.name}**`;
-    });
+    if (groups.length > 0) {
+      contentParts.push("**📁 预设组**\n");
+      for (const g of groups) {
+        const shareUrl = g.share_token ? `${baseUrl}/workflow-groups/${g.share_token}` : "";
+        const header = shareUrl
+          ? `• **${g.name}** — [分享链接](${shareUrl})`
+          : `• **${g.name}**`;
+        contentParts.push(header);
 
+        const presets = presetsByGroup.get(g.id) ?? [];
+        for (const p of presets) {
+          contentParts.push(`  └ ${p.name} (${p.branch})`);
+        }
+        if (presets.length === 0) {
+          contentParts.push("  └ (暂无预设)");
+        }
+      }
+    }
+
+    if (standalonePresets.length > 0) {
+      if (groups.length > 0) {
+        contentParts.push("\n");
+      }
+      contentParts.push("**📋 独立预设**\n");
+      for (const p of standalonePresets) {
+        const repo = p.repository?.full_name ?? "";
+        const repoName = repo ? ` (${repo})` : "";
+        contentParts.push(`• **${p.name}**${repoName}`);
+      }
+    }
+
+    const totalCount = groups.length + standalonePresets.length;
     const card: FeishuInteractiveCard = {
       header: {
-        title: { tag: "plain_text", content: `📦 工作流预设 (${groups.length})` },
+        title: { tag: "plain_text", content: `📦 工作流预设 (${totalCount})` },
         template: "blue",
       },
       elements: [
@@ -577,7 +647,7 @@ registerCommand({
           tag: "div",
           text: {
             tag: "lark_md",
-            content: lines.join("\n"),
+            content: contentParts.join("\n"),
           },
         },
       ],

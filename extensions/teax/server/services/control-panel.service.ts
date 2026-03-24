@@ -5,8 +5,27 @@
 
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
+import { useGiteaSdk } from "~~/server/utils/gitea";
 import type { FeishuInteractiveCard } from "~~/server/utils/feishu-sdk";
 import type { UpdateCardFn } from "~~/server/utils/feishu-card-updater";
+
+function getStatusEmoji(status: string, conclusion: string | null): string {
+  if (conclusion === "success") return "✅";
+  if (conclusion === "failure") return "❌";
+  if (conclusion === "cancelled") return "🚫";
+  if (status === "in_progress" || status === "waiting") return "⏳";
+  return "⚪";
+}
+
+function formatTimeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+  return `${Math.floor(diff / 86400)}天前`;
+}
 
 /**
  * 生成控制面板首页 - 显示用户的组织列表
@@ -410,7 +429,96 @@ export async function handleControlPanelAction(
       return await generateOrgRepoList(orgName);
     }
 
-    case "open_actions":
+    case "open_actions": {
+      const owner = action.owner as string;
+      const repo = action.repo as string;
+      const config = useRuntimeConfig();
+      const baseUrl = config.public.appUrl;
+
+      const gitea = useGiteaSdk();
+      let runs: any[] = [];
+
+      try {
+        const giteaService = await gitea.role("admin");
+        const response = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 10);
+        runs = response.workflow_runs ?? [];
+      } catch (error) {
+        console.error("Failed to fetch workflow runs:", error);
+      }
+
+      const elements: Array<{ tag: string; [key: string]: unknown }> = [
+        {
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: `**🚀 Actions 运行记录**\n最近 ${runs.length > 0 ? runs.length : 0} 条记录`,
+          },
+        },
+        { tag: "hr" },
+      ];
+
+      if (runs.length === 0) {
+        elements.push({
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: `暂无运行记录\n\n[在浏览器中查看全部](${baseUrl}/${owner}/${repo}/actions)`,
+          },
+        });
+      } else {
+        for (const run of runs) {
+          const emoji = getStatusEmoji(run.status, run.conclusion);
+          const timeAgo = formatTimeAgo(run.started_at);
+          const shortSha = run.head_sha.substring(0, 7);
+
+          elements.push({
+            tag: "div",
+            text: {
+              tag: "lark_md",
+              content: `${emoji} **${run.display_title}**\n分支: ${run.head_branch} · ${shortSha}\n时间: ${timeAgo}`,
+            },
+          });
+        }
+
+        elements.push({
+          tag: "hr",
+        });
+
+        elements.push({
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: `[查看全部运行记录](${baseUrl}/${owner}/${repo}/actions)`,
+          },
+        });
+      }
+
+      elements.push({ tag: "hr" });
+      elements.push({
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "⬅️ 返回" },
+            type: "default",
+            value: JSON.stringify({
+              action: "select_repo",
+              owner,
+              repo,
+            }),
+          },
+        ],
+      });
+
+      return {
+        header: {
+          title: { tag: "plain_text", content: `🚀 Actions - ${owner}/${repo}` },
+          template: "blue",
+        },
+        elements,
+      };
+    }
+
     case "open_agents":
     case "open_pages":
     case "open_settings": {
@@ -420,7 +528,6 @@ export async function handleControlPanelAction(
       const baseUrl = config.public.appUrl;
 
       const pathMap: Record<string, string> = {
-        open_actions: "actions",
         open_agents: "agents",
         open_pages: "pages",
         open_settings: "settings",
