@@ -1,3 +1,5 @@
+import type { WorkflowRunDetail, JobsResponse } from "~~/server/shared/dto";
+
 export interface RunJob {
   id: number;
   name: string;
@@ -5,6 +7,7 @@ export interface RunJob {
   conclusion: string | null;
   started_at: string | null;
   completed_at: string | null;
+  runner_name?: string | null;
 }
 
 export interface RunStatus {
@@ -46,19 +49,13 @@ export function useWorkflowStatus(options: UseWorkflowStatusOptions) {
         currentRunId.value &&
         options.runDetailUrlPrefix
       ) {
-        const runDetail = await $fetch<{
-          id: number;
-          runNumber: number;
-          status: string;
-          conclusion: string | null;
-          startedAt: string | null;
-          completedAt: string | null;
-          htmlUrl: string | null;
-        }>(`${options.runDetailUrlPrefix}/${currentRunId.value}`);
+        const runDetail = await $fetch<WorkflowRunDetail>(
+          `${options.runDetailUrlPrefix}/${currentRunId.value}`,
+        );
 
         let jobs: RunJob[] = [];
         try {
-          const jobsResult = await $fetch<{ jobs: RunJob[] }>(
+          const jobsResult = await $fetch<JobsResponse>(
             `${options.runDetailUrlPrefix}/${currentRunId.value}/jobs`,
           );
           jobs = jobsResult.jobs || [];
@@ -73,12 +70,12 @@ export function useWorkflowStatus(options: UseWorkflowStatusOptions) {
             runDetail.status === "waiting",
           run: {
             id: runDetail.id,
-            run_number: runDetail.runNumber,
+            run_number: runDetail.run_number,
             status: runDetail.status,
             conclusion: runDetail.conclusion,
-            started_at: runDetail.startedAt,
-            completed_at: runDetail.completedAt,
-            html_url: runDetail.htmlUrl,
+            started_at: runDetail.started_at,
+            completed_at: runDetail.completed_at,
+            html_url: runDetail.html_url,
             jobs,
           },
           triggeredBy: null,

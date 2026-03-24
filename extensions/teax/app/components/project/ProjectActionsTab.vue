@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import cronstrue from "cronstrue/i18n";
+import type {
+  WorkflowRun,
+  WorkflowRunsResponse,
+  WorkflowDefinition,
+  WorkflowInputDef,
+  WorkflowsResponse,
+} from "~~/server/shared/dto";
 
 const props = defineProps<{
   owner: string;
@@ -7,41 +14,6 @@ const props = defineProps<{
 }>();
 
 const toast = useToast();
-
-interface WorkflowRunItem {
-  id: number;
-  runNumber: number;
-  displayTitle: string;
-  status: string;
-  conclusion: string;
-  event: string;
-  headBranch: string;
-  headSha: string;
-  path: string;
-  htmlUrl: string;
-  startedAt: string;
-  completedAt: string | null;
-  actor: { login: string; avatar_url: string } | null;
-}
-
-interface WorkflowInput {
-  description?: string;
-  required?: boolean;
-  default?: string;
-  type?: string;
-  options?: string[];
-}
-
-interface WorkflowItem {
-  id: string;
-  name: string;
-  path: string;
-  state: string;
-  description: string;
-  triggers: string[];
-  schedules: string[];
-  inputs: Record<string, WorkflowInput>;
-}
 
 interface BranchItem {
   name: string;
@@ -55,18 +27,15 @@ const {
   error: actionsError,
   status: actionsStatus,
   refresh: refreshActions,
-} = useLazyFetch<{
-  data: WorkflowRunItem[];
-  total: number;
-}>(`/api/repos/${props.owner}/${props.repo}/actions`, {
+} = useLazyFetch<WorkflowRunsResponse>(`/api/repos/${props.owner}/${props.repo}/actions`, {
   query: { page: actionsPage, limit: 20 },
 });
-const workflowRuns = computed(() => actionsData.value?.data ?? []);
+const workflowRuns = computed(() => actionsData.value?.workflow_runs ?? []);
 
 // Workflow 列表
-const { data: workflowsData, error: workflowsError, status: workflowsStatus } = useLazyFetch<{
-  data: WorkflowItem[];
-}>(`/api/repos/${props.owner}/${props.repo}/workflows`);
+const { data: workflowsData, error: workflowsError, status: workflowsStatus } = useLazyFetch<WorkflowsResponse>(
+  `/api/repos/${props.owner}/${props.repo}/workflows`,
+);
 const workflows = computed(() => workflowsData.value?.data ?? []);
 
 // 分支列表
@@ -348,7 +317,7 @@ async function createPresetGroup() {
   }
 }
 
-function runStatusColor(status: string, conclusion: string): string {
+function runStatusColor(status: string, conclusion: string | null): string {
   if (status === "queued" || status === "waiting") return "info";
   if (status === "running" || status === "in_progress") return "warning";
   if (conclusion === "success") return "success";
@@ -357,7 +326,7 @@ function runStatusColor(status: string, conclusion: string): string {
   return "info";
 }
 
-function runStatusLabel(status: string, conclusion: string): string {
+function runStatusLabel(status: string, conclusion: string | null): string {
   if (status === "queued") return "排队中";
   if (status === "waiting") return "等待中";
   if (status === "running" || status === "in_progress") return "运行中";
@@ -368,7 +337,7 @@ function runStatusLabel(status: string, conclusion: string): string {
   return status || "未知";
 }
 
-function runStatusIcon(status: string, conclusion: string): string {
+function runStatusIcon(status: string, conclusion: string | null): string {
   if (status === "queued" || status === "waiting") return "i-lucide-clock";
   if (status === "running" || status === "in_progress")
     return "i-lucide-loader";
@@ -379,17 +348,17 @@ function runStatusIcon(status: string, conclusion: string): string {
   return "i-lucide-circle-dot";
 }
 
-function formatDuration(startedAt: string, completedAt: string | null): string {
+function formatDuration(startedAt: string | null, completedAt: string | null): string {
   if (!completedAt) return "";
   const seconds = Math.round(
-    (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000,
+    (new Date(completedAt).getTime() - new Date(startedAt!).getTime()) / 1000,
   );
   if (seconds < 0) return "";
   if (seconds < 60) return `${seconds}s`;
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-function relativeTime(dateStr: string): string {
+function relativeTime(dateStr: string | null): string {
   if (!dateStr) return "";
   const date = new Date(dateStr);
   if (date.getFullYear() <= 1970) return "";
@@ -739,10 +708,10 @@ function workflowFileName(path: string): string {
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="font-medium text-sm truncate">
-                      {{ run.displayTitle }}
+                      {{ run.display_title }}
                     </span>
                     <span class="text-xs text-gray-400 shrink-0">
-                      #{{ run.runNumber }}
+                      #{{ run.run_number }}
                     </span>
                     <UBadge
                       :color="runStatusColor(run.status, run.conclusion) as any"
@@ -770,10 +739,10 @@ function workflowFileName(path: string): string {
                         name="i-lucide-git-branch"
                         class="w-3.5 h-3.5"
                       />
-                      {{ run.headBranch }}
+                      {{ run.head_branch }}
                     </span>
                     <span class="font-mono">{{
-                      run.headSha?.substring(0, 7)
+                      run.head_sha?.substring(0, 7)
                     }}</span>
                     <UBadge
                       color="neutral"
@@ -793,24 +762,24 @@ function workflowFileName(path: string): string {
                       {{ run.actor.login }}
                     </span>
                     <span
-                      v-if="relativeTime(run.startedAt)"
+                      v-if="relativeTime(run.started_at)"
                       class="flex items-center gap-1"
                     >
                       <UIcon
                         name="i-lucide-clock"
                         class="w-3.5 h-3.5"
                       />
-                      {{ relativeTime(run.startedAt) }}
+                      {{ relativeTime(run.started_at) }}
                     </span>
                     <span
-                      v-if="formatDuration(run.startedAt, run.completedAt)"
+                      v-if="formatDuration(run.started_at, run.completed_at)"
                       class="flex items-center gap-1"
                     >
                       <UIcon
                         name="i-lucide-timer"
                         class="w-3.5 h-3.5"
                       />
-                      {{ formatDuration(run.startedAt, run.completedAt) }}
+                      {{ formatDuration(run.started_at, run.completed_at) }}
                     </span>
                   </div>
                 </div>

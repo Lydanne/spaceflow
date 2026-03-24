@@ -57,18 +57,8 @@ const repoFullName = computed(() => data.value.repository.full_name);
 const repoOwner = computed(() => repoFullName.value.split("/")[0] || "");
 const repoName = computed(() => repoFullName.value.split("/")[1] || "");
 
-// 转换 jobs 为 JobInfo 格式
-const jobsForPanel = computed<JobInfo[]>(() => {
-  const jobs = statusData.value?.run?.jobs || [];
-  return jobs.map((j) => ({
-    id: j.id,
-    name: j.name,
-    status: j.status,
-    conclusion: j.conclusion,
-    startedAt: j.started_at,
-    completedAt: j.completed_at,
-  }));
-});
+// jobs 直接使用，无需转换
+const jobsForPanel = computed<JobInfo[]>(() => statusData.value?.run?.jobs || []);
 
 // 切换日志面板
 function toggleLogs() {

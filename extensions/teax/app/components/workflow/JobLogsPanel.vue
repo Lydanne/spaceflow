@@ -6,9 +6,9 @@ export interface JobInfo {
   name: string;
   status: string;
   conclusion: string | null;
-  startedAt?: string | null;
-  completedAt?: string | null;
-  runnerName?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  runner_name?: string | null;
 }
 
 const props = withDefaults(
@@ -197,10 +197,10 @@ function runStatusIcon(status: string, conclusion: string | null): string {
   return "i-lucide-circle-dot";
 }
 
-function formatDuration(startedAt?: string | null, completedAt?: string | null): string {
-  if (!startedAt || !completedAt) return "";
+function formatDuration(started_at?: string | null, completed_at?: string | null): string {
+  if (!started_at || !completed_at) return "";
   const seconds = Math.round(
-    (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000,
+    (new Date(completed_at).getTime() - new Date(started_at).getTime()) / 1000,
   );
   if (seconds < 0) return "";
   if (seconds < 60) return `${seconds}s`;
@@ -316,10 +316,10 @@ defineExpose({
           />
           <span class="truncate flex-1">{{ job.name }}</span>
           <span
-            v-if="formatDuration(job.startedAt, job.completedAt)"
+            v-if="formatDuration(job.started_at, job.completed_at)"
             class="text-xs text-gray-400 shrink-0"
           >
-            {{ formatDuration(job.startedAt, job.completedAt) }}
+            {{ formatDuration(job.started_at, job.completed_at) }}
           </span>
         </button>
       </nav>
@@ -335,17 +335,17 @@ defineExpose({
           </h3>
           <div class="flex items-center gap-2 text-xs text-gray-400">
             <span
-              v-if="activeJob.runnerName"
+              v-if="activeJob.runner_name"
               class="flex items-center gap-1"
             >
               <UIcon
                 name="i-lucide-server"
                 class="w-3.5 h-3.5"
               />
-              {{ activeJob.runnerName }}
+              {{ activeJob.runner_name }}
             </span>
-            <span v-if="formatDuration(activeJob.startedAt, activeJob.completedAt)">
-              {{ formatDuration(activeJob.startedAt, activeJob.completedAt) }}
+            <span v-if="formatDuration(activeJob.started_at, activeJob.completed_at)">
+              {{ formatDuration(activeJob.started_at, activeJob.completed_at) }}
             </span>
             <div class="flex justify-end">
               <UButton

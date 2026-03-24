@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { JobInfo } from "~/components/workflow/JobLogsPanel.vue";
+import type { WorkflowRunDetail, JobsResponse } from "~~/server/shared/dto";
 
 const props = defineProps<{
   owner: string;
@@ -9,66 +10,26 @@ const props = defineProps<{
 const route = useRoute();
 const runId = computed(() => route.params.runId as string);
 
-interface JobItem {
-  id: number;
-  runId: number;
-  name: string;
-  status: string;
-  conclusion: string;
-  startedAt: string;
-  completedAt: string | null;
-  runnerName: string | null;
-  labels: string[];
-  steps: unknown[];
-}
-
-interface RunDetail {
-  id: number;
-  runNumber: number;
-  displayTitle: string;
-  status: string;
-  conclusion: string;
-  event: string;
-  headBranch: string;
-  headSha: string;
-  path: string;
-  htmlUrl: string;
-  startedAt: string;
-  completedAt: string | null;
-  workflowId: number;
-  actor: { login: string; avatar_url: string } | null;
-}
-
 const {
   data: runData,
   status: runStatus,
   error: runError,
-} = useLazyFetch<RunDetail>(
+} = useLazyFetch<WorkflowRunDetail>(
   () => `/api/repos/${props.owner}/${props.repo}/actions/runs/${runId.value}`,
 );
 
 const {
   data: jobsData,
   status: jobsStatus,
-} = useLazyFetch<{ total: number; data: JobItem[] }>(
+} = useLazyFetch<JobsResponse>(
   () => `/api/repos/${props.owner}/${props.repo}/actions/runs/${runId.value}/jobs`,
 );
 
-const jobs = computed<JobInfo[]>(() =>
-  (jobsData.value?.data ?? []).map((j) => ({
-    id: j.id,
-    name: j.name,
-    status: j.status,
-    conclusion: j.conclusion,
-    startedAt: j.startedAt,
-    completedAt: j.completedAt,
-    runnerName: j.runnerName,
-  })),
-);
+const jobs = computed<JobInfo[]>(() => jobsData.value?.jobs ?? []);
 const isLoading = computed(() => runStatus.value === "pending" || jobsStatus.value === "pending");
 
 // 辅助函数
-function runStatusColor(status: string, conclusion: string): string {
+function runStatusColor(status: string, conclusion: string | null): string {
   if (status === "queued" || status === "waiting") return "info";
   if (status === "running" || status === "in_progress") return "warning";
   if (conclusion === "success") return "success";
@@ -77,7 +38,7 @@ function runStatusColor(status: string, conclusion: string): string {
   return "info";
 }
 
-function runStatusLabel(status: string, conclusion: string): string {
+function runStatusLabel(status: string, conclusion: string | null): string {
   if (status === "queued") return "排队中";
   if (status === "waiting") return "等待中";
   if (status === "running" || status === "in_progress") return "运行中";
@@ -88,7 +49,7 @@ function runStatusLabel(status: string, conclusion: string): string {
   return status || "未知";
 }
 
-function runStatusIcon(status: string, conclusion: string): string {
+function runStatusIcon(status: string, conclusion: string | null): string {
   if (status === "queued" || status === "waiting") return "i-lucide-clock";
   if (status === "running" || status === "in_progress") return "i-lucide-loader";
   if (conclusion === "success") return "i-lucide-check-circle";
@@ -98,8 +59,8 @@ function runStatusIcon(status: string, conclusion: string): string {
   return "i-lucide-circle-dot";
 }
 
-function formatDuration(startedAt: string, completedAt: string | null): string {
-  if (!completedAt) return "";
+function formatDuration(startedAt: string | null, completedAt: string | null): string {
+  if (!startedAt || !completedAt) return "";
   const seconds = Math.round(
     (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000,
   );
@@ -108,7 +69,7 @@ function formatDuration(startedAt: string, completedAt: string | null): string {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-function relativeTime(dateStr: string): string {
+function relativeTime(dateStr: string | null): string {
   if (!dateStr) return "";
   const date = new Date(dateStr);
   if (date.getFullYear() <= 1970) return "";
@@ -190,8 +151,8 @@ function eventLabel(event: string): string {
             />
             <div>
               <h2 class="text-lg font-semibold">
-                {{ runData.displayTitle }}
-                <span class="text-sm font-normal text-gray-400 ml-2">#{{ runData.runNumber }}</span>
+                {{ runData.display_title }}
+                <span class="text-sm font-normal text-gray-400 ml-2">#{{ runData.run_number }}</span>
               </h2>
               <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-gray-500 dark:text-gray-400">
                 <UBadge
@@ -206,9 +167,9 @@ function eventLabel(event: string): string {
                     name="i-lucide-git-branch"
                     class="w-4 h-4"
                   />
-                  {{ runData.headBranch }}
+                  {{ runData.head_branch }}
                 </span>
-                <span class="font-mono text-xs">{{ runData.headSha?.substring(0, 7) }}</span>
+                <span class="font-mono text-xs">{{ runData.head_sha?.substring(0, 7) }}</span>
                 <UBadge
                   color="neutral"
                   variant="subtle"
@@ -227,24 +188,24 @@ function eventLabel(event: string): string {
                   {{ runData.actor.login }}
                 </span>
                 <span
-                  v-if="relativeTime(runData.startedAt)"
+                  v-if="relativeTime(runData.started_at)"
                   class="flex items-center gap-1"
                 >
                   <UIcon
                     name="i-lucide-clock"
                     class="w-4 h-4"
                   />
-                  {{ relativeTime(runData.startedAt) }}
+                  {{ relativeTime(runData.started_at) }}
                 </span>
                 <span
-                  v-if="formatDuration(runData.startedAt, runData.completedAt)"
+                  v-if="formatDuration(runData.started_at, runData.completed_at)"
                   class="flex items-center gap-1"
                 >
                   <UIcon
                     name="i-lucide-timer"
                     class="w-4 h-4"
                   />
-                  {{ formatDuration(runData.startedAt, runData.completedAt) }}
+                  {{ formatDuration(runData.started_at, runData.completed_at) }}
                 </span>
               </div>
             </div>
@@ -273,7 +234,7 @@ function eventLabel(event: string): string {
               重新运行
             </UButton> -->
             <a
-              :href="runData.htmlUrl"
+              :href="runData.html_url"
               target="_blank"
               rel="noopener noreferrer"
             >

@@ -6,3 +6,4 @@ export * from "./audit.dto";
 export * from "./common.dto";
 export * from "./approval.dto";
 export * from "./workflow-preset.dto";
+export * from "./actions.dto";
