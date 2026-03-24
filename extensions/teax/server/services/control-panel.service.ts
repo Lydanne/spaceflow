@@ -436,7 +436,7 @@ export async function handleControlPanelAction(
       const baseUrl = config.public.appUrl;
 
       const gitea = useGiteaSdk();
-      let runs: any[] = [];
+      let runs: GiteaWorkflowRun[] = [];
 
       try {
         const giteaService = await gitea.role("admin");
