@@ -233,13 +233,34 @@ function saveInputs() {
 const isLocking = ref(false);
 const isUnlocking = ref(false);
 
+// 本地锁定状态（用于覆盖 props，避免直接修改 props）
+const localLockInfo = ref<{
+  locked_by: string;
+  locked_at: string;
+  auto_unlock_at: string | null;
+} | null>(null);
+
+// 合并后的锁定状态
+const lockState = computed(() => {
+  if (localLockInfo.value) {
+    return localLockInfo.value;
+  }
+  if (props.data.preset.locked_by) {
+    return {
+      locked_by: props.data.preset.locked_by,
+      locked_at: props.data.preset.locked_at || "",
+      auto_unlock_at: props.data.preset.auto_unlock_at || null,
+    };
+  }
+  return null;
+});
+
 // 是否是子预设（属于某个 group）
 const isSubPreset = computed(() => !!props.data.group);
 
 // 当前用户是否锁定了此预设
 const isLockedByMe = computed(() => {
-  // 这里简化处理，实际应该比较 locked_by 和当前用户 ID
-  return !!props.data.preset.locked_by;
+  return !!lockState.value?.locked_by;
 });
 
 async function lockPreset() {
@@ -337,11 +358,9 @@ async function triggerRun() {
       currentRunId.value = result.run_id;
     }
 
-    // 如果返回了锁定信息，更新 UI 状态
+    // 如果返回了锁定信息，更新本地状态
     if (result.lockInfo) {
-      props.data.preset.locked_by = result.lockInfo.locked_by;
-      props.data.preset.locked_at = result.lockInfo.locked_at;
-      props.data.preset.auto_unlock_at = result.lockInfo.auto_unlock_at;
+      localLockInfo.value = result.lockInfo;
     }
 
     // 刷新状态并开始轮询
@@ -541,7 +560,7 @@ function formatHistoryTime(dateStr: string): string {
 
         <!-- 子预设锁定状态 -->
         <div v-if="isSubPreset" class="flex items-center gap-2">
-          <template v-if="data.preset.locked_by">
+          <template v-if="lockState">
             <span
               class="inline-flex items-center gap-1 px-2 py-0.5 bg-warning-100 dark:bg-warning-900/30 text-warning-600 dark:text-warning-400 rounded text-xs font-medium"
             >
@@ -549,10 +568,10 @@ function formatHistoryTime(dateStr: string): string {
               已锁定
             </span>
             <span
-              v-if="data.preset.auto_unlock_at"
+              v-if="lockState.auto_unlock_at"
               class="text-xs text-gray-400"
             >
-              {{ new Date(data.preset.auto_unlock_at).toLocaleTimeString() }}
+              {{ new Date(lockState.auto_unlock_at).toLocaleTimeString() }}
             </span>
             <UButton
               size="xs"
