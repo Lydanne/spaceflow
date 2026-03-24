@@ -9,6 +9,7 @@ const addPresetBodySchema = z.object({
   branch: z.string().optional(),
   inputs: z.record(z.string(), z.union([z.string(), z.boolean(), z.number()])).optional(),
   locked_inputs: z.array(z.string()).optional(),
+  allow_branch_override: z.boolean().optional(),
 });
 
 /**
@@ -93,6 +94,7 @@ export default defineEventHandler(async (event) => {
       branch: newBranch,
       inputs: newInputs,
       locked_inputs: body.locked_inputs || [],
+      allow_branch_override: body.allow_branch_override ?? false,
       share_token: nanoid(16),
       created_by: session.user.id,
       group_id: group.id,
