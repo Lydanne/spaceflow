@@ -384,7 +384,7 @@ registerCommand({
     }
 
     const config = useRuntimeConfig();
-    const baseUrl = config.public.siteUrl || "https://teax.example.com";
+    const baseUrl = config.public.appUrl;
 
     const settings = [
       `${binding.notify_publish ? "✅" : "❌"} 发布通知`,
@@ -526,7 +526,7 @@ registerCommand({
 
     if (groups.length === 0) {
       const config = useRuntimeConfig();
-      const baseUrl = config.public.siteUrl || "https://teax.example.com";
+      const baseUrl = config.public.appUrl;
 
       const card: FeishuInteractiveCard = {
         header: {
@@ -558,7 +558,7 @@ registerCommand({
     }
 
     const config = useRuntimeConfig();
-    const baseUrl = config.public.siteUrl || "https://teax.example.com";
+    const baseUrl = config.public.appUrl;
 
     const lines = groups.map((g) => {
       const shareUrl = g.share_token ? `${baseUrl}/workflow-groups/${g.share_token}` : "";

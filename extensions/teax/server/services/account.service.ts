@@ -367,7 +367,7 @@ export async function handleAccountAction(
 
     case "view_binding_guide": {
       const config = useRuntimeConfig();
-      const baseUrl = config.public.siteUrl || "https://teax.example.com";
+      const baseUrl = config.public.appUrl;
 
       return {
         header: {

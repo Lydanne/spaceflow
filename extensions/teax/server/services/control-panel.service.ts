@@ -256,7 +256,7 @@ export async function generateRepoFunctionMenu(
   repo: string,
 ): Promise<FeishuInteractiveCard> {
   const config = useRuntimeConfig();
-  const baseUrl = config.public.siteUrl || "https://teax.example.com";
+  const baseUrl = config.public.appUrl;
 
   return {
     header: {
@@ -417,7 +417,7 @@ export async function handleControlPanelAction(
       const owner = action.owner as string;
       const repo = action.repo as string;
       const config = useRuntimeConfig();
-      const baseUrl = config.public.siteUrl || "https://teax.example.com";
+      const baseUrl = config.public.appUrl;
 
       const pathMap: Record<string, string> = {
         open_actions: "actions",
