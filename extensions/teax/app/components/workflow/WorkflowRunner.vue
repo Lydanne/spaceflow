@@ -1,4 +1,20 @@
 <script setup lang="ts">
+import {
+  useWorkflowStatus,
+  jobStatusColor,
+  jobStatusIcon,
+  overallStatusLabel,
+  formatDuration,
+} from "~/composables/useWorkflowStatus";
+import { usePresetLock, type LockInfo } from "~/composables/usePresetLock";
+import {
+  usePresetHistory,
+  actionLabel,
+  actionIcon,
+  actionColor,
+  formatHistoryTime,
+} from "~/composables/usePresetHistory";
+
 interface WorkflowInputDef {
   description?: string;
   required?: boolean;
@@ -19,7 +35,6 @@ interface PresetData {
     allow_input_override: boolean;
     locked_inputs: string[];
     allow_branch_override: boolean;
-    // 子预设锁定状态
     locked_by?: string | null;
     locked_at?: string | null;
     auto_unlock_at?: string | null;
@@ -40,153 +55,66 @@ interface PresetData {
   };
 }
 
-interface RunJob {
-  id: number;
-  name: string;
-  status: string;
-  conclusion: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-}
-
-interface RunStatus {
-  hasRunning: boolean;
-  run: {
-    id: number;
-    run_number: number;
-    status: string;
-    conclusion: string | null;
-    started_at: string | null;
-    completed_at: string | null;
-    html_url: string | null;
-    jobs: RunJob[];
-  } | null;
-  triggeredBy: {
-    id: string;
-    name: string;
-    avatar_url: string | null;
-  } | null;
-}
-
-interface HistoryItem {
-  id: string;
-  action: string;
-  actor_id: string | null;
-  details: Record<string, unknown> | null;
-  created_at: string;
-  actor_name: string | null;
-  actor_avatar: string | null;
-}
-
 const props = defineProps<{
   data: PresetData;
   statusUrl?: string;
   runUrl: string;
-  // 直接触发模式：发送 workflow_id 和 ref 而不是 inputs 和 branch
   directMode?: boolean;
-  // 直接模式下获取运行详情的 URL 前缀，如 /api/repos/owner/repo/actions/runs
   runDetailUrlPrefix?: string;
-  // 嵌入模式：用于 Tab 内显示，使用紧凑布局
   embedded?: boolean;
 }>();
 
 const toast = useToast();
 
-// 获取运行状态
-const statusData = ref<RunStatus | null>(null);
-const pollingInterval = ref<ReturnType<typeof setInterval> | null>(null);
-const currentRunId = ref<number | null>(null);
+// 是否是子预设（属于某个 group）
+const isSubPreset = computed(() => !!props.data.group);
 
-async function refreshStatus() {
-  try {
-    if (props.statusUrl) {
-      // 预设模式：使用 statusUrl
-      statusData.value = await $fetch<RunStatus>(props.statusUrl);
-    } else if (
-      props.directMode &&
-      currentRunId.value &&
-      props.runDetailUrlPrefix
-    ) {
-      // 直接模式：使用 runDetailUrlPrefix + runId
-      const runDetail = await $fetch<{
-        id: number;
-        runNumber: number;
-        status: string;
-        conclusion: string | null;
-        startedAt: string | null;
-        completedAt: string | null;
-        htmlUrl: string | null;
-      }>(`${props.runDetailUrlPrefix}/${currentRunId.value}`);
-
-      // 获取 jobs
-      let jobs: RunJob[] = [];
-      try {
-        const jobsResult = await $fetch<{ jobs: RunJob[] }>(
-          `${props.runDetailUrlPrefix}/${currentRunId.value}/jobs`,
-        );
-        jobs = jobsResult.jobs || [];
-      } catch {
-        // 忽略
-      }
-
-      statusData.value = {
-        hasRunning:
-          runDetail.status === "running" ||
-          runDetail.status === "queued" ||
-          runDetail.status === "waiting",
-        run: {
-          id: runDetail.id,
-          run_number: runDetail.runNumber,
-          status: runDetail.status,
-          conclusion: runDetail.conclusion,
-          started_at: runDetail.startedAt,
-          completed_at: runDetail.completedAt,
-          html_url: runDetail.htmlUrl,
-          jobs,
-        },
-        triggeredBy: null,
-      };
-    }
-  } catch {
-    // 忽略
-  }
-}
-
-function startPolling() {
-  stopPolling();
-  pollingInterval.value = setInterval(() => {
-    refreshStatus();
-  }, 3000);
-}
-
-function stopPolling() {
-  if (pollingInterval.value) {
-    clearInterval(pollingInterval.value);
-    pollingInterval.value = null;
-  }
-}
-
-// 初始加载状态
-onMounted(() => {
-  if (props.statusUrl) {
-    refreshStatus();
-  }
+// 运行状态管理
+const {
+  statusData,
+  refreshStatus,
+  startPolling,
+  setCurrentRunId,
+} = useWorkflowStatus({
+  statusUrl: props.statusUrl,
+  directMode: props.directMode,
+  runDetailUrlPrefix: props.runDetailUrlPrefix,
 });
 
-// 当有运行中的任务时开始轮询
-watch(
-  () => statusData.value?.hasRunning,
-  (hasRunning) => {
-    if (hasRunning) {
-      startPolling();
-    } else {
-      stopPolling();
-    }
-  },
-);
+// 锁定状态管理
+const initialLockInfo = computed<LockInfo | null>(() => {
+  if (props.data.preset.locked_by) {
+    return {
+      locked_by: props.data.preset.locked_by,
+      locked_at: props.data.preset.locked_at || "",
+      auto_unlock_at: props.data.preset.auto_unlock_at || null,
+    };
+  }
+  return null;
+});
 
-onUnmounted(() => {
-  stopPolling();
+const {
+  isLocking,
+  isUnlocking,
+  lockState,
+  updateLockInfo,
+  lock: lockPreset,
+  unlock: unlockPreset,
+} = usePresetLock({
+  shareToken: props.data.preset.share_token,
+  initialLockInfo: initialLockInfo.value,
+  isSubPreset,
+});
+
+// 操作历史管理
+const {
+  historyData,
+  loadingHistory,
+  showHistory,
+  toggleHistory,
+} = usePresetHistory({
+  shareToken: props.data.preset.share_token,
+  isSubPreset,
 });
 
 // 用户可修改的输入值
@@ -229,79 +157,12 @@ function saveInputs() {
   showEditInputsModal.value = false;
 }
 
-// 子预设锁定/解锁
-const isLocking = ref(false);
-const isUnlocking = ref(false);
-
-// 本地锁定状态（用于覆盖 props，避免直接修改 props）
-const localLockInfo = ref<{
-  locked_by: string;
-  locked_at: string;
-  auto_unlock_at: string | null;
-} | null>(null);
-
-// 合并后的锁定状态
-const lockState = computed(() => {
-  if (localLockInfo.value) {
-    return localLockInfo.value;
-  }
-  if (props.data.preset.locked_by) {
-    return {
-      locked_by: props.data.preset.locked_by,
-      locked_at: props.data.preset.locked_at || "",
-      auto_unlock_at: props.data.preset.auto_unlock_at || null,
-    };
-  }
-  return null;
+// 是否有可编辑的参数（任何参数未被锁定）
+const hasEditableInputs = computed(() => {
+  const inputKeys = Object.keys(props.data.preset.inputs || {});
+  const lockedInputs = props.data.preset.locked_inputs || [];
+  return inputKeys.some((key) => !lockedInputs.includes(key));
 });
-
-// 是否是子预设（属于某个 group）
-const isSubPreset = computed(() => !!props.data.group);
-
-// 当前用户是否锁定了此预设
-const isLockedByMe = computed(() => {
-  return !!lockState.value?.locked_by;
-});
-
-async function lockPreset() {
-  isLocking.value = true;
-  try {
-    await $fetch(`/api/workflow-presets/${props.data.preset.share_token}/lock`, {
-      method: "POST",
-    });
-    toast.add({ title: "已锁定预设", color: "success" });
-    // 刷新页面以获取最新状态
-    window.location.reload();
-  } catch (err) {
-    toast.add({
-      title:
-        (err as { data?: { message?: string } })?.data?.message || "锁定失败",
-      color: "error",
-    });
-  } finally {
-    isLocking.value = false;
-  }
-}
-
-async function unlockPreset() {
-  isUnlocking.value = true;
-  try {
-    await $fetch(`/api/workflow-presets/${props.data.preset.share_token}/unlock`, {
-      method: "POST",
-    });
-    toast.add({ title: "已解锁预设", color: "success" });
-    // 刷新页面以获取最新状态
-    window.location.reload();
-  } catch (err) {
-    toast.add({
-      title:
-        (err as { data?: { message?: string } })?.data?.message || "解锁失败",
-      color: "error",
-    });
-  } finally {
-    isUnlocking.value = false;
-  }
-}
 
 // 触发运行
 const isTriggering = ref(false);
@@ -316,16 +177,13 @@ async function triggerRun() {
   try {
     let body: Record<string, unknown>;
     if (props.directMode) {
-      // 直接触发模式：发送 workflow_id, ref, inputs
       body = {
         workflow_id: props.data.preset.workflow_path,
         ref: overrideBranch.value,
         inputs: overrideInputs.value,
       };
     } else {
-      // 预设模式：发送 inputs 和 branch（可选）
       body = {};
-      // 只发送未锁定的参数
       if (hasEditableInputs.value) {
         const lockedInputs = props.data.preset.locked_inputs || [];
         const editableInputs: Record<string, string> = {};
@@ -353,17 +211,14 @@ async function triggerRun() {
     }>(props.runUrl, { method: "POST", body });
     toast.add({ title: "工作流已触发", color: "success" });
 
-    // 保存 run_id 并开始轮询
     if (result.run_id) {
-      currentRunId.value = result.run_id;
+      setCurrentRunId(result.run_id);
     }
 
-    // 如果返回了锁定信息，更新本地状态
     if (result.lockInfo) {
-      localLockInfo.value = result.lockInfo;
+      updateLockInfo(result.lockInfo);
     }
 
-    // 刷新状态并开始轮询
     if (
       props.statusUrl ||
       (props.directMode && result.run_id && props.runDetailUrlPrefix)
@@ -378,133 +233,6 @@ async function triggerRun() {
   } finally {
     isTriggering.value = false;
   }
-}
-
-// 状态颜色和图标
-function jobStatusColor(status: string, conclusion: string | null): string {
-  if (status === "queued" || status === "waiting") return "info";
-  if (status === "running" || status === "in_progress") return "warning";
-  if (conclusion === "success") return "success";
-  if (conclusion === "failure") return "error";
-  if (conclusion === "cancelled") return "neutral";
-  return "info";
-}
-
-function jobStatusIcon(status: string, conclusion: string | null): string {
-  if (status === "queued" || status === "waiting") return "i-lucide-clock";
-  if (status === "running" || status === "in_progress")
-    return "i-lucide-loader";
-  if (conclusion === "success") return "i-lucide-check-circle";
-  if (conclusion === "failure") return "i-lucide-x-circle";
-  if (conclusion === "cancelled") return "i-lucide-ban";
-  return "i-lucide-circle-dot";
-}
-
-function overallStatusLabel(status: string, conclusion: string | null): string {
-  if (status === "queued") return "排队中";
-  if (status === "waiting") return "等待中";
-  if (status === "running" || status === "in_progress") return "运行中";
-  if (conclusion === "success") return "成功";
-  if (conclusion === "failure") return "失败";
-  if (conclusion === "cancelled") return "已取消";
-  return "未知";
-}
-
-function formatDuration(
-  startedAt: string | null,
-  completedAt: string | null,
-): string {
-  if (!startedAt || !completedAt) return "";
-  const seconds = Math.round(
-    (new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000,
-  );
-  if (seconds < 0) return "";
-  if (seconds < 60) return `${seconds}s`;
-  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
-}
-
-// 是否有可编辑的参数（任何参数未被锁定）
-const hasEditableInputs = computed(() => {
-  const inputKeys = Object.keys(props.data.preset.inputs || {});
-  const lockedInputs = props.data.preset.locked_inputs || [];
-  // 如果有任何参数未被锁定，则可以编辑
-  return inputKeys.some((key) => !lockedInputs.includes(key));
-});
-
-// 操作历史
-const historyData = ref<HistoryItem[]>([]);
-const loadingHistory = ref(false);
-const showHistory = ref(false);
-
-async function loadHistory() {
-  if (!isSubPreset.value) return;
-  loadingHistory.value = true;
-  try {
-    const result = await $fetch<{ history: HistoryItem[] }>(
-      `/api/workflow-presets/${props.data.preset.share_token}/history`,
-    );
-    historyData.value = result.history;
-  } catch (err) {
-    console.error("Failed to load history:", err);
-  } finally {
-    loadingHistory.value = false;
-  }
-}
-
-function toggleHistory() {
-  showHistory.value = !showHistory.value;
-  if (showHistory.value && historyData.value.length === 0) {
-    loadHistory();
-  }
-}
-
-// 操作类型的显示文本和图标
-function actionLabel(action: string): string {
-  switch (action) {
-    case "lock": return "锁定";
-    case "unlock": return "解锁";
-    case "trigger": return "触发运行";
-    case "create": return "创建";
-    case "update": return "更新配置";
-    default: return action;
-  }
-}
-
-function actionIcon(action: string): string {
-  switch (action) {
-    case "lock": return "i-lucide-lock";
-    case "unlock": return "i-lucide-unlock";
-    case "trigger": return "i-lucide-play";
-    case "create": return "i-lucide-plus";
-    case "update": return "i-lucide-pencil";
-    default: return "i-lucide-activity";
-  }
-}
-
-function actionColor(action: string): string {
-  switch (action) {
-    case "lock": return "text-amber-500";
-    case "unlock": return "text-green-500";
-    case "trigger": return "text-blue-500";
-    case "create": return "text-purple-500";
-    case "update": return "text-gray-500";
-    default: return "text-gray-400";
-  }
-}
-
-function formatHistoryTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "刚刚";
-  if (diffMins < 60) return `${diffMins} 分钟前`;
-  if (diffHours < 24) return `${diffHours} 小时前`;
-  if (diffDays < 7) return `${diffDays} 天前`;
-  return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
 }
 </script>
 
