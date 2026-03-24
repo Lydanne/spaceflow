@@ -300,6 +300,97 @@ async function savePreferences() {
       </div>
     </UCard>
 
+    <!-- 飞书绑定 -->
+    <UCard class="mb-6">
+      <template #header>
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">
+            飞书绑定
+          </h2>
+          <UBadge
+            :color="binding ? 'success' : 'neutral'"
+            variant="subtle"
+          >
+            {{ binding ? '已绑定' : '未绑定' }}
+          </UBadge>
+        </div>
+      </template>
+
+      <div v-if="binding">
+        <div class="space-y-4">
+          <div class="flex items-center gap-4">
+            <UAvatar
+              :src="binding.feishu_avatar || undefined"
+              :alt="binding.feishu_name"
+              size="lg"
+            />
+            <div class="flex-1">
+              <p class="font-medium">
+                {{ binding.feishu_name }}
+              </p>
+              <p class="text-xs text-gray-400 font-mono">
+                {{ binding.feishu_open_id }}
+              </p>
+            </div>
+          </div>
+
+          <USeparator />
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                绑定时间
+              </p>
+              <p class="text-sm mt-1">
+                {{ new Date(binding.created_at).toLocaleString('zh-CN') }}
+              </p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                绑定 ID
+              </p>
+              <p class="font-mono text-xs mt-1">
+                {{ binding.id }}
+              </p>
+            </div>
+          </div>
+
+          <div class="pt-2">
+            <UButton
+              color="error"
+              variant="outline"
+              size="sm"
+              icon="i-lucide-unlink"
+              :loading="unbinding"
+              @click="unbindFeishu"
+            >
+              解绑飞书账号
+            </UButton>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-else
+        class="text-center py-6"
+      >
+        <UIcon
+          name="i-lucide-message-square"
+          class="w-10 h-10 mx-auto mb-3 text-gray-400"
+        />
+        <p class="text-gray-500 dark:text-gray-400 mb-4">
+          绑定飞书账号以接收构建通知、审批提醒和机器人交互
+        </p>
+        <UButton
+          color="primary"
+          icon="i-lucide-link"
+          @click="bindFeishu"
+        >
+          绑定飞书账号
+        </UButton>
+      </div>
+    </UCard>
+
     <!-- 我的团队 -->
     <UCard class="mb-6">
       <template #header>
@@ -467,97 +558,6 @@ async function savePreferences() {
             </div>
           </div>
         </div>
-      </div>
-    </UCard>
-
-    <!-- 飞书绑定 -->
-    <UCard class="mb-6">
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">
-            飞书绑定
-          </h2>
-          <UBadge
-            :color="binding ? 'success' : 'neutral'"
-            variant="subtle"
-          >
-            {{ binding ? '已绑定' : '未绑定' }}
-          </UBadge>
-        </div>
-      </template>
-
-      <div v-if="binding">
-        <div class="space-y-4">
-          <div class="flex items-center gap-4">
-            <UAvatar
-              :src="binding.feishu_avatar || undefined"
-              :alt="binding.feishu_name"
-              size="lg"
-            />
-            <div class="flex-1">
-              <p class="font-medium">
-                {{ binding.feishu_name }}
-              </p>
-              <p class="text-xs text-gray-400 font-mono">
-                {{ binding.feishu_open_id }}
-              </p>
-            </div>
-          </div>
-
-          <USeparator />
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p class="text-sm text-gray-500 dark:text-gray-400">
-                绑定时间
-              </p>
-              <p class="text-sm mt-1">
-                {{ new Date(binding.created_at).toLocaleString('zh-CN') }}
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500 dark:text-gray-400">
-                绑定 ID
-              </p>
-              <p class="font-mono text-xs mt-1">
-                {{ binding.id }}
-              </p>
-            </div>
-          </div>
-
-          <div class="pt-2">
-            <UButton
-              color="error"
-              variant="outline"
-              size="sm"
-              icon="i-lucide-unlink"
-              :loading="unbinding"
-              @click="unbindFeishu"
-            >
-              解绑飞书账号
-            </UButton>
-          </div>
-        </div>
-      </div>
-
-      <div
-        v-else
-        class="text-center py-6"
-      >
-        <UIcon
-          name="i-lucide-message-square"
-          class="w-10 h-10 mx-auto mb-3 text-gray-400"
-        />
-        <p class="text-gray-500 dark:text-gray-400 mb-4">
-          绑定飞书账号以接收构建通知、审批提醒和机器人交互
-        </p>
-        <UButton
-          color="primary"
-          icon="i-lucide-link"
-          @click="bindFeishu"
-        >
-          绑定飞书账号
-        </UButton>
       </div>
     </UCard>
 
