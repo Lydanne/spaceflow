@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireAuth } from "~~/server/utils/auth";
 
@@ -26,7 +26,10 @@ export default defineEventHandler(async (event) => {
       schema.repositories,
       eq(schema.workflowPresets.repository_id, schema.repositories.id),
     )
-    .where(eq(schema.workflowPresets.created_by, session.user.id))
+    .where(and(
+      eq(schema.workflowPresets.created_by, session.user.id),
+      isNull(schema.workflowPresets.group_id),
+    ))
     .orderBy(desc(schema.workflowPresets.created_at));
 
   return { data: presets };

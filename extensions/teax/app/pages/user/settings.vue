@@ -60,11 +60,71 @@ interface WorkflowPreset {
   };
 }
 
+interface SubPreset {
+  id: string;
+  name: string;
+  branch: string;
+  share_token: string;
+  preset_index: number | null;
+  locked_by: string | null;
+  locked_at: string | null;
+  current_run_id: number | null;
+}
+
+interface PresetGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  workflow_path: string;
+  default_branch: string;
+  share_token: string;
+  created_at: string;
+  repository: {
+    id: string;
+    full_name: string;
+  };
+  presets: SubPreset[];
+}
+
+// 独立预设
 const { data: presetsData, refresh: refreshPresets } = await useFetch<{ data: WorkflowPreset[] }>(
   "/api/user/workflow-presets",
   { key: "user-workflow-presets" },
 );
 const presets = computed(() => presetsData.value?.data ?? []);
+
+// 预设组
+const { data: groupsData, refresh: refreshGroups } = await useFetch<{ data: PresetGroup[] }>(
+  "/api/user/workflow-preset-groups",
+  { key: "user-workflow-preset-groups" },
+);
+const presetGroups = computed(() => groupsData.value?.data ?? []);
+
+// 展开的预设组 ID
+const expandedGroupId = ref<string | null>(null);
+function toggleGroup(groupId: string) {
+  expandedGroupId.value = expandedGroupId.value === groupId ? null : groupId;
+}
+
+const deletingGroupId = ref<string | null>(null);
+async function deleteGroup(group: PresetGroup) {
+  const subCount = group.presets.length;
+  const msg = subCount > 0
+    ? `确定删除预设组「${group.name}」及其 ${subCount} 个子预设？删除后分享链接将失效。`
+    : `确定删除预设组「${group.name}」？删除后分享链接将失效。`;
+  if (!confirm(msg)) return;
+  deletingGroupId.value = group.id;
+  try {
+    await $fetch(`/api/user/workflow-preset-groups/${group.id}`, { method: "DELETE" });
+    toast.add({ title: "预设组已删除", color: "success" });
+    await refreshGroups();
+  } catch (err: unknown) {
+    const errMsg = (err as { data?: { message?: string } })?.data?.message || "删除失败";
+    toast.add({ title: errMsg, color: "error" });
+  } finally {
+    deletingGroupId.value = null;
+  }
+}
 
 const deletingPresetId = ref<string | null>(null);
 async function deletePreset(preset: WorkflowPreset) {
@@ -82,8 +142,14 @@ async function deletePreset(preset: WorkflowPreset) {
   }
 }
 
-function copyShareUrl(preset: WorkflowPreset) {
+function copyShareUrl(preset: WorkflowPreset | SubPreset) {
   const url = `${window.location.origin}/workflows/${preset.share_token}`;
+  navigator.clipboard.writeText(url);
+  toast.add({ title: "链接已复制", color: "success" });
+}
+
+function copyGroupShareUrl(group: PresetGroup) {
+  const url = `${window.location.origin}/workflow-groups/${group.share_token}`;
   navigator.clipboard.writeText(url);
   toast.add({ title: "链接已复制", color: "success" });
 }
@@ -502,17 +568,25 @@ async function savePreferences() {
           <h2 class="text-lg font-semibold">
             工作流预设
           </h2>
-          <UBadge
-            color="neutral"
-            variant="subtle"
-          >
-            {{ presets.length }} 个预设
-          </UBadge>
+          <div class="flex items-center gap-2">
+            <UBadge
+              color="neutral"
+              variant="subtle"
+            >
+              {{ presetGroups.length }} 个预设组
+            </UBadge>
+            <UBadge
+              color="neutral"
+              variant="subtle"
+            >
+              {{ presets.length }} 个独立预设
+            </UBadge>
+          </div>
         </div>
       </template>
 
       <div
-        v-if="presets.length === 0"
+        v-if="presetGroups.length === 0 && presets.length === 0"
         class="text-center py-6"
       >
         <UIcon
@@ -523,86 +597,261 @@ async function savePreferences() {
           暂无工作流预设
         </p>
         <p class="text-sm text-gray-400 mt-1">
-          在项目 Actions 页面触发 Workflow 时可保存为预设
+          在项目 Actions 页面可创建预设或预设组
         </p>
       </div>
 
       <div
         v-else
-        class="space-y-3"
+        class="space-y-6"
       >
-        <div
-          v-for="preset in presets"
-          :key="preset.id"
-          class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-        >
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <span class="font-medium truncate">{{ preset.name }}</span>
-              <UBadge
-                v-if="preset.allow_input_override"
-                color="info"
-                variant="subtle"
-                size="xs"
+        <!-- 预设组部分 -->
+        <div v-if="presetGroups.length > 0">
+          <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+            预设组
+          </h3>
+          <div class="space-y-3">
+            <div
+              v-for="group in presetGroups"
+              :key="group.id"
+              class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+            >
+              <!-- 预设组头部 -->
+              <div
+                class="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                @click="toggleGroup(group.id)"
               >
-                可改参数
-              </UBadge>
-              <UBadge
-                v-if="preset.allow_branch_override"
-                color="info"
-                variant="subtle"
-                size="xs"
+                <div class="flex items-center gap-3 flex-1 min-w-0">
+                  <UIcon
+                    name="i-lucide-folder"
+                    class="w-5 h-5 text-primary flex-shrink-0"
+                  />
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium truncate">{{ group.name }}</span>
+                      <UBadge
+                        color="info"
+                        variant="subtle"
+                        size="xs"
+                      >
+                        {{ group.presets.length }} 个子预设
+                      </UBadge>
+                    </div>
+                    <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                      <span class="flex items-center gap-1">
+                        <UIcon
+                          name="i-lucide-folder-git-2"
+                          class="w-3.5 h-3.5"
+                        />
+                        {{ group.repository.full_name }}
+                      </span>
+                      <span class="flex items-center gap-1">
+                        <UIcon
+                          name="i-lucide-git-branch"
+                          class="w-3.5 h-3.5"
+                        />
+                        {{ group.default_branch }}
+                      </span>
+                      <span class="font-mono truncate max-w-[200px]">
+                        {{ group.workflow_path.split('/').pop() }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1 ml-3">
+                  <UButton
+                    icon="i-lucide-copy"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    title="复制分享链接"
+                    @click.stop="copyGroupShareUrl(group)"
+                  />
+                  <UButton
+                    icon="i-lucide-external-link"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    title="打开预设组页面"
+                    :to="`/workflow-groups/${group.share_token}`"
+                    target="_blank"
+                    @click.stop
+                  />
+                  <UButton
+                    icon="i-lucide-trash-2"
+                    color="error"
+                    variant="ghost"
+                    size="xs"
+                    title="删除预设组"
+                    :loading="deletingGroupId === group.id"
+                    @click.stop="deleteGroup(group)"
+                  />
+                  <UIcon
+                    :name="expandedGroupId === group.id ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                    class="w-4 h-4 text-gray-400 ml-2"
+                  />
+                </div>
+              </div>
+
+              <!-- 子预设列表 -->
+              <div
+                v-if="expandedGroupId === group.id"
+                class="border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30"
               >
-                可改分支
-              </UBadge>
-            </div>
-            <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
-              <span class="flex items-center gap-1">
-                <UIcon
-                  name="i-lucide-folder-git-2"
-                  class="w-3.5 h-3.5"
-                />
-                {{ preset.repository.full_name }}
-              </span>
-              <span class="flex items-center gap-1">
-                <UIcon
-                  name="i-lucide-git-branch"
-                  class="w-3.5 h-3.5"
-                />
-                {{ preset.branch }}
-              </span>
-              <span class="font-mono truncate max-w-[200px]">
-                {{ preset.workflow_path.split('/').pop() }}
-              </span>
+                <div
+                  v-if="group.presets.length === 0"
+                  class="p-4 text-center text-sm text-gray-400"
+                >
+                  暂无子预设
+                </div>
+                <div
+                  v-else
+                  class="divide-y divide-gray-200 dark:divide-gray-700"
+                >
+                  <div
+                    v-for="subPreset in group.presets"
+                    :key="subPreset.id"
+                    class="flex items-center justify-between p-3 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
+                  >
+                    <div class="flex items-center gap-3 flex-1 min-w-0">
+                      <span class="text-xs text-gray-400 w-6 text-center">#{{ subPreset.preset_index }}</span>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                          <span class="font-medium truncate">{{ subPreset.name }}</span>
+                          <UBadge
+                            v-if="subPreset.locked_by"
+                            color="warning"
+                            variant="subtle"
+                            size="xs"
+                          >
+                            已锁定
+                          </UBadge>
+                          <UBadge
+                            v-if="subPreset.current_run_id"
+                            color="info"
+                            variant="subtle"
+                            size="xs"
+                          >
+                            运行中
+                          </UBadge>
+                        </div>
+                        <div class="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
+                          <span class="flex items-center gap-1">
+                            <UIcon
+                              name="i-lucide-git-branch"
+                              class="w-3 h-3"
+                            />
+                            {{ subPreset.branch }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-1 ml-3">
+                      <UButton
+                        icon="i-lucide-copy"
+                        color="neutral"
+                        variant="ghost"
+                        size="xs"
+                        title="复制分享链接"
+                        @click="copyShareUrl(subPreset)"
+                      />
+                      <UButton
+                        icon="i-lucide-external-link"
+                        color="neutral"
+                        variant="ghost"
+                        size="xs"
+                        title="打开子预设页面"
+                        :to="`/workflows/${subPreset.share_token}`"
+                        target="_blank"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="flex items-center gap-1 ml-3">
-            <UButton
-              icon="i-lucide-copy"
-              color="neutral"
-              variant="ghost"
-              size="xs"
-              title="复制分享链接"
-              @click="copyShareUrl(preset)"
-            />
-            <UButton
-              icon="i-lucide-external-link"
-              color="neutral"
-              variant="ghost"
-              size="xs"
-              title="打开预设页面"
-              :to="`/workflows/${preset.share_token}`"
-              target="_blank"
-            />
-            <UButton
-              icon="i-lucide-trash-2"
-              color="error"
-              variant="ghost"
-              size="xs"
-              title="删除预设"
-              :loading="deletingPresetId === preset.id"
-              @click="deletePreset(preset)"
-            />
+        </div>
+
+        <!-- 独立预设部分 -->
+        <div v-if="presets.length > 0">
+          <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+            独立预设
+          </h3>
+          <div class="space-y-3">
+            <div
+              v-for="preset in presets"
+              :key="preset.id"
+              class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+            >
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium truncate">{{ preset.name }}</span>
+                  <UBadge
+                    v-if="preset.allow_input_override"
+                    color="info"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    可改参数
+                  </UBadge>
+                  <UBadge
+                    v-if="preset.allow_branch_override"
+                    color="info"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    可改分支
+                  </UBadge>
+                </div>
+                <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                  <span class="flex items-center gap-1">
+                    <UIcon
+                      name="i-lucide-folder-git-2"
+                      class="w-3.5 h-3.5"
+                    />
+                    {{ preset.repository.full_name }}
+                  </span>
+                  <span class="flex items-center gap-1">
+                    <UIcon
+                      name="i-lucide-git-branch"
+                      class="w-3.5 h-3.5"
+                    />
+                    {{ preset.branch }}
+                  </span>
+                  <span class="font-mono truncate max-w-[200px]">
+                    {{ preset.workflow_path.split('/').pop() }}
+                  </span>
+                </div>
+              </div>
+              <div class="flex items-center gap-1 ml-3">
+                <UButton
+                  icon="i-lucide-copy"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  title="复制分享链接"
+                  @click="copyShareUrl(preset)"
+                />
+                <UButton
+                  icon="i-lucide-external-link"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  title="打开预设页面"
+                  :to="`/workflows/${preset.share_token}`"
+                  target="_blank"
+                />
+                <UButton
+                  icon="i-lucide-trash-2"
+                  color="error"
+                  variant="ghost"
+                  size="xs"
+                  title="删除预设"
+                  :loading="deletingPresetId === preset.id"
+                  @click="deletePreset(preset)"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
