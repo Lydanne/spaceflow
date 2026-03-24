@@ -89,6 +89,13 @@ watch(
   { immediate: true },
 );
 
+// 监听分支变化，同步到数据库
+watch(overrideBranch, async (newBranch, oldBranch) => {
+  // 跳过初始化
+  if (!oldBranch || newBranch === oldBranch) return;
+  await syncOverrideToDb();
+});
+
 function openEditInputsModal() {
   const presetInputs = props.data.preset.inputs || {};
   const stringifiedInputs: Record<string, string> = {};
@@ -102,9 +109,28 @@ function openEditInputsModal() {
   showEditInputsModal.value = true;
 }
 
-function saveInputs() {
+async function saveInputs() {
   overrideInputs.value = { ...tempInputs.value };
   showEditInputsModal.value = false;
+  // 如果允许同步，保存到数据库
+  await syncOverrideToDb();
+}
+
+// 同步用户修改到数据库
+async function syncOverrideToDb() {
+  if (!props.data.preset.allow_sync_override) return;
+
+  try {
+    await $fetch(`/api/workflow-presets/${props.data.preset.share_token}/sync`, {
+      method: "POST",
+      body: {
+        branch: overrideBranch.value,
+        inputs: overrideInputs.value,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to sync override:", err);
+  }
 }
 
 // 是否有可编辑的参数（任何参数未被锁定）

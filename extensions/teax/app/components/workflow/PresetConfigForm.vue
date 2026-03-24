@@ -23,6 +23,7 @@ const props = withDefaults(
     showOverrideOptions?: boolean;
     lockedInputs?: string[];
     allowBranchOverride?: boolean;
+    allowSyncOverride?: boolean;
     showPreview?: boolean;
     namePlaceholder?: string;
     branchPlaceholder?: string;
@@ -33,6 +34,7 @@ const props = withDefaults(
     showOverrideOptions: false,
     lockedInputs: () => [],
     allowBranchOverride: false,
+    allowSyncOverride: false,
     showPreview: false,
     namePlaceholder: "预设名称",
     branchPlaceholder: "分支",
@@ -45,6 +47,7 @@ const emit = defineEmits<{
   "update:inputs": [value: Record<string, string>];
   "update:lockedInputs": [value: string[]];
   "update:allowBranchOverride": [value: boolean];
+  "update:allowSyncOverride": [value: boolean];
 }>();
 
 const localName = computed({
@@ -60,6 +63,11 @@ const localBranch = computed({
 const localAllowBranchOverride = computed({
   get: () => props.allowBranchOverride,
   set: (val) => emit("update:allowBranchOverride", val),
+});
+
+const localAllowSyncOverride = computed({
+  get: () => props.allowSyncOverride,
+  set: (val) => emit("update:allowSyncOverride", val),
 });
 
 function updateInputs(newInputs: Record<string, string>) {
@@ -142,6 +150,15 @@ const hasInputs = computed(() => Object.keys(props.inputDefs).length > 0);
           </p>
         </div>
         <USwitch v-model="localAllowBranchOverride" />
+      </div>
+      <div class="flex items-center justify-between">
+        <div>
+          <label class="text-sm font-medium">允许同步用户修改</label>
+          <p class="text-xs text-gray-400">
+            开启后，用户修改的分支和参数会同步保存到数据库
+          </p>
+        </div>
+        <USwitch v-model="localAllowSyncOverride" />
       </div>
     </template>
 

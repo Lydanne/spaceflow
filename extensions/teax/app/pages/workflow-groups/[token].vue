@@ -76,6 +76,7 @@ const newPresetBranch = ref("");
 const newPresetInputs = ref<Record<string, string>>({});
 const newPresetLockedInputs = ref<string[]>([]);
 const newPresetAllowBranchOverride = ref(false);
+const newPresetAllowSyncOverride = ref(false);
 const addingPreset = ref(false);
 
 // 是否是创建者或管理员
@@ -201,6 +202,7 @@ function openAddPresetModal() {
   newPresetInputs.value = initialInputs;
   newPresetLockedInputs.value = [];
   newPresetAllowBranchOverride.value = false;
+  newPresetAllowSyncOverride.value = false;
   showAddPresetModal.value = true;
 }
 
@@ -217,6 +219,7 @@ async function addPreset() {
         inputs: { ...newPresetInputs.value },
         locked_inputs: newPresetLockedInputs.value,
         allow_branch_override: newPresetAllowBranchOverride.value,
+        allow_sync_override: newPresetAllowSyncOverride.value,
       },
     });
     showAddPresetModal.value = false;
@@ -541,6 +544,7 @@ function getStatusText(preset: SubPreset): string {
                 v-model:name="newPresetName"
                 v-model:branch="newPresetBranch"
                 v-model:allow-branch-override="newPresetAllowBranchOverride"
+                v-model:allow-sync-override="newPresetAllowSyncOverride"
                 :inputs="newPresetInputs"
                 :input-defs="groupData?.workflow_inputs || {}"
                 :locked-inputs="newPresetLockedInputs"

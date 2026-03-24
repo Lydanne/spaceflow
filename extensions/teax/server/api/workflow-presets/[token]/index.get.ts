@@ -101,6 +101,7 @@ export default defineEventHandler(async (event) => {
       allow_input_override: preset.allow_input_override ?? false,
       locked_inputs: preset.locked_inputs ?? [],
       allow_branch_override: preset.allow_branch_override ?? false,
+      allow_sync_override: preset.allow_sync_override ?? false,
       // 子预设锁定状态
       locked_by: preset.locked_by,
       locked_at: preset.locked_at,

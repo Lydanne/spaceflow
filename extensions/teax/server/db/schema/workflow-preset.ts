@@ -36,6 +36,7 @@ export const workflowPresets = pgTable(
     allow_input_override: boolean("allow_input_override").default(false), // 已废弃，保留兼容
     locked_inputs: jsonb("locked_inputs").default([]).$type<string[]>(), // 被锁定不可修改的参数名列表
     allow_branch_override: boolean("allow_branch_override").default(false),
+    allow_sync_override: boolean("allow_sync_override").default(false), // 允许用户修改同步到数据库
     created_by: uuid("created_by")
       .notNull()
       .references(() => users.id),

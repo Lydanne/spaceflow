@@ -21,6 +21,7 @@ export interface PresetData {
     allow_input_override: boolean;
     locked_inputs: string[];
     allow_branch_override: boolean;
+    allow_sync_override: boolean;
     locked_by?: string | null;
     locked_at?: string | null;
     auto_unlock_at?: string | null;

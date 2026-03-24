@@ -137,6 +137,7 @@ const showSavePresetModal = ref(false);
 const presetName = ref("");
 const lockedInputs = ref<string[]>([]);
 const allowBranchOverride = ref(false);
+const allowSyncOverride = ref(false);
 const savingPreset = ref(false);
 
 // 创建预设组
@@ -236,6 +237,7 @@ async function savePreset() {
           inputs: { ...inputValues },
           locked_inputs: lockedInputs.value,
           allow_branch_override: allowBranchOverride.value,
+          allow_sync_override: allowSyncOverride.value,
         },
       },
     );
@@ -936,6 +938,7 @@ function workflowFileName(path: string): string {
                 v-model:inputs="inputValues"
                 v-model:locked-inputs="lockedInputs"
                 v-model:allow-branch-override="allowBranchOverride"
+                v-model:allow-sync-override="allowSyncOverride"
                 :input-defs="currentInputs"
                 :branch-options="branchOptions"
                 :workflow-name="selectedWorkflowItem?.name"

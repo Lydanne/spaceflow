@@ -23,6 +23,7 @@ interface PresetData {
     allow_input_override: boolean;
     locked_inputs: string[];
     allow_branch_override: boolean;
+    allow_sync_override: boolean;
     // 子预设锁定状态
     locked_by?: string | null;
     locked_at?: string | null;

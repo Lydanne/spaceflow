@@ -9,6 +9,7 @@ const updatePresetBodySchema = z.object({
   inputs: z.record(z.string(), z.union([z.string(), z.boolean(), z.number()])).optional(),
   locked_inputs: z.array(z.string()).optional(),
   allow_branch_override: z.boolean().optional(),
+  allow_sync_override: z.boolean().optional(),
 });
 
 /**
@@ -88,6 +89,10 @@ export default defineEventHandler(async (event) => {
 
   if (body.allow_branch_override !== undefined) {
     updateData.allow_branch_override = body.allow_branch_override;
+  }
+
+  if (body.allow_sync_override !== undefined) {
+    updateData.allow_sync_override = body.allow_sync_override;
   }
 
   if (Object.keys(updateData).length === 0) {

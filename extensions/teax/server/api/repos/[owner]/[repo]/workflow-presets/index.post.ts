@@ -25,6 +25,7 @@ export default defineEventHandler(async (event) => {
       allow_input_override: body.allow_input_override,
       locked_inputs: body.locked_inputs,
       allow_branch_override: body.allow_branch_override,
+      allow_sync_override: body.allow_sync_override,
       created_by: session.user.id,
     })
     .returning();
