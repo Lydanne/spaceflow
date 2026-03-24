@@ -153,11 +153,11 @@ async function triggerRun() {
     const result = await $fetch<{
       success: boolean;
       run_id?: number;
-      lockInfo?: {
+      lock_info?: {
         locked_by: string;
         locked_at: string;
         auto_unlock_at: string | null;
-      } | null;
+      };
     }>(props.runUrl, { method: "POST", body });
     toast.add({ title: "工作流已触发", color: "success" });
 
@@ -165,8 +165,8 @@ async function triggerRun() {
       setCurrentRunId(result.run_id);
     }
 
-    if (result.lockInfo) {
-      updateLockInfo(result.lockInfo);
+    if (result.lock_info) {
+      updateLockInfo(result.lock_info);
     }
 
     if (

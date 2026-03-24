@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
     default_branch: string | null;
     clone_url: string | null;
     created_at: string | null;
-    htmlUrl: string;
+    html_url: string;
     stars: number;
     forks: number;
     language: string | null;
@@ -66,7 +66,7 @@ export default defineEventHandler(async (event) => {
       default_branch: project.default_branch,
       clone_url: project.clone_url,
       created_at: project.created_at ? new Date(project.created_at).toISOString() : null,
-      htmlUrl: giteaRepo.html_url || "",
+      html_url: giteaRepo.html_url || "",
       stars: giteaRepo.stars_count || 0,
       forks: giteaRepo.forks_count || 0,
       language: giteaRepo.language || null,
@@ -78,7 +78,7 @@ export default defineEventHandler(async (event) => {
       default_branch: project.default_branch,
       clone_url: project.clone_url,
       created_at: project.created_at ? new Date(project.created_at).toISOString() : null,
-      htmlUrl: "",
+      html_url: "",
       stars: 0,
       forks: 0,
       language: null,

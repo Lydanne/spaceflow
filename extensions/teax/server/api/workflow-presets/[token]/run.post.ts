@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
         throw createError({
           statusCode: 409,
           message: "当前有一个正在运行的工作流，请等待完成后再试",
-          data: { runId: currentRun.id, runNumber: currentRun.run_number },
+          data: { run_id: currentRun.id, run_number: currentRun.run_number },
         });
       }
       // 已完成，允许继续触发新的工作流（会覆盖 current_run_id）
@@ -168,8 +168,8 @@ export default defineEventHandler(async (event) => {
   return {
     success: true,
     message: "工作流已触发",
-    runId: newRunId,
-    runNumber: newRunNumber,
-    lockInfo,
+    run_id: newRunId,
+    run_number: newRunNumber,
+    lock_info: lockInfo,
   };
 });

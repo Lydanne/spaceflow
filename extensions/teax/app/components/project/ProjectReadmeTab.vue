@@ -5,7 +5,7 @@ interface RepoInfo {
   default_branch: string | null;
   clone_url: string | null;
   created_at: string | null;
-  htmlUrl: string;
+  html_url: string;
   stars: number;
   forks: number;
   language: string | null;
@@ -72,8 +72,8 @@ function formatDate(dateStr: string | null) {
               </p>
             </div>
             <a
-              v-if="data.repoInfo.htmlUrl"
-              :href="data.repoInfo.htmlUrl"
+              v-if="data.repoInfo.html_url"
+              :href="data.repoInfo.html_url"
               target="_blank"
               class="shrink-0"
             >
