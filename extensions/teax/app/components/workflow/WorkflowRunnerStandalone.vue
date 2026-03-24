@@ -113,19 +113,14 @@ function statusIconClass(status: string, conclusion: string | null): string {
 
       <div class="flex items-center gap-2">
         <USelect
-          v-if="data.preset.allow_branch_override && data.branches.length > 0"
+          v-if="data.branches.length > 0"
           v-model="overrideBranch"
           :items="data.branches.map((b) => ({ label: b, value: b }))"
           value-key="value"
+          :disabled="!data.preset.allow_branch_override"
           size="lg"
+          class="lg:min-w-[228px]"
         />
-        <div v-else class="flex items-center gap-2">
-          <UIcon name="i-lucide-git-branch" class="w-4 h-4 text-gray-400" />
-          <span class="font-mono text-gray-900 dark:text-white">
-            {{ data.preset.branch }}
-          </span>
-          <UBadge variant="subtle" color="neutral" size="xs"> 固定 </UBadge>
-        </div>
         <!-- 运行按钮 -->
         <UButton
           size="lg"
@@ -136,7 +131,7 @@ function statusIconClass(status: string, conclusion: string | null): string {
           class="whitespace-nowrap"
           @click="triggerRun"
         >
-          {{ statusData?.hasRunning ? "运行中..." : "运行工作流" }}
+          {{ statusData?.hasRunning ? "运行中..." : "运行" }}
         </UButton>
       </div>
     </div>
@@ -145,29 +140,6 @@ function statusIconClass(status: string, conclusion: string | null): string {
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左侧：配置区 (2/3) -->
       <div class="lg:col-span-2 space-y-6">
-        <!-- 分支配置 -->
-        <!-- <UCard>
-          <div>
-            <USelect
-              v-if="
-                data.preset.allow_branch_override && data.branches.length > 0
-              "
-              v-model="overrideBranch"
-              :items="data.branches.map((b) => ({ label: b, value: b }))"
-              value-key="value"
-              size="lg"
-              class="w-full"
-            />
-            <div v-else class="flex items-center gap-2">
-              <UIcon name="i-lucide-git-branch" class="w-4 h-4 text-gray-400" />
-              <span class="font-mono text-gray-900 dark:text-white">
-                {{ data.preset.branch }}
-              </span>
-              <UBadge variant="subtle" color="neutral" size="xs"> 固定 </UBadge>
-            </div>
-          </div>
-        </UCard> -->
-
         <!-- 参数配置 -->
         <UCard v-if="Object.keys(data.preset.inputs || {}).length > 0">
           <template #header>

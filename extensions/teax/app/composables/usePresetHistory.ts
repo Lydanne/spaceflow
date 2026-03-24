@@ -18,7 +18,7 @@ export interface UsePresetHistoryOptions {
 export function usePresetHistory(options: UsePresetHistoryOptions) {
   const historyData = ref<HistoryItem[]>([]);
   const loadingHistory = ref(false);
-  const showHistory = ref(false);
+  const showHistory = ref(true); // 默认展开
 
   async function loadHistory() {
     if (!options.isSubPreset.value) return;
@@ -42,6 +42,20 @@ export function usePresetHistory(options: UsePresetHistoryOptions) {
       loadHistory();
     }
   }
+
+  // 自动加载历史
+  onMounted(() => {
+    if (options.isSubPreset.value) {
+      loadHistory();
+    }
+  });
+
+  // 监听 isSubPreset 变化
+  watch(options.isSubPreset, (isSubPreset) => {
+    if (isSubPreset && historyData.value.length === 0) {
+      loadHistory();
+    }
+  });
 
   return {
     historyData,
