@@ -8,6 +8,7 @@ export interface FeishuSelectData {
   userIds: string[];
   feishuName: string;
   feishuAvatar: string;
+  redirect?: string;
 }
 
 export function generateSelectToken(): string {

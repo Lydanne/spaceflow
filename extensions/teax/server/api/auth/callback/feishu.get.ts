@@ -7,6 +7,7 @@ import { generateSelectToken, storeFeishuSelectToken } from "~~/server/utils/fei
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
   const code = query.code as string;
+  const state = query.state as string | undefined;
 
   if (!code) {
     throw createError({
@@ -14,6 +15,9 @@ export default defineEventHandler(async (event) => {
       message: "Missing authorization code",
     });
   }
+
+  // 解析 state 中的 redirect
+  const redirect = parseState(state);
 
   try {
     const tokenData = await exchangeFeishuCode(code);
@@ -42,7 +46,10 @@ export default defineEventHandler(async (event) => {
 
     if (users.length === 0) {
       // 未绑定任何账号,跳转到登录页提示需先绑定
-      return sendRedirect(event, "/auth/login?error=feishu_not_bound");
+      const errorUrl = redirect
+        ? `/auth/login?error=feishu_not_bound&redirect=${encodeURIComponent(redirect)}`
+        : "/auth/login?error=feishu_not_bound";
+      return sendRedirect(event, errorUrl);
     }
 
     if (users.length === 1) {
@@ -83,7 +90,8 @@ export default defineEventHandler(async (event) => {
         giteaRefreshToken: giteaTokens?.refreshToken || "",
       });
 
-      return sendRedirect(event, "/");
+      // 跳转到原页面或首页
+      return sendRedirect(event, redirect || "/");
     }
 
     // 绑定了多个账号,生成临时 token 跳转到选择页面
@@ -93,6 +101,7 @@ export default defineEventHandler(async (event) => {
       userIds: users.map((u) => u.id),
       feishuName: feishuUser.name,
       feishuAvatar: feishuUser.avatar_url,
+      redirect: redirect || undefined,
     });
 
     return sendRedirect(event, `/auth/select-account?token=${selectToken}`);
@@ -104,3 +113,20 @@ export default defineEventHandler(async (event) => {
     });
   }
 });
+
+/**
+ * 解析 state 参数，提取 redirect
+ */
+function parseState(state?: string): string | null {
+  if (!state) return null;
+
+  try {
+    // 尝试解码 base64url
+    const decoded = Buffer.from(state, "base64url").toString("utf8");
+    const payload = JSON.parse(decoded);
+    return payload.redirect || null;
+  } catch {
+    // 旧格式：纯随机字符串
+    return null;
+  }
+}

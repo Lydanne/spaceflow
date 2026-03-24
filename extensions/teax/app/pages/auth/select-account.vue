@@ -34,16 +34,16 @@ async function selectAccount(userId: string) {
   error.value = null;
 
   try {
-    await $fetch("/api/auth/feishu-select", {
+    const result = await $fetch<{ success: boolean; redirect: string }>("/api/auth/feishu-select", {
       method: "POST",
       body: {
         token: token.value,
         user_id: userId,
       },
     });
-    // 刷新 session 状态后跳转首页
+    // 刷新 session 状态后跳转
     await refreshSession();
-    await navigateTo("/");
+    await navigateTo(result.redirect);
   } catch (err: unknown) {
     error.value = "登录失败，请重试";
     selecting.value = false;

@@ -75,5 +75,5 @@ export default defineEventHandler(async (event) => {
     giteaRefreshToken: giteaTokens?.refreshToken || "",
   });
 
-  return { success: true };
+  return { success: true, redirect: data.redirect || "/" };
 });

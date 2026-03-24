@@ -8,6 +8,8 @@ export default defineNuxtRouteMiddleware((to) => {
   }
 
   if (!loggedIn.value) {
-    return navigateTo("/auth/login");
+    // 保存原始路径，登录后跳回
+    const redirect = to.fullPath;
+    return navigateTo(`/auth/login?redirect=${encodeURIComponent(redirect)}`);
   }
 });

@@ -6,6 +6,8 @@ definePageMeta({
 const config = useRuntimeConfig();
 const route = useRoute();
 
+const redirect = computed(() => route.query.redirect as string | undefined);
+
 const error = computed(() => {
   const err = route.query.error as string | undefined;
   if (err === "feishu_not_bound") {
@@ -15,11 +17,17 @@ const error = computed(() => {
 });
 
 function loginWithGitea() {
-  navigateTo("/api/auth/gitea", { external: true });
+  const url = redirect.value
+    ? `/api/auth/gitea?redirect=${encodeURIComponent(redirect.value)}`
+    : "/api/auth/gitea";
+  navigateTo(url, { external: true });
 }
 
 function loginWithFeishu() {
-  navigateTo("/api/auth/feishu", { external: true });
+  const url = redirect.value
+    ? `/api/auth/feishu?redirect=${encodeURIComponent(redirect.value)}`
+    : "/api/auth/feishu";
+  navigateTo(url, { external: true });
 }
 </script>
 
