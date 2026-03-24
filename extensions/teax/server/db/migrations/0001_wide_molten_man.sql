@@ -1,1 +1,0 @@
-ALTER TABLE "workflow_presets" ADD COLUMN "current_run_id" bigint;
