@@ -1,4 +1,4 @@
-import { pgTable, uuid, integer, varchar, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, integer, varchar, text, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { baseColumns } from "./base";
 
 export const users = pgTable("users", {
@@ -13,8 +13,8 @@ export const users = pgTable("users", {
 
 export const userFeishu = pgTable("user_feishu", {
   id: uuid("id").primaryKey().defaultRandom(),
-  user_id: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-  feishu_open_id: varchar("feishu_open_id", { length: 255 }).unique().notNull(),
+  user_id: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  feishu_open_id: varchar("feishu_open_id", { length: 255 }).notNull(),
   feishu_union_id: varchar("feishu_union_id", { length: 255 }),
   feishu_name: varchar("feishu_name", { length: 255 }).notNull(),
   feishu_avatar: text("feishu_avatar"),
@@ -26,4 +26,6 @@ export const userFeishu = pgTable("user_feishu", {
   notify_agent: boolean("notify_agent").default(true),
   notify_system: boolean("notify_system").default(false),
   ...baseColumns(),
-});
+}, (table) => [
+  uniqueIndex("user_feishu_user_open_idx").on(table.user_id, table.feishu_open_id),
+]);

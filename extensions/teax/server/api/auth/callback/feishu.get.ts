@@ -1,6 +1,7 @@
 import { exchangeFeishuCode, getFeishuUserInfo } from "~~/server/utils/feishu-sdk";
-import { findUserByFeishuOpenId, bindFeishuToUser } from "~~/server/services/feishu.service";
+import { findUsersByFeishuOpenId, bindFeishuToUser } from "~~/server/services/feishu.service";
 import { generateSessionId, registerSession } from "~~/server/utils/session";
+import { generateSelectToken, storeFeishuSelectToken } from "~~/server/utils/feishu-select-token";
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
@@ -35,48 +36,61 @@ export default defineEventHandler(async (event) => {
       return sendRedirect(event, "/user/settings?success=feishu_bound");
     }
 
-    // 用户未登录,查找是否已有绑定记录
-    const user = await findUserByFeishuOpenId(feishuUser.open_id);
+    // 用户未登录,查找所有绑定的账户
+    const users = await findUsersByFeishuOpenId(feishuUser.open_id);
 
-    if (!user) {
-      // 未绑定 Gitea 账号,跳转到登录页提示需先绑定
+    if (users.length === 0) {
+      // 未绑定任何账号,跳转到登录页提示需先绑定
       return sendRedirect(event, "/auth/login?error=feishu_not_bound");
     }
 
-    // 已有绑定记录,更新绑定信息并登录
-    await bindFeishuToUser(
-      user.id,
-      feishuUser,
-      tokenData.access_token,
-      tokenExpiresAt,
-      tokenData.refresh_token,
-    );
+    if (users.length === 1) {
+      // 只绑定了一个账号,直接登录
+      const user = users[0]!;
+      await bindFeishuToUser(
+        user.id,
+        feishuUser,
+        tokenData.access_token,
+        tokenExpiresAt,
+        tokenData.refresh_token,
+      );
 
-    // 创建 session
-    const sessionId = generateSessionId();
-    await registerSession(user.id, sessionId, {
-      user_id: user.id,
-      username: user.gitea_username,
-      login_at: Date.now(),
-      login_provider: "feishu",
-      ip: getRequestIP(event) || undefined,
-      ua: getRequestHeader(event, "user-agent") || undefined,
-    });
-
-    await setUserSession(event, {
-      user: {
-        id: user.id,
-        gitea_id: user.gitea_id,
+      const sessionId = generateSessionId();
+      await registerSession(user.id, sessionId, {
+        user_id: user.id,
         username: user.gitea_username,
-        email: user.email,
-        avatar_url: user.avatar_url,
-        is_admin: user.is_admin,
-      },
-      sessionId,
-      giteaAccessToken: "",
+        login_at: Date.now(),
+        login_provider: "feishu",
+        ip: getRequestIP(event) || undefined,
+        ua: getRequestHeader(event, "user-agent") || undefined,
+      });
+
+      await setUserSession(event, {
+        user: {
+          id: user.id,
+          gitea_id: user.gitea_id,
+          username: user.gitea_username,
+          email: user.email,
+          avatar_url: user.avatar_url,
+          is_admin: user.is_admin,
+        },
+        sessionId,
+        giteaAccessToken: "",
+      });
+
+      return sendRedirect(event, "/");
+    }
+
+    // 绑定了多个账号,生成临时 token 跳转到选择页面
+    const selectToken = generateSelectToken();
+    await storeFeishuSelectToken(selectToken, {
+      openId: feishuUser.open_id,
+      userIds: users.map((u) => u.id),
+      feishuName: feishuUser.name,
+      feishuAvatar: feishuUser.avatar_url,
     });
 
-    return sendRedirect(event, "/");
+    return sendRedirect(event, `/auth/select-account?token=${selectToken}`);
   } catch (err: unknown) {
     console.error("Feishu OAuth callback error:", err);
     throw createError({

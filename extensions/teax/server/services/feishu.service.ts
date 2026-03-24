@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 
 interface FeishuUserInfo {
@@ -12,25 +12,31 @@ interface FeishuUserInfo {
   mobile: string;
 }
 
-export async function findUserByFeishuOpenId(openId: string) {
+export interface FeishuBoundUser {
+  id: string;
+  gitea_username: string;
+  email: string;
+  avatar_url: string | null;
+  is_admin: boolean | null;
+  gitea_id: number;
+}
+
+export async function findUsersByFeishuOpenId(openId: string): Promise<FeishuBoundUser[]> {
   const db = useDB();
-  const [binding] = await db
-    .select()
+  const bindings = await db
+    .select({
+      user: schema.users,
+    })
     .from(schema.userFeishu)
-    .where(eq(schema.userFeishu.feishu_open_id, openId))
-    .limit(1);
+    .innerJoin(schema.users, eq(schema.userFeishu.user_id, schema.users.id))
+    .where(eq(schema.userFeishu.feishu_open_id, openId));
 
-  if (!binding?.user_id) {
-    return null;
-  }
+  return bindings.map((b) => b.user);
+}
 
-  const [user] = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.id, binding.user_id))
-    .limit(1);
-
-  return user || null;
+export async function findUserByFeishuOpenId(openId: string) {
+  const users = await findUsersByFeishuOpenId(openId);
+  return users[0] || null;
 }
 
 export async function bindFeishuToUser(
@@ -42,13 +48,18 @@ export async function bindFeishuToUser(
 ) {
   const db = useDB();
 
+  // 查找该用户是否已绑定此飞书账号（按 user_id + open_id 组合查找）
   const [existing] = await db
     .select()
     .from(schema.userFeishu)
-    .where(eq(schema.userFeishu.feishu_open_id, feishuUser.open_id))
+    .where(and(
+      eq(schema.userFeishu.user_id, user_id),
+      eq(schema.userFeishu.feishu_open_id, feishuUser.open_id),
+    ))
     .limit(1);
 
   if (existing) {
+    // 更新已有绑定
     await db
       .update(schema.userFeishu)
       .set({
@@ -59,10 +70,11 @@ export async function bindFeishuToUser(
         refresh_token: refreshToken,
         token_expires_at: tokenExpiresAt,
       })
-      .where(eq(schema.userFeishu.feishu_open_id, feishuUser.open_id));
+      .where(eq(schema.userFeishu.id, existing.id));
     return existing;
   }
 
+  // 创建新绑定（允许同一飞书绑定不同用户）
   const [binding] = await db
     .insert(schema.userFeishu)
     .values({
