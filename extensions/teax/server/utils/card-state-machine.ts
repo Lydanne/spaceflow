@@ -263,12 +263,16 @@ export function getStateMachine(name: string): CardStateMachine | undefined {
   return stateMachines.get(name);
 }
 
+/** 卡片更新回调类型 */
+export type UpdateCardFn = (card: Record<string, unknown>) => Promise<void>;
+
 /**
  * 从 action 中提取状态机信息并路由到对应的处理器
  */
 export async function routeCardAction(params: {
   action: Record<string, unknown>;
   openId: string;
+  updateCard?: UpdateCardFn;
 }): Promise<void> {
   const actionValue = params.action.value as Record<string, unknown> | undefined;
   if (!actionValue) {

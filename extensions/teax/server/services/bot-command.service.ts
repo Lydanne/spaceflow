@@ -319,9 +319,12 @@ export interface CardActionContext {
   action: Record<string, unknown>;
   openId: string;
   token: string;
+  /** 可选的卡片更新回调，用于在处理过程中实时更新卡片 */
+  updateCard?: (card: Record<string, unknown>) => Promise<void>;
 }
 
 export async function handleCardAction(ctx: CardActionContext): Promise<Record<string, unknown> | undefined> {
+  const { updateCard } = ctx;
   const actionValue = ctx.action.value as Record<string, unknown> | string | undefined;
 
   // value 可能是双重 JSON 编码的字符串，需要解析
@@ -339,7 +342,7 @@ export async function handleCardAction(ctx: CardActionContext): Promise<Record<s
       // 如果不是 JSON，可能是简单的 action 字符串如 "approval_flow:approve:xxx"
       if (actionValue.startsWith("approval_flow:")) {
         const { handleApprovalFlowCardAction } = await import("~~/server/services/approval-flow/card-handler");
-        return await handleApprovalFlowCardAction(ctx.openId, ctx.token, actionValue);
+        return await handleApprovalFlowCardAction(ctx.openId, ctx.token, actionValue, updateCard);
       }
       parsedValue = undefined;
     }
@@ -352,7 +355,7 @@ export async function handleCardAction(ctx: CardActionContext): Promise<Record<s
   // 检查是否是审批流程的交互 (格式: approval_flow:approve:flowId)
   if (actionType?.startsWith("approval_flow:")) {
     const { handleApprovalFlowCardAction } = await import("~~/server/services/approval-flow/card-handler");
-    return await handleApprovalFlowCardAction(ctx.openId, ctx.token, actionType);
+    return await handleApprovalFlowCardAction(ctx.openId, ctx.token, actionType, updateCard);
   }
 
   // 检查是否是控制面板的交互
@@ -369,7 +372,7 @@ export async function handleCardAction(ctx: CardActionContext): Promise<Record<s
 
   if (actionType && actionValue && controlPanelActions.includes(actionType)) {
     const { handleControlPanelAction } = await import("~~/server/services/control-panel.service");
-    const newCard = await handleControlPanelAction(ctx.openId, actionValue as Record<string, unknown>);
+    const newCard = await handleControlPanelAction(ctx.openId, actionValue as Record<string, unknown>, updateCard);
     return newCard as Record<string, unknown> | undefined;
   }
 
@@ -382,7 +385,7 @@ export async function handleCardAction(ctx: CardActionContext): Promise<Record<s
 
   if (actionType && actionValue && accountActions.includes(actionType)) {
     const { handleAccountAction } = await import("~~/server/services/account.service");
-    const newCard = await handleAccountAction(ctx.openId, actionValue as Record<string, unknown>);
+    const newCard = await handleAccountAction(ctx.openId, actionValue as Record<string, unknown>, updateCard);
     return newCard as Record<string, unknown> | undefined;
   }
 
@@ -391,6 +394,7 @@ export async function handleCardAction(ctx: CardActionContext): Promise<Record<s
   await routeCardAction({
     action: ctx.action,
     openId: ctx.openId,
+    updateCard,
   });
 
   return undefined;

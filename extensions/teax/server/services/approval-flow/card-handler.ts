@@ -4,17 +4,22 @@ import { approveFlow, rejectFlow } from "./service";
 import { FeishuCardBuilder } from "~~/server/utils/feishu-card-builder";
 import { updateCardMessage } from "~~/server/utils/feishu-sdk";
 
+/** 卡片更新回调类型 */
+export type UpdateCardFn = (card: Record<string, unknown>) => Promise<void>;
+
 /**
  * 处理审批流程卡片交互（来自飞书长连接）
  * @param openId 操作者的飞书 open_id
  * @param _messageToken 消息 token（长连接的 token，不是 message_id）
  * @param action 操作类型，格式: approval_flow:approve:flowId 或 approval_flow:reject:flowId
+ * @param updateCard 可选的卡片更新回调
  * @returns 返回新卡片内容，用于飞书更新卡片
  */
 export async function handleApprovalFlowCardAction(
   openId: string,
   _messageToken: string,
   action: string,
+  updateCard?: UpdateCardFn,
 ): Promise<Record<string, unknown> | undefined> {
   const parts = action.split(":");
   if (parts.length < 3) {
@@ -69,8 +74,11 @@ export async function handleApprovalFlowCardAction(
       return;
     }
 
-    // 使用 message_id 更新卡片（不返回卡片，避免被飞书长连接覆盖）
-    if (messageId) {
+    // 使用回调更新卡片（优先）或通过 message_id 更新
+    if (updateCard) {
+      await updateCard(resultCard);
+      console.log("[ApprovalFlow] Card updated via callback");
+    } else if (messageId) {
       // 延迟 500ms 再更新，确保飞书长连接的响应先处理完
       setTimeout(async () => {
         try {
@@ -90,7 +98,9 @@ export async function handleApprovalFlowCardAction(
     const errorCard = buildErrorCard(errorMessage);
 
     // 尝试更新卡片显示错误
-    if (messageId) {
+    if (updateCard) {
+      await updateCard(errorCard);
+    } else if (messageId) {
       setTimeout(async () => {
         try {
           await updateCardMessage(messageId, errorCard);

@@ -14,7 +14,9 @@ export default defineNitroPlugin(async () => {
 
   // 检查配置
   if (!config.feishuAppId || !config.feishuAppSecret) {
-    console.warn("[feishu-ws] Missing app credentials, long connection disabled");
+    console.warn(
+      "[feishu-ws] Missing app credentials, long connection disabled",
+    );
     return;
   }
 
@@ -41,15 +43,21 @@ export default defineNitroPlugin(async () => {
         encryptKey: config.feishuEncryptKey || undefined,
       }).register({
         // 消息接收事件
-        "im.message.receive_v1": async (data: Parameters<typeof handleMessageEvent>[0]) => {
+        "im.message.receive_v1": async (
+          data: Parameters<typeof handleMessageEvent>[0],
+        ) => {
           await handleMessageEvent(data);
         },
         // 卡片交互事件
-        "card.action.trigger": async (data: Parameters<typeof handleCardActionEvent>[0]) => {
+        "card.action.trigger": async (
+          data: Parameters<typeof handleCardActionEvent>[0],
+        ) => {
           return await handleCardActionEvent(data);
         },
         // 审批事件
-        approval_instance: async (data: Parameters<typeof handleApprovalEvent>[0]) => {
+        approval_instance: async (
+          data: Parameters<typeof handleApprovalEvent>[0],
+        ) => {
           await handleApprovalEvent(data);
         },
       }),
@@ -125,7 +133,9 @@ async function handleMessageEvent(data: {
 
     // 群聊中必须 @ 机器人才响应
     const isGroupChat = message.chat_type === "group";
-    const isMentioned = data.message.mentions?.some((m) => m.name === "Teax" || m.name === "TeaxBot");
+    const isMentioned = data.message.mentions?.some(
+      (m) => m.name === "Teax" || m.name === "TeaxBot",
+    );
 
     if (isGroupChat && !isMentioned) {
       // 群聊中没有 @ 机器人，忽略
@@ -143,10 +153,13 @@ async function handleMessageEvent(data: {
     // 去除 @bot 的 mention 前缀
     textContent = textContent.replace(/@_user_\d+\s*/g, "").trim();
 
-    console.log(`[feishu-ws] 📨 Message from ${senderId}: ${textContent || "(empty)"}`);
+    console.log(
+      `[feishu-ws] 📨 Message from ${senderId}: ${textContent || "(empty)"}`,
+    );
 
     // 调用指令处理(空文本也处理,用于显示控制面板)
-    const { handleBotCommand } = await import("~~/server/services/bot-command.service");
+    const { handleBotCommand } =
+      await import("~~/server/services/bot-command.service");
     await handleBotCommand({
       messageId: message.message_id,
       chatId: message.chat_id,
@@ -178,7 +191,10 @@ async function handleCardActionEvent(data: {
     const token = data.token;
     const openMessageId = data.open_message_id;
 
-    console.log(`[feishu-ws] 🎯 Card action data:`, JSON.stringify({ token, openMessageId }, null, 2));
+    console.log(
+      `[feishu-ws] 🎯 Card action data:`,
+      JSON.stringify({ token, openMessageId }, null, 2),
+    );
 
     if (!action || !operator || !token) {
       return;
@@ -191,22 +207,38 @@ async function handleCardActionEvent(data: {
 
     console.log(`[feishu-ws] 🎯 Card action from ${openId}`);
 
-    const { handleCardAction } = await import("~~/server/services/bot-command.service");
+    // 构造卡片更新回调
+    let updateCard:
+      | ((card: Record<string, unknown>) => Promise<void>)
+      | undefined;
+    if (openMessageId) {
+      const { updateCardMessage } = await import("~~/server/utils/feishu-sdk");
+      updateCard = async (card: Record<string, unknown>) => {
+        setTimeout(async () => {
+          try {
+            await updateCardMessage(openMessageId, card);
+            console.log(
+              `[feishu-ws] ✅ Card updated for message ${openMessageId}`,
+            );
+          } catch (e) {
+            console.error("[feishu-ws] Failed to update card:", e);
+          }
+        }, 500);
+      };
+    }
+
+    const { handleCardAction } =
+      await import("~~/server/services/bot-command.service");
     const result = await handleCardAction({
       action: action as Record<string, unknown>,
       openId,
       token,
+      updateCard,
     });
 
-    // 如果返回了卡片更新内容，需要通过 API 更新卡片
-    if (result && openMessageId) {
-      const { updateCardMessage } = await import("~~/server/utils/feishu-sdk");
-      try {
-        await updateCardMessage(openMessageId, result);
-        console.log(`[feishu-ws] ✅ Card updated for message ${openMessageId}`);
-      } catch (e) {
-        console.error("[feishu-ws] Failed to update card:", e);
-      }
+    // 如果返回了卡片且有回调，使用回调更新
+    if (result && updateCard) {
+      await updateCard(result);
     }
 
     return result;
@@ -228,7 +260,8 @@ async function handleApprovalEvent(data: {
   try {
     console.log("[feishu-ws] 📋 Approval event received");
 
-    const { handleFeishuApprovalEvent } = await import("~~/server/services/approval.service");
+    const { handleFeishuApprovalEvent } =
+      await import("~~/server/services/approval.service");
     await handleFeishuApprovalEvent({
       instance_code: data.instance_code,
       status: data.status,
@@ -244,7 +277,10 @@ async function handleApprovalEvent(data: {
 /**
  * 获取长连接状态
  */
-export function getLongConnectionStatus(): { enabled: boolean; connected: boolean } {
+export function getLongConnectionStatus(): {
+  enabled: boolean;
+  connected: boolean;
+} {
   return {
     enabled: wsClient !== null,
     connected: wsClient !== null,

@@ -173,12 +173,16 @@ export async function generateAccountCard(openId: string): Promise<FeishuInterac
   };
 }
 
+/** 卡片更新回调类型 */
+export type UpdateCardFn = (card: Record<string, unknown>) => Promise<void>;
+
 /**
  * 处理账户相关的卡片交互
  */
 export async function handleAccountAction(
   openId: string,
   action: Record<string, unknown>,
+  _updateCard?: UpdateCardFn,
 ): Promise<FeishuInteractiveCard | null> {
   const actionType = action.action as string;
 

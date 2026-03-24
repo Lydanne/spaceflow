@@ -7,7 +7,7 @@ export default withNuxt({
   rules: {
     "@stylistic/quote-props": ["error", "as-needed"],
     "@stylistic/arrow-parens": ["error", "always"],
-    "@stylistic/operator-linebreak": ["error", "after", { overrides: { "?": "before", ":": "before" } }],
+    "@stylistic/operator-linebreak": ["error", "after", { overrides: { "?": "before", ":": "before", "|": "before" } }],
     "@typescript-eslint/no-unused-vars": "off",
     "vue/singleline-html-element-content-newline": "off",
   },
