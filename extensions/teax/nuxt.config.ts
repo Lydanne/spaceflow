@@ -43,6 +43,8 @@ export default defineNuxtConfig({
       ? {
           // 每分钟检查过期的子预设
           "* * * * *": ["presets:unlock-expired"],
+          // 每月 1 号凌晨 3 点清理 30 天前的历史记录
+          "0 3 1 * *": ["presets:cleanup-history"],
         }
       : {},
     typescript: {
