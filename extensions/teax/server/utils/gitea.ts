@@ -644,8 +644,8 @@ export function useGiteaSdk(event?: H3Event): GiteaSdk {
     if (!ctx.event) return null;
 
     const session = await getUserSession(ctx.event);
-    const giteaAccessToken = (session as Record<string, unknown>)?.giteaAccessToken as string | undefined;
-    const giteaRefreshToken = (session as Record<string, unknown>)?.giteaRefreshToken as string | undefined;
+    const giteaAccessToken = session?.giteaAccessToken;
+    const giteaRefreshToken = session?.giteaRefreshToken;
 
     if (!giteaAccessToken) return null;
 
@@ -677,10 +677,23 @@ export function useGiteaSdk(event?: H3Event): GiteaSdk {
 
       // 更新 session（保留原有字段，只更新 token）
       await setUserSession(ctx.event, {
-        ...(session as Record<string, unknown>),
+        ...session!,
         giteaAccessToken: tokenResponse.access_token,
         giteaRefreshToken: tokenResponse.refresh_token,
-      } as Parameters<typeof setUserSession>[1]);
+      });
+
+      // 同步更新 DB 中的 token
+      const userId = session?.user?.id;
+      if (userId) {
+        const { updateUserGiteaToken } = await import("~~/server/services/auth.service");
+        await updateUserGiteaToken(userId, {
+          accessToken: tokenResponse.access_token,
+          refreshToken: tokenResponse.refresh_token,
+          expiresIn: tokenResponse.expires_in,
+        }).catch((err) => {
+          console.error("Failed to update Gitea token in DB:", err);
+        });
+      }
 
       return createGiteaService(tokenResponse.access_token);
     } catch {

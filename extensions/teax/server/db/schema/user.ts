@@ -8,6 +8,10 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull(),
   avatar_url: text("avatar_url"),
   is_admin: boolean("is_admin").default(false),
+  // Gitea token（加密存储）
+  gitea_access_token: text("gitea_access_token"),
+  gitea_refresh_token: text("gitea_refresh_token"),
+  gitea_token_expires_at: timestamp("gitea_token_expires_at", { withTimezone: true }),
   ...baseColumns(),
 });
 

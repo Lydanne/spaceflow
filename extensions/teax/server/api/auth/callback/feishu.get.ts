@@ -1,5 +1,6 @@
 import { exchangeFeishuCode, getFeishuUserInfo } from "~~/server/utils/feishu-sdk";
 import { findUsersByFeishuOpenId, bindFeishuToUser } from "~~/server/services/feishu.service";
+import { getUserGiteaTokens } from "~~/server/services/auth.service";
 import { generateSessionId, registerSession } from "~~/server/utils/session";
 import { generateSelectToken, storeFeishuSelectToken } from "~~/server/utils/feishu-select-token";
 
@@ -55,6 +56,9 @@ export default defineEventHandler(async (event) => {
         tokenData.refresh_token,
       );
 
+      // 从 DB 获取用户的 Gitea token
+      const giteaTokens = await getUserGiteaTokens(user.id);
+
       const sessionId = generateSessionId();
       await registerSession(user.id, sessionId, {
         user_id: user.id,
@@ -75,7 +79,8 @@ export default defineEventHandler(async (event) => {
           is_admin: user.is_admin,
         },
         sessionId,
-        giteaAccessToken: "",
+        giteaAccessToken: giteaTokens?.accessToken || "",
+        giteaRefreshToken: giteaTokens?.refreshToken || "",
       });
 
       return sendRedirect(event, "/");

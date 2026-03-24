@@ -22,6 +22,7 @@ export default defineNuxtConfig({
     feishuVerificationToken: process.env.FEISHU_VERIFICATION_TOKEN || "",
     feishuApprovalCode: process.env.FEISHU_APPROVAL_CODE || "",
     giteaServiceToken: process.env.GITEA_SERVICE_TOKEN || "",
+    tokenEncryptSecret: process.env.TOKEN_ENCRYPT_SECRET || "",
     session: {
       password: process.env.NUXT_SESSION_PASSWORD || "",
     },

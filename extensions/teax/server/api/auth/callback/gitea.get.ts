@@ -1,5 +1,5 @@
 import { exchangeGiteaCode, createGiteaService } from "~~/server/utils/gitea";
-import { upsertUser } from "~~/server/services/auth.service";
+import { upsertUser, updateUserGiteaToken } from "~~/server/services/auth.service";
 import { syncUserOrgsAndTeams } from "~~/server/services/sync.service";
 import { generateSessionId, registerSession } from "~~/server/utils/session";
 
@@ -26,6 +26,13 @@ export default defineEventHandler(async (event) => {
         message: "Failed to create or update user",
       });
     }
+
+    // 存储 Gitea token 到 DB（加密）
+    await updateUserGiteaToken(user.id, {
+      accessToken: tokenResponse.access_token,
+      refreshToken: tokenResponse.refresh_token,
+      expiresIn: tokenResponse.expires_in,
+    });
 
     const sessionId = generateSessionId();
     await registerSession(user.id, sessionId, {

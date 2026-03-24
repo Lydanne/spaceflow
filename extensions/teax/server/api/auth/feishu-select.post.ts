@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { consumeFeishuSelectToken } from "~~/server/utils/feishu-select-token";
+import { getUserGiteaTokens } from "~~/server/services/auth.service";
 import { generateSessionId, registerSession } from "~~/server/utils/session";
 
 export default defineEventHandler(async (event) => {
@@ -46,6 +47,9 @@ export default defineEventHandler(async (event) => {
     });
   }
 
+  // 从 DB 获取用户的 Gitea token
+  const giteaTokens = await getUserGiteaTokens(user.id);
+
   // 创建 session
   const sessionId = generateSessionId();
   await registerSession(user.id, sessionId, {
@@ -67,7 +71,8 @@ export default defineEventHandler(async (event) => {
       is_admin: user.is_admin,
     },
     sessionId,
-    giteaAccessToken: "",
+    giteaAccessToken: giteaTokens?.accessToken || "",
+    giteaRefreshToken: giteaTokens?.refreshToken || "",
   });
 
   return { success: true };
