@@ -102,7 +102,7 @@ export async function generateControlPanelHome(openId: string): Promise<FeishuIn
 
   return {
     header: {
-      title: { tag: "plain_text", content: "🎛️ 控制面板" },
+      title: { tag: "plain_text", content: "📋 控制面板" },
       template: "blue",
     },
     elements,

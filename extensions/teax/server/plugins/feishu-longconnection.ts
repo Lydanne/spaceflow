@@ -176,25 +176,14 @@ async function handleMessageEvent(data: {
  * 处理卡片交互事件
  * 返回值会被飞书用于更新卡片
  */
-async function handleCardActionEvent(data: {
-  action?: Record<string, unknown>;
-  operator?: {
-    open_id?: string;
-    user_id?: string;
-  };
-  token?: string;
-  open_message_id?: string;
-}): Promise<Record<string, unknown> | undefined> {
+async function handleCardActionEvent(data: Record<string, unknown>): Promise<Record<string, unknown> | undefined> {
   try {
-    const action = data.action;
-    const operator = data.operator;
-    const token = data.token;
-    const openMessageId = data.open_message_id;
-
-    console.log(
-      `[feishu-ws] 🎯 Card action data:`,
-      JSON.stringify({ token, openMessageId }, null, 2),
-    );
+    const action = data.action as Record<string, unknown> | undefined;
+    const operator = data.operator as { open_id?: string; user_id?: string } | undefined;
+    const token = data.token as string | undefined;
+    // 消息 ID 在 context.open_message_id 中
+    const context = data.context as { open_message_id?: string; open_chat_id?: string } | undefined;
+    const openMessageId = context?.open_message_id;
 
     if (!action || !operator || !token) {
       return;
@@ -229,19 +218,17 @@ async function handleCardActionEvent(data: {
 
     const { handleCardAction } =
       await import("~~/server/services/bot-command.service");
-    const result = await handleCardAction({
+
+    // handleCardAction 内部会通过 updateCard 回调更新卡片
+    await handleCardAction({
       action: action as Record<string, unknown>,
       openId,
       token,
       updateCard,
     });
 
-    // 如果返回了卡片且有回调，使用回调更新
-    if (result && updateCard) {
-      await updateCard(result);
-    }
-
-    return result;
+    // 不通过返回值更新卡片
+    return undefined;
   } catch (error) {
     console.error("[feishu-ws] Error handling card action:", error);
   }

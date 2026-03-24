@@ -7,6 +7,7 @@ import {
 } from "~~/server/services/messaging";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { startWorkflowAction } from "~~/server/services/workflow-action-machine";
+import { getActiveAccount } from "~~/server/services/account.service";
 
 // ─── 指令上下文 ─────────────────────────────────────────
 
@@ -42,9 +43,6 @@ registerCommand({
   description: "查看所有可用指令",
   usage: "/help",
   handler: async (ctx) => {
-    const lines = commands.map(
-      (c) => `**${c.usage}** — ${c.description}`,
-    );
     const card: FeishuInteractiveCard = {
       header: {
         title: { tag: "plain_text", content: "🤖 Teax Bot 帮助" },
@@ -55,42 +53,28 @@ registerCommand({
           tag: "div",
           text: {
             tag: "lark_md",
-            content: lines.join("\n"),
+            content: [
+              "**📋 仓库与构建**",
+              "`/repos [org]` — 列出已注册的仓库",
+              "`/orgs` — 查看我所属的组织",
+              "`/status <owner/repo>` — 查询构建状态",
+              "`/actions <owner/repo>` — 触发工作流",
+              "",
+              "**👤 账户与设置**",
+              "`/account` — 查看账户信息（多账户可切换）",
+              "`/notify` — 查看通知设置",
+              "`/presets` — 查看工作流预设",
+              "",
+              "**📝 审批**",
+              "`/approvals` — 查看待处理审批",
+              "",
+              "**💡 提示**",
+              "直接 @ 机器人可打开控制面板",
+            ].join("\n"),
           },
         },
       ],
     };
-    await replyFeishuCardMessage(ctx.messageId, card);
-  },
-});
-
-// ─── /list ────────────────────────────────────────────────
-
-registerCommand({
-  name: "list",
-  aliases: ["/list", "列表"],
-  description: "查看工作流列表",
-  usage: "/list",
-  handler: async (ctx) => {
-    const lines = commands.map(
-      (c) => `**${c.usage}** — ${c.description}`,
-    );
-    const card: FeishuInteractiveCard = {
-      header: {
-        title: { tag: "plain_text", content: "📋 工作流列表" },
-        template: "blue",
-      },
-      elements: [
-        {
-          tag: "div",
-          text: {
-            tag: "lark_md",
-            content: lines.join("\n"),
-          },
-        },
-      ],
-    };
-
     await replyFeishuCardMessage(ctx.messageId, card);
   },
 });
@@ -127,20 +111,15 @@ registerCommand({
     const owner = parts[0] || "";
     const repo = parts[1] || "";
 
-    // 验证用户权限：检查发送者是否绑定了 Teax 账号
-    const db = useDB();
-    const [binding] = await db
-      .select({ user_id: schema.userFeishu.user_id })
-      .from(schema.userFeishu)
-      .where(eq(schema.userFeishu.feishu_open_id, ctx.senderOpenId))
-      .limit(1);
-
-    if (!binding?.user_id) {
+    // 验证用户权限：使用当前活跃账户
+    const activeUser = await getActiveAccount(ctx.senderOpenId);
+    if (!activeUser) {
       await replyFeishuMessage(ctx.messageId, "❌ 请先在 Teax 中绑定飞书账号");
       return;
     }
 
     // 验证仓库是否在 Teax 中注册
+    const db = useDB();
     const [repoRecord] = await db
       .select({ id: schema.repositories.id, full_name: schema.repositories.full_name })
       .from(schema.repositories)
@@ -237,30 +216,24 @@ registerCommand({
   },
 });
 
-// ─── /list [orgName] ─────────────────────────────────────
+// ─── /repos [orgName] ────────────────────────────────────
 
 registerCommand({
-  name: "list",
-  aliases: ["/list", "列表"],
-  description: "列出组织下已注册的仓库",
-  usage: "/list [orgName]",
+  name: "repos",
+  aliases: ["/repos", "/list", "仓库", "列表"],
+  description: "列出已注册的仓库",
+  usage: "/repos [orgName]",
   handler: async (ctx, args) => {
     const orgName = args[0];
 
-    const db = useDB();
-
-    // 验证用户绑定
-    const [binding] = await db
-      .select({ user_id: schema.userFeishu.user_id })
-      .from(schema.userFeishu)
-      .where(eq(schema.userFeishu.feishu_open_id, ctx.senderOpenId))
-      .limit(1);
-
-    if (!binding?.user_id) {
+    // 验证用户绑定：使用当前活跃账户
+    const activeUser = await getActiveAccount(ctx.senderOpenId);
+    if (!activeUser) {
       await replyFeishuMessage(ctx.messageId, "❌ 请先在 Teax 中绑定飞书账号");
       return;
     }
 
+    const db = useDB();
     let repos;
     if (orgName) {
       // 查找指定组织的仓库
@@ -296,6 +269,307 @@ registerCommand({
     const card: FeishuInteractiveCard = {
       header: {
         title: { tag: "plain_text", content: orgName ? `📋 ${orgName} 仓库列表` : "📋 仓库列表" },
+        template: "blue",
+      },
+      elements: [
+        {
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: lines.join("\n"),
+          },
+        },
+      ],
+    };
+
+    await replyFeishuCardMessage(ctx.messageId, card);
+  },
+});
+
+// ─── /orgs ───────────────────────────────────────────────
+
+registerCommand({
+  name: "orgs",
+  aliases: ["/orgs", "组织", "我的组织"],
+  description: "查看我所属的组织",
+  usage: "/orgs",
+  handler: async (ctx) => {
+    // 验证用户绑定：使用当前活跃账户
+    const activeUser = await getActiveAccount(ctx.senderOpenId);
+    if (!activeUser) {
+      await replyFeishuMessage(ctx.messageId, "❌ 请先在 Teax 中绑定飞书账号");
+      return;
+    }
+
+    // 查询用户所属的组织
+    const db = useDB();
+    const orgs = await db
+      .selectDistinct({
+        id: schema.organizations.id,
+        name: schema.organizations.name,
+        full_name: schema.organizations.full_name,
+      })
+      .from(schema.teamMembers)
+      .innerJoin(schema.teams, eq(schema.teamMembers.team_id, schema.teams.id))
+      .innerJoin(schema.organizations, eq(schema.teams.organization_id, schema.organizations.id))
+      .where(eq(schema.teamMembers.user_id, activeUser.id));
+
+    if (orgs.length === 0) {
+      await replyFeishuMessage(ctx.messageId, "📋 您暂未加入任何组织");
+      return;
+    }
+
+    const lines = orgs.map((o) => `• **${o.full_name || o.name}** (${o.name})`);
+    const card: FeishuInteractiveCard = {
+      header: {
+        title: { tag: "plain_text", content: "🏢 我的组织" },
+        template: "blue",
+      },
+      elements: [
+        {
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: lines.join("\n"),
+          },
+        },
+        {
+          tag: "hr",
+        },
+        {
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: "💡 使用 `/repos <组织名>` 查看组织下的仓库",
+          },
+        },
+      ],
+    };
+
+    await replyFeishuCardMessage(ctx.messageId, card);
+  },
+});
+
+// ─── /notify ─────────────────────────────────────────────
+
+registerCommand({
+  name: "notify",
+  aliases: ["/notify", "通知", "通知设置"],
+  description: "查看通知偏好设置",
+  usage: "/notify",
+  handler: async (ctx) => {
+    // 验证用户绑定：使用当前活跃账户
+    const activeUser = await getActiveAccount(ctx.senderOpenId);
+    if (!activeUser) {
+      await replyFeishuMessage(ctx.messageId, "❌ 请先在 Teax 中绑定飞书账号");
+      return;
+    }
+
+    // 查询当前活跃账户的通知设置
+    const db = useDB();
+    const [binding] = await db
+      .select({
+        notify_publish: schema.userFeishu.notify_publish,
+        notify_approval: schema.userFeishu.notify_approval,
+        notify_agent: schema.userFeishu.notify_agent,
+        notify_system: schema.userFeishu.notify_system,
+      })
+      .from(schema.userFeishu)
+      .where(eq(schema.userFeishu.user_id, activeUser.id))
+      .limit(1);
+
+    if (!binding) {
+      await replyFeishuMessage(ctx.messageId, "❌ 未找到通知设置");
+      return;
+    }
+
+    const config = useRuntimeConfig();
+    const baseUrl = config.public.siteUrl || "https://teax.example.com";
+
+    const settings = [
+      `${binding.notify_publish ? "✅" : "❌"} 发布通知`,
+      `${binding.notify_approval ? "✅" : "❌"} 审批通知`,
+      `${binding.notify_agent ? "✅" : "❌"} Agent 通知`,
+      `${binding.notify_system ? "✅" : "❌"} 系统通知`,
+    ];
+
+    const card: FeishuInteractiveCard = {
+      header: {
+        title: { tag: "plain_text", content: "🔔 通知设置" },
+        template: "blue",
+      },
+      elements: [
+        {
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: "**当前通知偏好**\n\n" + settings.join("\n"),
+          },
+        },
+        {
+          tag: "hr",
+        },
+        {
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: `[前往设置页面修改](${baseUrl}/user/settings)`,
+          },
+        },
+      ],
+    };
+
+    await replyFeishuCardMessage(ctx.messageId, card);
+  },
+});
+
+// ─── /approvals ──────────────────────────────────────────
+
+registerCommand({
+  name: "approvals",
+  aliases: ["/approvals", "审批", "待审批"],
+  description: "查看待处理的审批",
+  usage: "/approvals",
+  handler: async (ctx) => {
+    // 验证用户绑定：使用当前活跃账户
+    const activeUser = await getActiveAccount(ctx.senderOpenId);
+    if (!activeUser) {
+      await replyFeishuMessage(ctx.messageId, "❌ 请先在 Teax 中绑定飞书账号");
+      return;
+    }
+
+    // 查询待处理的审批流程
+    const db = useDB();
+    const pendingApprovals = await db
+      .select({
+        id: schema.approvalFlows.id,
+        title: schema.approvalFlows.title,
+        flow_type: schema.approvalFlows.flow_type,
+        created_at: schema.approvalFlows.created_at,
+      })
+      .from(schema.approvalFlows)
+      .where(eq(schema.approvalFlows.status, "pending"))
+      .orderBy(schema.approvalFlows.created_at)
+      .limit(10);
+
+    if (pendingApprovals.length === 0) {
+      const card: FeishuInteractiveCard = {
+        header: {
+          title: { tag: "plain_text", content: "✅ 审批列表" },
+          template: "green",
+        },
+        elements: [
+          {
+            tag: "div",
+            text: {
+              tag: "lark_md",
+              content: "暂无待处理的审批",
+            },
+          },
+        ],
+      };
+      await replyFeishuCardMessage(ctx.messageId, card);
+      return;
+    }
+
+    const lines = pendingApprovals.map((a) => {
+      const date = a.created_at ? new Date(a.created_at).toLocaleDateString("zh-CN") : "";
+      return `• **${a.title}**\n  ${a.flow_type} · ${date}`;
+    });
+
+    const card: FeishuInteractiveCard = {
+      header: {
+        title: { tag: "plain_text", content: `📋 待处理审批 (${pendingApprovals.length})` },
+        template: "orange",
+      },
+      elements: [
+        {
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: lines.join("\n\n"),
+          },
+        },
+      ],
+    };
+
+    await replyFeishuCardMessage(ctx.messageId, card);
+  },
+});
+
+// ─── /presets ────────────────────────────────────────────
+
+registerCommand({
+  name: "presets",
+  aliases: ["/presets", "预设", "工作流预设"],
+  description: "查看我的工作流预设",
+  usage: "/presets",
+  handler: async (ctx) => {
+    // 验证用户绑定：使用当前活跃账户
+    const activeUser = await getActiveAccount(ctx.senderOpenId);
+    if (!activeUser) {
+      await replyFeishuMessage(ctx.messageId, "❌ 请先在 Teax 中绑定飞书账号");
+      return;
+    }
+
+    // 查询用户的预设组
+    const db = useDB();
+    const groups = await db
+      .select({
+        id: schema.workflowPresetGroups.id,
+        name: schema.workflowPresetGroups.name,
+        share_token: schema.workflowPresetGroups.share_token,
+      })
+      .from(schema.workflowPresetGroups)
+      .where(eq(schema.workflowPresetGroups.created_by, activeUser.id))
+      .limit(10);
+
+    if (groups.length === 0) {
+      const config = useRuntimeConfig();
+      const baseUrl = config.public.siteUrl || "https://teax.example.com";
+
+      const card: FeishuInteractiveCard = {
+        header: {
+          title: { tag: "plain_text", content: "📦 工作流预设" },
+          template: "blue",
+        },
+        elements: [
+          {
+            tag: "div",
+            text: {
+              tag: "lark_md",
+              content: "您还没有创建工作流预设\n\n工作流预设可以保存常用的工作流配置，方便快速触发",
+            },
+          },
+          {
+            tag: "hr",
+          },
+          {
+            tag: "div",
+            text: {
+              tag: "lark_md",
+              content: "💡 在仓库的 **Workflows** 页面可以创建预设组",
+            },
+          },
+        ],
+      };
+      await replyFeishuCardMessage(ctx.messageId, card);
+      return;
+    }
+
+    const config = useRuntimeConfig();
+    const baseUrl = config.public.siteUrl || "https://teax.example.com";
+
+    const lines = groups.map((g) => {
+      const shareUrl = g.share_token ? `${baseUrl}/workflow-groups/${g.share_token}` : "";
+      return shareUrl
+        ? `• **${g.name}** — [分享链接](${shareUrl})`
+        : `• **${g.name}**`;
+    });
+
+    const card: FeishuInteractiveCard = {
+      header: {
+        title: { tag: "plain_text", content: `📦 工作流预设 (${groups.length})` },
         template: "blue",
       },
       elements: [
@@ -370,10 +644,14 @@ export async function handleCardAction(ctx: CardActionContext): Promise<Record<s
     "open_settings",
   ];
 
-  if (actionType && actionValue && controlPanelActions.includes(actionType)) {
+  if (actionType && parsedValue && controlPanelActions.includes(actionType)) {
     const { handleControlPanelAction } = await import("~~/server/services/control-panel.service");
-    const newCard = await handleControlPanelAction(ctx.openId, actionValue as Record<string, unknown>, updateCard);
-    return newCard as Record<string, unknown> | undefined;
+    const newCard = await handleControlPanelAction(ctx.openId, parsedValue, updateCard);
+    // 通过 updateCard 回调更新卡片
+    if (newCard && updateCard) {
+      await updateCard(newCard);
+    }
+    return undefined;
   }
 
   // 检查是否是账户相关的交互
@@ -381,12 +659,17 @@ export async function handleCardAction(ctx: CardActionContext): Promise<Record<s
     "refresh_account",
     "unbind_feishu",
     "view_binding_guide",
+    "switch_account",
   ];
 
-  if (actionType && actionValue && accountActions.includes(actionType)) {
+  if (actionType && parsedValue && accountActions.includes(actionType)) {
     const { handleAccountAction } = await import("~~/server/services/account.service");
-    const newCard = await handleAccountAction(ctx.openId, actionValue as Record<string, unknown>, updateCard);
-    return newCard as Record<string, unknown> | undefined;
+    const newCard = await handleAccountAction(ctx.openId, parsedValue, updateCard);
+    // 通过 updateCard 回调更新卡片
+    if (newCard && updateCard) {
+      await updateCard(newCard);
+    }
+    return undefined;
   }
 
   // 否则调用状态机处理其他卡片交互
