@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AnsiToHtml from "ansi-to-html";
+import type { JobInfo } from "./JobLogsPanel.vue";
 import {
   jobStatusColor,
   jobStatusIcon,
@@ -51,65 +51,28 @@ function statusIconClass(status: string, conclusion: string | null): string {
 
 // ==================== 日志查看 ====================
 const showLogs = ref(false);
-const activeJobId = ref<number | null>(null);
-const jobLogs = ref<Record<number, string>>({});
-const jobLogsLoading = ref<Record<number, boolean>>({});
-
-// ANSI → HTML 转换器
-const ansiConverter = new AnsiToHtml({
-  fg: "#d4d4d4",
-  bg: "transparent",
-  newline: true,
-  escapeXML: true,
-});
 
 // 获取仓库信息用于日志 API
 const repoFullName = computed(() => data.value.repository.full_name);
-const repoOwner = computed(() => repoFullName.value.split("/")[0]);
-const repoName = computed(() => repoFullName.value.split("/")[1]);
+const repoOwner = computed(() => repoFullName.value.split("/")[0] || "");
+const repoName = computed(() => repoFullName.value.split("/")[1] || "");
 
-// 加载 Job 日志
-async function fetchJobLogs(jobId: number) {
-  if (jobLogs.value[jobId] || jobLogsLoading.value[jobId]) return;
-  jobLogsLoading.value[jobId] = true;
-  try {
-    const text = await $fetch<string>(
-      `/api/repos/${repoOwner.value}/${repoName.value}/actions/jobs/${jobId}/logs`,
-      { responseType: "text" },
-    );
-    jobLogs.value[jobId] = text;
-  } catch {
-    jobLogs.value[jobId] = "日志加载失败";
-  } finally {
-    jobLogsLoading.value[jobId] = false;
-  }
-}
-
-// 当前 Job 的 HTML 日志
-const activeJobLogHtml = computed(() => {
-  if (!activeJobId.value) return "";
-  const raw = jobLogs.value[activeJobId.value];
-  if (!raw) return "";
-  return ansiConverter.toHtml(raw);
+// 转换 jobs 为 JobInfo 格式
+const jobsForPanel = computed<JobInfo[]>(() => {
+  const jobs = statusData.value?.run?.jobs || [];
+  return jobs.map((j) => ({
+    id: j.id,
+    name: j.name,
+    status: j.status,
+    conclusion: j.conclusion,
+    startedAt: j.started_at,
+    completedAt: j.completed_at,
+  }));
 });
 
 // 切换日志面板
 function toggleLogs() {
   showLogs.value = !showLogs.value;
-  // 自动选中第一个 job 并加载日志
-  if (showLogs.value && statusData.value?.run?.jobs?.length) {
-    const firstJob = statusData.value.run.jobs[0];
-    if (firstJob && !activeJobId.value) {
-      activeJobId.value = firstJob.id;
-      fetchJobLogs(firstJob.id);
-    }
-  }
-}
-
-// 选择 Job
-function selectJob(jobId: number) {
-  activeJobId.value = jobId;
-  fetchJobLogs(jobId);
 }
 </script>
 
@@ -288,7 +251,7 @@ function selectJob(jobId: number) {
             v-for="job in statusData.run.jobs"
             :key="job.id"
             class="w-full flex items-center gap-2 text-sm px-2 py-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left"
-            @click="selectJob(job.id); showLogs = true"
+            @click="showLogs = true"
           >
             <UIcon
               :name="jobStatusIcon(job.status, job.conclusion)"
@@ -308,62 +271,16 @@ function selectJob(jobId: number) {
 
       <!-- 日志面板 -->
       <div
-        v-if="showLogs && statusData.run.jobs.length > 0"
+        v-if="showLogs && jobsForPanel.length > 0"
         class="mt-3"
       >
-        <!-- Job 选择器 -->
-        <div class="flex items-center gap-2 mb-2 overflow-x-auto pb-1">
-          <button
-            v-for="job in statusData.run.jobs"
-            :key="job.id"
-            class="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md whitespace-nowrap transition-colors"
-            :class="activeJobId === job.id
-              ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'"
-            @click="selectJob(job.id)"
-          >
-            <UIcon
-              :name="jobStatusIcon(job.status, job.conclusion)"
-              class="w-3 h-3"
-              :class="statusIconClass(job.status, job.conclusion)"
-            />
-            {{ job.name }}
-          </button>
-        </div>
-
-        <!-- 日志内容 -->
-        <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-900 overflow-hidden">
-          <!-- 加载中 -->
-          <div
-            v-if="activeJobId && jobLogsLoading[activeJobId]"
-            class="flex items-center gap-2 text-gray-400 text-sm px-4 py-6"
-          >
-            <UIcon
-              name="i-lucide-loader-2"
-              class="w-4 h-4 animate-spin"
-            />
-            加载日志中...
-          </div>
-
-          <!-- 日志内容 -->
-          <div
-            v-else-if="activeJobLogHtml"
-            class="max-h-80 overflow-auto px-4 py-3"
-          >
-            <pre
-              class="text-xs font-mono leading-5 whitespace-pre-wrap break-all text-gray-200"
-              v-html="activeJobLogHtml"
-            />
-          </div>
-
-          <!-- 无日志 -->
-          <div
-            v-else
-            class="text-center text-sm text-gray-500 py-6"
-          >
-            暂无日志
-          </div>
-        </div>
+        <WorkflowJobLogsPanel
+          :owner="repoOwner"
+          :repo="repoName"
+          :jobs="jobsForPanel"
+          compact
+          max-height="320px"
+        />
       </div>
     </div>
 
