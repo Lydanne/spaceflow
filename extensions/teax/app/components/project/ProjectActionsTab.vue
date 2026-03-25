@@ -138,6 +138,7 @@ const presetName = ref("");
 const lockedInputs = ref<string[]>([]);
 const allowBranchOverride = ref(false);
 const allowSyncOverride = ref(false);
+const isPresetPublic = ref(false);
 const savingPreset = ref(false);
 
 // 创建预设组
@@ -238,6 +239,7 @@ async function savePreset() {
           locked_inputs: lockedInputs.value,
           allow_branch_override: allowBranchOverride.value,
           allow_sync_override: allowSyncOverride.value,
+          is_public: isPresetPublic.value,
         },
       },
     );
@@ -247,6 +249,7 @@ async function savePreset() {
     showSavePresetModal.value = false;
     showDispatchModal.value = false;
     presetName.value = "";
+    isPresetPublic.value = false;
   } catch (err: unknown) {
     const msg
       = (err as { data?: { message?: string } })?.data?.message || "保存失败";
@@ -939,10 +942,12 @@ function workflowFileName(path: string): string {
                 v-model:locked-inputs="lockedInputs"
                 v-model:allow-branch-override="allowBranchOverride"
                 v-model:allow-sync-override="allowSyncOverride"
+                v-model:is-public="isPresetPublic"
                 :input-defs="currentInputs"
                 :branch-options="branchOptions"
                 :workflow-name="selectedWorkflowItem?.name"
                 :show-override-options="true"
+                :show-public-option="true"
                 :show-preview="false"
                 name-placeholder="如：正式发布、预发布环境"
               />

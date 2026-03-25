@@ -15,6 +15,7 @@ export default defineEventHandler(async (event) => {
       share_token: schema.workflowPresets.share_token,
       allow_input_override: schema.workflowPresets.allow_input_override,
       allow_branch_override: schema.workflowPresets.allow_branch_override,
+      is_public: schema.workflowPresets.is_public,
       created_at: schema.workflowPresets.created_at,
       repository: {
         id: schema.repositories.id,

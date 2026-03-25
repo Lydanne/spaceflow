@@ -64,6 +64,7 @@ async function syncOrg() {
 const tabs = [
   { key: "teams", label: "团队管理", icon: "i-lucide-users", requireAdmin: false },
   { key: "permissions", label: "权限组管理", icon: "i-lucide-shield", requireAdmin: true },
+  { key: "presets", label: "预设管理", icon: "i-lucide-bookmark", requireAdmin: true },
   { key: "feishu", label: "通知规则", icon: "i-simple-icons-bytedance", requireAdmin: true },
 ];
 

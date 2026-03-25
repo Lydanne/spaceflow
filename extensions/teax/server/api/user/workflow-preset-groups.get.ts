@@ -15,6 +15,7 @@ export default defineEventHandler(async (event) => {
       workflow_path: schema.workflowPresetGroups.workflow_path,
       default_branch: schema.workflowPresetGroups.default_branch,
       share_token: schema.workflowPresetGroups.share_token,
+      is_public: schema.workflowPresetGroups.is_public,
       created_at: schema.workflowPresetGroups.created_at,
       repository: {
         id: schema.repositories.id,

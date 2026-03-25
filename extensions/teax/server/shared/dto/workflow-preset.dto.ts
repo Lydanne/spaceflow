@@ -11,6 +11,7 @@ export const createWorkflowPresetBodySchema = z.object({
   locked_inputs: z.array(z.string()).optional().default([]), // 被锁定不可修改的参数名列表
   allow_branch_override: z.boolean().optional().default(false),
   allow_sync_override: z.boolean().optional().default(false),
+  is_public: z.boolean().optional().default(false), // 是否公开到组织
 });
 
 export const updateWorkflowPresetBodySchema = z.object({
@@ -20,4 +21,16 @@ export const updateWorkflowPresetBodySchema = z.object({
   locked_inputs: z.array(z.string()).optional(), // 被锁定不可修改的参数名列表
   allow_branch_override: z.boolean().optional(),
   allow_sync_override: z.boolean().optional(),
+  is_public: z.boolean().optional(), // 是否公开到组织
+});
+
+export const createPresetGroupBodySchema = z.object({
+  repository_id: z.string().uuid(),
+  name: z.string().min(1).max(255),
+  description: z.string().optional(),
+  workflow_path: z.string().min(1).max(512),
+  default_branch: z.string().min(1).max(255),
+  default_inputs: z.record(z.string(), z.union([z.string(), z.boolean(), z.number()])).optional(),
+  auto_unlock_minutes: z.number().int().positive().optional(),
+  is_public: z.boolean().optional().default(false), // 是否公开到组织
 });

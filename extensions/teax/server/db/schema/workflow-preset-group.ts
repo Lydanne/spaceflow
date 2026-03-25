@@ -6,8 +6,10 @@ import {
   index,
   integer,
   text,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { repositories } from "./repository";
+import { organizations } from "./organization";
 import { users } from "./user";
 import { baseColumns } from "./base";
 
@@ -36,6 +38,10 @@ export const workflowPresetGroups = pgTable(
     // 分享
     share_token: varchar("share_token", { length: 32 }).notNull().unique(),
 
+    // 组织公开相关字段
+    organization_id: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+    is_public: boolean("is_public").default(false), // 是否公开到组织
+
     // 创建者
     created_by: uuid("created_by")
       .notNull()
@@ -47,5 +53,7 @@ export const workflowPresetGroups = pgTable(
     index("idx_preset_groups_repo").on(table.repository_id),
     index("idx_preset_groups_token").on(table.share_token),
     index("idx_preset_groups_created_by").on(table.created_by),
+    index("idx_preset_groups_org").on(table.organization_id),
+    index("idx_preset_groups_public").on(table.organization_id, table.is_public),
   ],
 );

@@ -27,6 +27,8 @@ const props = withDefaults(
     showPreview?: boolean;
     namePlaceholder?: string;
     branchPlaceholder?: string;
+    showPublicOption?: boolean;
+    isPublic?: boolean;
   }>(),
   {
     branchOptions: () => [],
@@ -38,6 +40,8 @@ const props = withDefaults(
     showPreview: false,
     namePlaceholder: "预设名称",
     branchPlaceholder: "分支",
+    showPublicOption: false,
+    isPublic: false,
   },
 );
 
@@ -48,6 +52,7 @@ const emit = defineEmits<{
   "update:lockedInputs": [value: string[]];
   "update:allowBranchOverride": [value: boolean];
   "update:allowSyncOverride": [value: boolean];
+  "update:isPublic": [value: boolean];
 }>();
 
 const localName = computed({
@@ -68,6 +73,11 @@ const localAllowBranchOverride = computed({
 const localAllowSyncOverride = computed({
   get: () => props.allowSyncOverride,
   set: (val) => emit("update:allowSyncOverride", val),
+});
+
+const localIsPublic = computed({
+  get: () => props.isPublic,
+  set: (val) => emit("update:isPublic", val),
 });
 
 function updateInputs(newInputs: Record<string, string>) {
@@ -137,6 +147,19 @@ const hasInputs = computed(() => Object.keys(props.inputDefs).length > 0);
           @update:model-value="updateInputs"
           @update:locked-inputs="emit('update:lockedInputs', $event)"
         />
+      </div>
+    </template>
+
+    <!-- 公开到组织选项 -->
+    <template v-if="showPublicOption">
+      <div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+        <div>
+          <label class="text-sm font-medium">公开到组织</label>
+          <p class="text-xs text-gray-400">
+            开启后，组织内所有成员都可以使用此预设
+          </p>
+        </div>
+        <USwitch v-model="localIsPublic" />
       </div>
     </template>
 

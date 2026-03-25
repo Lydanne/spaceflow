@@ -10,6 +10,7 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 import { repositories } from "./repository";
+import { organizations } from "./organization";
 import { users } from "./user";
 import { baseColumns } from "./base";
 import { workflowPresetGroups } from "./workflow-preset-group";
@@ -45,6 +46,10 @@ export const workflowPresets = pgTable(
     group_id: uuid("group_id").references(() => workflowPresetGroups.id, { onDelete: "cascade" }),
     preset_index: integer("preset_index"), // 子预设在组内的序号
 
+    // 组织公开相关字段
+    organization_id: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
+    is_public: boolean("is_public").default(false), // 是否公开到组织
+
     // 锁定状态（仅子预设使用）
     locked_by: uuid("locked_by").references(() => users.id),
     locked_at: timestamp("locked_at", { withTimezone: true }),
@@ -57,5 +62,7 @@ export const workflowPresets = pgTable(
     index("idx_workflow_presets_token").on(table.share_token),
     index("idx_workflow_presets_group").on(table.group_id),
     index("idx_workflow_presets_locked_by").on(table.locked_by),
+    index("idx_workflow_presets_org").on(table.organization_id),
+    index("idx_workflow_presets_public").on(table.organization_id, table.is_public),
   ],
 );
