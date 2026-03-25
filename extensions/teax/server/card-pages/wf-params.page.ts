@@ -107,6 +107,7 @@ export default defineCardPage({
             placeholder: `选择 ${key}`,
             required: required || false,
             options: options.map((opt) => ({ label: opt, value: opt })),
+            initial_option: defaultValue,
           });
         } else if (inputType === "boolean") {
           card.select({
@@ -118,6 +119,7 @@ export default defineCardPage({
               { label: "true", value: "true" },
               { label: "false", value: "false" },
             ],
+            initial_option: defaultValue,
           });
         } else {
           card.inputV2({

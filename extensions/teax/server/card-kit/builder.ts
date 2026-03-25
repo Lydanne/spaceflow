@@ -30,7 +30,7 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
     pageName: string,
     data: Record<string, unknown> = {},
   ) {
-    this.inner = new FeishuCardBuilder({ ...config, schema: "2.0" });
+    this.inner = new FeishuCardBuilder(config);
     this.pageName = pageName;
     this.currentData = data;
   }
@@ -69,6 +69,7 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
       placeholder: config.placeholder,
       required: config.required,
       options: config.options,
+      initial_option: config.initial_option,
     });
     return this;
   }

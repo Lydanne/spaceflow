@@ -8,7 +8,6 @@ export interface CardConfig {
   title: string;
   theme?: "blue" | "green" | "red" | "orange" | "grey";
   icon?: string;
-  schema?: "1.0" | "2.0";
 }
 
 /** 卡片元素 */
@@ -162,6 +161,8 @@ export interface SelectConfig {
   placeholder?: string;
   required?: boolean;
   options: Array<{ label: string; value: string }>;
+  /** 默认选中项的 value */
+  initial_option?: string;
 }
 
 // ─── 布局配置 ──────────────────────────

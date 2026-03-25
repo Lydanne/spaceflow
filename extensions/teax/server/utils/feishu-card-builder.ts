@@ -2,8 +2,6 @@ interface CardConfig {
   title: string;
   theme?: "blue" | "green" | "red" | "orange" | "grey";
   icon?: string;
-  /** 卡片 JSON 结构版本，默认 "1.0"。设为 "2.0" 可使用 form 容器等特性。 */
-  schema?: "1.0" | "2.0";
 }
 
 interface CardElement {
@@ -17,21 +15,6 @@ interface FormElement extends CardElement {
   elements: CardElement[];
 }
 
-interface ActionElement extends CardElement {
-  tag: "action";
-  actions: Array<{
-    tag: string;
-    text: { tag: string; content: string };
-    type?: string;
-    value?: string | Record<string, unknown>;
-    url?: string;
-    confirm?: {
-      title: { tag: string; content: string };
-      text: { tag: string; content: string };
-    };
-  }>;
-}
-
 interface CardHeader {
   title: {
     tag: string;
@@ -40,13 +23,13 @@ interface CardHeader {
   template: string;
 }
 
-/** JSON 2.0 输入框的输入类型 */
+/** 输入框的输入类型 */
 type InputType = "text" | "multiline_text" | "password";
 
-/** JSON 2.0 文本标签位置 */
+/** 文本标签位置 */
 type LabelPosition = "top" | "left";
 
-/** JSON 2.0 增强输入框配置 */
+/** 增强输入框配置 */
 interface InputConfigV2 {
   /** JSON 2.0 组件唯一标识，同一卡片内全局唯一。仅允许字母、数字和下划线，必须以字母开头，不超过 20 字符。 */
   element_id?: string;
@@ -84,21 +67,11 @@ interface InputConfigV2 {
   margin?: string;
 }
 
-/** JSON 1.0 兼容输入框配置 */
-interface InputConfigV1 {
-  name: string;
-  label: string;
-  placeholder?: string;
-  required?: boolean;
-  /** @deprecated 使用 addInputV2 的 input_type: "multiline_text" 代替 */
-  multiline?: boolean;
-}
-
 export class FeishuCardBuilder {
   private config: CardConfig;
   private header: CardHeader;
   private elements: CardElement[] = [];
-  /** 当前正在构建的表单容器（JSON 2.0） */
+  /** 当前正在构建的表单容器 */
   private currentForm: FormElement | null = null;
 
   constructor(config: CardConfig) {
@@ -112,20 +85,19 @@ export class FeishuCardBuilder {
     };
   }
 
-  // ─── 基础元素（JSON 1.0 / 2.0 通用） ─────────────
+  // ─── 基础元素 ─────────────
 
   addText(content: string, isMarkdown = false): this {
-    // JSON 2.0: markdown 组件使用 content 字符串直接作为内容，不再嵌套 text 对象
-    if (this.config.schema === "2.0" && isMarkdown) {
+    if (isMarkdown) {
       this.pushElement({
         tag: "markdown",
         content,
       });
     } else {
       this.pushElement({
-        tag: isMarkdown ? "markdown" : "div",
+        tag: "div",
         text: {
-          tag: isMarkdown ? "lark_md" : "plain_text",
+          tag: "plain_text",
           content,
         },
       });
@@ -164,47 +136,33 @@ export class FeishuCardBuilder {
       rawValue?: boolean;
     }>,
   ): this {
-    if (this.config.schema === "2.0") {
-      // JSON 2.0: 单按钮独立；多按钮用 column_set 并排
-      const btnElements = buttons.map((btn) => {
-        const element: CardElement = {
-          tag: "button",
-          text: { tag: "plain_text", content: btn.text },
-          type: btn.type || "default",
-          value: btn.rawValue ? btn.value : { action: btn.value },
-        };
-        if (btn.url) {
-          element.behaviors = [{ type: "open_url", default_url: btn.url }];
-        }
-        return element;
-      });
-
-      if (btnElements.length <= 1) {
-        btnElements.forEach((el) => this.pushElement(el));
-      } else {
-        this.pushElement({
-          tag: "column_set",
-          flex_mode: "none",
-          background_style: "default",
-          horizontal_spacing: "default",
-          columns: btnElements.map((el) => ({
-            tag: "column",
-            width: "auto",
-            vertical_align: "top",
-            elements: [el],
-          })),
-        });
+    // 单按钮独立；多按钮用 column_set 并排
+    const btnElements = buttons.map((btn) => {
+      const element: CardElement = {
+        tag: "button",
+        text: { tag: "plain_text", content: btn.text },
+        type: btn.type || "default",
+        value: btn.rawValue ? btn.value : { action: btn.value },
+      };
+      if (btn.url) {
+        element.behaviors = [{ type: "open_url", default_url: btn.url }];
       }
+      return element;
+    });
+
+    if (btnElements.length <= 1) {
+      btnElements.forEach((el) => this.pushElement(el));
     } else {
-      // JSON 1.0: action 容器包裹
       this.pushElement({
-        tag: "action",
-        actions: buttons.map((btn) => ({
-          tag: "button",
-          text: { tag: "plain_text", content: btn.text },
-          type: btn.type || "default",
-          value: btn.rawValue ? btn.value : JSON.stringify({ action: btn.value }),
-          ...(btn.url && { url: btn.url }),
+        tag: "column_set",
+        flex_mode: "none",
+        background_style: "default",
+        horizontal_spacing: "default",
+        columns: btnElements.map((el) => ({
+          tag: "column",
+          width: "auto",
+          vertical_align: "top",
+          elements: [el],
         })),
       });
     }
@@ -217,27 +175,18 @@ export class FeishuCardBuilder {
       : this.elements;
     const target = elements[elements.length - 1];
 
-    const confirmObj = {
-      title: { tag: "plain_text", content: config.title },
-      text: { tag: "plain_text", content: config.text },
-    };
-
     if (target?.tag === "button") {
-      // JSON 2.0: 直接在 button element 上设置 confirm
-      target.confirm = confirmObj;
-    } else if (target?.tag === "action") {
-      // JSON 1.0: action 容器内所有按钮
-      const actionElement = target as ActionElement;
-      actionElement.actions.forEach((action) => {
-        action.confirm = confirmObj;
-      });
+      target.confirm = {
+        title: { tag: "plain_text", content: config.title },
+        text: { tag: "plain_text", content: config.text },
+      };
     }
     return this;
   }
 
-  // ─── JSON 1.0 输入组件（兼容旧接口） ──────────────
+  // ─── 输入组件 ──────────────
 
-  addInput(config: InputConfigV1): this {
+  addInput(config: { name: string; label: string; placeholder?: string; required?: boolean }): this {
     const element: CardElement = {
       tag: "input",
       name: config.name,
@@ -251,12 +200,6 @@ export class FeishuCardBuilder {
         content: config.label,
       },
     };
-
-    // 兼容旧 multiline 属性：转换为 JSON 2.0 的 input_type
-    if (config.multiline) {
-      element.input_type = "multiline_text";
-    }
-
     this.pushElement(element);
     return this;
   }
@@ -267,8 +210,25 @@ export class FeishuCardBuilder {
     placeholder?: string;
     required?: boolean;
     options: Array<{ label: string; value: string }>;
+    /** 默认选中项的 value（JSON 2.0 通过 options[].selected 实现） */
+    initial_option?: string;
   }): this {
-    this.pushElement({
+    // JSON 2.0: 通过 options[].selected 标记默认选中
+    const options = config.options.map((opt) => {
+      const option: { text: { tag: string; content: string }; value: string; selected?: boolean } = {
+        text: {
+          tag: "plain_text",
+          content: opt.label,
+        },
+        value: opt.value,
+      };
+      if (config.initial_option === opt.value) {
+        option.selected = true;
+      }
+      return option;
+    });
+
+    const element: CardElement = {
       tag: "select_static",
       name: config.name,
       required: config.required || false,
@@ -276,20 +236,15 @@ export class FeishuCardBuilder {
         tag: "plain_text",
         content: config.placeholder || "请选择",
       },
-      options: config.options.map((opt) => ({
-        text: {
-          tag: "plain_text",
-          content: opt.label,
-        },
-        value: opt.value,
-      })),
-    });
+      options,
+    };
+
+    this.pushElement(element);
     return this;
   }
 
   addDatePicker(config: {
     name: string;
-    label: string;
     placeholder?: string;
     required?: boolean;
   }): this {
@@ -302,21 +257,14 @@ export class FeishuCardBuilder {
         content: config.placeholder || "选择日期",
       },
     };
-    // JSON 2.0 的 date_picker 不支持 label 属性（尤其在 form 容器内）
-    if (this.config.schema !== "2.0") {
-      element.label = {
-        tag: "plain_text",
-        content: config.label,
-      };
-    }
     this.pushElement(element);
     return this;
   }
 
-  // ─── JSON 2.0 表单容器 ────────────────────────────
+  // ─── 表单容器 ────────────────────────────
 
   /**
-   * 开始一个 JSON 2.0 表单容器。
+   * 开始一个表单容器。
    * 后续通过 addInputV2 / addSelect / addDatePicker / addFormButtons 添加的元素会自动归入此容器。
    * 必须搭配 endForm() 使用。
    */
@@ -346,7 +294,7 @@ export class FeishuCardBuilder {
   }
 
   /**
-   * JSON 2.0 增强输入框。
+   * 增强输入框。
    * 支持 input_type（text / multiline_text / password）、element_id、auto_resize 等完整属性。
    * 在表单容器内使用时，name 会作为 form_value 回调中的键名。
    */
@@ -364,7 +312,7 @@ export class FeishuCardBuilder {
       },
     };
 
-    // JSON 2.0 属性
+    // 可选属性
     if (config.element_id) {
       element.element_id = config.element_id;
     }
@@ -522,28 +470,14 @@ export class FeishuCardBuilder {
       this.currentForm = null;
     }
 
-    if (this.config.schema === "2.0") {
-      return {
-        msg_type: "interactive",
-        card: {
-          schema: "2.0",
-          header: this.header,
-          body: {
-            elements: this.elements,
-          },
-        },
-      };
-    }
-
-    // JSON 1.0（默认）
     return {
       msg_type: "interactive",
       card: {
-        config: {
-          wide_screen_mode: true,
-        },
+        schema: "2.0",
         header: this.header,
-        elements: this.elements,
+        body: {
+          elements: this.elements,
+        },
       },
     };
   }
