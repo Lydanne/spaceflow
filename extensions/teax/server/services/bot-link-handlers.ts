@@ -17,9 +17,20 @@ registerLinkRoute(
   async (ctx) => {
     const token = ctx.match[1]!;
     try {
-      const { generatePresetConsoleCard } = await import("~~/server/services/preset-console.service");
-      const card = await generatePresetConsoleCard({ openId: ctx.senderOpenId, shareToken: token });
-      await replyFeishuCardMessage(ctx.messageId, card);
+      const { cardRouter, ensurePages } = await import("~~/server/card-kit");
+      await ensurePages();
+      const card = await cardRouter.dispatch({
+        openId: ctx.senderOpenId,
+        actionValue: JSON.stringify({
+          __page: "preset:console",
+          __params: { shareToken: token },
+        }),
+        token: "",
+        updateCard: async () => {},
+      });
+      if (card) {
+        await replyFeishuCardMessage(ctx.messageId, card);
+      }
       return true;
     } catch (err) {
       console.error("[link-handler] preset-console error:", err);

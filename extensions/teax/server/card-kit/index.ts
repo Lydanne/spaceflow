@@ -38,6 +38,9 @@ export async function ensurePages(): Promise<void> {
     import("~~/server/card-pages/account-unbound.page"),
     import("~~/server/card-pages/test-form.page"),
     import("~~/server/card-pages/test-result.page"),
+    import("~~/server/card-pages/preset-console.page"),
+    import("~~/server/card-pages/wf-select.page"),
+    import("~~/server/card-pages/wf-params.page"),
   ]);
   for (const mod of pages) {
     const def = mod.default;

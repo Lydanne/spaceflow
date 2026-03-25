@@ -6,7 +6,6 @@ import {
 } from "~~/server/services/messaging";
 import { sendFeishuChatCardMessage } from "~~/server/utils/feishu-sdk";
 import { useGiteaSdk } from "~~/server/utils/gitea";
-import { startWorkflowAction } from "~~/server/services/workflow-action-machine";
 import { getActiveAccount } from "~~/server/services/account.service";
 
 // ─── 指令上下文 ─────────────────────────────────────────
@@ -220,13 +219,20 @@ registerCommand({
     }
 
     try {
-      const card = await startWorkflowAction({
-        messageId: ctx.messageId,
+      const { cardRouter, ensurePages } = await import("~~/server/card-kit");
+      await ensurePages();
+      const card = await cardRouter.dispatch({
         openId: ctx.senderOpenId,
-        repoFullName,
+        actionValue: JSON.stringify({
+          __page: "wf:select",
+          __params: { repoFullName },
+        }),
+        token: "",
+        updateCard: async () => {},
       });
-
-      await replyFeishuCardMessage(ctx.messageId, card);
+      if (card) {
+        await replyFeishuCardMessage(ctx.messageId, card);
+      }
     } catch (err) {
       console.error("[bot-command] actions error:", err);
       const msg = (err as Error).message || "获取工作流列表失败,请稍后重试";
@@ -627,13 +633,20 @@ registerCommand({
     }
 
     try {
-      const { generatePresetConsoleCard }
-        = await import("~~/server/services/preset-console.service");
-      const card = await generatePresetConsoleCard({
+      const { cardRouter, ensurePages } = await import("~~/server/card-kit");
+      await ensurePages();
+      const card = await cardRouter.dispatch({
         openId: ctx.senderOpenId,
-        shareToken: token,
+        actionValue: JSON.stringify({
+          __page: "preset:console",
+          __params: { shareToken: token },
+        }),
+        token: "",
+        updateCard: async () => {},
       });
-      await replyFeishuCardMessage(ctx.messageId, card);
+      if (card) {
+        await replyFeishuCardMessage(ctx.messageId, card);
+      }
     } catch (err) {
       console.error("[bot-command] run error:", err);
       const msg
@@ -710,7 +723,7 @@ export async function handleCardAction(
     }
   }
 
-  // ─── 旧卡片兼容：非 CardKit 的交互 ──────────────────────────
+  // ─── 审批流程兼容（尚未迁移到 CardKit） ──────────────────────────
   const actionValue = ctx.action.value as
     | Record<string, unknown>
     | string
@@ -754,30 +767,6 @@ export async function handleCardAction(
       updateCard,
     );
   }
-
-  // 预设控制台触发交互（尚未迁移到 CardKit）
-  if (actionType === "preset_console_trigger" && parsedValue?.token) {
-    const { handlePresetConsoleTrigger }
-      = await import("~~/server/services/preset-console.service");
-    await handlePresetConsoleTrigger({
-      openId: ctx.openId,
-      parsedValue,
-      formValue: (ctx.action.form_value
-        ?? ctx.action.form_values
-        ?? {}) as Record<string, string>,
-      updateCard,
-    });
-    return undefined;
-  }
-
-  // fallback: 状态机处理其他卡片交互
-  const { routeCardAction }
-    = await import("~~/server/utils/card-state-machine");
-  await routeCardAction({
-    action: ctx.action,
-    openId: ctx.openId,
-    updateCard,
-  });
 
   return undefined;
 }
