@@ -699,73 +699,24 @@ export async function handleCardAction(
 ): Promise<Record<string, unknown> | undefined> {
   const { updateCard } = ctx;
 
-  // ─── CardKit 路由优先处理 ──────────────────────────────────
-  // 所有 value 中包含 __page 的交互（控制面板、账户、表单等）统一由 cardRouter 分发
-  {
-    const { cardRouter, ensurePages } = await import("~~/server/card-kit");
-    await ensurePages();
-    const formVal = (ctx.action.form_value ?? ctx.action.form_values) as
-      | Record<string, string>
-      | undefined;
-    const noop = async () => {};
-    const cardResult = await cardRouter.dispatch({
-      openId: ctx.openId,
-      actionValue: ctx.action.value,
-      formValue: formVal,
-      token: ctx.token,
-      updateCard: updateCard || noop,
-    });
-    if (cardResult) {
-      if (updateCard) {
-        await updateCard(cardResult);
-      }
-      return undefined;
-    }
-  }
-
-  // ─── 审批流程兼容（尚未迁移到 CardKit） ──────────────────────────
-  const actionValue = ctx.action.value as
-    | Record<string, unknown>
-    | string
+  // ─── 所有交互统一由 CardKit 路由分发 ──────────────────────────────────
+  const { cardRouter, ensurePages } = await import("~~/server/card-kit");
+  await ensurePages();
+  const formVal = (ctx.action.form_value ?? ctx.action.form_values) as
+    | Record<string, string>
     | undefined;
-
-  let parsedValue: Record<string, unknown> | undefined;
-  if (typeof actionValue === "string") {
-    try {
-      let parsed = JSON.parse(actionValue);
-      if (typeof parsed === "string") {
-        parsed = JSON.parse(parsed);
-      }
-      parsedValue = parsed as Record<string, unknown>;
-    } catch {
-      if (actionValue.startsWith("approval_flow:")) {
-        const { handleApprovalFlowCardAction }
-          = await import("~~/server/services/approval-flow/card-handler");
-        return await handleApprovalFlowCardAction(
-          ctx.openId,
-          ctx.token,
-          actionValue,
-          updateCard,
-        );
-      }
-      parsedValue = undefined;
+  const noop = async () => {};
+  const cardResult = await cardRouter.dispatch({
+    openId: ctx.openId,
+    actionValue: ctx.action.value,
+    formValue: formVal,
+    token: ctx.token,
+    updateCard: updateCard || noop,
+  });
+  if (cardResult) {
+    if (updateCard) {
+      await updateCard(cardResult);
     }
-  } else {
-    parsedValue = actionValue;
-  }
-
-  const actionType = parsedValue?.action as string | undefined;
-
-  // 审批流程交互 (格式: approval_flow:approve:flowId)
-  if (actionType?.startsWith("approval_flow:")) {
-    const { handleApprovalFlowCardAction }
-      = await import("~~/server/services/approval-flow/card-handler");
-    return await handleApprovalFlowCardAction(
-      ctx.openId,
-      ctx.token,
-      actionType,
-      updateCard,
-    );
   }
 
   return undefined;

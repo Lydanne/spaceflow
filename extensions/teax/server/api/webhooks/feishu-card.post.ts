@@ -1,7 +1,6 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { verifyFeishuEventSignature } from "~~/server/utils/feishu-sdk";
-import { approveFlow, rejectFlow } from "~~/server/services/approval-flow/service";
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
@@ -87,14 +86,9 @@ async function handleCardAction(
   interaction: CardInteractionRecord,
   actionValue: CardActionValue,
   formValue?: Record<string, unknown>,
-  openId?: string,
+  _openId?: string,
 ) {
   const { card_type, business_id } = interaction;
-
-  // 处理通用审批流程卡片（action 格式: approval_flow:approve:flowId）
-  if (actionValue.action?.startsWith("approval_flow:")) {
-    return handleApprovalFlowAction(event, actionValue, openId);
-  }
 
   switch (card_type) {
     case "deploy_approval":
@@ -168,75 +162,6 @@ async function handleAgentConfirm(_sessionId: string | null, action: CardActionV
       toast: {
         type: "success",
         content: "Agent 已开始执行",
-      },
-    };
-  }
-
-  return { success: true };
-}
-
-async function handleApprovalFlowAction(
-  event: Parameters<typeof defineEventHandler>[0] extends (e: infer E) => unknown ? E : never,
-  actionValue: CardActionValue,
-  openId?: string,
-) {
-  // action 格式: approval_flow:approve:flowId 或 approval_flow:reject:flowId
-  const parts = (actionValue.action || "").split(":");
-  if (parts.length < 3) {
-    return { error: "Invalid action format" };
-  }
-
-  const [, actionType, flowId] = parts;
-
-  if (!flowId) {
-    return { error: "Missing flowId" };
-  }
-
-  if (!openId) {
-    return { error: "Missing open_id" };
-  }
-
-  // 根据 open_id 查找用户
-  const db = useDB();
-  const [feishuBinding] = await db
-    .select()
-    .from(schema.userFeishu)
-    .where(eq(schema.userFeishu.feishu_open_id, openId))
-    .limit(1);
-
-  if (!feishuBinding?.user_id) {
-    return {
-      toast: {
-        type: "error",
-        content: "未找到关联的用户账号",
-      },
-    };
-  }
-
-  try {
-    if (actionType === "approve") {
-      await approveFlow(event, flowId, feishuBinding.user_id);
-      return {
-        toast: {
-          type: "success",
-          content: "审批已通过",
-        },
-      };
-    } else if (actionType === "reject") {
-      await rejectFlow(event, flowId, feishuBinding.user_id);
-      return {
-        toast: {
-          type: "info",
-          content: "审批已拒绝",
-        },
-      };
-    }
-  } catch (e) {
-    console.error("[ApprovalFlow] Card action error:", e);
-    return {
-      toast: {
-        type: "error",
-        content: e instanceof Error ? e.message : "操作失败",
       },
     };
   }

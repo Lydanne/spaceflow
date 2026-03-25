@@ -1,7 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { getStrategy } from "./registry";
-import { FeishuCardBuilder } from "~~/server/utils/feishu-card-builder";
 import { sendFeishuCardMessage } from "~~/server/utils/feishu-sdk";
 import { writeAuditLog } from "~~/server/utils/audit";
 import type { H3Event } from "h3";
@@ -9,38 +8,6 @@ import type { ApprovalFlow } from "~~/server/db/schema/approval-flow";
 import type { ApprovalStrategy } from "./types";
 
 const DEFAULT_EXPIRE_DAYS = 7;
-
-/**
- * 获取申请人的显示信息
- * 优先使用飞书 @ 格式，否则使用用户名
- */
-async function getRequesterDisplayInfo(requesterId: string): Promise<string> {
-  const db = useDB();
-
-  // 查询用户信息和飞书绑定
-  const [user] = await db
-    .select({
-      gitea_username: schema.users.gitea_username,
-      feishu_open_id: schema.userFeishu.feishu_open_id,
-      feishu_name: schema.userFeishu.feishu_name,
-    })
-    .from(schema.users)
-    .leftJoin(schema.userFeishu, eq(schema.users.id, schema.userFeishu.user_id))
-    .where(eq(schema.users.id, requesterId))
-    .limit(1);
-
-  if (!user) {
-    return "未知用户";
-  }
-
-  // 如果绑定了飞书，使用 @ 格式
-  if (user.feishu_open_id) {
-    return `<at id=${user.feishu_open_id}></at>`;
-  }
-
-  // 否则使用飞书名称或 Gitea 用户名
-  return user.feishu_name || user.gitea_username || "未知用户";
-}
 
 /**
  * 创建审批流程
@@ -310,51 +277,27 @@ export async function cancelFlow(
 async function sendApprovalCard(
   flow: ApprovalFlow,
   approverOpenIds: string[],
-  strategy: ApprovalStrategy,
+  _strategy: ApprovalStrategy,
 ): Promise<void> {
-  const fields = await strategy.buildCardFields(
-    flow,
-    flow.payload as Record<string, unknown>,
-  );
-
-  // 添加申请人信息
-  const requesterInfo = await getRequesterDisplayInfo(flow.requester_id);
-  fields.unshift({ label: "申请人", value: requesterInfo });
-
-  // 添加申请理由
-  if (flow.reason) {
-    fields.push({ label: "申请理由", value: flow.reason });
-  }
-
-  const card = new FeishuCardBuilder({
-    title: `📋 ${flow.title}`,
-    theme: "blue",
-  })
-    .addFields(fields)
-    .addDivider()
-    .addButtons([
-      {
-        text: "✅ 通过",
-        value: `approval_flow:approve:${flow.id}`,
-        type: "primary",
-      },
-      {
-        text: "❌ 拒绝",
-        value: `approval_flow:reject:${flow.id}`,
-        type: "danger",
-      },
-    ])
-    .addConfirm({
-      title: "确认操作",
-      text: "确定要执行此操作吗？",
-    })
-    .build();
+  const { cardRouter, ensurePages } = await import("~~/server/card-kit");
+  await ensurePages();
 
   // 私信发送给每个审批人
   const db = useDB();
   for (const openId of approverOpenIds) {
     try {
-      const result = await sendFeishuCardMessage(openId, card.card, "open_id");
+      const card = await cardRouter.dispatch({
+        openId,
+        actionValue: JSON.stringify({
+          __page: "approval:pending",
+          __params: { flowId: flow.id },
+        }),
+        token: "",
+        updateCard: async () => {},
+      });
+      if (!card) continue;
+
+      const result = await sendFeishuCardMessage(openId, card, "open_id");
 
       // 记录第一个成功发送的 message_id
       if (result.message_id && !flow.feishu_message_id) {
@@ -409,15 +352,16 @@ async function notifyRequester(
     fields.push({ label: "审批备注", value: flow.approver_comment });
   }
 
-  const card = new FeishuCardBuilder({
-    title,
-    theme: isApproved ? "green" : "red",
-  })
-    .addFields(fields)
+  const { EnhancedCardBuilder } = await import("~~/server/card-kit");
+  const card = new EnhancedCardBuilder(
+    { title, theme: isApproved ? "green" : "red" },
+    "",
+  )
+    .fields(fields)
     .build();
 
   try {
-    await sendFeishuCardMessage(feishuBinding.feishu_open_id, card.card, "open_id");
+    await sendFeishuCardMessage(feishuBinding.feishu_open_id, card, "open_id");
   } catch (e) {
     console.error("[ApprovalFlow] Failed to notify requester:", e);
   }
