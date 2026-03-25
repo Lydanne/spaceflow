@@ -32,6 +32,7 @@ export async function ensurePages(): Promise<void> {
     import("~~/server/card-pages/cp-repos.page"),
     import("~~/server/card-pages/cp-repo-menu.page"),
     import("~~/server/card-pages/cp-actions.page"),
+    import("~~/server/card-pages/cp-trigger-wf.page"),
     import("~~/server/card-pages/cp-feature.page"),
     import("~~/server/card-pages/account-home.page"),
     import("~~/server/card-pages/account-guide.page"),
