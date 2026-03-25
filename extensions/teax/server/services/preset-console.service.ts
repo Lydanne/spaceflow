@@ -25,7 +25,7 @@ function buildLoadingCard(): Record<string, unknown> {
     .build().card;
 }
 
-// --- Main: Generate Preset Console Card ---
+// --- Main: Generate Preset Console Card (JSON 2.0 structure) ---
 export async function generatePresetConsoleCard(params: {
   openId: string;
   shareToken: string;
@@ -57,115 +57,161 @@ export async function generatePresetConsoleCard(params: {
     console.warn("[preset-console] Failed to fetch workflow inputs:", err);
   }
 
-  // Get branches if override is allowed
+  // Get branches for display
   let branches: Array<{ label: string; value: string }> = [];
-  if (preset.allow_branch_override) {
-    try {
-      const branchList = await gitea.getRepoBranches(owner, repoName);
-      branches = branchList.map((b) => ({ label: b.name, value: b.name }));
-    } catch (err) {
-      console.warn("[preset-console] Failed to fetch branches:", err);
-    }
+  try {
+    const branchList = await gitea.getRepoBranches(owner, repoName);
+    branches = branchList.map((b) => ({ label: b.name, value: b.name }));
+  } catch (err) {
+    console.warn("[preset-console] Failed to fetch branches:", err);
   }
 
-  // Build card
-  const builder = new FeishuCardBuilder({ title: `🚀 ${preset.name}`, theme: "blue" });
+  // Collect form elements (branch selector, editable inputs)
+  const formElements: Array<Record<string, unknown>> = [];
 
-  // Preset info
-  const infoLines = [
-    `**仓库**: ${repo.full_name}`,
-    `**工作流**: ${preset.workflow_path}`,
-  ];
-  if (!preset.allow_branch_override) {
-    infoLines.push(`**分支**: ${preset.branch}`);
-  }
-  builder.addText(infoLines.join("\n"), true);
-  builder.addDivider();
-
-  // Branch selector (only if override allowed)
-  if (preset.allow_branch_override && branches.length > 0) {
+  // Branch selector — always show when branches are available
+  if (branches.length > 0) {
     const defaultFirst = branches.find((b) => b.value === preset.branch)
       ? [branches.find((b) => b.value === preset.branch)!]
       : [];
     const rest = branches.filter((b) => b.value !== preset.branch);
-    builder.addSelect({
+
+    formElements.push({
+      tag: "select_static",
       name: "branch",
-      label: "分支",
-      placeholder: "选择分支",
       required: true,
-      options: [...defaultFirst, ...rest],
+      placeholder: {
+        tag: "plain_text",
+        content: "选择分支",
+      },
+      options: [...defaultFirst, ...rest].map((opt) => ({
+        text: { tag: "plain_text", content: opt.label },
+        value: opt.value,
+      })),
     });
   }
 
-  // Input parameters
+  // Collect locked fields (displayed outside form as read-only)
+  const lockedFields: Array<{ label: string; value: string }> = [];
+
+  // Process input definitions
   if (inputDefs) {
-    if (preset.allow_input_override) {
-      const lockedInputs = new Set<string>(preset.locked_inputs || []);
+    const lockedInputs = new Set<string>(preset.locked_inputs || []);
 
-      for (const [key, def] of Object.entries(inputDefs)) {
-        if (lockedInputs.has(key)) continue;
-
-        if (def.type === "choice" && def.options?.length) {
-          builder.addSelect({
-            name: key,
-            label: def.description || key,
-            placeholder: `选择 ${def.description || key}`,
-            required: def.required,
-            options: def.options.map((o) => ({ label: o, value: o })),
-          });
-        } else if (def.type === "boolean") {
-          builder.addSelect({
-            name: key,
-            label: def.description || key,
-            placeholder: `选择 ${def.description || key}`,
-            required: def.required,
-            options: [
-              { label: "是", value: "true" },
-              { label: "否", value: "false" },
-            ],
-          });
-        } else {
-          builder.addInput({
-            name: key,
-            label: def.description || key,
-            placeholder: def.default ? String(def.default) : `输入 ${def.description || key}`,
-            required: def.required,
-          });
-        }
+    for (const [key, def] of Object.entries(inputDefs)) {
+      if (lockedInputs.has(key)) {
+        // Locked inputs: collect for read-only display outside form
+        lockedFields.push({
+          label: def.description || key,
+          value: String((preset.inputs as Record<string, unknown>)?.[key] ?? def.default ?? "-"),
+        });
+        continue;
       }
-    } else {
-      // Read-only display when input override is not allowed
-      const fields = Object.entries(inputDefs).map(([key, def]) => ({
-        label: def.description || key,
-        value: String((preset.inputs as Record<string, unknown>)?.[key] ?? def.default ?? "-"),
-      }));
 
-      if (fields.length > 0) {
-        builder.addFields(fields);
+      // Editable inputs: add to form elements
+      if (def.type === "choice" && def.options?.length) {
+        formElements.push({
+          tag: "select_static",
+          name: key,
+          required: def.required || false,
+          placeholder: {
+            tag: "plain_text",
+            content: `选择 ${def.description || key}`,
+          },
+          options: def.options.map((o) => ({
+            text: { tag: "plain_text", content: o },
+            value: o,
+          })),
+        });
+      } else if (def.type === "boolean") {
+        formElements.push({
+          tag: "select_static",
+          name: key,
+          required: def.required || false,
+          placeholder: {
+            tag: "plain_text",
+            content: `选择 ${def.description || key}`,
+          },
+          options: [
+            { text: { tag: "plain_text", content: "是" }, value: "true" },
+            { text: { tag: "plain_text", content: "否" }, value: "false" },
+          ],
+        });
+      } else {
+        formElements.push({
+          tag: "input",
+          name: key,
+          required: def.required || false,
+          placeholder: {
+            tag: "plain_text",
+            content: def.default ? String(def.default) : `输入 ${def.description || key}`,
+          },
+        });
       }
     }
   }
 
-  // Build card, then add raw trigger button
-  const card = builder.build().card;
-
-  // Trigger button — raw element to bypass addButtons value wrapping
-  card.elements.push({
-    tag: "action",
-    actions: [
-      {
-        tag: "button",
-        text: { tag: "plain_text", content: "🚀 触发工作流" },
-        type: "primary",
-        value: JSON.stringify({
-          action: "preset_console_trigger",
-          token: params.shareToken,
-        }),
-      },
-    ],
+  // Add submit button to form elements
+  formElements.push({
+    tag: "button",
+    text: { tag: "plain_text", content: "🚀 触发工作流" },
+    type: "primary",
+    action_type: "form_submit",
+    name: "submit_btn",
+    value: {
+      action: "preset_console_trigger",
+      token: params.shareToken,
+    },
   });
 
-  return card;
+  // Build body elements array
+  const bodyElements: Array<Record<string, unknown>> = [
+    // Preset info (markdown)
+    {
+      tag: "markdown",
+      text: {
+        tag: "lark_md",
+        content: `**仓库**: ${repo.full_name}\n**工作流**: ${preset.workflow_path}`,
+      },
+    },
+    // Divider
+    { tag: "hr" },
+    // Form container with all interactive elements
+    {
+      tag: "form",
+      name: "preset_form",
+      elements: formElements,
+    },
+  ];
+
+  // Add locked fields as read-only display (outside form)
+  if (lockedFields.length > 0) {
+    bodyElements.push({
+      tag: "div",
+      fields: lockedFields.map((f) => ({
+        is_short: true,
+        text: {
+          tag: "lark_md",
+          content: `**${f.label}**\n${f.value}`,
+        },
+      })),
+    });
+  }
+
+  // Return JSON 2.0 structure
+  return {
+    schema: "2.0",
+    header: {
+      title: {
+        tag: "plain_text",
+        content: `🚀 ${preset.name}`,
+      },
+      template: "blue",
+    },
+    body: {
+      elements: bodyElements,
+    },
+  };
 }
 
 // --- Main: Handle Preset Console Trigger ---

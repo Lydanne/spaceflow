@@ -190,8 +190,7 @@ async function handleMessageEvent(data: {
     );
 
     // 1. 优先尝试链接处理器（支持 text 和 post 消息）
-    const { handleLinkMessage }
-      = await import("~~/server/utils/link-handler");
+    const { handleLinkMessage } = await import("~~/server/utils/link-handler");
     // 确保 link handlers 已注册（触发 bot-link-handlers 模块加载）
     await import("~~/server/services/bot-link-handlers");
 
@@ -213,8 +212,8 @@ async function handleMessageEvent(data: {
     }
 
     // 调用指令处理(空文本也处理,用于显示控制面板)
-    const { handleBotCommand }
-      = await import("~~/server/services/bot-command.service");
+    const { handleBotCommand } =
+      await import("~~/server/services/bot-command.service");
     await handleBotCommand({
       messageId: message.message_id,
       chatId: message.chat_id,
@@ -231,52 +230,69 @@ async function handleMessageEvent(data: {
  * 处理卡片交互事件
  * 返回值会被飞书用于更新卡片
  */
-async function handleCardActionEvent(data: Record<string, unknown>): Promise<Record<string, unknown> | undefined> {
+async function handleCardActionEvent(
+  data: Record<string, unknown>,
+): Promise<Record<string, unknown> | undefined> {
+  // 调试：打印所有 card.action.trigger 原始数据，排查表单提交是否到达
+  console.log(
+    "[feishu-ws] 🔍 card.action.trigger raw data:",
+    JSON.stringify(data, null, 2),
+  );
+
   try {
     const action = data.action as Record<string, unknown> | undefined;
-    const operator = data.operator as { open_id?: string; user_id?: string } | undefined;
+    const operator = data.operator as
+      | { open_id?: string; user_id?: string }
+      | undefined;
     const token = data.token as string | undefined;
     // 消息 ID 在 context.open_message_id 中
-    const context = data.context as { open_message_id?: string; open_chat_id?: string } | undefined;
+    const context = data.context as
+      | { open_message_id?: string; open_chat_id?: string }
+      | undefined;
     const openMessageId = context?.open_message_id;
 
     if (!action || !operator || !token) {
-      return;
+      return {};
     }
 
     const openId = operator.open_id;
     if (!openId) {
-      return;
+      return {};
     }
 
     console.log(`[feishu-ws] 🎯 Card action from ${openId}`);
 
     // 使用卡片更新器
-    let cardUpdater: Awaited<ReturnType<typeof import("~~/server/utils/feishu-card-updater").createCardUpdater>> | undefined;
+    let cardUpdater:
+      | Awaited<
+          ReturnType<
+            typeof import("~~/server/utils/feishu-card-updater").createCardUpdater
+          >
+        >
+      | undefined;
     if (openMessageId) {
-      const { createCardUpdater } = await import("~~/server/utils/feishu-card-updater");
+      const { createCardUpdater } =
+        await import("~~/server/utils/feishu-card-updater");
       cardUpdater = createCardUpdater("long", openMessageId);
     }
 
-    const { handleCardAction }
-      = await import("~~/server/services/bot-command.service");
+    const { handleCardAction } =
+      await import("~~/server/services/bot-command.service");
 
-    // handleCardAction 内部会通过 updateCard 回调更新卡片
-    await handleCardAction({
+    // handleCardAction 内部会通过 updateCard 回调更新卡片，
+    // 其返回值可能是 toast 等响应对象，需要透传给飞书。
+    const result = await handleCardAction({
       action: action as Record<string, unknown>,
       openId,
       token,
       updateCard: cardUpdater?.updateCard,
     });
 
-    // // 等待卡片更新完成后再返回
-    // if (cardUpdater) {
-    //   return await cardUpdater.waitForUpdate();
-    // }
-
-    return undefined;
+    // 有显式返回值则透传（如 toast），否则返回空对象告诉飞书不做额外处理
+    return result ?? {};
   } catch (error) {
     console.error("[feishu-ws] Error handling card action:", error);
+    return {};
   }
 }
 
@@ -293,8 +309,8 @@ async function handleApprovalEvent(data: {
   try {
     console.log("[feishu-ws] 📋 Approval event received");
 
-    const { handleFeishuApprovalEvent }
-      = await import("~~/server/services/approval.service");
+    const { handleFeishuApprovalEvent } =
+      await import("~~/server/services/approval.service");
     await handleFeishuApprovalEvent({
       instance_code: data.instance_code,
       status: data.status,
