@@ -1,6 +1,6 @@
 import { useDB, schema } from "~~/server/db";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
-import { and, eq, isNull, desc } from "drizzle-orm";
+import { and, eq, isNull, desc, or } from "drizzle-orm";
 
 export default defineEventHandler(async (event) => {
   const { repoId, orgId } = await resolveRepoId(event);
@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
     )
     .orderBy(desc(schema.workflowPresets.created_at));
 
-  // 获取预设组（属于当前仓库）
+  // 获取预设组（属于当前仓库，且是公开的或用户自己创建的）
   const presetGroups = await db
     .select({
       id: schema.workflowPresetGroups.id,
@@ -77,7 +77,15 @@ export default defineEventHandler(async (event) => {
     })
     .from(schema.workflowPresetGroups)
     .leftJoin(schema.users, eq(schema.workflowPresetGroups.created_by, schema.users.id))
-    .where(eq(schema.workflowPresetGroups.repository_id, repoId))
+    .where(
+      and(
+        eq(schema.workflowPresetGroups.repository_id, repoId),
+        or(
+          eq(schema.workflowPresetGroups.is_public, true),
+          eq(schema.workflowPresetGroups.created_by, session.user.id),
+        ),
+      ),
+    )
     .orderBy(desc(schema.workflowPresetGroups.created_at));
 
   return {

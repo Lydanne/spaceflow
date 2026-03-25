@@ -127,22 +127,16 @@ async function deletePreset(preset: RepoPresetItem) {
 
     <template v-else>
       <!-- 组织预设 -->
-      <div class="space-y-3">
+      <div
+        v-if="orgPresets.length > 0"
+        class="space-y-3"
+      >
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">
             组织预设 ({{ orgPresets.length }})
           </h3>
         </div>
-        <p
-          v-if="orgPresets.length === 0"
-          class="text-sm text-gray-400 py-4 text-center"
-        >
-          暂无公开预设
-        </p>
-        <div
-          v-else
-          class="space-y-2"
-        >
+        <div class="space-y-2">
           <div
             v-for="preset in orgPresets"
             :key="preset.id"
@@ -200,22 +194,16 @@ async function deletePreset(preset: RepoPresetItem) {
       </div>
 
       <!-- 我的预设 -->
-      <div class="space-y-3">
+      <div
+        v-if="myPresets.length > 0"
+        class="space-y-3"
+      >
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">
             我的预设 ({{ myPresets.length }})
           </h3>
         </div>
-        <p
-          v-if="myPresets.length === 0"
-          class="text-sm text-gray-400 py-4 text-center"
-        >
-          暂无私有预设
-        </p>
-        <div
-          v-else
-          class="space-y-2"
-        >
+        <div class="space-y-2">
           <div
             v-for="preset in myPresets"
             :key="preset.id"
@@ -282,22 +270,16 @@ async function deletePreset(preset: RepoPresetItem) {
       </div>
 
       <!-- 预设组 -->
-      <div class="space-y-3">
+      <div
+        v-if="presetGroups.length > 0"
+        class="space-y-3"
+      >
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">
             预设组 ({{ presetGroups.length }})
           </h3>
         </div>
-        <p
-          v-if="presetGroups.length === 0"
-          class="text-sm text-gray-400 py-4 text-center"
-        >
-          暂无预设组
-        </p>
-        <div
-          v-else
-          class="space-y-2"
-        >
+        <div class="space-y-2">
           <div
             v-for="group in presetGroups"
             :key="group.id"
@@ -352,6 +334,23 @@ async function deletePreset(preset: RepoPresetItem) {
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- 全部为空时的提示 -->
+      <div
+        v-if="orgPresets.length === 0 && myPresets.length === 0 && presetGroups.length === 0"
+        class="text-center py-12"
+      >
+        <UIcon
+          name="i-lucide-bookmark"
+          class="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4"
+        />
+        <p class="text-gray-400">
+          暂无预设
+        </p>
+        <p class="text-sm text-gray-400 mt-1">
+          在 Actions 页面触发工作流后可保存为预设
+        </p>
       </div>
     </template>
   </div>
