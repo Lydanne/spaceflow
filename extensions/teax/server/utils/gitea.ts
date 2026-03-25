@@ -612,15 +612,22 @@ export async function refreshGiteaToken(refreshToken: string): Promise<GiteaOAut
 
 type GiteaRole = "admin" | "user";
 
+/** 用户 token 提供者回调 */
+export type UserTokenProvider = () => Promise<
+  { accessToken: string; refreshToken: string } | null
+>;
+
 interface GiteaSdkContext {
   event?: H3Event;
+  /** 自定义 token 提供者（用于非 H3Event 场景，如飞书卡片交互） */
+  userTokenProvider?: UserTokenProvider;
 }
 
 interface GiteaSdk {
   /**
    * 选择角色创建 GiteaService
    * - 'admin': 使用 Service Token（后台操作、webhook、同步等）
-   * - 'user': 使用当前用户的 OAuth Token（需要传入 event）
+   * - 'user': 使用当前用户的 OAuth Token（需要传入 event 或 userTokenProvider）
    */
   role(role: GiteaRole): Promise<GiteaService>;
 }
@@ -632,15 +639,51 @@ interface GiteaSdk {
  * const gitea = await useGiteaSdk().role('admin');
  * await gitea.listSystemHooks();
  *
- * // 使用用户 token
+ * // 使用用户 token（通过 H3Event）
  * const gitea = await useGiteaSdk(event).role('user');
  * await gitea.dispatchWorkflow(owner, repo, workflowId, ref);
+ *
+ * // 使用用户 token（通过回调，如飞书卡片交互）
+ * const gitea = await useGiteaSdk({
+ *   userTokenProvider: async () => {
+ *     const user = await getActiveAccount(openId);
+ *     return user ? getUserGiteaTokens(user.id) : null;
+ *   }
+ * }).role('user');
  */
-export function useGiteaSdk(event?: H3Event): GiteaSdk {
-  const ctx: GiteaSdkContext = { event };
+export function useGiteaSdk(
+  eventOrOptions?: H3Event | { userTokenProvider: UserTokenProvider },
+): GiteaSdk {
+  const ctx: GiteaSdkContext
+    = !eventOrOptions || "userTokenProvider" in eventOrOptions
+      ? { userTokenProvider: eventOrOptions?.userTokenProvider }
+      : { event: eventOrOptions };
 
   // 获取用户 token 并验证/刷新
   async function getUserGiteaService(): Promise<GiteaService | null> {
+    // 优先使用自定义 token 提供者
+    if (ctx.userTokenProvider) {
+      const tokens = await ctx.userTokenProvider();
+      if (!tokens) return null;
+
+      const gitea = createGiteaService(tokens.accessToken);
+      try {
+        await gitea.getCurrentUser();
+        return gitea;
+      } catch {
+        // Token 无效，尝试刷新
+        if (!tokens.refreshToken) return null;
+      }
+
+      try {
+        const tokenResponse = await refreshGiteaToken(tokens.refreshToken);
+        return createGiteaService(tokenResponse.access_token);
+      } catch {
+        return null;
+      }
+    }
+
+    // 使用 H3Event 获取 session token
     if (!ctx.event) return null;
 
     const session = await getUserSession(ctx.event);
@@ -716,19 +759,19 @@ export function useGiteaSdk(event?: H3Event): GiteaSdk {
   return {
     async role(role: GiteaRole): Promise<GiteaService> {
       if (role === "admin") {
-        // admin 角色：有 event 时优先用户 token（维护刷新），fallback 到 service token
-        if (ctx.event) {
+        // admin 角色：有 event/provider 时优先用户 token（维护刷新），fallback 到 service token
+        if (ctx.event || ctx.userTokenProvider) {
           const userGitea = await getUserGiteaService();
           if (userGitea) return userGitea;
         }
         return getServiceGiteaService();
       }
 
-      // role === 'user'：必须有 event，必须有用户 token
-      if (!ctx.event) {
+      // role === 'user'：必须有 event 或 userTokenProvider，必须有用户 token
+      if (!ctx.event && !ctx.userTokenProvider) {
         throw createError({
           statusCode: 500,
-          message: "useGiteaSdk: event is required for user role",
+          message: "useGiteaSdk: event or userTokenProvider is required for user role",
         });
       }
 

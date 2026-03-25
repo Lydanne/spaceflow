@@ -2,6 +2,7 @@ import { defineCardPage } from "~~/server/card-kit";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { parseWorkflowYaml, extractInputs, type WorkflowInputDef } from "~~/server/utils/workflow-yaml";
 import { getActiveAccount } from "~~/server/services/account.service";
+import { getUserGiteaTokens } from "~~/server/services/auth.service";
 import { queryUserPermissionGroups, rowGrantsPermission } from "~~/server/utils/permission";
 import { useDB, schema } from "~~/server/db";
 import { eq } from "drizzle-orm";
@@ -20,17 +21,24 @@ export default defineCardPage({
     const repo = ctx.params.repo as string;
     const workflowPath = ctx.params.workflowPath as string;
 
-    const gitea = await useGiteaSdk().role("admin");
+    // 使用用户 token（通过飞书 openId 获取），fallback 到 admin token
+    const gitea = useGiteaSdk({
+      userTokenProvider: async () => {
+        const user = await getActiveAccount(ctx.openId);
+        return user ? getUserGiteaTokens(user.id) : null;
+      },
+    });
+    const giteaService = await gitea.role("admin");
     const workflowName = workflowPath.split("/").pop() || workflowPath;
 
     // 获取分支列表
     let branches: Array<{ label: string; value: string }> = [];
     let defaultBranch = "main";
     try {
-      const branchList = await gitea.getRepoBranches(owner, repo);
+      const branchList = await giteaService.getRepoBranches(owner, repo);
       branches = branchList.map((b) => ({ label: b.name, value: b.name }));
       // 获取默认分支
-      const repoInfo = await gitea.getRepo(owner, repo);
+      const repoInfo = await giteaService.getRepo(owner, repo);
       defaultBranch = repoInfo.default_branch || "main";
     } catch (err) {
       console.warn("[cp:trigger-wf] Failed to fetch branches:", err);
@@ -38,10 +46,11 @@ export default defineCardPage({
 
     // 获取 workflow inputs
     let inputDefs: Record<string, WorkflowInputDef> | null = null;
+    let workflowYaml: string | null = null;
     try {
-      const content = await gitea.getFileContent(owner, repo, workflowPath, defaultBranch);
-      if (content) {
-        const doc = parseWorkflowYaml(content);
+      workflowYaml = await giteaService.getFileContent(owner, repo, workflowPath, defaultBranch);
+      if (workflowYaml) {
+        const doc = parseWorkflowYaml(workflowYaml);
         if (doc) {
           inputDefs = extractInputs(doc);
         }
@@ -204,12 +213,18 @@ export default defineCardPage({
       await ctx.updateCard(loadingCard);
     }
 
-    // 5. Dispatch workflow
-    const gitea = await useGiteaSdk().role("admin");
+    // 5. Dispatch workflow（使用用户 token）
+    const gitea = useGiteaSdk({
+      userTokenProvider: async () => {
+        const user = await getActiveAccount(ctx.openId);
+        return user ? getUserGiteaTokens(user.id) : null;
+      },
+    });
+    const giteaService = await gitea.role("admin");
     const workflowFileName = workflowPath.split("/").pop() || workflowPath;
 
     try {
-      await gitea.dispatchWorkflow(owner, repo, workflowFileName, branch, inputs);
+      await giteaService.dispatchWorkflow(owner, repo, workflowFileName, branch, inputs);
     } catch (err) {
       console.error("[cp:trigger-wf] dispatchWorkflow error:", err);
       const errObj = err as { data?: { message?: string }; message?: string };
@@ -231,8 +246,8 @@ export default defineCardPage({
     let latestRunId = 0;
 
     try {
-      const runs = await gitea.getRepoWorkflowRuns(owner, repo, 1, 5);
-      const latestRun = runs.workflow_runs?.find((run) => run.path?.includes(workflowFileName));
+      const runs = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 5);
+      const latestRun = runs.workflow_runs?.find((run: { path?: string }) => run.path?.includes(workflowFileName));
       if (latestRun) {
         latestRunId = latestRun.id;
       }
@@ -243,8 +258,8 @@ export default defineCardPage({
     for (let i = 0; i < 10; i++) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       try {
-        const runs = await gitea.getRepoWorkflowRuns(owner, repo, 1, 5);
-        const newRun = runs.workflow_runs?.find((run) => {
+        const runs = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 5);
+        const newRun = runs.workflow_runs?.find((run: { path?: string; id: number }) => {
           return run.path?.includes(workflowFileName) && run.id > latestRunId;
         });
         if (newRun) {

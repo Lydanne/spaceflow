@@ -27,6 +27,7 @@ const projectBase = `/${owner}/${repo}`;
 
 const baseTabs = [
   { label: "README", value: "readme", icon: "i-lucide-file-text", to: projectBase },
+  { label: "Presets", value: "presets", icon: "i-lucide-bookmark", to: `${projectBase}/presets` },
   { label: "Actions", value: "actions", icon: "i-lucide-zap", to: `${projectBase}/actions` },
   { label: "Workspaces", value: "workspaces", icon: "i-lucide-container", to: `${projectBase}/workspaces` },
   { label: "Pages", value: "pages", icon: "i-lucide-earth", to: `${projectBase}/pages` },
@@ -39,6 +40,7 @@ const tabs = computed(() =>
 
 const activeTab = computed(() => {
   const path = route.path;
+  if (path.includes("/presets")) return "presets";
   if (path.includes("/actions") || path.includes("/workflows")) return "actions";
   if (path.includes("/workspaces")) return "workspaces";
   if (path.endsWith("/pages")) return "pages";

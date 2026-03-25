@@ -1,5 +1,7 @@
 import { defineCardPage } from "~~/server/card-kit";
 import { useGiteaSdk } from "~~/server/utils/gitea";
+import { getActiveAccount } from "~~/server/services/account.service";
+import { getUserGiteaTokens } from "~~/server/services/auth.service";
 
 function getStatusEmoji(status: string, conclusion: string | null): string {
   if (conclusion === "success") return "✅";
@@ -28,16 +30,28 @@ export default defineCardPage({
     const config = useRuntimeConfig();
     const baseUrl = config.public.appUrl;
 
-    const gitea = useGiteaSdk();
-    let runs: Awaited<
-      ReturnType<
-        Awaited<ReturnType<typeof gitea.role>>["getRepoWorkflowRuns"]
-      >
-    >["workflow_runs"] = [];
+    let runs: Array<{
+      id: number;
+      run_number: number;
+      display_title: string;
+      status: string;
+      conclusion: string | null;
+      head_branch: string;
+      head_sha: string;
+      started_at: string;
+    }> = [];
     let workflows: Array<{ name: string; path: string }> = [];
 
     try {
+      // 使用用户 token（通过飞书 openId 获取），fallback 到 admin token
+      const gitea = await useGiteaSdk({
+        userTokenProvider: async () => {
+          const user = await getActiveAccount(ctx.openId);
+          return user ? getUserGiteaTokens(user.id) : null;
+        },
+      });
       const giteaService = await gitea.role("admin");
+
       // 只获取前5条运行记录
       const response = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 5);
       runs = response.workflow_runs ?? [];
