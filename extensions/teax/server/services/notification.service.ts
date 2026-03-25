@@ -5,6 +5,7 @@ import {
   sendFeishuChatCardMessage,
   type FeishuInteractiveCard,
 } from "~~/server/services/messaging";
+import { EnhancedCardBuilder } from "~~/server/card-kit";
 import type { NotifyRule, NotifyEvent } from "~~/server/shared/dto/repository.dto";
 
 // ─── 通知类型 ─────────────────────────────────────────────
@@ -68,45 +69,22 @@ export function buildWorkflowRunCard(params: {
     else duration = `${Math.floor(seconds / 3600)}h${Math.floor((seconds % 3600) / 60)}m`;
   }
 
-  return {
-    header: {
-      title: { tag: "plain_text", content: `${conclusionText} ${params.repoFullName} #${params.runNumber}` },
-      template,
-    },
-    elements: [
-      {
-        tag: "div",
-        text: {
-          tag: "lark_md",
-          content: `**${params.displayTitle}**`,
-        },
-      },
-      {
-        tag: "div",
-        text: {
-          tag: "lark_md",
-          content: [
-            `🌿 ${params.headBranch}`,
-            `📝 ${params.headSha.substring(0, 7)}`,
-            `🏷 ${eventText}`,
-            `👤 ${params.actor}`,
-            duration ? `⏱ ${duration}` : "",
-          ].filter(Boolean).join("  "),
-        },
-      },
-      {
-        tag: "action",
-        actions: [
-          {
-            tag: "button",
-            text: { tag: "plain_text", content: "查看详情" },
-            url: params.htmlUrl || `${params.appUrl}/${params.repoFullName}/actions`,
-            type: "primary",
-          },
-        ],
-      },
-    ],
-  };
+  const meta = [
+    `🌿 ${params.headBranch}`,
+    `📝 ${params.headSha.substring(0, 7)}`,
+    `🏷 ${eventText}`,
+    `👤 ${params.actor}`,
+    duration ? `⏱ ${duration}` : "",
+  ].filter(Boolean).join("  ");
+
+  return new EnhancedCardBuilder(
+    { title: `${conclusionText} ${params.repoFullName} #${params.runNumber}`, theme: template as "green" | "red" | "grey" },
+    "",
+  )
+    .text(`**${params.displayTitle}**`, true)
+    .text(meta, true)
+    .button("查看详情", { type: "primary", url: params.htmlUrl || `${params.appUrl}/${params.repoFullName}/actions` })
+    .build() as FeishuInteractiveCard;
 }
 
 /**
@@ -127,41 +105,18 @@ export function buildPushCard(params: {
 
   const extra = params.commits.length > 5 ? `\n...还有 ${params.commits.length - 5} 个提交` : "";
 
-  return {
-    header: {
-      title: { tag: "plain_text", content: `📦 ${params.repoFullName} 新推送` },
-      template: "blue",
-    },
-    elements: [
-      {
-        tag: "div",
-        text: {
-          tag: "lark_md",
-          content: `🌿 **${params.branch}**  👤 ${params.pusher}`,
-        },
-      },
-      {
-        tag: "div",
-        text: {
-          tag: "lark_md",
-          content: commitLines + extra,
-        },
-      },
-      ...(params.compareUrl
-        ? [{
-            tag: "action" as const,
-            actions: [
-              {
-                tag: "button" as const,
-                text: { tag: "plain_text" as const, content: "查看对比" },
-                url: params.compareUrl,
-                type: "default" as const,
-              },
-            ],
-          }]
-        : []),
-    ],
-  };
+  const card = new EnhancedCardBuilder(
+    { title: `📦 ${params.repoFullName} 新推送`, theme: "blue" },
+    "",
+  )
+    .text(`🌿 **${params.branch}**  👤 ${params.pusher}`, true)
+    .text(commitLines + extra, true);
+
+  if (params.compareUrl) {
+    card.button("查看对比", { url: params.compareUrl });
+  }
+
+  return card.build() as FeishuInteractiveCard;
 }
 
 /**
@@ -183,51 +138,22 @@ export function buildAgentResultCard(params: {
   };
   const template = params.status === "completed" ? "green" : params.status === "failed" ? "red" : "grey";
 
-  const elements: FeishuInteractiveCard["elements"] = [
-    {
-      tag: "div",
-      text: {
-        tag: "lark_md",
-        content: `**Agent**: ${params.agentName}\n**Session**: ${params.sessionId}\n**状态**: ${statusMap[params.status]}`,
-      },
-    },
-  ];
+  const card = new EnhancedCardBuilder(
+    { title: `🤖 Agent ${statusMap[params.status]}`, theme: template as "green" | "red" | "grey" },
+    "",
+  )
+    .text(`**Agent**: ${params.agentName}\n**Session**: ${params.sessionId}\n**状态**: ${statusMap[params.status]}`, true);
 
   if (params.summary) {
-    elements.push({
-      tag: "div",
-      text: {
-        tag: "lark_md",
-        content: params.summary,
-      },
-    });
+    card.text(params.summary, true);
   }
 
-  const actions: Array<{ tag: string; text: { tag: string; content: string }; url: string; type: string }> = [];
   if (params.prUrl) {
-    actions.push({
-      tag: "button",
-      text: { tag: "plain_text", content: "查看 PR" },
-      url: params.prUrl,
-      type: "primary",
-    });
+    card.button("查看 PR", { type: "primary", url: params.prUrl });
   }
-  actions.push({
-    tag: "button",
-    text: { tag: "plain_text", content: "查看详情" },
-    url: `${params.appUrl}/${params.repoFullName}/agents`,
-    type: "default",
-  });
+  card.button("查看详情", { url: `${params.appUrl}/${params.repoFullName}/agents` });
 
-  elements.push({ tag: "action", actions });
-
-  return {
-    header: {
-      title: { tag: "plain_text", content: `🤖 Agent ${statusMap[params.status]}` },
-      template,
-    },
-    elements,
-  };
+  return card.build() as FeishuInteractiveCard;
 }
 
 // ─── 通配符匹配 ─────────────────────────────────────────

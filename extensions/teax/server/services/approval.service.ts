@@ -4,8 +4,8 @@ import {
   createFeishuApprovalInstance,
   getFeishuApprovalInstance,
   sendFeishuCardMessage,
-  type FeishuInteractiveCard,
 } from "~~/server/services/messaging";
+import { EnhancedCardBuilder } from "~~/server/card-kit";
 
 // ─── 创建审批请求 ─────────────────────────────────────────
 
@@ -238,21 +238,12 @@ async function notifyApprovalResult(
 
     const template = newStatus === "approved" ? "green" : newStatus === "rejected" ? "red" : "grey";
 
-    const card: FeishuInteractiveCard = {
-      header: {
-        title: { tag: "plain_text", content: `审批结果: ${statusText[newStatus] || newStatus}` },
-        template,
-      },
-      elements: [
-        {
-          tag: "div",
-          text: {
-            tag: "lark_md",
-            content: `**${record.title}**\n类型: ${record.type || "deploy"}\n状态: ${statusText[newStatus] || newStatus}`,
-          },
-        },
-      ],
-    };
+    const card = new EnhancedCardBuilder(
+      { title: `审批结果: ${statusText[newStatus] || newStatus}`, theme: template as "green" | "red" | "grey" },
+      "",
+    )
+      .text(`**${record.title}**\n类型: ${record.type || "deploy"}\n状态: ${statusText[newStatus] || newStatus}`, true)
+      .build();
 
     await sendFeishuCardMessage(binding.feishu_open_id, card, "open_id");
   } catch (err) {

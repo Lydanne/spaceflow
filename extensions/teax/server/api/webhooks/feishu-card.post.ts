@@ -1,5 +1,3 @@
-import { eq } from "drizzle-orm";
-import { useDB, schema } from "~~/server/db";
 import { verifyFeishuEventSignature } from "~~/server/utils/feishu-sdk";
 
 export default defineEventHandler(async (event) => {
@@ -30,141 +28,12 @@ export default defineEventHandler(async (event) => {
     return { challenge: body.challenge };
   }
 
+  // 所有卡片交互现已通过飞书长连接 + CardKit 路由处理。
+  // 此 webhook 仅保留 url_verification 响应。
   if (body.type === "card.action.trigger") {
-    const { open_id, open_message_id, action } = body;
-    const actionValue = JSON.parse(action.value);
-
-    const db = useDB();
-
-    const [interaction] = await db
-      .select()
-      .from(schema.cardInteractions)
-      .where(eq(schema.cardInteractions.message_id, open_message_id))
-      .limit(1);
-
-    if (!interaction) {
-      return { error: "Card interaction not found" };
-    }
-
-    await db
-      .update(schema.cardInteractions)
-      .set({
-        interaction_data: action.form_value || actionValue,
-        interacted_at: new Date(),
-        status: "completed",
-        open_id,
-      })
-      .where(eq(schema.cardInteractions.id, interaction.id));
-
-    const result = await handleCardAction(
-      event,
-      interaction,
-      actionValue,
-      action.form_value,
-      open_id,
-    );
-
-    return result;
+    console.warn("[feishu-card webhook] Received card action via HTTP callback, all card interactions should go through long connection now.");
+    return { success: true };
   }
 
   return { success: true };
 });
-
-interface CardInteractionRecord {
-  id: string;
-  card_type: string | null;
-  business_id: string | null;
-}
-
-interface CardActionValue {
-  action?: string;
-  [key: string]: unknown;
-}
-
-async function handleCardAction(
-  event: Parameters<typeof defineEventHandler>[0] extends (e: infer E) => unknown ? E : never,
-  interaction: CardInteractionRecord,
-  actionValue: CardActionValue,
-  formValue?: Record<string, unknown>,
-  _openId?: string,
-) {
-  const { card_type, business_id } = interaction;
-
-  switch (card_type) {
-    case "deploy_approval":
-      return handleDeployApproval(business_id, actionValue);
-
-    case "config_form":
-      return handleConfigForm(business_id, formValue);
-
-    case "agent_confirm":
-      return handleAgentConfirm(business_id, actionValue);
-
-    default:
-      return { error: "Unknown card type" };
-  }
-}
-
-async function handleDeployApproval(
-  _approvalId: string | null,
-  action: CardActionValue,
-) {
-  const db = useDB();
-  const [actionType, id] = (action.action || "").split(":");
-
-  if (!id) {
-    return { error: "Missing approval ID" };
-  }
-
-  if (actionType === "approve") {
-    await db
-      .update(schema.approvalRequests)
-      .set({ status: "approved" })
-      .where(eq(schema.approvalRequests.id, id));
-
-    return {
-      toast: {
-        type: "success",
-        content: "审批通过，发布流程已启动",
-      },
-    };
-  } else if (actionType === "reject") {
-    await db
-      .update(schema.approvalRequests)
-      .set({ status: "rejected" })
-      .where(eq(schema.approvalRequests.id, id));
-
-    return {
-      toast: {
-        type: "info",
-        content: "已拒绝此发布请求",
-      },
-    };
-  }
-
-  return { success: true };
-}
-
-async function handleConfigForm(_formId: string | null, _formValue?: Record<string, unknown>) {
-  return {
-    toast: {
-      type: "success",
-      content: "配置已保存",
-    },
-  };
-}
-
-async function handleAgentConfirm(_sessionId: string | null, action: CardActionValue) {
-  const [actionType] = (action.action || "").split(":");
-
-  if (actionType === "start_agent") {
-    return {
-      toast: {
-        type: "success",
-        content: "Agent 已开始执行",
-      },
-    };
-  }
-
-  return { success: true };
-}
