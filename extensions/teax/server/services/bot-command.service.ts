@@ -509,6 +509,7 @@ registerCommand({
       name: string;
       branch: string;
       group_id: string | null;
+      share_token: string;
     }> = [];
     if (groupIds.length > 0) {
       const { inArray } = await import("drizzle-orm");
@@ -518,6 +519,7 @@ registerCommand({
           name: schema.workflowPresets.name,
           branch: schema.workflowPresets.branch,
           group_id: schema.workflowPresets.group_id,
+          share_token: schema.workflowPresets.share_token,
         })
         .from(schema.workflowPresets)
         .where(inArray(schema.workflowPresets.group_id, groupIds))
@@ -583,7 +585,8 @@ registerCommand({
 
         const presets = presetsByGroup.get(g.id) ?? [];
         for (const p of presets) {
-          contentParts.push(`  └ ${p.name} (${p.branch})`);
+          const presetUrl = `${baseUrl}/workflows/${p.share_token}`;
+          contentParts.push(`  └ [${p.name}](${presetUrl}) (${p.branch})`);
         }
         if (presets.length === 0) {
           contentParts.push("  └ (暂无预设)");
@@ -599,7 +602,12 @@ registerCommand({
       for (const p of standalonePresets) {
         const repo = p.repository?.full_name ?? "";
         const repoName = repo ? ` (${repo})` : "";
-        contentParts.push(`• **${p.name}**${repoName}`);
+        const shareUrl = p.share_token ? `${baseUrl}/workflows/${p.share_token}` : "";
+        if (shareUrl) {
+          contentParts.push(`• **${p.name}**${repoName} — [触发](${shareUrl})`);
+        } else {
+          contentParts.push(`• **${p.name}**${repoName}`);
+        }
       }
     }
 
