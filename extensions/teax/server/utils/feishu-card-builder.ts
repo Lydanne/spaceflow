@@ -165,8 +165,8 @@ export class FeishuCardBuilder {
     }>,
   ): this {
     if (this.config.schema === "2.0") {
-      // JSON 2.0: 每个按钮作为独立 body element
-      for (const btn of buttons) {
+      // JSON 2.0: 单按钮独立；多按钮用 column_set 并排
+      const btnElements = buttons.map((btn) => {
         const element: CardElement = {
           tag: "button",
           text: { tag: "plain_text", content: btn.text },
@@ -176,7 +176,24 @@ export class FeishuCardBuilder {
         if (btn.url) {
           element.behaviors = [{ type: "open_url", default_url: btn.url }];
         }
-        this.pushElement(element);
+        return element;
+      });
+
+      if (btnElements.length <= 1) {
+        btnElements.forEach((el) => this.pushElement(el));
+      } else {
+        this.pushElement({
+          tag: "column_set",
+          flex_mode: "none",
+          background_style: "default",
+          horizontal_spacing: "default",
+          columns: btnElements.map((el) => ({
+            tag: "column",
+            width: "auto",
+            vertical_align: "top",
+            elements: [el],
+          })),
+        });
       }
     } else {
       // JSON 1.0: action 容器包裹

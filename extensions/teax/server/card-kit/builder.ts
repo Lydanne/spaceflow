@@ -198,7 +198,43 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
   }
 
   buttons(items: EnhancedButtonConfig[]): this {
-    items.forEach((btn) => this.button(btn.text, btn));
+    const rawButtons: Array<{
+      text: string;
+      value: string | Record<string, unknown>;
+      type?: "default" | "primary" | "danger";
+      url?: string;
+      rawValue?: boolean;
+    }> = [];
+
+    for (const btn of items) {
+      if (btn.navigate) {
+        rawButtons.push({
+          text: btn.text,
+          type: btn.type,
+          value: {
+            __page: btn.navigate[0],
+            __params: btn.navigate[1] || {},
+          },
+          rawValue: true,
+        });
+      } else if (btn.url) {
+        rawButtons.push({ text: btn.text, type: btn.type, value: "", url: btn.url });
+      } else if (btn.action) {
+        const value: Record<string, unknown> = {
+          __page: this.pageName,
+          __action: btn.action,
+          __params: btn.params || {},
+        };
+        if (Object.keys(this.currentData).length > 0) {
+          value.__data = this.currentData;
+        }
+        rawButtons.push({ text: btn.text, type: btn.type, value, rawValue: true });
+      }
+    }
+
+    if (rawButtons.length > 0) {
+      this.inner.addButtons(rawButtons);
+    }
     return this;
   }
 

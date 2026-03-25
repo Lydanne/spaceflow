@@ -106,20 +106,23 @@ export default defineCardPage({
         true,
       );
 
-      // 操作按钮
+      // 操作按钮（横排）
+      const accountBtns: Parameters<typeof card.buttons>[0] = [];
       if (!isActive && bindings.length > 1) {
-        card.button(`⭐ 设为当前`, {
+        accountBtns.push({
+          text: "⭐ 设为当前",
           type: "primary",
           action: "switch_account",
           params: { user_id: user.id, username: user.gitea_username },
         });
       }
-
-      card.button(`🔓 解绑`, {
+      accountBtns.push({
+        text: "🔓 解绑",
         type: "danger",
         action: "unbind_feishu",
         params: { binding_id: binding.id, username: user.gitea_username },
       });
+      card.buttons(accountBtns);
 
       card.divider();
     }
