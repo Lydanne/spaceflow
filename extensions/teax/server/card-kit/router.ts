@@ -143,7 +143,7 @@ export class CardRouter {
       params: opts.params,
       data: opts.data,
       card: (config: CardConfig) =>
-        new EnhancedCardBuilder(config, page.name, opts.data),
+        new EnhancedCardBuilder(config, page.name, opts.data, opts.params),
     };
   }
 
