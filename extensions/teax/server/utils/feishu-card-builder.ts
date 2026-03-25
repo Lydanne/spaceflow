@@ -157,10 +157,10 @@ export class FeishuCardBuilder {
   addButtons(
     buttons: Array<{
       text: string;
-      value: string;
+      value: string | Record<string, unknown>;
       type?: "default" | "primary" | "danger";
       url?: string;
-      /** 如果为 true，value 直接作为 JSON 字符串，不再包 { action: value } */
+      /** 如果为 true，value 直接存储（对象或已解析的值），不再包 { action: value } */
       rawValue?: boolean;
     }>,
   ): this {

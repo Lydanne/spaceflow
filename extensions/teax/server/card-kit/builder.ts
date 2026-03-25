@@ -165,10 +165,10 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
         {
           text,
           type: opts.type,
-          value: JSON.stringify({
+          value: {
             __page: opts.navigate[0],
             __params: opts.navigate[1] || {},
-          }),
+          },
           rawValue: true,
         },
       ]);
@@ -189,7 +189,7 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
         {
           text,
           type: opts.type,
-          value: JSON.stringify(value),
+          value,
           rawValue: true,
         },
       ]);
@@ -258,10 +258,10 @@ export class ColumnBuilder implements ColumnBuilderInterface {
             tag: "button",
             text: { tag: "plain_text", content: text },
             type: opts.type || "default",
-            value: JSON.stringify({
+            value: {
               __page: opts.navigate[0],
               __params: opts.navigate[1] || {},
-            }),
+            },
           },
         ],
       });
@@ -281,7 +281,7 @@ export class ColumnBuilder implements ColumnBuilderInterface {
             tag: "button",
             text: { tag: "plain_text", content: text },
             type: opts.type || "default",
-            value: JSON.stringify(value),
+            value,
           },
         ],
       });

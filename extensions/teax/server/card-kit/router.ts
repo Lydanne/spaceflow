@@ -26,6 +26,10 @@ interface DispatchInput {
 export class CardRouter {
   private pages = new Map<string, CardPageDef>();
 
+  get pageCount(): number {
+    return this.pages.size;
+  }
+
   register(page: CardPageDef): void {
     if (this.pages.has(page.name)) {
       console.warn(`[CardRouter] page "${page.name}" already registered, overwriting`);
@@ -99,19 +103,18 @@ export class CardRouter {
   private parseValue(value: unknown): EncodedValue | null {
     if (!value) return null;
 
-    if (typeof value === "string") {
+    // 飞书回调可能对 value 做多层 JSON 编码，循环解析直到得到对象
+    let current = value;
+    for (let i = 0; i < 5 && typeof current === "string"; i++) {
       try {
-        const parsed = JSON.parse(value);
-        if (typeof parsed === "object" && parsed !== null && parsed.__page) {
-          return parsed as EncodedValue;
-        }
+        current = JSON.parse(current);
       } catch {
         return null;
       }
     }
 
-    if (typeof value === "object" && value !== null && "__page" in value) {
-      return value as EncodedValue;
+    if (typeof current === "object" && current !== null && "__page" in current) {
+      return current as EncodedValue;
     }
 
     return null;

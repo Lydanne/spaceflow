@@ -858,6 +858,30 @@ export async function handleCardAction(
     JSON.stringify(ctx.action, null, 2),
   );
 
+  // ─── CardKit 路由优先处理 ──────────────────────────────────
+  // 如果 action.value 中包含 __page，交由 cardRouter 分发
+  {
+    const { cardRouter, ensurePages } = await import("~~/server/card-kit");
+    await ensurePages();
+    const formVal = (ctx.action.form_value ?? ctx.action.form_values) as
+      | Record<string, string>
+      | undefined;
+    const noop = async () => {};
+    const cardResult = await cardRouter.dispatch({
+      openId: ctx.openId,
+      actionValue: ctx.action.value,
+      formValue: formVal,
+      token: ctx.token,
+      updateCard: updateCard || noop,
+    });
+    if (cardResult) {
+      if (updateCard) {
+        await updateCard(cardResult);
+      }
+      return undefined;
+    }
+  }
+
   const actionValue = ctx.action.value as
     | Record<string, unknown>
     | string
@@ -1053,10 +1077,17 @@ export async function handleBotCommand(ctx: BotCommandContext): Promise<void> {
 
   // 如果只是 @ 机器人,没有输入任何内容,显示控制面板
   if (!text || text === "") {
-    const { generateControlPanelHome }
-      = await import("~~/server/services/control-panel.service");
-    const card = await generateControlPanelHome(ctx.senderOpenId);
-    await replyFeishuCardMessage(ctx.messageId, card);
+    const { cardRouter, ensurePages } = await import("~~/server/card-kit");
+    await ensurePages();
+    const card = await cardRouter.dispatch({
+      openId: ctx.senderOpenId,
+      actionValue: JSON.stringify({ __page: "cp:home" }),
+      token: "",
+      updateCard: async () => {},
+    });
+    if (card) {
+      await replyFeishuCardMessage(ctx.messageId, card);
+    }
     return;
   }
 
