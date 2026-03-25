@@ -4,6 +4,10 @@
 
 本文档描述 Teax 系统中飞书卡片交互表单的设计方案，支持通过程序化方式生成复杂的交互式卡片消息，实现业务流程的自动化控制。
 
+> **⚠️ 注意：** 本文档描述的是底层 `FeishuCardBuilder` 的原始 API（JSON 1.0 为主）。
+> `FeishuCardBuilder` 现已支持 **JSON 2.0 schema**（通过 `schema: "2.0"` 参数），JSON 2.0 中按钮直接作为 body element，`value` 为对象类型，不再需要 `action` 容器包裹。
+> 对于新的卡片交互开发，推荐使用 **CardKit 框架**（`server/card-kit/`），它强制使用 JSON 2.0 并提供声明式路由。详见 [`feishu-card-framework.md`](./feishu-card-framework.md)。
+
 ## 核心目标
 
 1. **程序化生成**：通过 TypeScript 类型安全的 API 构建卡片消息对象
@@ -36,7 +40,7 @@ class FeishuCardBuilder {
   private config: CardConfig;
   private header: any;
   private elements: CardElement[] = [];
-  
+
   constructor(config: CardConfig) {
     this.config = config;
     this.header = {
@@ -469,25 +473,25 @@ export const cardInteractions = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     organization_id: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
     user_id: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
-    
+
     // 飞书相关
     message_id: varchar("message_id", { length: 255 }).notNull().unique(),
     chat_id: varchar("chat_id", { length: 255 }).notNull(),
     open_id: varchar("open_id", { length: 255 }),
-    
+
     // 业务相关
     card_type: varchar("card_type", { length: 100 }).notNull(), // 'deploy_approval', 'config_form', 'agent_confirm' 等
     business_id: varchar("business_id", { length: 255 }), // 关联的业务对象 ID（如 approval_id, workflow_id）
     status: varchar("status", { length: 50 }).default("pending"), // 'pending', 'completed', 'cancelled'
-    
+
     // 卡片数据
     card_data: jsonb("card_data").default({}), // 卡片初始数据
     interaction_data: jsonb("interaction_data").default({}), // 用户交互数据
-    
+
     // 时间戳
     sent_at: timestamp("sent_at", { withTimezone: true }).defaultNow(),
     interacted_at: timestamp("interacted_at", { withTimezone: true }),
-    
+
     ...baseColumns(),
   },
   (table) => [
@@ -514,7 +518,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
   const signature = getHeader(event, "x-lark-signature");
   const timestamp = getHeader(event, "x-lark-request-timestamp");
-  
+
   if (!verifyFeishuSignature(body, signature, timestamp)) {
     throw createError({ statusCode: 401, message: "Invalid signature" });
   }
@@ -528,9 +532,9 @@ export default defineEventHandler(async (event) => {
   if (body.type === "card.action.trigger") {
     const { open_id, open_message_id, action } = body;
     const actionValue = JSON.parse(action.value);
-    
+
     const db = useDB();
-    
+
     // 查找卡片交互记录
     const [interaction] = await db
       .select()
@@ -571,13 +575,13 @@ async function handleCardAction(
   switch (card_type) {
     case "deploy_approval":
       return handleDeployApproval(business_id, actionValue, formValue);
-    
+
     case "config_form":
       return handleConfigForm(business_id, formValue);
-    
+
     case "agent_confirm":
       return handleAgentConfirm(business_id, actionValue);
-    
+
     default:
       return { error: "Unknown card type" };
   }
@@ -586,17 +590,17 @@ async function handleCardAction(
 async function handleDeployApproval(approvalId: string, action: any, formValue: any) {
   const db = useDB();
   const [actionType, id] = action.action.split(":");
-  
+
   if (actionType === "approve") {
     // 更新审批状态
     await db
       .update(schema.approvalRequests)
       .set({ status: "approved" })
       .where(eq(schema.approvalRequests.id, id));
-    
+
     // 触发发布流程
     // await triggerDeployment(id);
-    
+
     return {
       toast: {
         type: "success",
@@ -608,7 +612,7 @@ async function handleDeployApproval(approvalId: string, action: any, formValue: 
       .update(schema.approvalRequests)
       .set({ status: "rejected" })
       .where(eq(schema.approvalRequests.id, id));
-    
+
     return {
       toast: {
         type: "info",
@@ -616,14 +620,14 @@ async function handleDeployApproval(approvalId: string, action: any, formValue: 
       },
     };
   }
-  
+
   return { success: true };
 }
 
 async function handleConfigForm(formId: string, formValue: any) {
   // 处理配置表单提交
   // 保存配置到数据库或触发相应业务逻辑
-  
+
   return {
     toast: {
       type: "success",
@@ -634,11 +638,11 @@ async function handleConfigForm(formId: string, formValue: any) {
 
 async function handleAgentConfirm(sessionId: string, action: any) {
   const [actionType, id] = action.action.split(":");
-  
+
   if (actionType === "start_agent") {
     // 启动 Agent 执行
     // await startAgentExecution(id);
-    
+
     return {
       toast: {
         type: "success",
@@ -646,7 +650,7 @@ async function handleAgentConfirm(sessionId: string, action: any) {
       },
     };
   }
-  
+
   return { success: true };
 }
 ```
@@ -672,14 +676,14 @@ export class CardService {
     cardData?: any;
   }) {
     const db = useDB();
-    
+
     // 发送卡片消息
     const result = await sendCardMessage(params.chatId, params.card);
-    
+
     if (!result.message_id) {
       throw new Error("Failed to send card message");
     }
-    
+
     // 记录卡片交互
     const [interaction] = await db
       .insert(schema.cardInteractions)
@@ -694,13 +698,13 @@ export class CardService {
         status: "pending",
       })
       .returning();
-    
+
     return {
       messageId: result.message_id,
       interactionId: interaction.id,
     };
   }
-  
+
   static async updateCard(params: {
     messageId: string;
     card: any;
@@ -710,7 +714,7 @@ export class CardService {
     const result = await updateCardMessage(params.messageId, params.card);
     return result;
   }
-  
+
   static async getInteraction(messageId: string) {
     const db = useDB();
     const [interaction] = await db
@@ -718,7 +722,7 @@ export class CardService {
       .from(schema.cardInteractions)
       .where(eq(schema.cardInteractions.message_id, messageId))
       .limit(1);
-    
+
     return interaction;
   }
 }
@@ -741,7 +745,7 @@ async function sendDeployApprovalCard(approvalRequest: any) {
     description: approvalRequest.description,
     approvalId: approvalRequest.id,
   });
-  
+
   await CardService.sendCard({
     chatId: approvalRequest.organization.settings.feishuChatId,
     card,
@@ -792,7 +796,7 @@ async function sendConfigFormCard(chatId: string, orgId: string) {
       },
     ],
   });
-  
+
   await CardService.sendCard({
     chatId,
     card,
@@ -813,7 +817,7 @@ async function updateWorkflowCard(messageId: string, workflow: any) {
     steps: workflow.steps,
     workflowId: workflow.id,
   });
-  
+
   await CardService.updateCard({
     messageId,
     card,
@@ -853,11 +857,11 @@ class CardComponents {
   static buildApprovalSection(approver: string, status: string) {
     // 返回审批状态组件
   }
-  
+
   static buildProgressBar(current: number, total: number) {
     // 返回进度条组件
   }
-  
+
   static buildUserMention(userId: string) {
     // 返回 @用户 组件
   }
