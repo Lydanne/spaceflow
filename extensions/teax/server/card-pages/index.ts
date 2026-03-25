@@ -6,6 +6,7 @@ import "./cp-home.page";
 import "./cp-repos.page";
 import "./cp-repo-menu.page";
 import "./cp-actions.page";
+import "./cp-trigger-wf.page";
 import "./cp-feature.page";
 import "./wf-select.page";
 import "./wf-params.page";

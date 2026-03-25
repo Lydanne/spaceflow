@@ -34,13 +34,19 @@ export default defineCardPage({
         Awaited<ReturnType<typeof gitea.role>>["getRepoWorkflowRuns"]
       >
     >["workflow_runs"] = [];
+    let workflows: Array<{ name: string; path: string }> = [];
 
     try {
       const giteaService = await gitea.role("admin");
-      const response = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 10);
+      // 只获取前5条运行记录
+      const response = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 5);
       runs = response.workflow_runs ?? [];
+
+      // 获取可用的 workflow 列表
+      const wfResponse = await giteaService.getRepoWorkflows(owner, repo);
+      workflows = wfResponse.workflows ?? [];
     } catch (error) {
-      console.error("[cp:actions] Failed to fetch workflow runs:", error);
+      console.error("[cp:actions] Failed to fetch data:", error);
     }
 
     const card = ctx.card({
@@ -48,10 +54,28 @@ export default defineCardPage({
       theme: "blue",
     });
 
-    card.text(
-      `**🚀 Actions 运行记录**\n最近 ${runs.length > 0 ? runs.length : 0} 条记录`,
-      true,
-    );
+    // === 触发工作流区域（上） ===
+    if (workflows.length > 0) {
+      card.text("**🚗 触发工作流**", true);
+      card.divider();
+
+      // 显示可用的 workflow 按钮
+      const workflowButtons = workflows.map((wf) => ({
+        text: wf.name.replace(/\.ya?ml$/, ""),
+        type: "default" as const,
+        navigate: ["cp:trigger-wf", { owner, repo, workflowPath: wf.path }] as [string, Record<string, unknown>],
+      }));
+
+      // 每4个一组显示按钮
+      for (let i = 0; i < workflowButtons.length; i += 4) {
+        const chunk = workflowButtons.slice(i, i + 4);
+        card.buttons(chunk);
+      }
+    }
+
+    // === 运行记录区域（下） ===
+    card.divider();
+    card.text("**📋 运行记录**", true);
     card.divider();
 
     if (runs.length === 0) {
@@ -60,12 +84,14 @@ export default defineCardPage({
         true,
       );
     } else {
+      // 显示前5条记录，每条可点击跳转
       for (const run of runs) {
         const emoji = getStatusEmoji(run.status, run.conclusion);
         const timeAgo = formatTimeAgo(run.started_at);
         const shortSha = run.head_sha.substring(0, 7);
+        const runUrl = `${baseUrl}/${owner}/${repo}/actions/runs/${run.id}`;
         card.text(
-          `${emoji} **${run.display_title}**\n分支: ${run.head_branch} · ${shortSha}\n时间: ${timeAgo}`,
+          `${emoji} [**${run.display_title}**](${runUrl})\n分支: ${run.head_branch} · ${shortSha}\n时间: ${timeAgo}`,
           true,
         );
       }
