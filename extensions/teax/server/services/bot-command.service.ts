@@ -3,10 +3,8 @@ import { useDB, schema } from "~~/server/db";
 import {
   replyFeishuMessage,
   replyFeishuCardMessage,
-  type FeishuInteractiveCard,
 } from "~~/server/services/messaging";
 import { sendFeishuChatCardMessage } from "~~/server/utils/feishu-sdk";
-import { FeishuCardBuilder } from "~~/server/utils/feishu-card-builder";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { startWorkflowAction } from "~~/server/services/workflow-action-machine";
 import { getActiveAccount } from "~~/server/services/account.service";
@@ -45,44 +43,39 @@ registerCommand({
   description: "查看所有可用指令",
   usage: "/help",
   handler: async (ctx) => {
-    const card: FeishuInteractiveCard = {
-      header: {
-        title: { tag: "plain_text", content: "🤖 Teax Bot 帮助" },
-        template: "blue",
-      },
-      elements: [
-        {
-          tag: "div",
-          text: {
-            tag: "lark_md",
-            content: [
-              "**📋 仓库与构建**",
-              "`/repos [org]` — 列出已注册的仓库",
-              "`/orgs` — 查看我所属的组织",
-              "`/status <owner/repo>` — 查询构建状态",
-              "`/actions <owner/repo>` — 触发工作流",
-              "",
-              "**🚀 工作流预设**",
-              "`/run <token>` — 通过预设 Token 触发工作流",
-              "`/presets` — 查看工作流预设",
-              "",
-              "**👤 账户与设置**",
-              "`/account` — 查看账户信息（多账户可切换）",
-              "`/notify` — 查看通知设置",
-              "",
-              "**📝 审批**",
-              "`/approvals` — 查看待处理审批",
-              "",
-              "**🧪 测试**",
-              "`/test-form` — 测试飞书卡片表单组件",
-              "",
-              "**💡 提示**",
-              "直接 @ 机器人或发送预设链接可触发工作流",
-            ].join("\n"),
-          },
-        },
-      ],
-    };
+    const { EnhancedCardBuilder } = await import("~~/server/card-kit");
+    const card = new EnhancedCardBuilder(
+      { title: "🤖 Teax Bot 帮助", theme: "blue" },
+      "",
+    )
+      .text(
+        [
+          "**📋 仓库与构建**",
+          "`/repos [org]` — 列出已注册的仓库",
+          "`/orgs` — 查看我所属的组织",
+          "`/status <owner/repo>` — 查询构建状态",
+          "`/actions <owner/repo>` — 触发工作流",
+          "",
+          "**🚀 工作流预设**",
+          "`/run <token>` — 通过预设 Token 触发工作流",
+          "`/presets` — 查看工作流预设",
+          "",
+          "**👤 账户与设置**",
+          "`/account` — 查看账户信息（多账户可切换）",
+          "`/notify` — 查看通知设置",
+          "",
+          "**📝 审批**",
+          "`/approvals` — 查看待处理审批",
+          "",
+          "**🧪 测试**",
+          "`/test-form` — 测试飞书卡片表单组件",
+          "",
+          "**💡 提示**",
+          "直接 @ 机器人或发送预设链接可触发工作流",
+        ].join("\n"),
+        true,
+      )
+      .build();
     await replyFeishuCardMessage(ctx.messageId, card);
   },
 });
@@ -95,10 +88,17 @@ registerCommand({
   description: "查看账户信息和飞书绑定状态",
   usage: "/account",
   handler: async (ctx) => {
-    const { generateAccountCard }
-      = await import("~~/server/services/account.service");
-    const card = await generateAccountCard(ctx.senderOpenId);
-    await replyFeishuCardMessage(ctx.messageId, card);
+    const { cardRouter, ensurePages } = await import("~~/server/card-kit");
+    await ensurePages();
+    const card = await cardRouter.dispatch({
+      openId: ctx.senderOpenId,
+      actionValue: JSON.stringify({ __page: "account:home" }),
+      token: "",
+      updateCard: async () => {},
+    });
+    if (card) {
+      await replyFeishuCardMessage(ctx.messageId, card);
+    }
   },
 });
 
@@ -183,21 +183,13 @@ registerCommand({
         return `${emoji} #${r.run_number} **${r.display_title}** (${branch})`;
       });
 
-      const card: FeishuInteractiveCard = {
-        header: {
-          title: { tag: "plain_text", content: `📋 ${repoFullName} 构建状态` },
-          template: "blue",
-        },
-        elements: [
-          {
-            tag: "div",
-            text: {
-              tag: "lark_md",
-              content: lines.join("\n"),
-            },
-          },
-        ],
-      };
+      const { EnhancedCardBuilder } = await import("~~/server/card-kit");
+      const card = new EnhancedCardBuilder(
+        { title: `📋 ${repoFullName} 构建状态`, theme: "blue" },
+        "",
+      )
+        .text(lines.join("\n"), true)
+        .build();
 
       await replyFeishuCardMessage(ctx.messageId, card);
     } catch (err) {
@@ -296,24 +288,13 @@ registerCommand({
     }
 
     const lines = repos.map((r) => `• ${r.full_name}`);
-    const card: FeishuInteractiveCard = {
-      header: {
-        title: {
-          tag: "plain_text",
-          content: orgName ? `📋 ${orgName} 仓库列表` : "📋 仓库列表",
-        },
-        template: "blue",
-      },
-      elements: [
-        {
-          tag: "div",
-          text: {
-            tag: "lark_md",
-            content: lines.join("\n"),
-          },
-        },
-      ],
-    };
+    const { EnhancedCardBuilder } = await import("~~/server/card-kit");
+    const card = new EnhancedCardBuilder(
+      { title: orgName ? `📋 ${orgName} 仓库列表` : "📋 仓库列表", theme: "blue" },
+      "",
+    )
+      .text(lines.join("\n"), true)
+      .build();
 
     await replyFeishuCardMessage(ctx.messageId, card);
   },
@@ -356,31 +337,15 @@ registerCommand({
     }
 
     const lines = orgs.map((o) => `• **${o.full_name || o.name}** (${o.name})`);
-    const card: FeishuInteractiveCard = {
-      header: {
-        title: { tag: "plain_text", content: "🏢 我的组织" },
-        template: "blue",
-      },
-      elements: [
-        {
-          tag: "div",
-          text: {
-            tag: "lark_md",
-            content: lines.join("\n"),
-          },
-        },
-        {
-          tag: "hr",
-        },
-        {
-          tag: "div",
-          text: {
-            tag: "lark_md",
-            content: "💡 使用 `/repos <组织名>` 查看组织下的仓库",
-          },
-        },
-      ],
-    };
+    const { EnhancedCardBuilder } = await import("~~/server/card-kit");
+    const card = new EnhancedCardBuilder(
+      { title: "🏢 我的组织", theme: "blue" },
+      "",
+    )
+      .text(lines.join("\n"), true)
+      .divider()
+      .text("💡 使用 `/repos <组织名>` 查看组织下的仓库", true)
+      .build();
 
     await replyFeishuCardMessage(ctx.messageId, card);
   },
@@ -429,31 +394,15 @@ registerCommand({
       `${binding.notify_system ? "✅" : "❌"} 系统通知`,
     ];
 
-    const card: FeishuInteractiveCard = {
-      header: {
-        title: { tag: "plain_text", content: "🔔 通知设置" },
-        template: "blue",
-      },
-      elements: [
-        {
-          tag: "div",
-          text: {
-            tag: "lark_md",
-            content: "**当前通知偏好**\n\n" + settings.join("\n"),
-          },
-        },
-        {
-          tag: "hr",
-        },
-        {
-          tag: "div",
-          text: {
-            tag: "lark_md",
-            content: `[前往设置页面修改](${baseUrl}/user/settings)`,
-          },
-        },
-      ],
-    };
+    const { EnhancedCardBuilder } = await import("~~/server/card-kit");
+    const card = new EnhancedCardBuilder(
+      { title: "🔔 通知设置", theme: "blue" },
+      "",
+    )
+      .text("**当前通知偏好**\n\n" + settings.join("\n"), true)
+      .divider()
+      .text(`[前往设置页面修改](${baseUrl}/user/settings)`, true)
+      .build();
 
     await replyFeishuCardMessage(ctx.messageId, card);
   },
@@ -488,22 +437,15 @@ registerCommand({
       .orderBy(schema.approvalFlows.created_at)
       .limit(10);
 
+    const { EnhancedCardBuilder } = await import("~~/server/card-kit");
+
     if (pendingApprovals.length === 0) {
-      const card: FeishuInteractiveCard = {
-        header: {
-          title: { tag: "plain_text", content: "✅ 审批列表" },
-          template: "green",
-        },
-        elements: [
-          {
-            tag: "div",
-            text: {
-              tag: "lark_md",
-              content: "暂无待处理的审批",
-            },
-          },
-        ],
-      };
+      const card = new EnhancedCardBuilder(
+        { title: "✅ 审批列表", theme: "green" },
+        "",
+      )
+        .text("暂无待处理的审批", true)
+        .build();
       await replyFeishuCardMessage(ctx.messageId, card);
       return;
     }
@@ -515,24 +457,12 @@ registerCommand({
       return `• **${a.title}**\n  ${a.flow_type} · ${date}`;
     });
 
-    const card: FeishuInteractiveCard = {
-      header: {
-        title: {
-          tag: "plain_text",
-          content: `📋 待处理审批 (${pendingApprovals.length})`,
-        },
-        template: "orange",
-      },
-      elements: [
-        {
-          tag: "div",
-          text: {
-            tag: "lark_md",
-            content: lines.join("\n\n"),
-          },
-        },
-      ],
-    };
+    const card = new EnhancedCardBuilder(
+      { title: `📋 待处理审批 (${pendingApprovals.length})`, theme: "orange" },
+      "",
+    )
+      .text(lines.join("\n\n"), true)
+      .build();
 
     await replyFeishuCardMessage(ctx.messageId, card);
   },
@@ -614,33 +544,20 @@ registerCommand({
       .where(eq(schema.workflowPresets.created_by, activeUser.id))
       .limit(10);
 
+    const { EnhancedCardBuilder } = await import("~~/server/card-kit");
+
     if (groups.length === 0 && standalonePresets.length === 0) {
-      const card: FeishuInteractiveCard = {
-        header: {
-          title: { tag: "plain_text", content: "📦 工作流预设" },
-          template: "blue",
-        },
-        elements: [
-          {
-            tag: "div",
-            text: {
-              tag: "lark_md",
-              content:
-                "您还没有创建工作流预设\n\n工作流预设可以保存常用的工作流配置，方便快速触发",
-            },
-          },
-          {
-            tag: "hr",
-          },
-          {
-            tag: "div",
-            text: {
-              tag: "lark_md",
-              content: "💡 在仓库的 **Workflows** 页面可以创建预设组",
-            },
-          },
-        ],
-      };
+      const card = new EnhancedCardBuilder(
+        { title: "📦 工作流预设", theme: "blue" },
+        "",
+      )
+        .text(
+          "您还没有创建工作流预设\n\n工作流预设可以保存常用的工作流配置，方便快速触发",
+          true,
+        )
+        .divider()
+        .text("💡 在仓库的 **Workflows** 页面可以创建预设组", true)
+        .build();
       await replyFeishuCardMessage(ctx.messageId, card);
       return;
     }
@@ -681,21 +598,12 @@ registerCommand({
     }
 
     const totalCount = groups.length + standalonePresets.length;
-    const card: FeishuInteractiveCard = {
-      header: {
-        title: { tag: "plain_text", content: `📦 工作流预设 (${totalCount})` },
-        template: "blue",
-      },
-      elements: [
-        {
-          tag: "div",
-          text: {
-            tag: "lark_md",
-            content: contentParts.join("\n"),
-          },
-        },
-      ],
-    };
+    const card = new EnhancedCardBuilder(
+      { title: `📦 工作流预设 (${totalCount})`, theme: "blue" },
+      "",
+    )
+      .text(contentParts.join("\n"), true)
+      .build();
 
     await replyFeishuCardMessage(ctx.messageId, card);
   },
@@ -743,97 +651,23 @@ registerCommand({
 
 // ─── /test-form ──────────────────────────────────────────
 
-/**
- * 构建 JSON 2.0 测试表单卡片
- * 演示飞书卡片表单容器（form）中的各类输入组件：
- * - input_type: text（普通文本）
- * - input_type: password（密码，show_icon 前缀图标）
- * - input_type: multiline_text（多行文本，auto_resize 自适应高度）
- * - select_static（下拉选择）
- * - date_picker（日期选择）
- * - action_type: form_submit / form_reset（表单提交与重置按钮）
- *
- * 参考：https://open.feishu.cn/document/feishu-cards/card-json-v2-components/interactive-components/input
- */
-function buildTestFormCard(): Record<string, unknown> {
-  return (
-    new FeishuCardBuilder({
-      title: "🧪 表单组件测试",
-      theme: "blue",
-      schema: "2.0",
-    })
-      .addText(
-        "此卡片使用 **JSON 2.0** 结构，演示 `form` 表单容器中的输入组件。\n填写后点击「提交」查看回传数据。",
-        true,
-      )
-      .addDivider()
-      .addForm({ name: "test_form" })
-      // ── 文本输入（label_position: left） ──
-      .addInputV2({
-        element_id: "username",
-        name: "test_username",
-        label: "用户名",
-        label_position: "left",
-        placeholder: "请输入用户名",
-        required: true,
-        max_length: 30,
-      })
-      // ── 密码输入（show_icon 前缀图标） ──
-      .addInputV2({
-        element_id: "password",
-        name: "test_password",
-        label: "密码",
-        placeholder: "请输入密码",
-        input_type: "password",
-        show_icon: true,
-      })
-      // ── 多行文本（auto_resize 自适应高度） ──
-      .addInputV2({
-        element_id: "address",
-        name: "test_address",
-        label: "收货地址",
-        placeholder: "请输入详细地址...",
-        input_type: "multiline_text",
-        rows: 3,
-        auto_resize: true,
-        max_rows: 8,
-      })
-      // ── 下拉选择 ──
-      .addSelect({
-        name: "test_priority",
-        label: "优先级",
-        placeholder: "请选择优先级",
-        required: true,
-        options: [
-          { label: "🟢 低", value: "low" },
-          { label: "🟡 中", value: "medium" },
-          { label: "🔴 高", value: "high" },
-          { label: "🔥 紧急", value: "urgent" },
-        ],
-      })
-      // ── 日期选择 ──
-      .addDatePicker({
-        name: "test_deadline",
-        label: "截止日期",
-        placeholder: "选择截止日期",
-      })
-      // ── 表单按钮（form_submit / form_reset） ──
-      .addFormButtons({
-        submit: { text: "提交", type: "primary" },
-        reset: { text: "取消", type: "default" },
-      })
-      .endForm()
-      .build().card
-  );
-}
-
 registerCommand({
   name: "test-form",
   aliases: ["/test-form", "测试表单"],
   description: "测试飞书卡片 JSON 2.0 表单组件",
   usage: "/test-form",
   handler: async (ctx) => {
-    await replyFeishuCardMessage(ctx.messageId, buildTestFormCard());
+    const { cardRouter, ensurePages } = await import("~~/server/card-kit");
+    await ensurePages();
+    const card = await cardRouter.dispatch({
+      openId: ctx.senderOpenId,
+      actionValue: JSON.stringify({ __page: "test:form" }),
+      token: "",
+      updateCard: async () => {},
+    });
+    if (card) {
+      await replyFeishuCardMessage(ctx.messageId, card);
+    }
   },
 });
 
@@ -852,14 +686,8 @@ export async function handleCardAction(
 ): Promise<Record<string, unknown> | undefined> {
   const { updateCard } = ctx;
 
-  // 调试日志：打印完整的 action 回调数据，用于排查 JSON 2.0 表单提交
-  console.log(
-    "[bot-command] handleCardAction received:",
-    JSON.stringify(ctx.action, null, 2),
-  );
-
   // ─── CardKit 路由优先处理 ──────────────────────────────────
-  // 如果 action.value 中包含 __page，交由 cardRouter 分发
+  // 所有 value 中包含 __page 的交互（控制面板、账户、表单等）统一由 cardRouter 分发
   {
     const { cardRouter, ensurePages } = await import("~~/server/card-kit");
     await ensurePages();
@@ -882,24 +710,21 @@ export async function handleCardAction(
     }
   }
 
+  // ─── 旧卡片兼容：非 CardKit 的交互 ──────────────────────────
   const actionValue = ctx.action.value as
     | Record<string, unknown>
     | string
     | undefined;
 
-  // value 可能是双重 JSON 编码的字符串，需要解析
   let parsedValue: Record<string, unknown> | undefined;
   if (typeof actionValue === "string") {
     try {
-      // 第一次解析
       let parsed = JSON.parse(actionValue);
-      // 如果解析结果还是字符串，再解析一次（双重编码）
       if (typeof parsed === "string") {
         parsed = JSON.parse(parsed);
       }
       parsedValue = parsed as Record<string, unknown>;
     } catch {
-      // 如果不是 JSON，可能是简单的 action 字符串如 "approval_flow:approve:xxx"
       if (actionValue.startsWith("approval_flow:")) {
         const { handleApprovalFlowCardAction }
           = await import("~~/server/services/approval-flow/card-handler");
@@ -918,7 +743,7 @@ export async function handleCardAction(
 
   const actionType = parsedValue?.action as string | undefined;
 
-  // 检查是否是审批流程的交互 (格式: approval_flow:approve:flowId)
+  // 审批流程交互 (格式: approval_flow:approve:flowId)
   if (actionType?.startsWith("approval_flow:")) {
     const { handleApprovalFlowCardAction }
       = await import("~~/server/services/approval-flow/card-handler");
@@ -930,57 +755,7 @@ export async function handleCardAction(
     );
   }
 
-  // 检查是否是控制面板的交互
-  const controlPanelActions = [
-    "select_org",
-    "select_repo",
-    "back_to_home",
-    "back_to_org",
-    "open_actions",
-    "open_agents",
-    "open_pages",
-    "open_settings",
-  ];
-
-  if (actionType && parsedValue && controlPanelActions.includes(actionType)) {
-    const { handleControlPanelAction }
-      = await import("~~/server/services/control-panel.service");
-    const newCard = await handleControlPanelAction(
-      ctx.openId,
-      parsedValue,
-      updateCard,
-    );
-    // 通过 updateCard 回调更新卡片
-    if (newCard && updateCard) {
-      await updateCard(newCard);
-    }
-    return undefined;
-  }
-
-  // 检查是否是账户相关的交互
-  const accountActions = [
-    "refresh_account",
-    "unbind_feishu",
-    "view_binding_guide",
-    "switch_account",
-  ];
-
-  if (actionType && parsedValue && accountActions.includes(actionType)) {
-    const { handleAccountAction }
-      = await import("~~/server/services/account.service");
-    const newCard = await handleAccountAction(
-      ctx.openId,
-      parsedValue,
-      updateCard,
-    );
-    // 通过 updateCard 回调更新卡片
-    if (newCard && updateCard) {
-      await updateCard(newCard);
-    }
-    return undefined;
-  }
-
-  // 检查是否是预设控制台的触发交互
+  // 预设控制台触发交互（尚未迁移到 CardKit）
   if (actionType === "preset_console_trigger" && parsedValue?.token) {
     const { handlePresetConsoleTrigger }
       = await import("~~/server/services/preset-console.service");
@@ -995,70 +770,7 @@ export async function handleCardAction(
     return undefined;
   }
 
-  // ─── JSON 2.0 表单容器交互 ────────────────────────────
-  // form 容器的提交按钮（action_type: "form_submit"）回传时，
-  // action.tag 可能是 "button" 或 "form"，表单字段值在 action.form_value 中（键名为 name）。
-  // 通过检测 test_username 字段来识别是测试表单的提交。
-  // 重置按钮（action_type: "form_reset"）为纯前端操作，不会发起回调。
-  const formValue = (ctx.action.form_value ?? ctx.action.form_values) as
-    | Record<string, string>
-    | undefined;
-  if (formValue && "test_username" in formValue) {
-    const priorityMap: Record<string, string> = {
-      low: "🟢 低",
-      medium: "🟡 中",
-      high: "🔴 高",
-      urgent: "🔥 紧急",
-    };
-
-    const username = formValue.test_username || "(未填写)";
-    const password = formValue.test_password ? "••••••" : "(未填写)";
-    const address = formValue.test_address || "(未填写)";
-    const priorityKey = formValue.test_priority as string | undefined;
-    const priority = priorityKey
-      ? priorityMap[priorityKey] || priorityKey
-      : "(未选择)";
-    const deadline = formValue.test_deadline || "(未选择)";
-
-    const resultCard = new FeishuCardBuilder({
-      title: "✅ 表单提交成功",
-      theme: "green",
-      schema: "2.0",
-    })
-      .addText("**表单数据如下：**", true)
-      .addDivider()
-      .addFields([
-        { label: "用户名", value: username },
-        { label: "密码", value: password },
-        { label: "优先级", value: priority },
-        { label: "截止日期", value: deadline },
-      ])
-      .addDivider()
-      .addText(`**收货地址：**\n${address}`, true)
-      .addDivider()
-      .addText(
-        `*原始 form_value：*\n\`\`\`${JSON.stringify(formValue, null, 2)}\`\`\``,
-        true,
-      )
-      .addDivider()
-      .addButtons([
-        { text: "🔄 重新填写", value: "test_form_again", type: "default" },
-      ])
-      .build().card;
-
-    // 直接返回卡片 JSON 作为同步响应，飞书会用它替换当前卡片内容
-    return resultCard;
-  }
-
-  // "重新填写"按钮 — 将卡片更新回表单
-  if (actionType === "test_form_again") {
-    if (updateCard) {
-      await updateCard(buildTestFormCard());
-    }
-    return undefined;
-  }
-
-  // 否则调用状态机处理其他卡片交互
+  // fallback: 状态机处理其他卡片交互
   const { routeCardAction }
     = await import("~~/server/utils/card-state-machine");
   await routeCardAction({

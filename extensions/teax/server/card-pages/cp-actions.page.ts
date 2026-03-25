@@ -39,7 +39,6 @@ export default defineCardPage({
       const giteaService = await gitea.role("admin");
       const response = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 10);
       runs = response.workflow_runs ?? [];
-      console.log(`[cp:actions] Gitea API returned ${runs.length} runs`);
     } catch (error) {
       console.error("[cp:actions] Failed to fetch workflow runs:", error);
     }

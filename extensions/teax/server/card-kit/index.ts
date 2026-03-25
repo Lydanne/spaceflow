@@ -26,7 +26,6 @@ export function defineCardPage<
 // 避免 side-effect import 可能引用到不同模块实例的 cardRouter。
 
 export async function ensurePages(): Promise<void> {
-  console.log(`[CardKit] ensurePages called, current pageCount: ${cardRouter.pageCount}`);
   if (cardRouter.pageCount > 0) return;
   const pages = await Promise.all([
     import("~~/server/card-pages/cp-home.page"),
@@ -34,15 +33,18 @@ export async function ensurePages(): Promise<void> {
     import("~~/server/card-pages/cp-repo-menu.page"),
     import("~~/server/card-pages/cp-actions.page"),
     import("~~/server/card-pages/cp-feature.page"),
+    import("~~/server/card-pages/account-home.page"),
+    import("~~/server/card-pages/account-guide.page"),
+    import("~~/server/card-pages/account-unbound.page"),
+    import("~~/server/card-pages/test-form.page"),
+    import("~~/server/card-pages/test-result.page"),
   ]);
   for (const mod of pages) {
     const def = mod.default;
-    console.log(`[CardKit] ensurePages: mod.default =`, def?.name ?? "undefined", "keys:", Object.keys(mod));
     if (def?.name) {
       cardRouter.register(def as CardPageDef);
     }
   }
-  console.log(`[CardKit] ensurePages: registered ${cardRouter.pageCount} pages`);
 }
 
 // ─── navigate ──────────────────────────

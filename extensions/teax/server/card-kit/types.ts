@@ -149,6 +149,7 @@ export interface InputV2Config {
   rows?: number;
   auto_resize?: boolean;
   max_rows?: number;
+  show_icon?: boolean;
   disabled?: boolean;
   disabled_tips?: string;
   margin?: string;
