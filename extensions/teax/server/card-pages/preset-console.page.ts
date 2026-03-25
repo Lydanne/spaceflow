@@ -95,6 +95,7 @@ export default defineCardPage({
         placeholder: "选择分支",
         required: true,
         options: sortedBranches,
+        initial_option: preset.branch,
       });
     }
 
@@ -112,14 +113,17 @@ export default defineCardPage({
         }
 
         if (def.type === "choice" && def.options?.length) {
+          const defaultValue = def.default != null ? String(def.default) : undefined;
           card.select({
             name: key,
             label: def.description || key,
             placeholder: `选择 ${def.description || key}`,
             required: def.required || false,
             options: def.options.map((o) => ({ label: o, value: o })),
+            initial_option: defaultValue,
           });
         } else if (def.type === "boolean") {
+          const boolDefault = def.default != null ? (def.default ? "true" : "false") : undefined;
           card.select({
             name: key,
             label: def.description || key,
@@ -129,6 +133,7 @@ export default defineCardPage({
               { label: "是", value: "true" },
               { label: "否", value: "false" },
             ],
+            initial_option: boolDefault,
           });
         } else {
           card.inputV2({

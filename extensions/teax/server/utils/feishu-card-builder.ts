@@ -210,23 +210,16 @@ export class FeishuCardBuilder {
     placeholder?: string;
     required?: boolean;
     options: Array<{ label: string; value: string }>;
-    /** 默认选中项的 value（JSON 2.0 通过 options[].selected 实现） */
+    /** 默认选中项的 value */
     initial_option?: string;
   }): this {
-    // JSON 2.0: 通过 options[].selected 标记默认选中
-    const options = config.options.map((opt) => {
-      const option: { text: { tag: string; content: string }; value: string; selected?: boolean } = {
-        text: {
-          tag: "plain_text",
-          content: opt.label,
-        },
-        value: opt.value,
-      };
-      if (config.initial_option === opt.value) {
-        option.selected = true;
-      }
-      return option;
-    });
+    const options = config.options.map((opt) => ({
+      text: {
+        tag: "plain_text",
+        content: opt.label,
+      },
+      value: opt.value,
+    }));
 
     const element: CardElement = {
       tag: "select_static",
@@ -238,6 +231,11 @@ export class FeishuCardBuilder {
       },
       options,
     };
+
+    // JSON 2.0: 使用 initial_option 属性设置默认选中
+    if (config.initial_option !== undefined) {
+      element.initial_option = config.initial_option;
+    }
 
     this.pushElement(element);
     return this;

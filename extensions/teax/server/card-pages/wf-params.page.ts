@@ -77,13 +77,14 @@ export default defineCardPage({
 
     card.form("wf_params_form");
 
-    // Branch selector
+    // Branch selector - 默认选中仓库默认分支
     card.select({
       name: "branch",
       label: "分支",
       placeholder: "选择分支",
       required: true,
       options: sortedBranches,
+      initial_option: defaultBranch,
     });
 
     // Workflow input parameters
@@ -94,6 +95,7 @@ export default defineCardPage({
         const defaultValue = inputDef.default as string | undefined;
         const required = inputDef.required as boolean | undefined;
         const inputType = inputDef.type as string | undefined;
+        console.log(`[wf-params] key=${key}, type=${inputType}, defaultValue=${defaultValue}, inputDef=`, JSON.stringify(inputDef));
 
         const label = description
           ? `${key}${required ? " *" : ""} - ${description}`
