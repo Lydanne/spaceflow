@@ -53,6 +53,30 @@ interface FeishuEventPayload {
   encrypt?: string;
 }
 
+/**
+ * 从飞书富文本(post)消息中提取纯文本
+ */
+function extractPostText(content: string): string {
+  try {
+    const parsed = JSON.parse(content);
+    const textParts: string[] = [];
+    const contentBlocks: unknown[][] = parsed.content || [];
+    for (const block of contentBlocks) {
+      if (Array.isArray(block)) {
+        for (const element of block) {
+          const el = element as Record<string, unknown>;
+          if (el.tag === "text" || el.tag === "a") {
+            textParts.push(String(el.text || ""));
+          }
+        }
+      }
+    }
+    return textParts.join("");
+  } catch {
+    return "";
+  }
+}
+
 // 已处理的 event_id 缓存（防重放，保留 5 分钟）
 const processedEvents = new Map<string, number>();
 const EVENT_DEDUP_TTL = 5 * 60 * 1000;
@@ -124,38 +148,57 @@ export default defineEventHandler(async (event) => {
     const msg = payload.event.message;
     const senderId = payload.event.sender?.sender_id?.open_id;
 
-    // 只处理文本消息
-    if (msg.message_type === "text" && senderId) {
-      // 群聊中必须 @ 机器人才响应
-      const isGroupChat = msg.chat_type === "group";
-      const botAppId = config.feishuAppId;
-      const isMentioned = msg.mentions?.some((m) => m.id.open_id === botAppId || m.name === "Teax" || m.name === "TeaxBot");
+    const isTextMessage = msg.message_type === "text";
+    const isPostMessage = msg.message_type === "post";
+    if (!senderId || (!isTextMessage && !isPostMessage)) {
+      return { code: 0, msg: "ok" };
+    }
 
-      if (isGroupChat && !isMentioned) {
-        // 群聊中没有 @ 机器人，忽略
-        return { code: 0, msg: "ok" };
-      }
+    // 群聊中必须 @ 机器人才响应
+    const isGroupChat = msg.chat_type === "group";
+    const isMentioned = msg.mentions?.some((m) => m.name === "Teax" || m.name === "TeaxBot");
 
-      let textContent = "";
+    if (isGroupChat && !isMentioned) {
+      return { code: 0, msg: "ok" };
+    }
+
+    let textContent = "";
+    if (isPostMessage) {
+      textContent = extractPostText(msg.content);
+    } else {
       try {
         const parsed = JSON.parse(msg.content) as { text?: string };
         textContent = parsed.text || "";
       } catch {
         textContent = msg.content;
       }
+    }
 
-      // 去除 @bot 的 mention 前缀
-      textContent = textContent.replace(/@_user_\d+\s*/g, "").trim();
+    // 去除 @bot 的 mention 前缀
+    textContent = textContent.replace(/@_user_\d+\s*/g, "").trim();
 
-      // 异步处理指令，不阻塞回调响应（空文本也处理，显示控制面板）
-      handleBotCommand({
+    // 异步处理：先尝试链接处理器，再走命令处理
+    (async () => {
+      const { handleLinkMessage } = await import("~~/server/utils/link-handler");
+      await import("~~/server/services/bot-link-handlers");
+      const linkHandled = await handleLinkMessage({
+        text: textContent,
+        senderOpenId: senderId,
+        messageId: msg.message_id,
+        chatId: msg.chat_id,
+        chatType: msg.chat_type,
+      });
+      if (linkHandled) return;
+
+      if (!isTextMessage) return;
+      await handleBotCommand({
         messageId: msg.message_id,
         chatId: msg.chat_id,
         chatType: msg.chat_type,
         senderOpenId: senderId,
         text: textContent,
-      }).catch((e: unknown) => console.error("[feishu-bot] command error:", e));
-    }
+      });
+    })().catch((e: unknown) => console.error("[feishu-webhook] command error:", e));
 
     return { code: 0, msg: "ok" };
   }

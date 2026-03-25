@@ -173,9 +173,6 @@ export function matchPattern(value: string, patterns: string[]): boolean {
   });
 }
 
-/** 向后兼容别名 */
-export const matchBranch = matchPattern;
-
 // ─── 规则匹配引擎 ─────────────────────────────────────────
 
 export interface RepoNotifySettings {
