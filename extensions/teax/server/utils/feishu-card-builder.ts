@@ -23,7 +23,7 @@ interface ActionElement extends CardElement {
     tag: string;
     text: { tag: string; content: string };
     type?: string;
-    value?: string;
+    value?: string | Record<string, unknown>;
     url?: string;
     confirm?: {
       title: { tag: string; content: string };
@@ -152,7 +152,7 @@ export class FeishuCardBuilder {
     return this;
   }
 
-  // ─── JSON 1.0 按钮 ─────────────────────────────────
+  // ─── 按钮 ─────────────────────────────────
 
   addButtons(
     buttons: Array<{
@@ -164,40 +164,55 @@ export class FeishuCardBuilder {
       rawValue?: boolean;
     }>,
   ): this {
-    this.pushElement({
-      tag: "action",
-      actions: buttons.map((btn) => ({
-        tag: "button",
-        text: {
-          tag: "plain_text",
-          content: btn.text,
-        },
-        type: btn.type || "default",
-        value: btn.rawValue ? btn.value : JSON.stringify({ action: btn.value }),
-        ...(btn.url && { url: btn.url }),
-      })),
-    });
+    if (this.config.schema === "2.0") {
+      // JSON 2.0: 每个按钮作为独立 body element
+      for (const btn of buttons) {
+        const element: CardElement = {
+          tag: "button",
+          text: { tag: "plain_text", content: btn.text },
+          type: btn.type || "default",
+          value: btn.rawValue ? btn.value : { action: btn.value },
+        };
+        if (btn.url) {
+          element.behaviors = [{ type: "open_url", default_url: btn.url }];
+        }
+        this.pushElement(element);
+      }
+    } else {
+      // JSON 1.0: action 容器包裹
+      this.pushElement({
+        tag: "action",
+        actions: buttons.map((btn) => ({
+          tag: "button",
+          text: { tag: "plain_text", content: btn.text },
+          type: btn.type || "default",
+          value: btn.rawValue ? btn.value : JSON.stringify({ action: btn.value }),
+          ...(btn.url && { url: btn.url }),
+        })),
+      });
+    }
     return this;
   }
 
   addConfirm(config: { title: string; text: string }): this {
-    const target = this.currentForm
-      ? this.currentForm.elements[this.currentForm.elements.length - 1]
-      : this.elements[this.elements.length - 1];
+    const elements = this.currentForm
+      ? this.currentForm.elements
+      : this.elements;
+    const target = elements[elements.length - 1];
 
-    if (target?.tag === "action") {
+    const confirmObj = {
+      title: { tag: "plain_text", content: config.title },
+      text: { tag: "plain_text", content: config.text },
+    };
+
+    if (target?.tag === "button") {
+      // JSON 2.0: 直接在 button element 上设置 confirm
+      target.confirm = confirmObj;
+    } else if (target?.tag === "action") {
+      // JSON 1.0: action 容器内所有按钮
       const actionElement = target as ActionElement;
       actionElement.actions.forEach((action) => {
-        action.confirm = {
-          title: {
-            tag: "plain_text",
-            content: config.title,
-          },
-          text: {
-            tag: "plain_text",
-            content: config.text,
-          },
-        };
+        action.confirm = confirmObj;
       });
     }
     return this;

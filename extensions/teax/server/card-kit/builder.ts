@@ -30,7 +30,7 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
     pageName: string,
     data: Record<string, unknown> = {},
   ) {
-    this.inner = new FeishuCardBuilder(config);
+    this.inner = new FeishuCardBuilder({ ...config, schema: "2.0" });
     this.pageName = pageName;
     this.currentData = data;
   }
@@ -252,18 +252,13 @@ export class ColumnBuilder implements ColumnBuilderInterface {
   button(text: string, opts?: ButtonOpts): this {
     if (opts?.navigate) {
       this.elements.push({
-        tag: "action",
-        actions: [
-          {
-            tag: "button",
-            text: { tag: "plain_text", content: text },
-            type: opts.type || "default",
-            value: {
-              __page: opts.navigate[0],
-              __params: opts.navigate[1] || {},
-            },
-          },
-        ],
+        tag: "button",
+        text: { tag: "plain_text", content: text },
+        type: opts.type || "default",
+        value: {
+          __page: opts.navigate[0],
+          __params: opts.navigate[1] || {},
+        },
       });
     } else if (opts?.action) {
       const value: Record<string, unknown> = {
@@ -275,15 +270,10 @@ export class ColumnBuilder implements ColumnBuilderInterface {
         value.__data = this.currentData;
       }
       this.elements.push({
-        tag: "action",
-        actions: [
-          {
-            tag: "button",
-            text: { tag: "plain_text", content: text },
-            type: opts.type || "default",
-            value,
-          },
-        ],
+        tag: "button",
+        text: { tag: "plain_text", content: text },
+        type: opts.type || "default",
+        value,
       });
     }
     return this;
