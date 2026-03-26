@@ -42,7 +42,7 @@ export interface CardPageDef<
    * - ctx.data 当前状态，ctx.setData() 更新状态并重渲染
    * - ctx.formValue 取表单数据（仅 form_submit 时有值）
    */
-  onAction?: (ctx: CardActionContext<D>) => Promise<CardActionResult>;
+  onAction?: (ctx: CardActionContext<D>) => CardActionResult | Promise<CardActionResult>;
 }
 
 // ─── 上下文 ──────────────────────────
@@ -99,10 +99,20 @@ export interface ToastResult {
   content: string;
 }
 
+/** 异步任务返回值：立即渲染 loadingCard，后台执行 task 通过 updateCard 更新结果 */
+export interface AsyncTaskResult {
+  __type: "async_task";
+  /** 立即返回给飞书渲染的 loading 卡片 */
+  loadingCard: CardJSON;
+  /** 后台异步执行的任务，通过闭包访问 ctx.updateCard 更新最终结果 */
+  task: () => Promise<void>;
+}
+
 /** onAction 的返回值 */
 export type CardActionResult
   = | NavigateResult
     | ToastResult
+    | AsyncTaskResult
     | CardJSON
     | undefined;
 

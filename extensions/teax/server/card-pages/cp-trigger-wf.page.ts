@@ -1,4 +1,4 @@
-import { defineCardPage } from "~~/server/card-kit";
+import { defineCardPage, EnhancedCardBuilder, asyncTask } from "~~/server/card-kit";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { parseWorkflowYaml, extractInputs, type WorkflowInputDef } from "~~/server/utils/workflow-yaml";
 import { getActiveAccount } from "~~/server/services/account.service";
@@ -143,57 +143,10 @@ export default defineCardPage({
     const repo = ctx.params.repo as string;
     const workflowPath = ctx.params.workflowPath as string;
     const formValue = ctx.formValue || {};
+    const workflowFileName = workflowPath.split("/").pop() || workflowPath;
+    const openId = ctx.openId;
 
-    // 1. Check user binding
-    const activeUser = await getActiveAccount(ctx.openId);
-    if (!activeUser) {
-      const config = useRuntimeConfig();
-      const baseUrl = config.public.appUrl as string;
-      const { EnhancedCardBuilder } = await import("~~/server/card-kit");
-      const card = new EnhancedCardBuilder(
-        { title: "🔗 未绑定账号", theme: "orange" },
-        "",
-      )
-        .text(`请先在 Teax 中绑定飞书账号\n\n[前往绑定](${baseUrl}/user/settings)`, true)
-        .build();
-      await ctx.updateCard(card);
-      return undefined;
-    }
-
-    // 2. Check permission
-    const db = useDB();
-    const [repoRecord] = await db
-      .select({ id: schema.repositories.id, organization_id: schema.repositories.organization_id })
-      .from(schema.repositories)
-      .where(eq(schema.repositories.full_name, `${owner}/${repo}`))
-      .limit(1);
-
-    if (!repoRecord) {
-      const { EnhancedCardBuilder } = await import("~~/server/card-kit");
-      const card = new EnhancedCardBuilder(
-        { title: "❌ 仓库不存在", theme: "red" },
-        "",
-      )
-        .text("该仓库未在系统中注册", true)
-        .build();
-      await ctx.updateCard(card);
-      return undefined;
-    }
-
-    const canTrigger = await checkUserPermission(activeUser.id, repoRecord.organization_id, "actions:trigger", repoRecord.id);
-    if (!canTrigger) {
-      const { EnhancedCardBuilder } = await import("~~/server/card-kit");
-      const card = new EnhancedCardBuilder(
-        { title: "❌ 无权限", theme: "red" },
-        "",
-      )
-        .text("您没有触发此工作流的权限", true)
-        .build();
-      await ctx.updateCard(card);
-      return undefined;
-    }
-
-    // 3. Build inputs
+    // Build inputs synchronously
     const branch = formValue.branch || "main";
     const inputs: Record<string, string> = {};
     for (const [key, value] of Object.entries(formValue)) {
@@ -201,103 +154,130 @@ export default defineCardPage({
       inputs[key] = String(value);
     }
 
-    // 4. Show loading
-    {
-      const { EnhancedCardBuilder } = await import("~~/server/card-kit");
-      const loadingCard = new EnhancedCardBuilder(
-        { title: "🚀 触发工作流", theme: "blue" },
-        "",
-      )
-        .text("⏳ 正在触发工作流，请稍候...", true)
-        .build();
-      await ctx.updateCard(loadingCard);
-    }
-
-    // 5. Dispatch workflow（使用用户 token）
-    const gitea = useGiteaSdk({
-      userTokenProvider: async () => {
-        const user = await getActiveAccount(ctx.openId);
-        return user ? getUserGiteaTokens(user.id) : null;
-      },
-    });
-    const giteaService = await gitea.role("admin");
-    const workflowFileName = workflowPath.split("/").pop() || workflowPath;
-
-    try {
-      await giteaService.dispatchWorkflow(owner, repo, workflowFileName, branch, inputs);
-    } catch (err) {
-      console.error("[cp:trigger-wf] dispatchWorkflow error:", err);
-      const errObj = err as { data?: { message?: string }; message?: string };
-      const msg = errObj?.data?.message || errObj?.message || "触发工作流失败";
-      const { EnhancedCardBuilder } = await import("~~/server/card-kit");
-      const card = new EnhancedCardBuilder(
-        { title: "❌ 触发失败", theme: "red" },
-        "",
-      )
-        .text(msg, true)
-        .build();
-      await ctx.updateCard(card);
-      return undefined;
-    }
-
-    // 6. Poll for new run
-    let newRunId: number | null = null;
-    let newRunNumber: number | null = null;
-    let latestRunId = 0;
-
-    try {
-      const runs = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 5);
-      const latestRun = runs.workflow_runs?.find((run: { path?: string }) => run.path?.includes(workflowFileName));
-      if (latestRun) {
-        latestRunId = latestRun.id;
-      }
-    } catch {
-      // Ignore
-    }
-
-    for (let i = 0; i < 10; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      try {
-        const runs = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 5);
-        const newRun = runs.workflow_runs?.find((run: { path?: string; id: number }) => {
-          return run.path?.includes(workflowFileName) && run.id > latestRunId;
-        });
-        if (newRun) {
-          newRunId = newRun.id;
-          newRunNumber = newRun.run_number;
-          break;
+    // Return AsyncTaskResult: loading card rendered immediately, task runs in background
+    return asyncTask(
+      `**仓库**: ${owner}/${repo}\n**分支**: ${branch}\n**工作流**: ${workflowFileName}\n\n⏳ 正在触发工作流，请稍候...`,
+      async () => {
+        // 1. Check user binding
+        const activeUser = await getActiveAccount(openId);
+        if (!activeUser) {
+          const config = useRuntimeConfig();
+          const baseUrl = config.public.appUrl as string;
+          await ctx.updateCard(
+            new EnhancedCardBuilder({ title: "🔗 未绑定账号", theme: "orange" }, "")
+              .text(`请先在 Teax 中绑定飞书账号\n\n[前往绑定](${baseUrl}/user/settings)`, true)
+              .build(),
+          );
+          return;
         }
-      } catch {
-        // Continue polling
-      }
-    }
 
-    // 7. Show result
-    const config = useRuntimeConfig();
-    const baseUrl = config.public.appUrl as string;
-    const { EnhancedCardBuilder } = await import("~~/server/card-kit");
-    const resultCard = new EnhancedCardBuilder(
-      {
-        title: newRunId ? "✅ 工作流已触发" : "⚠️ 工作流已提交",
-        theme: newRunId ? "green" : "orange",
+        // 2. Check permission
+        const db = useDB();
+        const [repoRecord] = await db
+          .select({ id: schema.repositories.id, organization_id: schema.repositories.organization_id })
+          .from(schema.repositories)
+          .where(eq(schema.repositories.full_name, `${owner}/${repo}`))
+          .limit(1);
+
+        if (!repoRecord) {
+          await ctx.updateCard(
+            new EnhancedCardBuilder({ title: "❌ 仓库不存在", theme: "red" }, "")
+              .text("该仓库未在系统中注册", true)
+              .build(),
+          );
+          return;
+        }
+
+        const canTrigger = await checkUserPermission(activeUser.id, repoRecord.organization_id, "actions:trigger", repoRecord.id);
+        if (!canTrigger) {
+          await ctx.updateCard(
+            new EnhancedCardBuilder({ title: "❌ 无权限", theme: "red" }, "")
+              .text("您没有触发此工作流的权限", true)
+              .build(),
+          );
+          return;
+        }
+
+        // 3. Dispatch workflow
+        const gitea = useGiteaSdk({
+          userTokenProvider: async () => {
+            const user = await getActiveAccount(openId);
+            return user ? getUserGiteaTokens(user.id) : null;
+          },
+        });
+        const giteaService = await gitea.role("admin");
+
+        try {
+          await giteaService.dispatchWorkflow(owner, repo, workflowFileName, branch, inputs);
+        } catch (err) {
+          console.error("[cp:trigger-wf] dispatchWorkflow error:", err);
+          const errObj = err as { data?: { message?: string }; message?: string };
+          const msg = errObj?.data?.message || errObj?.message || "触发工作流失败";
+          await ctx.updateCard(
+            new EnhancedCardBuilder({ title: "❌ 触发失败", theme: "red" }, "")
+              .text(msg, true)
+              .build(),
+          );
+          return;
+        }
+
+        // 4. Poll for new run
+        let newRunId: number | null = null;
+        let newRunNumber: number | null = null;
+        let latestRunId = 0;
+
+        try {
+          const runs = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 5);
+          const latestRun = runs.workflow_runs?.find((run: { path?: string }) => run.path?.includes(workflowFileName));
+          if (latestRun) {
+            latestRunId = latestRun.id;
+          }
+        } catch {
+          // Ignore
+        }
+
+        for (let i = 0; i < 10; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          try {
+            const runs = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 5);
+            const newRun = runs.workflow_runs?.find((run: { path?: string; id: number }) => {
+              return run.path?.includes(workflowFileName) && run.id > latestRunId;
+            });
+            if (newRun) {
+              newRunId = newRun.id;
+              newRunNumber = newRun.run_number;
+              break;
+            }
+          } catch {
+            // Continue polling
+          }
+        }
+
+        // 5. Show result
+        const config = useRuntimeConfig();
+        const baseUrl = config.public.appUrl as string;
+        const resultCard = new EnhancedCardBuilder(
+          {
+            title: newRunId ? "✅ 工作流已触发" : "⚠️ 工作流已提交",
+            theme: newRunId ? "green" : "orange",
+          },
+          "",
+        );
+
+        const resultLines = [
+          `**仓库**: ${owner}/${repo}`,
+          `**分支**: ${branch}`,
+          `**工作流**: ${workflowFileName}`,
+        ];
+
+        if (newRunId) {
+          resultLines.push(`**运行编号**: #${newRunNumber}`);
+          resultLines.push(`[查看运行详情](${baseUrl}/${owner}/${repo}/actions/runs/${newRunId})`);
+        }
+
+        resultCard.text(resultLines.join("\n"), true);
+        await ctx.updateCard(resultCard.build());
       },
-      "",
     );
-
-    const resultLines = [
-      `**仓库**: ${owner}/${repo}`,
-      `**分支**: ${branch}`,
-      `**工作流**: ${workflowFileName}`,
-    ];
-
-    if (newRunId) {
-      resultLines.push(`**运行编号**: #${newRunNumber}`);
-      resultLines.push(`[查看运行详情](${baseUrl}/${owner}/${repo}/actions/runs/${newRunId})`);
-    }
-
-    resultCard.text(resultLines.join("\n"), true);
-    await ctx.updateCard(resultCard.build());
-
-    return undefined;
   },
 });

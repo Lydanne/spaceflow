@@ -1,5 +1,6 @@
 import { EnhancedCardBuilder } from "./builder";
 import type {
+  AsyncTaskResult,
   CardActionContext,
   CardActionResult,
   CardConfig,
@@ -209,6 +210,19 @@ export class CardRouter {
         data: targetData,
       });
       return targetPage.render(renderCtx);
+    }
+
+    // AsyncTaskResult → 立即返回 loadingCard，后台执行 task
+    if (
+      typeof result === "object"
+      && "__type" in result
+      && result.__type === "async_task"
+    ) {
+      const asyncResult = result as AsyncTaskResult;
+      asyncResult.task().catch((err) => {
+        console.error(`[CardRouter] async task error:`, err);
+      });
+      return asyncResult.loadingCard;
     }
 
     // ToastResult → 返回飞书 toast 格式

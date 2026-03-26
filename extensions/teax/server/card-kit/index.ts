@@ -1,11 +1,13 @@
 import { CardRouter } from "./router";
 import type {
+  AsyncTaskResult,
   CardActionResult,
   CardJSON,
   CardPageDef,
   NavigateResult,
   ToastResult,
 } from "./types";
+import { EnhancedCardBuilder } from "./builder";
 
 // ─── 全局单例路由器 ──────────────────────────
 
@@ -80,9 +82,34 @@ export function toast(
   };
 }
 
+// ─── asyncTask ──────────────────────────
+
+/**
+ * 创建异步任务结果：立即返回 loading 卡片，后台执行 task。
+ * task 内通过闭包访问 ctx.updateCard 更新最终结果。
+ * @param loading - loading 提示文本（自动构建蓝色卡片）或完整的 CardJSON
+ * @param task - 后台异步任务
+ */
+export function asyncTask(
+  loading: string | CardJSON,
+  task: () => Promise<void>,
+): AsyncTaskResult {
+  const loadingCard = typeof loading === "string"
+    ? new EnhancedCardBuilder({ title: "⏳ 请稍候", theme: "blue" }, "")
+        .text(loading, true)
+        .build()
+    : loading;
+  return {
+    __type: "async_task",
+    loadingCard,
+    task,
+  };
+}
+
 // ─── 类型导出 ──────────────────────────
 
 export type {
+  AsyncTaskResult,
   CardActionResult,
   CardJSON,
   CardPageDef,
