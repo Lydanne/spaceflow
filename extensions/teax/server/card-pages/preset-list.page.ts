@@ -41,6 +41,8 @@ export default defineCardPage({
       name: string;
       share_token: string;
       group_id: string | null;
+      branch: string;
+      workflow_path: string;
     }> = [];
     if (groupIds.length > 0) {
       groupPresets = await db
@@ -49,6 +51,8 @@ export default defineCardPage({
           name: schema.workflowPresets.name,
           share_token: schema.workflowPresets.share_token,
           group_id: schema.workflowPresets.group_id,
+          branch: schema.workflowPresets.branch,
+          workflow_path: schema.workflowPresets.workflow_path,
         })
         .from(schema.workflowPresets)
         .where(inArray(schema.workflowPresets.group_id, groupIds))
@@ -70,6 +74,8 @@ export default defineCardPage({
         id: schema.workflowPresets.id,
         name: schema.workflowPresets.name,
         share_token: schema.workflowPresets.share_token,
+        branch: schema.workflowPresets.branch,
+        workflow_path: schema.workflowPresets.workflow_path,
         repository: {
           full_name: schema.repositories.full_name,
         },
@@ -87,89 +93,60 @@ export default defineCardPage({
       )
       .limit(10);
 
-    const card = ctx.card({ title: "📦 我的工作流预设", theme: "blue" });
+    const card = ctx.card({ title: "📦 工作流预设", theme: "blue" });
 
     // 空状态
     if (groups.length === 0 && standalonePresets.length === 0) {
-      card.text("您还没有创建工作流预设\n\n工作流预设可以保存常用的工作流配置，方便快速触发", true);
+      card.text("暂无预设\n\n预设可保存常用工作流配置，一键触发", true);
       card.divider();
-      card.button("💡 了解如何创建", { url: `${baseUrl}/user/settings` });
+      card.button("创建预设", { url: `${baseUrl}/user/settings` });
       return card.build();
     }
 
-    // 预设组列表
+    // 预设组：组名 + 预设按钮
     if (groups.length > 0) {
-      card.text("**📁 预设组**", true);
-      card.divider();
-
       for (const g of groups) {
         const presets = presetsByGroup.get(g.id) ?? [];
-        const presetCount = presets.length;
+        if (presets.length === 0) continue;
 
-        card.text(`**${g.name}**${g.description ? ` — ${g.description}` : ""} (${presetCount}个预设)`, true);
+        // 组名
+        card.text(`**${g.name}**${g.description ? ` ${g.description}` : ""}`, true);
 
-        // 每排两个按钮：进入、跳转
-        if (presets.length > 0) {
-          const buttons = presets.slice(0, 4).map((p) => [
-            {
-              text: `▶️ ${p.name}`,
-              type: "primary" as const,
-              navigate: ["preset:console", { shareToken: p.share_token }, { newMessage: true }] as [string, Record<string, unknown>, { newMessage: boolean }],
-            },
-            {
-              text: "🔗",
-              type: "default" as const,
-              url: `${baseUrl}/workflows/${p.share_token}`,
-            },
-          ]).flat();
-
-          // 每两个按钮一排（一个进入 + 一个跳转）
-          for (let i = 0; i < buttons.length; i += 2) {
-            const chunk = buttons.slice(i, i + 2);
-            card.buttons(chunk);
-          }
-        }
-
-        // 组分享链接
-        if (g.share_token) {
-          card.button("📎 分享预设组", { url: `${baseUrl}/workflow-groups/${g.share_token}` });
-        }
-
-        card.divider();
-      }
-    }
-
-    // 独立预设列表
-    if (standalonePresets.length > 0) {
-      if (groups.length > 0) {
-        card.text("**📋 独立预设**", true);
-        card.divider();
-      }
-
-      for (const p of standalonePresets) {
-        const repoName = p.repository?.full_name ?? "";
-        card.text(`**${p.name}**${repoName ? ` (${repoName})` : ""}`, true);
-
-        // 每排两个按钮：进入、跳转
-        card.buttons([
-          {
-            text: "▶️ 触发",
-            type: "primary",
+        // 预设按钮（每行2个）
+        const btns = presets.slice(0, 4).map((p) => {
+          const wf = p.workflow_path.replace(/^\.gitea\/workflows\/|\.ya?ml$/gi, "");
+          return {
+            text: `${p.name} (${p.branch})`,
+            type: "primary" as const,
             navigate: ["preset:console", { shareToken: p.share_token }, { newMessage: true }] as [string, Record<string, unknown>, { newMessage: boolean }],
-          },
-          {
-            text: "🔗",
-            type: "default",
-            url: `${baseUrl}/workflows/${p.share_token}`,
-          },
-        ]);
-
+          };
+        });
+        for (let i = 0; i < btns.length; i += 2) {
+          card.buttons(btns.slice(i, i + 2));
+        }
         card.divider();
       }
     }
 
-    // 底部链接
-    card.button("⚙️ 管理预设", { url: `${baseUrl}/user/settings` });
+    // 独立预设：按钮显示仓库+分支
+    if (standalonePresets.length > 0) {
+      card.text("**独立预设**", true);
+
+      const btns = standalonePresets.map((p) => {
+        const repo = p.repository?.full_name ?? "";
+        return {
+          text: `${p.name} (${repo} ${p.branch})`,
+          type: "primary" as const,
+          navigate: ["preset:console", { shareToken: p.share_token }, { newMessage: true }] as [string, Record<string, unknown>, { newMessage: boolean }],
+        };
+      });
+      for (let i = 0; i < btns.length; i += 2) {
+        card.buttons(btns.slice(i, i + 2));
+      }
+      card.divider();
+    }
+
+    card.button("管理预设", { url: `${baseUrl}/user/settings` });
 
     return card.build();
   },
