@@ -7,13 +7,7 @@
 
 import type { CardJSON } from "./types";
 import { encodeStackEntry } from "./stack";
-
-// 延迟获取 cardRouter 和 ensurePages，避免与 index.ts 循环依赖
-async function getRouter() {
-  const { cardRouter, ensurePages } = await import("./index");
-  await ensurePages();
-  return cardRouter;
-}
+import { getRouter } from "./register";
 
 async function render(
   openId: string,

@@ -29,8 +29,8 @@ export async function renderCardPage(
   page: string,
   params?: Record<string, unknown>,
 ): Promise<CardJSON | undefined> {
-  const { cardRouter, ensurePages } = await import("./index");
-  await ensurePages();
+  const { getRouter } = await import("./register");
+  const cardRouter = await getRouter();
   return cardRouter.dispatch({
     openId: ctx.openId,
     actionValue: JSON.stringify({
@@ -189,8 +189,8 @@ export function requireRepoPermission(permission: string): BeforeEnterGuard {
 export async function handleCardInteraction(
   ctx: CardInteractionContext,
 ): Promise<Record<string, unknown> | undefined> {
-  const { cardRouter, ensurePages } = await import("./index");
-  await ensurePages();
+  const { getRouter } = await import("./register");
+  const cardRouter = await getRouter();
   const formVal = (ctx.action.form_value ?? ctx.action.form_values) as
     | Record<string, string>
     | undefined;
