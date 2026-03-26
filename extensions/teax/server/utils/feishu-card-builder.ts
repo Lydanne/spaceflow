@@ -187,6 +187,10 @@ export class FeishuCardBuilder {
   // ─── 输入组件 ──────────────
 
   addInput(config: { name: string; label: string; placeholder?: string; required?: boolean }): this {
+    if (config.label) {
+      const labelText = config.required ? `**${config.label}** <font color='red'>*</font>` : `**${config.label}**`;
+      this.pushElement({ tag: "markdown", content: labelText });
+    }
     const element: CardElement = {
       tag: "input",
       name: config.name,
@@ -195,10 +199,6 @@ export class FeishuCardBuilder {
         tag: "plain_text",
         content: config.placeholder || "",
       },
-      label: {
-        tag: "plain_text",
-        content: config.label,
-      },
     };
     this.pushElement(element);
     return this;
@@ -206,7 +206,7 @@ export class FeishuCardBuilder {
 
   addSelect(config: {
     name: string;
-    label: string;
+    label?: string;
     placeholder?: string;
     required?: boolean;
     options: Array<{ label: string; value: string }>;
@@ -220,6 +220,12 @@ export class FeishuCardBuilder {
       },
       value: opt.value,
     }));
+
+    // select_static 不支持 label 属性，用前置 markdown 模拟
+    if (config.label) {
+      const labelText = config.required ? `**${config.label}** <font color='red'>*</font>` : `**${config.label}**`;
+      this.pushElement({ tag: "markdown", content: labelText });
+    }
 
     const element: CardElement = {
       tag: "select_static",
@@ -297,16 +303,16 @@ export class FeishuCardBuilder {
    * 在表单容器内使用时，name 会作为 form_value 回调中的键名。
    */
   addInputV2(config: InputConfigV2): this {
+    if (config.label) {
+      const labelText = config.required ? `**${config.label}** <font color='red'>*</font>` : `**${config.label}**`;
+      this.pushElement({ tag: "markdown", content: labelText });
+    }
     const element: CardElement = {
       tag: "input",
       name: config.name,
       placeholder: {
         tag: "plain_text",
         content: config.placeholder || "请输入",
-      },
-      label: {
-        tag: "plain_text",
-        content: config.label,
       },
     };
 

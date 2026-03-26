@@ -230,10 +230,12 @@ export function renderWorkflowForm(
   // Workflow inputs
   if (data.inputDefs) {
     for (const [key, def] of Object.entries(data.inputDefs)) {
+      const label = def.description || key;
+
       // 锁定参数跳过
       if (opts.lockedInputs?.has(key)) {
         lockedFields.push({
-          label: def.description || key,
+          label,
           value: String(opts.lockedValues?.[key] ?? def.default ?? "-"),
         });
         continue;
@@ -243,8 +245,8 @@ export function renderWorkflowForm(
         const defaultValue = def.default != null ? String(def.default) : undefined;
         card.select({
           name: key,
-          label: def.description || key,
-          placeholder: `选择 ${def.description || key}`,
+          label,
+          placeholder: `选择 ${key}`,
           required: def.required || false,
           options: def.options.map((o) => ({ label: o, value: o })),
           initial_option: defaultValue,
@@ -253,8 +255,8 @@ export function renderWorkflowForm(
         const boolDefault = def.default != null ? (def.default ? "true" : "false") : undefined;
         card.select({
           name: key,
-          label: def.description || key,
-          placeholder: `选择 ${def.description || key}`,
+          label,
+          placeholder: `选择 ${key}`,
           required: def.required || false,
           options: [
             { label: "是", value: "true" },
@@ -265,8 +267,8 @@ export function renderWorkflowForm(
       } else {
         card.inputV2({
           name: key,
-          label: def.description || key,
-          placeholder: def.default ? String(def.default) : `输入 ${def.description || key}`,
+          label,
+          placeholder: def.default ? String(def.default) : `输入 ${key}`,
           required: def.required || false,
           default_value: def.default ? String(def.default) : undefined,
         });
