@@ -3,9 +3,8 @@ import { useDB, schema } from "~~/server/db";
 import { defineCardPage, navigate, asyncTask, EnhancedCardBuilder, requireBinding } from "~~/server/card-kit";
 import { resolvePresetByShareToken } from "~~/server/utils/resolve-preset";
 import { useGiteaSdk } from "~~/server/utils/gitea";
-import { dispatchAndPoll, buildDispatchErrorCard, buildTriggerResultCard } from "~~/server/utils/workflow-trigger";
+import { dispatchAndPoll, buildDispatchErrorCard, buildTriggerResultCard, fetchWorkflowFormData, renderWorkflowForm } from "~~/server/utils/workflow-trigger";
 import { getActiveAccount } from "~~/server/services/account.service";
-import { parseWorkflowYaml, extractInputs, type WorkflowInputDef } from "~~/server/utils/workflow-yaml";
 import { queryUserPermissionGroups, rowGrantsPermission } from "~~/server/utils/permission";
 import { recordAutoLockHistory, recordTriggerHistory } from "~~/server/services/preset-lock.service";
 
@@ -41,121 +40,23 @@ export default defineCardPage({
     const { preset, repo, owner, repoName } = resolved;
     const gitea = await useGiteaSdk().role("admin");
 
-    // Fetch input definitions from workflow YAML
-    let inputDefs: Record<string, WorkflowInputDef> | null = null;
-    try {
-      const workflowFileName = preset.workflow_path.split("/").pop() || preset.workflow_path;
-      const { workflows } = await gitea.getRepoWorkflows(owner, repoName);
-      const wf = workflows.find((w) =>
-        w.path === preset.workflow_path
-        || w.name === workflowFileName
-        || w.name?.replace(/\.ya?ml$/, "") === workflowFileName.replace(/\.ya?ml$/, ""),
-      );
-
-      if (wf) {
-        const content = await gitea.getFileContent(owner, repoName, preset.workflow_path, preset.branch);
-        if (content) {
-          const doc = parseWorkflowYaml(content);
-          if (doc) {
-            inputDefs = extractInputs(doc);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn("[preset:console] Failed to fetch workflow inputs:", err);
-    }
-
-    // Get branches
-    let branches: Array<{ label: string; value: string }> = [];
-    try {
-      const branchList = await gitea.getRepoBranches(owner, repoName);
-      branches = branchList.map((b) => ({ label: b.name, value: b.name }));
-    } catch (err) {
-      console.warn("[preset:console] Failed to fetch branches:", err);
-    }
-
-    // Collect locked fields (displayed as read-only)
-    const lockedFields: Array<{ label: string; value: string }> = [];
+    const formData = await fetchWorkflowFormData(gitea, {
+      owner,
+      repo: repoName,
+      workflowPath: preset.workflow_path,
+      defaultBranch: preset.branch,
+    });
 
     const card = ctx.card({ title: `🚀 ${preset.name}`, theme: "blue" });
-
     card.text(`**仓库**: ${repo.full_name}\n**工作流**: ${preset.workflow_path}`, true);
     card.divider();
 
-    // Start form
-    card.form("preset_form");
-
-    // Branch selector
-    if (branches.length > 0) {
-      const defaultFirst = branches.find((b) => b.value === preset.branch);
-      const rest = branches.filter((b) => b.value !== preset.branch);
-      const sortedBranches = defaultFirst
-        ? [defaultFirst, ...rest]
-        : branches;
-      card.select({
-        name: "branch",
-        label: "分支",
-        placeholder: "选择分支",
-        required: true,
-        options: sortedBranches,
-        initial_option: preset.branch,
-      });
-    }
-
-    // Process input definitions
-    if (inputDefs) {
-      const lockedInputs = new Set<string>(preset.locked_inputs || []);
-
-      for (const [key, def] of Object.entries(inputDefs)) {
-        if (lockedInputs.has(key)) {
-          lockedFields.push({
-            label: def.description || key,
-            value: String((preset.inputs as Record<string, unknown>)?.[key] ?? def.default ?? "-"),
-          });
-          continue;
-        }
-
-        if (def.type === "choice" && def.options?.length) {
-          const defaultValue = def.default != null ? String(def.default) : undefined;
-          card.select({
-            name: key,
-            label: def.description || key,
-            placeholder: `选择 ${def.description || key}`,
-            required: def.required || false,
-            options: def.options.map((o) => ({ label: o, value: o })),
-            initial_option: defaultValue,
-          });
-        } else if (def.type === "boolean") {
-          const boolDefault = def.default != null ? (def.default ? "true" : "false") : undefined;
-          card.select({
-            name: key,
-            label: def.description || key,
-            placeholder: `选择 ${def.description || key}`,
-            required: def.required || false,
-            options: [
-              { label: "是", value: "true" },
-              { label: "否", value: "false" },
-            ],
-            initial_option: boolDefault,
-          });
-        } else {
-          card.inputV2({
-            name: key,
-            label: def.description || key,
-            placeholder: def.default ? String(def.default) : `输入 ${def.description || key}`,
-            required: def.required || false,
-            default_value: def.default ? String(def.default) : undefined,
-          });
-        }
-      }
-    }
-
-    // Submit button
-    card.formButtons({
-      submit: { text: "🚀 触发工作流", type: "primary" },
+    const lockedInputs = new Set<string>(preset.locked_inputs || []);
+    const lockedFields = renderWorkflowForm(card, formData, {
+      formName: "preset_form",
+      lockedInputs,
+      lockedValues: preset.inputs as Record<string, unknown>,
     });
-
-    card.endForm();
 
     // Locked fields outside form
     if (lockedFields.length > 0) {

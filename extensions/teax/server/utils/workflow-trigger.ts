@@ -1,6 +1,7 @@
 import type { GiteaService } from "./gitea";
 import { EnhancedCardBuilder } from "../card-kit/builder";
-import type { CardJSON } from "../card-kit/types";
+import type { CardJSON, EnhancedCardBuilderInterface } from "../card-kit/types";
+import { parseWorkflowYaml, extractInputs, type WorkflowInputDef } from "./workflow-yaml";
 
 // ─── dispatch + poll ──────────────────────────
 
@@ -120,4 +121,163 @@ export function buildTriggerResultCard(opts: TriggerResultCardOptions): CardJSON
 
   resultCard.text(lines.join("\n"), true);
   return resultCard.build();
+}
+
+// ─── 工作流表单数据获取 ──────────────────────────
+
+export interface WorkflowFormData {
+  /** 排序后的分支列表（默认分支在前） */
+  branches: Array<{ label: string; value: string }>;
+  /** 默认分支 */
+  defaultBranch: string;
+  /** 工作流 input 定义（null 表示获取失败） */
+  inputDefs: Record<string, WorkflowInputDef> | null;
+}
+
+export interface FetchWorkflowFormDataOptions {
+  owner: string;
+  repo: string;
+  workflowPath: string;
+  /** 覆盖默认分支（如 preset 指定的分支） */
+  defaultBranch?: string;
+}
+
+/**
+ * 获取工作流表单所需的数据：分支列表 + workflow input 定义。
+ * 分支列表自动排序（默认分支在前）。
+ */
+export async function fetchWorkflowFormData(
+  gitea: GiteaService,
+  opts: FetchWorkflowFormDataOptions,
+): Promise<WorkflowFormData> {
+  const { owner, repo, workflowPath } = opts;
+
+  // 获取分支列表 + 默认分支
+  let branches: Array<{ label: string; value: string }> = [];
+  let defaultBranch = opts.defaultBranch || "main";
+  try {
+    const branchList = await gitea.getRepoBranches(owner, repo);
+    branches = branchList.map((b) => ({ label: b.name, value: b.name }));
+    if (!opts.defaultBranch) {
+      const repoInfo = await gitea.getRepo(owner, repo);
+      defaultBranch = repoInfo.default_branch || "main";
+    }
+  } catch (err) {
+    console.warn("[workflow-trigger] Failed to fetch branches:", err);
+    branches = [{ label: defaultBranch, value: defaultBranch }];
+  }
+
+  // 排序：默认分支在前
+  const defaultFirst = branches.find((b) => b.value === defaultBranch);
+  const rest = branches.filter((b) => b.value !== defaultBranch);
+  const sortedBranches = defaultFirst ? [defaultFirst, ...rest] : branches;
+
+  // 解析 workflow inputs
+  let inputDefs: Record<string, WorkflowInputDef> | null = null;
+  try {
+    const content = await gitea.getFileContent(owner, repo, workflowPath, defaultBranch);
+    if (content) {
+      const doc = parseWorkflowYaml(content);
+      if (doc) {
+        inputDefs = extractInputs(doc);
+      }
+    }
+  } catch (err) {
+    console.warn("[workflow-trigger] Failed to parse workflow:", err);
+  }
+
+  return { branches: sortedBranches, defaultBranch, inputDefs };
+}
+
+// ─── 工作流表单渲染 ──────────────────────────
+
+export interface RenderWorkflowFormOptions {
+  /** 表单名称 */
+  formName: string;
+  /** 提交按钮文案（默认 "🚀 触发工作流"） */
+  submitText?: string;
+  /** 锁定的 input key 集合（不渲染为表单控件） */
+  lockedInputs?: Set<string>;
+  /** 锁定参数的预设值（用于展示） */
+  lockedValues?: Record<string, unknown>;
+}
+
+/**
+ * 在 card builder 上渲染工作流触发表单：分支选择 + workflow inputs + 提交按钮。
+ * 返回被锁定（跳过渲染）的字段列表，调用方可自行展示。
+ */
+export function renderWorkflowForm(
+  card: EnhancedCardBuilderInterface,
+  data: WorkflowFormData,
+  opts: RenderWorkflowFormOptions,
+): Array<{ label: string; value: string }> {
+  const lockedFields: Array<{ label: string; value: string }> = [];
+
+  card.form(opts.formName);
+
+  // 分支选择
+  if (data.branches.length > 0) {
+    card.select({
+      name: "branch",
+      label: "分支",
+      placeholder: "选择分支",
+      required: true,
+      options: data.branches,
+      initial_option: data.defaultBranch,
+    });
+  }
+
+  // Workflow inputs
+  if (data.inputDefs) {
+    for (const [key, def] of Object.entries(data.inputDefs)) {
+      // 锁定参数跳过
+      if (opts.lockedInputs?.has(key)) {
+        lockedFields.push({
+          label: def.description || key,
+          value: String(opts.lockedValues?.[key] ?? def.default ?? "-"),
+        });
+        continue;
+      }
+
+      if (def.type === "choice" && def.options?.length) {
+        const defaultValue = def.default != null ? String(def.default) : undefined;
+        card.select({
+          name: key,
+          label: def.description || key,
+          placeholder: `选择 ${def.description || key}`,
+          required: def.required || false,
+          options: def.options.map((o) => ({ label: o, value: o })),
+          initial_option: defaultValue,
+        });
+      } else if (def.type === "boolean") {
+        const boolDefault = def.default != null ? (def.default ? "true" : "false") : undefined;
+        card.select({
+          name: key,
+          label: def.description || key,
+          placeholder: `选择 ${def.description || key}`,
+          required: def.required || false,
+          options: [
+            { label: "是", value: "true" },
+            { label: "否", value: "false" },
+          ],
+          initial_option: boolDefault,
+        });
+      } else {
+        card.inputV2({
+          name: key,
+          label: def.description || key,
+          placeholder: def.default ? String(def.default) : `输入 ${def.description || key}`,
+          required: def.required || false,
+          default_value: def.default ? String(def.default) : undefined,
+        });
+      }
+    }
+  }
+
+  card.formButtons({
+    submit: { text: opts.submitText || "🚀 触发工作流", type: "primary" },
+  });
+  card.endForm();
+
+  return lockedFields;
 }
