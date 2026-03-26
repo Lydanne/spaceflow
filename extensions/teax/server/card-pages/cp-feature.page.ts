@@ -17,9 +17,7 @@ export default defineCardPage({
       .card({ title: `📦 ${owner}/${repo}`, theme: "blue" })
       .text(`**${label}**\n\n[在浏览器中打开](${url})`, true)
       .divider()
-      .button("⬅️ 返回", {
-        navigate: ["cp-repo-menu", { owner, repo }],
-      })
+      .backButton("⬅️ 返回")
       .build();
   },
 });

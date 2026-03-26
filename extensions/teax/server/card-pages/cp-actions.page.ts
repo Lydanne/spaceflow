@@ -110,9 +110,7 @@ export default defineCardPage({
     }
 
     card.divider();
-    card.button("⬅️ 返回", {
-      navigate: ["cp-repo-menu", { owner, repo }],
-    });
+    card.backButton("⬅️ 返回");
 
     return card.build();
   },

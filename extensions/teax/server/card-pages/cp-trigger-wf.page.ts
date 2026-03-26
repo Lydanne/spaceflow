@@ -27,7 +27,7 @@ export default defineCardPage({
     renderWorkflowForm(card, formData, { formName: "trigger_wf_form", submitText: "🚀 触发" });
 
     card.divider();
-    card.button("⬅️ 返回", { navigate: ["cp-actions", { owner, repo }] });
+    card.backButton("⬅️ 返回");
 
     return card.build();
   },

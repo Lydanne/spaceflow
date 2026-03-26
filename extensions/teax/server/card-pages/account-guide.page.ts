@@ -16,7 +16,7 @@ export default defineCardPage({
       .divider()
       .text(`[立即前往绑定](${baseUrl}/user/settings)`, true)
       .divider()
-      .button("⬅️ 返回", { navigate: ["account-home"] })
+      .backButton("⬅️ 返回")
       .build();
   },
 });

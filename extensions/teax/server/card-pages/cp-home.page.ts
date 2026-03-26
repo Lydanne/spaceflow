@@ -53,7 +53,7 @@ export default defineCardPage({
 
     for (const org of userOrgs) {
       card.button(`📁 ${org.org_name}`, {
-        navigate: ["cp-repos", { orgName: org.org_name }],
+        navigate: ["cp-repos", { orgName: org.org_name }, { mode: "push" }],
       });
     }
 

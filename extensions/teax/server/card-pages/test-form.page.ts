@@ -81,7 +81,7 @@ export default defineCardPage({
         address,
         priority,
         raw: JSON.stringify(formValue, null, 2),
-      });
+      }, { mode: "push" });
     }
   },
 });

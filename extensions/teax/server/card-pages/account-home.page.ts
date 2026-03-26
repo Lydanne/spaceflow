@@ -39,7 +39,7 @@ export default defineCardPage({
         .divider()
         .button("📖 查看绑定教程", {
           type: "primary",
-          navigate: ["account-guide"],
+          navigate: ["account-guide", {}, { mode: "push" }],
         })
         .build();
     }
@@ -132,7 +132,7 @@ export default defineCardPage({
       {
         text: "➕ 绑定更多账户",
         type: "primary",
-        navigate: ["account-guide"],
+        navigate: ["account-guide", {}, { mode: "push" }],
       },
     ]);
 

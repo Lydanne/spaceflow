@@ -20,7 +20,7 @@ import type {
 // ─── 常量 + 工具函数 ──────────────────────────
 
 /** 栈最大深度，超出时丢弃栈底 */
-export const MAX_STACK_DEPTH = 5;
+export const MAX_STACK_DEPTH = 9;
 
 interface ValueBuildCtx {
   pageName: string;
@@ -51,12 +51,11 @@ function buildNavValue(
   return value;
 }
 
-/** 构建 back 类型按钮的 value 对象，栈只有当前页面（长度<=1）时返回 null */
+/** 构建 back 类型按钮的 value 对象，历史栈为空时返回 null */
 function buildBackValue(stack: StackEntry[]): Record<string, unknown> | null {
-  // 栈至少需要 2 项：[...历史, 当前页面]，pop 当前页面后还有上一页
-  if (stack.length <= 1) return null;
-  // pop 掉当前页面，新栈顶就是要返回的页面
-  return { __stack: stack.slice(0, -1) };
+  // stack 是历史栈（不含当前页面），栈顶即返回目标
+  if (stack.length === 0) return null;
+  return { __stack: stack };
 }
 
 /** 构建 action 类型按钮的 value 对象 */

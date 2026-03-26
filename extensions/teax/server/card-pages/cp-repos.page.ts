@@ -39,7 +39,7 @@ export default defineCardPage({
         .card({ title: `📁 ${orgName}`, theme: "blue" })
         .text("该组织还没有仓库", true)
         .divider()
-        .button("⬅️ 返回", { navigate: ["cp-home"] })
+        .backButton("⬅️ 返回")
         .build();
     }
 
@@ -49,12 +49,12 @@ export default defineCardPage({
 
     for (const repo of repos) {
       card.button(`📦 ${repo.name}`, {
-        navigate: ["cp-repo-menu", { owner: orgName, repo: repo.name }],
+        navigate: ["cp-repo-menu", { owner: orgName, repo: repo.name }, { mode: "push" }],
       });
     }
 
     card.divider();
-    card.button("⬅️ 返回", { navigate: ["cp-home"] });
+    card.backButton("⬅️ 返回");
 
     return card.build();
   },

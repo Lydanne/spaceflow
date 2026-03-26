@@ -24,7 +24,7 @@ export default defineCardPage({
       .divider()
       .text(`*原始 form_value：*\n\`\`\`${raw}\`\`\``, true)
       .divider()
-      .button("🔄 重新填写", { navigate: ["test-form"] })
+      .backButton("🔄 重新填写")
       .build();
   },
 

@@ -15,34 +15,25 @@ export default defineCardPage({
       .divider()
       .button("🎯 Presets", {
         type: "primary",
-        navigate: ["preset-list", { owner, repo }],
+        navigate: ["preset-list", { owner, repo }, { mode: "push" }],
       })
       .button("🚀 Actions", {
         type: "primary",
-        navigate: ["cp-actions", { owner, repo }],
+        navigate: ["cp-actions", { owner, repo }, { mode: "push" }],
       })
       .button("🤖 Agents", {
-        navigate: ["cp-feature", { owner, repo, feature: "agents" }],
+        navigate: ["cp-feature", { owner, repo, feature: "agents" }, { mode: "push" }],
       })
       .button("📄 Pages", {
-        navigate: ["cp-feature", { owner, repo, feature: "pages" }],
+        navigate: ["cp-feature", { owner, repo, feature: "pages" }, { mode: "push" }],
       })
       .button("⚙️ 设置", {
-        navigate: ["cp-feature", { owner, repo, feature: "settings" }],
+        navigate: ["cp-feature", { owner, repo, feature: "settings" }, { mode: "push" }],
       })
       .divider()
       .text(`**快捷链接**\n[在网页中打开](${baseUrl}/${owner}/${repo})`, true)
       .divider()
-      .buttons([
-        {
-          text: "⬅️ 返回仓库列表",
-          navigate: ["cp-repos", { orgName: owner }],
-        },
-        {
-          text: "🏠 返回首页",
-          navigate: ["cp-home"],
-        },
-      ])
+      .backButton("⬅️ 返回")
       .build();
   },
 });

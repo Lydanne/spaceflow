@@ -157,7 +157,10 @@ export default defineCardPage({
     if (groups.length === 0 && standalonePresets.length === 0 && publicPresets.length === 0) {
       card.text("暂无预设\n\n预设可保存常用工作流配置，一键触发", true);
       card.divider();
-      card.button("创建预设", { url: `${baseUrl}/user/settings` });
+      card.buttons([
+        { text: "⬅️ 返回", back: true },
+        { text: "创建预设", url: `${baseUrl}/user/settings` },
+      ]);
       return card.build();
     }
 
@@ -223,7 +226,10 @@ export default defineCardPage({
       card.divider();
     }
 
-    card.button("管理预设", { url: `${baseUrl}/user/settings` });
+    card.buttons([
+      { text: "⬅️ 返回", back: true },
+      { text: "管理预设", url: `${baseUrl}/user/settings` },
+    ]);
 
     return card.build();
   },
