@@ -69,7 +69,7 @@ export default defineCardPage({
       const workflowButtons: EnhancedButtonConfig[] = workflows.map((wf) => ({
         text: wf.name.replace(/\.ya?ml$/, ""),
         type: "default",
-        navigate: ["cp-trigger-wf", { owner, repo, workflowPath: wf.path }, { newMessage: true }],
+        navigate: ["cp-trigger-wf", { owner, repo, workflowPath: wf.path }, { newMessage: false }],
       }));
 
       // 每4个一组显示按钮

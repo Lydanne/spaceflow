@@ -69,7 +69,7 @@ async function renderSingleGroup(
         card.buttons([{
           text: `▶️ ${p.name} (${p.branch})`,
           type: "primary",
-          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
+          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
         }]);
       }
       card.divider();
@@ -87,14 +87,14 @@ async function renderSingleGroup(
           card.buttons([{
             text: `${p.name}`,
             type: "default",
-            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
+            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
           }]);
         } else {
           // 空闲
           card.buttons([{
             text: `🔵 ${p.name} (${p.branch})`,
             type: "primary",
-            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
+            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
           }]);
         }
       }
@@ -287,7 +287,7 @@ export default defineCardPage({
         return {
           text: `${p.name} (${repo})`,
           type: "primary",
-          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
+          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
         };
       });
       for (let i = 0; i < btns.length; i += 2) {
@@ -311,7 +311,7 @@ export default defineCardPage({
           return {
             text: `${p.name} (${p.branch})`,
             type: "primary",
-            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
+            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
           };
         });
         for (let i = 0; i < btns.length; i += 2) {
@@ -330,7 +330,7 @@ export default defineCardPage({
         return {
           text: `${p.name} (${repo} ${p.branch})`,
           type: "primary",
-          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
+          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
         };
       });
       for (let i = 0; i < btns.length; i += 2) {
