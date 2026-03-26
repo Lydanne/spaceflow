@@ -48,7 +48,7 @@ export class CardRouter {
 
   /**
    * 渲染指定页面，返回 CardJSON。
-   * 用于 asyncTask task 内的异步跳转（ctx.navigateCard 底层调用此方法）。
+   * 用于 asyncTask task 内的异步跳转（ctx.navigate 底层调用此方法）。
    */
   async renderPage(
     pageName: string,
