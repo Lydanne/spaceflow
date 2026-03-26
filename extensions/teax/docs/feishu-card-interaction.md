@@ -109,14 +109,20 @@ class FeishuCardBuilder {
   }
 
   // 添加输入框
+  // label 通过前置 markdown 元素模拟（input 原生 label 在 form 内样式不一致）
   addInput(config: {
     name: string;
     label: string;
     placeholder?: string;
     required?: boolean;
-    multiline?: boolean;
   }): this {
-    this.elements.push({
+    if (config.label) {
+      const labelText = config.required
+        ? `**${config.label}** <font color='red'>*</font>`
+        : `**${config.label}**`;
+      this.pushElement({ tag: "markdown", content: labelText });
+    }
+    this.pushElement({
       tag: 'input',
       name: config.name,
       required: config.required || false,
@@ -124,42 +130,62 @@ class FeishuCardBuilder {
         tag: 'plain_text',
         content: config.placeholder || '',
       },
-      label: {
-        tag: 'plain_text',
-        content: config.label,
-      },
-      ...(config.multiline && { multiline: true }),
     });
     return this;
   }
 
   // 添加下拉选择
+  // select_static 不支持原生 label 属性，用前置 markdown 模拟
+  // disabled 支持 boolean | string，为 string 时在 label 后追加灰色提示
+  // disabled 时用只读 input 替代 select_static
   addSelect(config: {
     name: string;
-    label: string;
+    label?: string;
     placeholder?: string;
     required?: boolean;
+    /** true 或 string（提示文案）时禁用，用只读 input 替代 */
+    disabled?: boolean | string;
     options: Array<{ label: string; value: string }>;
+    initial_option?: string;
   }): this {
-    this.elements.push({
+    if (config.label) {
+      let labelText = config.required
+        ? `**${config.label}** <font color='red'>*</font>`
+        : `**${config.label}**`;
+      if (typeof config.disabled === "string") {
+        labelText += `  <font color='grey'>${config.disabled}</font>`;
+      }
+      this.pushElement({ tag: "markdown", content: labelText });
+    }
+
+    // disabled 时用只读 input 替代 select
+    if (config.disabled) {
+      const displayValue = config.initial_option
+        ? (config.options.find(o => o.value === config.initial_option)?.label || config.initial_option)
+        : "";
+      this.pushElement({
+        tag: "input",
+        name: config.name,
+        disabled: true,
+        default_value: displayValue,
+        placeholder: { tag: "plain_text", content: config.placeholder || "请选择" },
+        ...(typeof config.disabled === "string" && {
+          disabled_tips: { tag: "plain_text", content: config.disabled },
+        }),
+      });
+      return this;
+    }
+
+    this.pushElement({
       tag: 'select_static',
       name: config.name,
       required: config.required || false,
-      placeholder: {
-        tag: 'plain_text',
-        content: config.placeholder || '请选择',
-      },
-      label: {
-        tag: 'plain_text',
-        content: config.label,
-      },
+      placeholder: { tag: 'plain_text', content: config.placeholder || '请选择' },
       options: config.options.map(opt => ({
-        text: {
-          tag: 'plain_text',
-          content: opt.label,
-        },
+        text: { tag: 'plain_text', content: opt.label },
         value: opt.value,
       })),
+      ...(config.initial_option !== undefined && { initial_option: config.initial_option }),
     });
     return this;
   }

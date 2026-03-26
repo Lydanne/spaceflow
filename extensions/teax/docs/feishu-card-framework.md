@@ -641,12 +641,17 @@ class EnhancedCardBuilder {
   }
 
   // ─── 基础元素（委托给 inner）───
+  // label 统一通过前置 markdown 元素模拟（select_static 不支持原生 label，input 保持一致）
+  // disabled 支持 boolean | string：
+  //   - true → 禁用控件
+  //   - string → 禁用 + label 后追加灰色提示文案 + hover disabled_tips
+  //   - select disabled 时自动降级为只读 input 显示当前值
   text(content: string, isMarkdown?: boolean): this { ... }
   divider(): this { ... }
   fields(items: { label: string; value: string }[]): this { ... }
   input(config: InputConfig): this { ... }
-  inputV2(config: InputV2Config): this { ... }
-  select(config: SelectConfig): this { ... }
+  inputV2(config: InputV2Config): this { ... }  // disabled?: boolean | string
+  select(config: SelectConfig): this { ... }    // disabled?: boolean | string
 
   form(name: string): this {
     this.currentFormName = name;  // 记录当前 form 名称
