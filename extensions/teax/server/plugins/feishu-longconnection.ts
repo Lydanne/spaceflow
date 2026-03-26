@@ -272,7 +272,7 @@ async function handleCardActionEvent(
 
     const { handleCardAction }
       = await import("~~/server/services/bot-command.service");
-    const { sendFeishuCardMessage }
+    const { sendFeishuCardMessage, replyFeishuCardMessage }
       = await import("~~/server/utils/feishu-sdk");
 
     // handleCardAction 内部会通过 updateCard 回调更新卡片，
@@ -283,7 +283,11 @@ async function handleCardActionEvent(
       token,
       updateCard: cardUpdater?.updateCard,
       sendCard: async (card) => {
-        await sendFeishuCardMessage(openId, card);
+        if (openMessageId) {
+          await replyFeishuCardMessage(openMessageId, card);
+        } else {
+          await sendFeishuCardMessage(openId, card);
+        }
       },
     });
 
