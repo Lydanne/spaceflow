@@ -241,7 +241,7 @@ export default defineCardPage({
         }
 
         // Check if already running
-        const gitea = await useGiteaSdk().role("admin");
+        const gitea = await useGiteaSdk().role("fallback-admin");
         const workflowFileName = preset.workflow_path.split("/").pop() || preset.workflow_path;
 
         if (preset.current_run_id) {

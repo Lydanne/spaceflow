@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { defineCardPage, navigate, asyncTask } from "~~/server/card-kit";
-import { useGiteaSdk } from "~~/server/utils/gitea";
+import { useGiteaSdk, botLogin } from "~~/server/utils/gitea";
 import { buildDispatchErrorCard, buildTriggerResultCard } from "~~/server/utils/workflow-trigger";
 import * as yaml from "yaml";
 
@@ -175,7 +175,7 @@ export default defineCardPage({
       `**仓库**: ${repoFullName}\n**工作流**: ${workflowName}\n\n⏳ 正在触发工作流，请稍候...`,
       async () => {
         try {
-          const gitea = await useGiteaSdk().role("admin");
+          const gitea = await useGiteaSdk(botLogin(ctx.openId)).role("fallback-admin");
           await gitea.dispatchWorkflow(owner!, repo!, workflowPath, branch, inputs);
         } catch (err) {
           console.error("[wf:params] dispatchWorkflow error:", err);

@@ -1,8 +1,6 @@
 import { defineCardPage, asyncTask, guards, requireBinding, requireRepoPermission } from "~~/server/card-kit";
-import { useGiteaSdk } from "~~/server/utils/gitea";
+import { useGiteaSdk, botLogin } from "~~/server/utils/gitea";
 import { parseWorkflowYaml, extractInputs, type WorkflowInputDef } from "~~/server/utils/workflow-yaml";
-import { getActiveAccount } from "~~/server/services/account.service";
-import { getUserGiteaTokens } from "~~/server/services/auth.service";
 import { dispatchAndPoll, buildDispatchErrorCard, buildTriggerResultCard } from "~~/server/utils/workflow-trigger";
 
 export default defineCardPage({
@@ -19,13 +17,8 @@ export default defineCardPage({
     const workflowPath = ctx.params.workflowPath as string;
 
     // 使用用户 token（通过飞书 openId 获取），fallback 到 admin token
-    const gitea = useGiteaSdk({
-      userTokenProvider: async () => {
-        const user = await getActiveAccount(ctx.openId);
-        return user ? getUserGiteaTokens(user.id) : null;
-      },
-    });
-    const giteaService = await gitea.role("admin");
+    const gitea = useGiteaSdk(botLogin(ctx.openId));
+    const giteaService = await gitea.role("fallback-admin");
     const workflowName = workflowPath.split("/").pop() || workflowPath;
 
     // 获取分支列表
@@ -155,13 +148,7 @@ export default defineCardPage({
     return asyncTask(
       `**仓库**: ${owner}/${repo}\n**分支**: ${branch}\n**工作流**: ${workflowFileName}\n\n⏳ 正在触发工作流，请稍候...`,
       async () => {
-        const gitea = useGiteaSdk({
-          userTokenProvider: async () => {
-            const user = await getActiveAccount(openId);
-            return user ? getUserGiteaTokens(user.id) : null;
-          },
-        });
-        const giteaService = await gitea.role("admin");
+        const giteaService = await useGiteaSdk(botLogin(openId)).role("fallback-admin");
 
         let result;
         try {

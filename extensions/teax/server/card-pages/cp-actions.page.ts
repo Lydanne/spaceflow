@@ -1,7 +1,5 @@
 import { defineCardPage } from "~~/server/card-kit";
-import { useGiteaSdk } from "~~/server/utils/gitea";
-import { getActiveAccount } from "~~/server/services/account.service";
-import { getUserGiteaTokens } from "~~/server/services/auth.service";
+import { useGiteaSdk, botLogin } from "~~/server/utils/gitea";
 
 function getStatusEmoji(status: string, conclusion: string | null): string {
   if (conclusion === "success") return "✅";
@@ -44,13 +42,7 @@ export default defineCardPage({
 
     try {
       // 使用用户 token（通过飞书 openId 获取），fallback 到 admin token
-      const gitea = await useGiteaSdk({
-        userTokenProvider: async () => {
-          const user = await getActiveAccount(ctx.openId);
-          return user ? getUserGiteaTokens(user.id) : null;
-        },
-      });
-      const giteaService = await gitea.role("admin");
+      const giteaService = await useGiteaSdk(botLogin(ctx.openId)).role("fallback-admin");
 
       // 只获取前5条运行记录
       const response = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 5);

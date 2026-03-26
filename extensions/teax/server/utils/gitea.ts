@@ -610,7 +610,7 @@ export async function refreshGiteaToken(refreshToken: string): Promise<GiteaOAut
 
 // ─── Gitea SDK 统一入口 ─────────────────────────────────────────
 
-type GiteaRole = "admin" | "user";
+type GiteaRole = "admin" | "user" | "fallback-admin";
 
 /** 用户 token 提供者回调 */
 export type UserTokenProvider = () => Promise<
@@ -626,8 +626,9 @@ interface GiteaSdkContext {
 interface GiteaSdk {
   /**
    * 选择角色创建 GiteaService
-   * - 'admin': 使用 Service Token（后台操作、webhook、同步等）
-   * - 'user': 使用当前用户的 OAuth Token（需要传入 event 或 userTokenProvider）
+   * - 'admin': 始终使用 Service Token（后台操作、webhook、同步等）
+   * - 'fallback-admin': 优先用户 token，失败时 fallback 到 Service Token（卡片/bot 交互场景）
+   * - 'user': 必须使用用户 OAuth Token，失败则报错（需要传入 event 或 userTokenProvider）
    */
   role(role: GiteaRole): Promise<GiteaService>;
 }
@@ -643,13 +644,8 @@ interface GiteaSdk {
  * const gitea = await useGiteaSdk(event).role('user');
  * await gitea.dispatchWorkflow(owner, repo, workflowId, ref);
  *
- * // 使用用户 token（通过回调，如飞书卡片交互）
- * const gitea = await useGiteaSdk({
- *   userTokenProvider: async () => {
- *     const user = await getActiveAccount(openId);
- *     return user ? getUserGiteaTokens(user.id) : null;
- *   }
- * }).role('user');
+ * // 使用用户 token（通过 botLogin，飞书卡片交互场景）
+ * const gitea = await useGiteaSdk(botLogin(openId)).role('fallback-admin');
  */
 export function useGiteaSdk(
   eventOrOptions?: H3Event | { userTokenProvider: UserTokenProvider },
@@ -758,12 +754,15 @@ export function useGiteaSdk(
 
   return {
     async role(role: GiteaRole): Promise<GiteaService> {
-      if (role === "admin") {
+      if (role === "fallback-admin") {
         // admin 角色：有 event/provider 时优先用户 token（维护刷新），fallback 到 service token
         if (ctx.event || ctx.userTokenProvider) {
           const userGitea = await getUserGiteaService();
           if (userGitea) return userGitea;
         }
+        return getServiceGiteaService();
+      }
+      if (role === "admin") {
         return getServiceGiteaService();
       }
 
@@ -784,6 +783,25 @@ export function useGiteaSdk(
       }
 
       return userGitea;
+    },
+  };
+}
+
+/**
+ * 创建飞书卡片交互场景的 userTokenProvider。
+ * 通过 openId 查找已绑定账号的 Gitea token。
+ *
+ * @example
+ * const gitea = useGiteaSdk(botLogin(openId));
+ * const service = await gitea.role("fallback-admin"); // 优先用户 token，fallback service token
+ */
+export function botLogin(openId: string): { userTokenProvider: UserTokenProvider } {
+  return {
+    userTokenProvider: async () => {
+      const { getActiveAccount } = await import("~~/server/services/account.service");
+      const { getUserGiteaTokens } = await import("~~/server/services/auth.service");
+      const user = await getActiveAccount(openId);
+      return user ? getUserGiteaTokens(user.id) : null;
     },
   };
 }
