@@ -18,11 +18,8 @@ export interface CardElement {
 
 // ─── 页面栈 ──────────────────────────
 
-/** 页面栈条目（记录页面名+参数，用于 back() 返回） */
-export interface StackEntry {
-  page: string;
-  params?: Record<string, unknown>;
-}
+/** 页面栈条目："pageName?key=val&nested[k]=v" */
+export type StackEntry = string;
 
 /** back() 返回值，从栈中弹出上一页并渲染 */
 export interface BackResult {

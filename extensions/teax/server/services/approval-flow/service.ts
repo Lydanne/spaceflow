@@ -1,4 +1,5 @@
 import { eq, and } from "drizzle-orm";
+import { encodeStackEntry } from "~~/server/card-kit/stack";
 import { useDB, schema } from "~~/server/db";
 import { getStrategy } from "./registry";
 import { sendFeishuCardMessage } from "~~/server/utils/feishu-sdk";
@@ -289,7 +290,7 @@ async function sendApprovalCard(
       const card = await cardRouter.dispatch({
         openId,
         actionValue: JSON.stringify({
-          __stack: [{ page: "approval-pending", params: { flowId: flow.id } }],
+          __stack: [encodeStackEntry("approval-pending", { flowId: flow.id })],
         }),
         token: "",
         updateCard: async () => {},

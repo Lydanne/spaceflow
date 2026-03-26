@@ -1,4 +1,5 @@
 import { CardRouter } from "./router";
+import { encodeStackEntry } from "./stack";
 import type {
   AsyncTaskResult,
   BackResult,
@@ -53,7 +54,7 @@ export function bindRoute(
     const card = await cardRouter.dispatch({
       openId: ctx.senderOpenId,
       actionValue: JSON.stringify({
-        __stack: [{ page, params }],
+        __stack: [encodeStackEntry(page, params ?? {})],
       }),
       token: "",
       updateCard: async () => {},
@@ -282,4 +283,5 @@ export type {
 
 export { EnhancedCardBuilder, ColumnBuilder, ColumnSetBuilder, MAX_STACK_DEPTH } from "./builder";
 export { CardRouter } from "./router";
+export { encodeStackEntry, decodeStackEntry } from "./stack";
 export type { DispatchInput } from "./router";

@@ -8,6 +8,7 @@
  */
 
 import { registerLinkRoute } from "~~/server/utils/link-handler";
+import { encodeStackEntry } from "~~/server/card-kit/stack";
 
 // ─── 预设链接: /workflows/{token} ───────────────────────────
 
@@ -22,7 +23,7 @@ registerLinkRoute(
       const card = await cardRouter.dispatch({
         openId: ctx.senderOpenId,
         actionValue: JSON.stringify({
-          __stack: [{ page: "preset-console", params: { shareToken: token } }],
+          __stack: [encodeStackEntry("preset-console", { shareToken: token })],
         }),
         token: "",
         updateCard: async () => {},

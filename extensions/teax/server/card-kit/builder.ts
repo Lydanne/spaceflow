@@ -16,6 +16,7 @@ import type {
   SelectConfig,
   StackEntry,
 } from "./types";
+import { encodeStackEntry } from "./stack";
 
 // ─── 常量 + 工具函数 ──────────────────────────
 
@@ -34,11 +35,11 @@ function buildNavValue(
   ctx: ValueBuildCtx,
   nav: NonNullable<ButtonOpts["navigate"]>,
 ): Record<string, unknown> {
-  const target: StackEntry = { page: nav[0], params: nav[1] || {} };
+  const target = encodeStackEntry(nav[0], nav[1]);
   let stack: StackEntry[];
   if (nav[2]?.mode === "push") {
     // push: 保留历史栈 + 当前页面 + 目标页面
-    stack = [...ctx.stack, { page: ctx.pageName, params: ctx.params }, target];
+    stack = [...ctx.stack, encodeStackEntry(ctx.pageName, ctx.params), target];
     stack = stack.slice(-MAX_STACK_DEPTH);
   } else {
     // replace: 保留历史栈 + 目标页面（不压入当前页面）
@@ -65,7 +66,7 @@ function buildActionValue(
   extraParams?: Record<string, unknown>,
 ): Record<string, unknown> {
   // 栈顶 = 当前页面（带 action 的额外 params）
-  const current: StackEntry = { page: ctx.pageName, params: extraParams || {} };
+  const current = encodeStackEntry(ctx.pageName, extraParams);
   const value: Record<string, unknown> = {
     __stack: [...ctx.stack, current],
     __action: action,
@@ -209,7 +210,7 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
       type?: "default" | "primary" | "primary_filled" | "danger";
     };
   }): this {
-    const current: StackEntry = { page: this.pageName, params: this.currentParams };
+    const current = encodeStackEntry(this.pageName, this.currentParams);
     const submitValue: Record<string, unknown> = {
       __stack: [...this.currentStack, current],
       __formName: this.currentFormName,

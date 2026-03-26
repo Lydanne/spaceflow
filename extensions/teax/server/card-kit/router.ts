@@ -1,4 +1,5 @@
 import { EnhancedCardBuilder, MAX_STACK_DEPTH } from "./builder";
+import { decodeStackEntry, encodeStackEntry } from "./stack";
 import type {
   AsyncTaskResult,
   BackResult,
@@ -96,7 +97,7 @@ export class CardRouter {
     }
 
     // 栈顶 = 当前/目标页面
-    const current = encoded.__stack[encoded.__stack.length - 1]!;
+    const current = decodeStackEntry(encoded.__stack[encoded.__stack.length - 1]!);
     // 历史栈 = 栈顶之下的所有项
     const stack = encoded.__stack.slice(0, -1);
 
@@ -276,7 +277,7 @@ export class CardRouter {
       },
       back: async () => {
         if (stack.length === 0) return;
-        const target = stack[stack.length - 1]!;
+        const target = decodeStackEntry(stack[stack.length - 1]!);
         const card = await this.renderPage(target.page, {
           openId: opts.openId,
           params: target.params,
@@ -300,7 +301,7 @@ export class CardRouter {
     if (isResultType<BackResult>(result, "back")) {
       const stack = ctx.stack as StackEntry[];
       if (stack.length === 0) return undefined;
-      const target = stack[stack.length - 1]!;
+      const target = decodeStackEntry(stack[stack.length - 1]!);
       const backStack = stack.slice(0, -1);
       const targetPage = this.pages.get(target.page);
       if (!targetPage) return undefined;
@@ -342,7 +343,7 @@ export class CardRouter {
       // 构建目标页面的栈
       let targetStack = ctx.stack as StackEntry[];
       if (navResult.mode === "push") {
-        targetStack = [...targetStack, { page: page.name, params: ctx.params }];
+        targetStack = [...targetStack, encodeStackEntry(page.name, ctx.params)];
         if (targetStack.length > MAX_STACK_DEPTH) targetStack = targetStack.slice(-MAX_STACK_DEPTH);
       }
 

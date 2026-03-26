@@ -200,7 +200,7 @@ export async function handleBotCommand(ctx: BotCommandContext): Promise<void> {
     await ensurePages();
     const card = await cardRouter.dispatch({
       openId: ctx.senderOpenId,
-      actionValue: JSON.stringify({ __stack: [{ page: "cp-home" }] }),
+      actionValue: JSON.stringify({ __stack: ["cp-home"] }),
       token: "",
       updateCard: async () => {},
     });
