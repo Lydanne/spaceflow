@@ -1,6 +1,6 @@
-import { registerCardCommand } from "~~/server/card-kit";
+import { defineCardCommand } from "~~/server/card-kit";
 
-registerCardCommand({
+export default defineCardCommand({
   name: "status",
   aliases: ["/status", "状态"],
   description: "查询仓库最近构建状态",

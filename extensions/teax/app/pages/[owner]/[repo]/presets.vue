@@ -81,21 +81,21 @@ async function togglePresetPublic(preset: RepoPresetItem) {
   }
 }
 
-async function toggleGroupPublic(group: RepoPresetGroupItem) {
-  try {
-    await $fetch(`/api/workflow-preset-groups/${group.id}`, {
-      method: "PATCH",
-      body: { is_public: !group.is_public },
-    });
-    toast.add({
-      title: group.is_public ? "已设为私有" : "已设为公开",
-      color: "success",
-    });
-    await refresh();
-  } catch {
-    toast.add({ title: "操作失败", color: "error" });
-  }
-}
+// async function toggleGroupPublic(group: RepoPresetGroupItem) {
+//   try {
+//     await $fetch(`/api/workflow-preset-groups/${group.id}`, {
+//       method: "PATCH",
+//       body: { is_public: !group.is_public },
+//     });
+//     toast.add({
+//       title: group.is_public ? "已设为私有" : "已设为公开",
+//       color: "success",
+//     });
+//     await refresh();
+//   } catch {
+//     toast.add({ title: "操作失败", color: "error" });
+//   }
+// }
 
 // 删除预设
 async function deletePreset(preset: RepoPresetItem) {

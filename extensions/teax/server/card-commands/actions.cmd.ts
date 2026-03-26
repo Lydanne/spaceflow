@@ -1,6 +1,6 @@
-import { registerCardCommand } from "~~/server/card-kit";
+import { defineCardCommand } from "~~/server/card-kit";
 
-registerCardCommand({
+export default defineCardCommand({
   name: "actions",
   aliases: ["/actions", "工作流"],
   description: "触发仓库工作流(交互式)",

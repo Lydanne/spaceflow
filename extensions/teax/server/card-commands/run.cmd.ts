@@ -1,6 +1,6 @@
-import { registerCardCommand } from "~~/server/card-kit";
+import { defineCardCommand } from "~~/server/card-kit";
 
-registerCardCommand({
+export default defineCardCommand({
   name: "run",
   aliases: ["/run", "运行"],
   description: "通过预设 Token 触发工作流",

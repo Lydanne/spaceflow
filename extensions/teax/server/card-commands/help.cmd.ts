@@ -1,6 +1,6 @@
-import { registerCardCommand } from "~~/server/card-kit";
+import { defineCardCommand } from "~~/server/card-kit";
 
-registerCardCommand({
+export default defineCardCommand({
   name: "help",
   aliases: ["/help", "帮助"],
   description: "查看所有可用指令",

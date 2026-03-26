@@ -1,6 +1,6 @@
-import { registerCardCommand } from "~~/server/card-kit";
+import { defineCardCommand } from "~~/server/card-kit";
 
-registerCardCommand({
+export default defineCardCommand({
   name: "repos",
   aliases: ["/repos", "/list", "仓库", "列表"],
   description: "列出已注册的仓库",

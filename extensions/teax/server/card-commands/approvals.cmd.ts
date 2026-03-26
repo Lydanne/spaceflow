@@ -1,6 +1,6 @@
-import { registerCardCommand } from "~~/server/card-kit";
+import { defineCardCommand } from "~~/server/card-kit";
 
-registerCardCommand({
+export default defineCardCommand({
   name: "approvals",
   aliases: ["/approvals", "审批", "待审批"],
   description: "查看待处理的审批",

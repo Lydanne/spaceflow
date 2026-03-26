@@ -1,6 +1,6 @@
-import { registerCardCommand } from "~~/server/card-kit";
+import { defineCardCommand } from "~~/server/card-kit";
 
-registerCardCommand({
+export default defineCardCommand({
   name: "preset-link",
   description: "通过预设链接打开预设控制台",
   linkPattern: /\/workflows\/([a-zA-Z0-9_-]+)/,
