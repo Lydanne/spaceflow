@@ -288,14 +288,29 @@ async function batchCreatePresets() {
   let successCount = 0;
   let failCount = 0;
 
+  function resolveTemplateVars(value: string, preset: { name: string; index: number | string }): string {
+    return value
+      .replace(/\{i\}/g, String(preset.index))
+      .replace(/\{name\}/g, preset.name);
+  }
+
   for (const preset of presets) {
     try {
+      const resolvedBranch = resolveTemplateVars(
+        batchBranch.value || groupData.value?.default_branch || "main",
+        preset,
+      );
+      const resolvedInputs: Record<string, string> = {};
+      for (const [key, val] of Object.entries(batchInputs.value)) {
+        resolvedInputs[key] = resolveTemplateVars(String(val ?? ""), preset);
+      }
+
       await $fetch(`/api/workflow-preset-groups/${token.value}/presets`, {
         method: "POST",
         body: {
           name: preset.name,
-          branch: batchBranch.value || groupData.value?.default_branch,
-          inputs: { ...batchInputs.value },
+          branch: resolvedBranch,
+          inputs: resolvedInputs,
           locked_inputs: batchLockedInputs.value,
           allow_branch_override: batchAllowBranchOverride.value,
           allow_sync_override: batchAllowSyncOverride.value,
