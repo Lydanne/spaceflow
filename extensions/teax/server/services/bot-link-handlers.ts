@@ -8,7 +8,6 @@
  */
 
 import { registerLinkRoute } from "~~/server/utils/link-handler";
-import { encodeStackEntry } from "~~/server/card-kit/stack";
 
 // ─── 预设链接: /workflows/{token} ───────────────────────────
 
@@ -18,16 +17,8 @@ registerLinkRoute(
   async (ctx) => {
     const token = ctx.match[1]!;
     try {
-      const { cardRouter, ensurePages } = await import("~~/server/card-kit");
-      await ensurePages();
-      const card = await cardRouter.dispatch({
-        openId: ctx.senderOpenId,
-        actionValue: JSON.stringify({
-          __stack: [encodeStackEntry("preset-console", { shareToken: token })],
-        }),
-        token: "",
-        updateCard: async () => {},
-      });
+      const { renderCardPage } = await import("~~/server/card-kit");
+      const card = await renderCardPage({ openId: ctx.senderOpenId }, "preset-console", { shareToken: token });
       if (card) {
         await replyFeishuCardMessage(ctx.messageId, card);
       }

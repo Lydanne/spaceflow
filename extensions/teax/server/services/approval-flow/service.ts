@@ -1,5 +1,4 @@
 import { eq, and } from "drizzle-orm";
-import { encodeStackEntry } from "~~/server/card-kit/stack";
 import { useDB, schema } from "~~/server/db";
 import { getStrategy } from "./registry";
 import { sendFeishuCardMessage } from "~~/server/utils/feishu-sdk";
@@ -280,21 +279,13 @@ async function sendApprovalCard(
   approverOpenIds: string[],
   _strategy: ApprovalStrategy,
 ): Promise<void> {
-  const { cardRouter, ensurePages } = await import("~~/server/card-kit");
-  await ensurePages();
+  const { renderCardPage } = await import("~~/server/card-kit");
 
   // 私信发送给每个审批人
   const db = useDB();
   for (const openId of approverOpenIds) {
     try {
-      const card = await cardRouter.dispatch({
-        openId,
-        actionValue: JSON.stringify({
-          __stack: [encodeStackEntry("approval-pending", { flowId: flow.id })],
-        }),
-        token: "",
-        updateCard: async () => {},
-      });
+      const card = await renderCardPage({ openId }, "approval-pending", { flowId: flow.id });
       if (!card) continue;
 
       const result = await sendFeishuCardMessage(openId, card, "open_id");

@@ -49,16 +49,8 @@ export function bindRoute(
 ): (ctx: BotCommandContext, args: string[]) => Promise<void> {
   return async (ctx, args) => {
     const { replyFeishuCardMessage } = await import("~~/server/services/messaging");
-    await ensurePages();
     const params = paramsFromArgs?.(args);
-    const card = await cardRouter.dispatch({
-      openId: ctx.senderOpenId,
-      actionValue: JSON.stringify({
-        __stack: [encodeStackEntry(page, params ?? {})],
-      }),
-      token: "",
-      updateCard: async () => {},
-    });
+    const card = await renderCardPage({ openId: ctx.senderOpenId }, page, params);
     if (card) {
       await replyFeishuCardMessage(ctx.messageId, card);
     }
@@ -103,6 +95,28 @@ export async function ensurePages(): Promise<void> {
       cardRouter.register(def as CardPageDef);
     }
   }
+}
+
+// ─── renderCardPage（外部服务调用入口） ──────────────────────────
+
+/**
+ * 渲染指定卡片页面，自动处理 ensurePages + dispatch。
+ * 适用于机器人指令、链接处理等需要从外部获取卡片 JSON 的场景。
+ */
+export async function renderCardPage(
+  ctx: { openId: string },
+  page: string,
+  params?: Record<string, unknown>,
+): Promise<CardJSON | undefined> {
+  await ensurePages();
+  return cardRouter.dispatch({
+    openId: ctx.openId,
+    actionValue: JSON.stringify({
+      __stack: [encodeStackEntry(page, params ?? {})],
+    }),
+    token: "",
+    updateCard: async () => {},
+  });
 }
 
 // ─── navigate ──────────────────────────
@@ -260,7 +274,6 @@ export type {
   NavigateOpts,
   NavigateResult,
   NavigationGuardContext,
-  StackEntry,
   ToastResult,
 };
 

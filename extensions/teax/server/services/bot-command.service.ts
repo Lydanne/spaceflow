@@ -196,14 +196,8 @@ export async function handleBotCommand(ctx: BotCommandContext): Promise<void> {
 
   // 如果只是 @ 机器人,没有输入任何内容,显示控制面板
   if (!text || text === "") {
-    const { cardRouter, ensurePages } = await import("~~/server/card-kit");
-    await ensurePages();
-    const card = await cardRouter.dispatch({
-      openId: ctx.senderOpenId,
-      actionValue: JSON.stringify({ __stack: ["cp-home"] }),
-      token: "",
-      updateCard: async () => {},
-    });
+    const { renderCardPage } = await import("~~/server/card-kit");
+    const card = await renderCardPage({ openId: ctx.senderOpenId }, "cp-home");
     if (card) {
       await replyFeishuCardMessage(ctx.messageId, card);
     }
