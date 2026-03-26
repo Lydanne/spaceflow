@@ -9,16 +9,16 @@ function getPresetStatus(
   lockerUsername: string | null,
 ): { emoji: string; label: string; rank: number } {
   if (lockedBy === activeUserId) {
-    return { emoji: "🟢", label: "我正在使用", rank: 0 };
+    return { emoji: "🟢", label: "我在使用", rank: 0 };
   }
   if (lockedBy) {
     return {
-      emoji: "🔒",
-      label: `被 ${lockerUsername ?? "其他成员"} 使用中`,
+      emoji: "�",
+      label: `${lockerUsername ?? "其他成员"} 正在使用`,
       rank: 2,
     };
   }
-  return { emoji: "⚪", label: "空闲可用", rank: 1 };
+  return { emoji: "⚪", label: "空闲", rank: 1 };
 }
 
 // ─── 控制面板入口场景 ──────────────────────────
@@ -260,7 +260,7 @@ export default defineCardPage({
           ? ["preset-group", { groupToken: item.share_token }, { newMessage: false }]
           : ["preset-console", { shareToken: item.share_token }, { newMessage: false }];
         const repoMeta = item.kind === "group"
-          ? `🟡${item.summary.mine}/🟢${item.summary.idle}/🔒${item.summary.busy}`
+          ? `🟡${item.summary.busy}/🟢${item.summary.mine}/⚪${item.summary.idle}`
           : `${item.repo_name} ${item.branch}`;
         return {
           text: `${emoji} ${item.name} (${repoMeta})`,
@@ -301,7 +301,7 @@ export default defineCardPage({
         }, { mine: 0, idle: 0, busy: 0 });
 
         groupButtons.push({
-          text: `📁 ${group.name} (🟡${summary.mine}/🟢${summary.idle}/🔒${summary.busy})`,
+          text: `📁 ${group.name} (🟡${summary.busy}/🟢${summary.mine}/⚪${summary.idle})`,
           type: "default",
           navigate: ["preset-group", { groupToken: group.share_token }, { newMessage: false }],
         });

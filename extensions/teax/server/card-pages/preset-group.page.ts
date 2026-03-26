@@ -9,16 +9,16 @@ function getPresetStatus(
   lockerUsername: string | null,
 ): { emoji: string; label: string; rank: number } {
   if (lockedBy === activeUserId) {
-    return { emoji: "🟢", label: "我正在使用", rank: 0 };
+    return { emoji: "🟢", label: "我在使用", rank: 0 };
   }
   if (lockedBy) {
     return {
-      emoji: "🔒",
-      label: `被 ${lockerUsername ?? "其他成员"} 使用中`,
+      emoji: "🟡",
+      label: `${lockerUsername ?? "其他成员"} 正在使用`,
       rank: 2,
     };
   }
-  return { emoji: "⚪", label: "空闲可用", rank: 1 };
+  return { emoji: "⚪", label: "空闲", rank: 1 };
 }
 
 export default defineCardPage({
@@ -113,7 +113,7 @@ export default defineCardPage({
     } else {
       card.divider();
       card.text(
-        `共 ${sortedPresets.length} 个子预设 · 🟢 ${summary.mine} · ⚪ ${summary.idle} · 🔒 ${summary.busy}`,
+        `共 ${sortedPresets.length} 个子预设 · 🟡 ${summary.busy} · 🟢 ${summary.mine} · ⚪ ${summary.idle}`,
         true,
       );
       card.divider();
