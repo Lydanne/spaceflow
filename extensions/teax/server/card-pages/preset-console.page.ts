@@ -202,7 +202,7 @@ export default defineCardPage({
     return asyncTask(
       `**预设**: ${preset.name}\n**仓库**: ${repo.full_name}\n**分支**: ${finalBranch}\n\n⏳ 正在触发工作流，请稍候...`,
       async () => {
-        const updateCard = ctx.updateCard;
+        const updateCard = ctx.update;
 
         // Check user (binding already verified by beforeEnter)
         const activeUser = await getActiveAccount(openId);

@@ -124,7 +124,7 @@ export default defineCardPage({
       )
         .text("未找到关联的用户账号", true)
         .build();
-      await ctx.updateCard(card);
+      await ctx.update(card);
       return undefined;
     }
 
@@ -154,7 +154,7 @@ export default defineCardPage({
         return undefined;
       }
 
-      await ctx.updateCard(resultCard);
+      await ctx.update(resultCard);
 
       // 也尝试通过 message_id 更新（多审批人场景）
       const [flow] = await db
@@ -180,7 +180,7 @@ export default defineCardPage({
       )
         .text(errorMessage, true)
         .build();
-      await ctx.updateCard(errorCard);
+      await ctx.update(errorCard);
     }
 
     return undefined;

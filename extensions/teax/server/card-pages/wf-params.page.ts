@@ -173,7 +173,7 @@ export default defineCardPage({
     return asyncTask(
       `**仓库**: ${repoFullName}\n**工作流**: ${workflowName}\n\n⏳ 正在触发工作流，请稍候...`,
       async () => {
-        const updateCard = ctx.updateCard;
+        const updateCard = ctx.update;
 
         try {
           const gitea = await useGiteaSdk().role("admin");

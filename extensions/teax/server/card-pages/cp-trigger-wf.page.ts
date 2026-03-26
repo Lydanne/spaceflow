@@ -169,7 +169,7 @@ export default defineCardPage({
           console.error("[cp:trigger-wf] dispatchWorkflow error:", err);
           const errObj = err as { data?: { message?: string }; message?: string };
           const msg = errObj?.data?.message || errObj?.message || "触发工作流失败";
-          await ctx.updateCard(
+          await ctx.update(
             new EnhancedCardBuilder({ title: "❌ 触发失败", theme: "red" }, "")
               .text(msg, true)
               .build(),
@@ -232,7 +232,7 @@ export default defineCardPage({
         }
 
         resultCard.text(resultLines.join("\n"), true);
-        await ctx.updateCard(resultCard.build());
+        await ctx.update(resultCard.build());
       },
     );
   },

@@ -119,7 +119,13 @@ export interface CardActionContext<
   /** 飞书回调 token */
   token: string;
   /** 更新当前卡片 */
-  updateCard: (card: CardJSON) => Promise<void>;
+  update: (card: CardJSON) => Promise<void>;
+  /**
+   * 异步跳转：渲染目标页面并 update。
+   * 适用于 asyncTask task 内需要"跳转"到另一个页面的场景。
+   * 等价于：renderPage(page, params) → update(cardJSON)
+   */
+  navigate: (page: string, params?: Record<string, unknown>) => Promise<void>;
 }
 
 // ─── 返回值 ──────────────────────────

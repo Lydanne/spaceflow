@@ -47,6 +47,29 @@ export class CardRouter {
   }
 
   /**
+   * 渲染指定页面，返回 CardJSON。
+   * 用于 asyncTask task 内的异步跳转（ctx.navigateCard 底层调用此方法）。
+   */
+  async renderPage(
+    pageName: string,
+    opts: { openId: string; params?: Record<string, unknown> },
+  ): Promise<CardJSON | undefined> {
+    const page = this.pages.get(pageName);
+    if (!page) {
+      console.warn(`[CardRouter] renderPage: page "${pageName}" not found`);
+      return undefined;
+    }
+    const params = opts.params ?? {};
+    const data = page.data?.() ?? {};
+    const renderCtx = this.buildRenderContext(page, {
+      openId: opts.openId,
+      params,
+      data,
+    });
+    return page.render(renderCtx);
+  }
+
+  /**
    * 分发卡片交互事件。
    * 返回卡片 JSON 或 undefined（表示不由 CardKit 处理）。
    */
@@ -197,7 +220,16 @@ export class CardRouter {
       formValue: opts.formValue,
       formName: opts.formName,
       token: opts.token,
-      updateCard: opts.updateCard,
+      update: opts.updateCard,
+      navigate: async (targetPage: string, targetParams?: Record<string, unknown>) => {
+        const card = await this.renderPage(targetPage, {
+          openId: opts.openId,
+          params: targetParams,
+        });
+        if (card) {
+          await opts.updateCard(card);
+        }
+      },
     };
   }
 
