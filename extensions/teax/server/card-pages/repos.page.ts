@@ -10,6 +10,8 @@ export default defineCardPage({
   async render(ctx) {
     const db = useDB();
     const orgName = ctx.params.orgName as string | undefined;
+    const config = useRuntimeConfig();
+    const baseUrl = config.public.appUrl;
 
     let repos: { full_name: string }[];
 
@@ -39,19 +41,19 @@ export default defineCardPage({
         .limit(20);
     }
 
+    const title = orgName ? `📋 ${orgName} 仓库列表` : "📋 仓库列表";
+    const card = ctx.card({ title, theme: "blue" });
+
     if (repos.length === 0) {
-      return ctx
-        .card({ title: "📋 仓库列表", theme: "blue" })
-        .text(orgName ? `组织 ${orgName} 下暂无已注册仓库` : "暂无已注册仓库", true)
-        .build();
+      card.text(orgName ? `组织 ${orgName} 下暂无已注册仓库` : "暂无已注册仓库", true);
+    } else {
+      // 每个仓库可点击跳转
+      for (const repo of repos) {
+        const repoUrl = `${baseUrl}/${repo.full_name}`;
+        card.text(`• [${repo.full_name}](${repoUrl})`, true);
+      }
     }
 
-    const lines = repos.map((r) => `• ${r.full_name}`);
-    const title = orgName ? `📋 ${orgName} 仓库列表` : "📋 仓库列表";
-
-    return ctx
-      .card({ title, theme: "blue" })
-      .text(lines.join("\n"), true)
-      .build();
+    return card.build();
   },
 });

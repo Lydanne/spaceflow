@@ -11,6 +11,8 @@ export default defineCardPage({
   async render(ctx) {
     const db = useDB();
     const activeUser = await getActiveAccount(ctx.openId);
+    const config = useRuntimeConfig();
+    const baseUrl = config.public.appUrl;
 
     if (!activeUser) {
       return ctx
@@ -33,20 +35,21 @@ export default defineCardPage({
       )
       .where(eq(schema.teamMembers.user_id, activeUser.id));
 
+    const card = ctx.card({ title: "🏢 我的组织", theme: "blue" });
+
     if (orgs.length === 0) {
-      return ctx
-        .card({ title: "🏢 我的组织", theme: "blue" })
-        .text("您暂未加入任何组织", true)
-        .build();
+      card.text("您暂未加入任何组织", true);
+    } else {
+      // 每个组织可点击跳转
+      for (const org of orgs) {
+        const orgUrl = `${baseUrl}/${org.name}`;
+        card.text(`• [**${org.full_name || org.name}**](${orgUrl}) (\`${org.name}\`)`, true);
+      }
     }
 
-    const lines = orgs.map((o) => `• **${o.full_name || o.name}** (${o.name})`);
+    card.divider();
+    card.text("💡 使用 `/repos <组织名>` 查看组织下的仓库", true);
 
-    return ctx
-      .card({ title: "🏢 我的组织", theme: "blue" })
-      .text(lines.join("\n"), true)
-      .divider()
-      .text("💡 使用 `/repos <组织名>` 查看组织下的仓库", true)
-      .build();
+    return card.build();
   },
 });

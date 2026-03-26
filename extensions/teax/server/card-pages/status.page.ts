@@ -3,6 +3,24 @@ import { useDB, schema } from "~~/server/db";
 import { defineCardPage, requireBinding } from "~~/server/card-kit";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 
+function getStatusEmoji(status: string, conclusion: string | null): string {
+  if (conclusion === "success") return "✅";
+  if (conclusion === "failure") return "❌";
+  if (conclusion === "cancelled") return "🚫";
+  if (status === "in_progress" || status === "waiting") return "⏳";
+  return "⚪";
+}
+
+function formatTimeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+  return `${Math.floor(diff / 86400)}天前`;
+}
+
 export default defineCardPage({
   name: "status",
 
@@ -11,6 +29,8 @@ export default defineCardPage({
   async render(ctx) {
     const db = useDB();
     const repoFullName = ctx.params.repoFullName as string;
+    const config = useRuntimeConfig();
+    const baseUrl = config.public.appUrl;
 
     if (!repoFullName?.includes("/")) {
       return ctx
@@ -43,43 +63,28 @@ export default defineCardPage({
       const result = await gitea.getRepoWorkflowRuns(owner!, repo!, 1, 5);
       const runs = result.workflow_runs || [];
 
+      const card = ctx.card({ title: `📋 ${repoFullName}`, theme: "blue" });
+
       if (runs.length === 0) {
-        return ctx
-          .card({ title: `📋 ${repoFullName}`, theme: "blue" })
-          .text("暂无构建记录", true)
-          .build();
+        card.text("暂无构建记录", true);
+      } else {
+        // 每条记录可点击跳转
+        for (const run of runs) {
+          const emoji = getStatusEmoji(run.status, run.conclusion);
+          const timeAgo = formatTimeAgo(run.started_at);
+          const shortSha = run.head_sha?.substring(0, 7) || "?";
+          const runUrl = `${baseUrl}/${owner}/${repo}/actions/runs/${run.id}`;
+          card.text(
+            `${emoji} [#${run.run_number} ${run.display_title}](${runUrl})\n分支: ${run.head_branch} · ${shortSha} · ${timeAgo}`,
+            true,
+          );
+        }
       }
 
-      const conclusionEmoji: Record<string, string> = {
-        success: "✅",
-        failure: "❌",
-        cancelled: "⚫",
-        skipped: "⏭",
-      };
+      card.divider();
+      card.button("查看全部", { url: `${baseUrl}/${owner}/${repo}/actions` });
 
-      const statusEmoji: Record<string, string> = {
-        running: "🔄",
-        queued: "⏳",
-        waiting: "⏳",
-      };
-
-      const lines = runs.map((r) => {
-        const emoji = r.conclusion
-          ? conclusionEmoji[r.conclusion] || "❓"
-          : statusEmoji[r.status] || "❓";
-        const branch = r.head_branch || "?";
-        return `${emoji} #${r.run_number} **${r.display_title}** (${branch})`;
-      });
-
-      const config = useRuntimeConfig();
-      const actionsUrl = `${config.public.appUrl}/${owner}/${repo}/actions`;
-
-      return ctx
-        .card({ title: `📋 ${repoFullName} 构建状态`, theme: "blue" })
-        .text(lines.join("\n"), true)
-        .divider()
-        .button("查看全部", { url: actionsUrl })
-        .build();
+      return card.build();
     } catch (err) {
       console.error("[status] error:", err);
       return ctx
