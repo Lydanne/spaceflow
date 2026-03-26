@@ -1,10 +1,45 @@
+/**
+ * card-kit 注册中心
+ *
+ * 职责：路由器单例、类型定义、define 函数、注册表、
+ *       ensure 加载入口、消息分发。
+ */
+
 import { CardRouter } from "./router";
 import type { CardPageDef, CardJSON } from "./types";
 import { encodeStackEntry } from "./stack";
 
+// ━━━ 全局单例 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 export const cardRouter = new CardRouter();
 
-// ─── defineCardPage ──────────────────────────
+// ━━━ 类型定义 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export interface BotMessageContext {
+  messageId: string;
+  chatId: string;
+  chatType: string;
+  senderOpenId: string;
+  text: string;
+}
+
+export interface CardCommandDef {
+  name: string;
+  description: string;
+  usage?: string;
+  /** 文本指令别名（如 ["/help", "帮助"]） */
+  aliases?: string[];
+  /** 链接匹配正则 */
+  linkPattern?: RegExp;
+  /** 目标卡片页面 */
+  page: string;
+  /** 从指令参数提取 params */
+  paramsFromArgs?: (args: string[]) => Record<string, unknown> | undefined;
+  /** 从链接正则匹配提取 params */
+  paramsFromMatch?: (match: RegExpMatchArray) => Record<string, unknown> | undefined;
+}
+
+// ━━━ define 函数（纯声明，不注册） ━━━━━━━━━━━━━━━━━━━
 
 export function defineCardPage<
   D extends Record<string, unknown> = Record<string, unknown>,
@@ -12,10 +47,29 @@ export function defineCardPage<
   return def;
 }
 
-// ─── 确保 card-pages 注册 ──────────────────────────
+export function defineCardCommand(def: CardCommandDef): CardCommandDef {
+  return def;
+}
+
+// ━━━ 命令注册表 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const commands: CardCommandDef[] = [];
+
+export function registerCommand(def: CardCommandDef): void {
+  commands.push(def);
+}
+
+export function getCommands(): readonly CardCommandDef[] {
+  return commands;
+}
+
+export function hasLinkMatch(text: string): boolean {
+  return commands.some((c) => c.linkPattern && c.linkPattern.test(text));
+}
+
+// ━━━ ensure 加载入口 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Nitro dev HMR 会重新执行模块导致 cardRouter 为空实例。
-// 此函数显式 import 各 page 的 default export 并注册到 *当前* cardRouter，
-// 避免 side-effect import 可能引用到不同模块实例的 cardRouter。
+// ensure* 显式 import 各模块并注册到 *当前* 实例。
 
 export async function ensurePages(): Promise<void> {
   if (cardRouter.pageCount > 0) return;
@@ -51,8 +105,6 @@ export async function ensurePages(): Promise<void> {
   }
 }
 
-// ─── 确保 card-commands 注册 ──────────────────────────
-
 let commandsLoaded = false;
 
 export async function ensureCommands(): Promise<void> {
@@ -80,11 +132,12 @@ export async function ensureCommands(): Promise<void> {
   }
 }
 
-// 延迟获取 cardRouter 和 ensurePages，避免与 index.ts 循环依赖
 export async function getRouter() {
   await ensurePages();
   return cardRouter;
 }
+
+// ━━━ 消息分发 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async function render(
   openId: string,
@@ -102,63 +155,13 @@ async function render(
   });
 }
 
-// ─── 类型定义 ──────────────────────────
-
-export interface BotMessageContext {
-  messageId: string;
-  chatId: string;
-  chatType: string;
-  senderOpenId: string;
-  text: string;
-}
-
-export interface CardCommandDef {
-  name: string;
-  description: string;
-  usage?: string;
-  /** 文本指令别名（如 ["/help", "帮助"]） */
-  aliases?: string[];
-  /** 链接匹配正则 */
-  linkPattern?: RegExp;
-  /** 目标卡片页面 */
-  page: string;
-  /** 从指令参数提取 params */
-  paramsFromArgs?: (args: string[]) => Record<string, unknown> | undefined;
-  /** 从链接正则匹配提取 params */
-  paramsFromMatch?: (match: RegExpMatchArray) => Record<string, unknown> | undefined;
-}
-
-// ─── 注册表 ──────────────────────────
-
-const commands: CardCommandDef[] = [];
-
-export function defineCardCommand(def: CardCommandDef): CardCommandDef {
-  return def;
-}
-
-export function registerCommand(def: CardCommandDef): void {
-  commands.push(def);
-}
-
-export function getCommands(): readonly CardCommandDef[] {
-  return commands;
-}
-
-// ─── 链接匹配检查（快速判断，不执行处理） ──────────────────────────
-
-export function hasLinkMatch(text: string): boolean {
-  return commands.some((c) => c.linkPattern && c.linkPattern.test(text));
-}
-
-// ─── 消息分发 ──────────────────────────
-
 /**
  * 统一处理机器人消息：先匹配链接，再匹配文本指令。
  */
 export async function handleBotMessage(ctx: BotMessageContext): Promise<void> {
   const { replyFeishuCardMessage, replyFeishuMessage } = await import("~~/server/services/messaging");
 
-  // 1. 链接匹配（优先级最高，支持 text/post 消息中的 URL）
+  // 1. 链接匹配（优先级最高）
   for (const cmd of commands) {
     if (!cmd.linkPattern) continue;
     const match = ctx.text.match(cmd.linkPattern);
@@ -186,12 +189,9 @@ export async function handleBotMessage(ctx: BotMessageContext): Promise<void> {
   // 2. 文本指令匹配
   const text = ctx.text.trim();
 
-  // 空文本 → 显示控制面板
   if (!text) {
     const card = await render(ctx.senderOpenId, "cp-home");
-    if (card) {
-      await replyFeishuCardMessage(ctx.messageId, card);
-    }
+    if (card) await replyFeishuCardMessage(ctx.messageId, card);
     return;
   }
 
@@ -215,13 +215,10 @@ export async function handleBotMessage(ctx: BotMessageContext): Promise<void> {
       await replyFeishuMessage(ctx.messageId, "❌ 指令执行失败，请稍后重试");
     }
   } else {
-    // 未知指令 → 显示帮助
     const helpCmd = commands.find((c) => c.name === "help");
     if (helpCmd) {
       const card = await render(ctx.senderOpenId, helpCmd.page);
-      if (card) {
-        await replyFeishuCardMessage(ctx.messageId, card);
-      }
+      if (card) await replyFeishuCardMessage(ctx.messageId, card);
     } else {
       await replyFeishuMessage(ctx.messageId, "❌ 未知指令，请使用 /help 查看可用指令");
     }

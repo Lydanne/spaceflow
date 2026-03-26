@@ -45,7 +45,7 @@ export class CardRouter {
   private globalBeforeEach: Array<(ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>> = [];
 
   /** 开启后在卡片底部渲染内部调试数据（stack、params、data 等） */
-  debug = true;
+  debug = false;
 
   get pageCount(): number {
     return this.pages.size;
