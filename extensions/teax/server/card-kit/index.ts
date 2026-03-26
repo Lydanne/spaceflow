@@ -88,7 +88,7 @@ export function toast(
 
 /**
  * 创建异步任务结果：立即返回 loading 卡片，后台执行 task。
- * task 内通过闭包访问 ctx.updateCard 更新最终结果。
+ * task 内通过闭包访问 ctx.update 更新最终结果。
  * @param loading - loading 提示文本（自动构建蓝色卡片）或完整的 CardJSON
  * @param task - 后台异步任务
  */

@@ -99,7 +99,7 @@ ctx.data           // 当前页面状态（从 action.value.__data 解码）
 ctx.setData({})    // 合并更新状态 → 重渲染当前页面
 ctx.formValue      // 表单数据（仅 form_submit）
 ctx.formName       // 表单名称（仅 form_submit）
-ctx.updateCard()   // 卡片更新回调
+ctx.update()   // 卡片更新回调
 ctx.token          // 飞书回调 token
 ```
 
@@ -291,7 +291,7 @@ export default defineCardPage({
 
   async onAction(ctx) {
     // asyncTask 立即返回 loading 卡片（飞书 3 秒内渲染），
-    // task 在后台异步执行，通过闭包访问 ctx.updateCard 更新最终结果。
+    // task 在后台异步执行，通过闭包访问 ctx.update 更新最终结果。
     return asyncTask(
       `**仓库**: ${owner}/${repo}\n\n⏳ 正在触发工作流，请稍候...`,
       async () => {
@@ -299,7 +299,7 @@ export default defineCardPage({
         await giteaService.dispatchWorkflow(owner, repo, workflow, branch, inputs);
 
         // 轮询完成后更新卡片
-        await ctx.updateCard(
+        await ctx.update(
           new EnhancedCardBuilder({ title: "✅ 工作流已触发", theme: "green" }, "")
             .text(`运行编号: #${runNumber}`)
             .build(),
@@ -315,7 +315,7 @@ export default defineCardPage({
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
 | `loading` | `string \| CardJSON` | 字符串时自动构建蓝色 loading 卡片；也可传完整 CardJSON |
-| `task` | `() => Promise<void>` | 后台异步任务，通过闭包访问 `ctx.updateCard` |
+| `task` | `() => Promise<void>` | 后台异步任务，通过闭包访问 `ctx.update` |
 
 **执行流程：**
 
@@ -323,7 +323,7 @@ export default defineCardPage({
 onAction 返回 AsyncTaskResult
   → CardRouter 立即返回 loadingCard（飞书渲染 loading 状态）
   → task() 在后台执行（fire-and-forget）
-  → task 内通过 ctx.updateCard() 更新最终结果
+  → task 内通过 ctx.update() 更新最终结果
   → 如果 task 抛异常，CardRouter 自动 catch 并打印日志
 ```
 
@@ -493,7 +493,7 @@ server/
       ├─ 【守卫】全局 beforeEach → 页面 beforeEnter
       │    → 拦截时直接返回替代卡片 / 重定向 / undefined
       │
-      ├─ 注入 ctx.card / ctx.setData / ctx.updateCard
+      ├─ 注入 ctx.card / ctx.setData / ctx.update
       ├─ form_value 存在？
       │    → 调用 page.onAction(ctx)，ctx.type="form_submit"，ctx.formValue={...}
       ├─ value.__action 存在？
@@ -924,7 +924,7 @@ export interface AsyncTaskResult {
   __type: "async_task";
   /** 立即返回给飞书渲染的 loading 卡片 */
   loadingCard: CardJSON;
-  /** 后台异步执行的任务，通过闭包访问 ctx.updateCard 更新最终结果 */
+  /** 后台异步执行的任务，通过闭包访问 ctx.update 更新最终结果 */
   task: () => Promise<void>;
 }
 

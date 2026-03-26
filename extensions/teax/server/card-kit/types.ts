@@ -150,7 +150,7 @@ export interface AsyncTaskResult {
   __type: "async_task";
   /** 立即返回给飞书渲染的 loading 卡片 */
   loadingCard: CardJSON;
-  /** 后台异步执行的任务，通过闭包访问 ctx.updateCard 更新最终结果 */
+  /** 后台异步执行的任务，通过闭包访问 ctx.update 更新最终结果 */
   task: () => Promise<void>;
 }
 
