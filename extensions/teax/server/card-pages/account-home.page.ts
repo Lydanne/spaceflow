@@ -127,8 +127,7 @@ export default defineCardPage({
       card.divider();
     }
 
-    card.buttons([
-      { text: "🔄 刷新", action: "refresh" },
+    card.systemButtons([
       {
         text: "➕ 绑定更多账户",
         type: "primary",
@@ -143,10 +142,6 @@ export default defineCardPage({
     const db = useDB();
 
     switch (ctx.action) {
-      case "refresh": {
-        return navigate("account-home");
-      }
-
       case "switch_account": {
         const userId = ctx.params.user_id as string;
         const username = ctx.params.username as string;

@@ -38,8 +38,7 @@ export default defineCardPage({
       return ctx
         .card({ title: `📁 ${orgName}`, theme: "blue" })
         .text("该组织还没有仓库", true)
-        .divider()
-        .backButton("⬅️ 返回")
+        .systemButtons()
         .build();
     }
 
@@ -53,8 +52,7 @@ export default defineCardPage({
       });
     }
 
-    card.divider();
-    card.backButton("⬅️ 返回");
+    card.systemButtons();
 
     return card.build();
   },

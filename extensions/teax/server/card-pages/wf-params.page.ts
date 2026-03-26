@@ -45,6 +45,8 @@ export default defineCardPage({
 
     renderWorkflowForm(card, formData, { formName: "wf_params_form" });
 
+    card.systemButtons();
+
     return card.build();
   },
 

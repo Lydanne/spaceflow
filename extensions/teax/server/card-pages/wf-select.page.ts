@@ -91,6 +91,8 @@ export default defineCardPage({
     });
     card.endForm();
 
+    card.systemButtons();
+
     return card.build();
   },
 

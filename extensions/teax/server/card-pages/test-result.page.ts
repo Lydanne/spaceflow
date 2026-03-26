@@ -23,8 +23,7 @@ export default defineCardPage({
       .text(`**收货地址：**\n${address}`, true)
       .divider()
       .text(`*原始 form_value：*\n\`\`\`${raw}\`\`\``, true)
-      .divider()
-      .backButton("🔄 重新填写")
+      .systemButtons()
       .build();
   },
 

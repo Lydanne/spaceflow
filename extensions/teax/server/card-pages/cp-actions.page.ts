@@ -109,8 +109,7 @@ export default defineCardPage({
       );
     }
 
-    card.divider();
-    card.backButton("⬅️ 返回");
+    card.systemButtons();
 
     return card.build();
   },

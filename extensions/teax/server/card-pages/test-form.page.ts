@@ -53,6 +53,7 @@ export default defineCardPage({
         reset: { text: "取消", type: "default" },
       })
       .endForm()
+      .systemButtons()
       .build();
   },
 

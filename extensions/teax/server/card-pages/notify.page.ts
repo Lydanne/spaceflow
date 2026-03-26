@@ -51,7 +51,9 @@ export default defineCardPage({
       .card({ title: "🔔 通知设置", theme: "blue" })
       .text("**当前通知偏好**\n\n" + settings.join("\n"), true)
       .divider()
-      .button("前往设置页面", { url: `${baseUrl}/user/settings` })
+      .systemButtons([
+        { text: "前往设置页面", url: `${baseUrl}/user/settings` },
+      ])
       .build();
   },
 });

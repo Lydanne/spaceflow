@@ -82,16 +82,13 @@ export default defineCardPage({
     // 底部按钮
     const config = useRuntimeConfig();
     const presetUrl = `${config.public.appUrl}/workflows/${preset.share_token}`;
-    card.divider();
 
+    const extra: Parameters<typeof card.systemButtons>[0] = [];
     if (preset.group_id && preset.locked_by === activeUserId) {
-      card.buttons([
-        { text: "� 解锁", type: "danger", action: "unlock" },
-        { text: "🔗 查看详情", url: presetUrl },
-      ]);
-    } else {
-      card.button("�� 查看预设详情", { url: presetUrl });
+      extra.push({ text: "🔓 解锁", type: "danger", action: "unlock" });
     }
+    extra.push({ text: " 查看详情", url: presetUrl });
+    card.systemButtons(extra);
 
     return card.build();
   },

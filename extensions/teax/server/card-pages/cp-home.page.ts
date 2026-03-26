@@ -57,6 +57,8 @@ export default defineCardPage({
       });
     }
 
+    card.systemButtons();
+
     return card.build();
   },
 });

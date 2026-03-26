@@ -16,8 +16,7 @@ export default defineCardPage({
     return ctx
       .card({ title: `📦 ${owner}/${repo}`, theme: "blue" })
       .text(`**${label}**\n\n[在浏览器中打开](${url})`, true)
-      .divider()
-      .backButton("⬅️ 返回")
+      .systemButtons()
       .build();
   },
 });

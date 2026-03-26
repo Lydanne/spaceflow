@@ -32,8 +32,7 @@ export default defineCardPage({
       })
       .divider()
       .text(`**快捷链接**\n[在网页中打开](${baseUrl}/${owner}/${repo})`, true)
-      .divider()
-      .backButton("⬅️ 返回")
+      .systemButtons()
       .build();
   },
 });

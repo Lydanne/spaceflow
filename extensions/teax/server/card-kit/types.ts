@@ -205,6 +205,8 @@ export interface ButtonOpts {
   url?: string;
   /** 返回上一页（从栈中 pop） */
   back?: boolean;
+  /** 刷新当前页面（重新渲染，不压栈） */
+  refresh?: boolean;
 }
 
 /** 批量按钮配置 */
@@ -303,6 +305,8 @@ export interface EnhancedCardBuilderInterface {
   buttons(items: EnhancedButtonConfig[]): this;
   /** 返回上一页按钮（从栈中 pop，栈为空时不渲染） */
   backButton(text?: string, opts?: { type?: ButtonType }): this;
+  /** 底部系统按钮：默认 [⬅️ 返回, 🔄 刷新]，可传入额外按钮追加在后面。自动加 divider */
+  systemButtons(extra?: EnhancedButtonConfig[]): this;
   build(): CardJSON;
 }
 

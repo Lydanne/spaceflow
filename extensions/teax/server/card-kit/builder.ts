@@ -59,6 +59,12 @@ function buildBackValue(stack: StackEntry[]): Record<string, unknown> | null {
   return { __stack: stack };
 }
 
+/** 构建 refresh 类型按钮的 value 对象（重新渲染当前页面，不压栈） */
+function buildRefreshValue(ctx: ValueBuildCtx): Record<string, unknown> {
+  const current = encodeStackEntry(ctx.pageName, ctx.params);
+  return { __stack: [...ctx.stack, current] };
+}
+
 /** 构建 action 类型按钮的 value 对象 */
 function buildActionValue(
   ctx: ValueBuildCtx,
@@ -247,7 +253,11 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
     if (opts?.back) {
       return this.backButton(text, { type: opts.type });
     }
-    if (opts?.navigate) {
+    if (opts?.refresh) {
+      this.inner.addButtons([
+        { text, type: opts.type, value: buildRefreshValue(this.valueCtx), rawValue: true },
+      ]);
+    } else if (opts?.navigate) {
       this.inner.addButtons([
         { text, type: opts.type, value: buildNavValue(this.valueCtx, opts.navigate), rawValue: true },
       ]);
@@ -278,7 +288,9 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
         if (bv) rawButtons.push({ text: btn.text, type: btn.type, value: bv, rawValue: true });
         continue;
       }
-      if (btn.navigate) {
+      if (btn.refresh) {
+        rawButtons.push({ text: btn.text, type: btn.type, value: buildRefreshValue(this.valueCtx), rawValue: true });
+      } else if (btn.navigate) {
         rawButtons.push({ text: btn.text, type: btn.type, value: buildNavValue(this.valueCtx, btn.navigate), rawValue: true });
       } else if (btn.url) {
         rawButtons.push({ text: btn.text, type: btn.type, value: "", url: btn.url });
@@ -302,6 +314,20 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
       { text: text || "⬅️ 返回", type: opts?.type || "default", value: bv, rawValue: true },
     ]);
     return this;
+  }
+
+  // ─── 系统按钮（底部标准按钮组） ───
+
+  systemButtons(extra?: EnhancedButtonConfig[]): this {
+    this.divider();
+    const btns: EnhancedButtonConfig[] = [
+      { text: "⬅️ 返回", back: true },
+      { text: "🔄 刷新", refresh: true },
+    ];
+    if (extra && extra.length > 0) {
+      btns.push(...extra);
+    }
+    return this.buttons(btns);
   }
 
   // ─── 构建 ───
@@ -373,6 +399,13 @@ export class ColumnBuilder implements ColumnBuilderInterface {
           value: bv,
         });
       }
+    } else if (opts?.refresh) {
+      this.elements.push({
+        tag: "button",
+        text: { tag: "plain_text", content: text },
+        type: opts.type || "default",
+        value: buildRefreshValue(this.valueCtx),
+      });
     } else if (opts?.navigate) {
       this.elements.push({
         tag: "button",

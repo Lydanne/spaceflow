@@ -81,8 +81,9 @@ export default defineCardPage({
         }
       }
 
-      card.divider();
-      card.button("查看全部", { url: `${baseUrl}/${owner}/${repo}/actions` });
+      card.systemButtons([
+        { text: "查看全部", url: `${baseUrl}/${owner}/${repo}/actions` },
+      ]);
 
       return card.build();
     } catch (err) {

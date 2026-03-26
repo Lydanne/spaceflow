@@ -48,6 +48,7 @@ export default defineCardPage({
     return ctx
       .card({ title: `📋 待处理审批 (${pendingApprovals.length})`, theme: "orange" })
       .text(lines.join("\n\n"), true)
+      .systemButtons()
       .build();
   },
 });

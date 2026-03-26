@@ -49,6 +49,7 @@ export default defineCardPage({
 
     card.divider();
     card.text("💡 使用 `/repos <组织名>` 查看组织下的仓库", true);
+    card.systemButtons();
 
     return card.build();
   },

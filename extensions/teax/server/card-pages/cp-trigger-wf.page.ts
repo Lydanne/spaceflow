@@ -26,8 +26,7 @@ export default defineCardPage({
 
     renderWorkflowForm(card, formData, { formName: "trigger_wf_form", submitText: "🚀 触发" });
 
-    card.divider();
-    card.backButton("⬅️ 返回");
+    card.systemButtons();
 
     return card.build();
   },

@@ -14,11 +14,9 @@ export default defineCardPage({
           : "已成功解除飞书账号绑定\n\n您可以重新绑定其他账号",
         true,
       )
-      .divider()
-      .button("📖 查看绑定教程", {
-        type: "primary",
-        navigate: ["account-guide"],
-      })
+      .systemButtons([
+        { text: "📖 查看绑定教程", type: "primary", navigate: ["account-guide"] },
+      ])
       .build();
   },
 });

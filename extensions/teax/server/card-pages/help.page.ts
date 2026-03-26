@@ -33,6 +33,7 @@ export default defineCardPage({
         ].join("\n"),
         true,
       )
+      .systemButtons()
       .build();
   },
 });

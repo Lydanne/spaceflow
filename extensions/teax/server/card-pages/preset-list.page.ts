@@ -27,7 +27,7 @@ async function renderSingleGroup(
   if (!group) {
     const card = ctx.card({ title: "❌ 预设组不存在", theme: "red" });
     card.text("该预设组不存在或已被删除", true);
-    card.buttons([{ text: "⬅️ 返回", back: true }]);
+    card.systemButtons();
     return card.build();
   }
 
@@ -101,9 +101,7 @@ async function renderSingleGroup(
     }
   }
 
-  card.divider();
-  card.buttons([
-    { text: "⬅️ 返回", back: true },
+  card.systemButtons([
     { text: "在浏览器中打开", url: `${baseUrl}/workflow-groups/${groupToken}` },
   ]);
 
@@ -273,9 +271,7 @@ export default defineCardPage({
     // 空状态
     if (groups.length === 0 && standalonePresets.length === 0 && publicPresets.length === 0) {
       card.text("暂无预设\n\n预设可保存常用工作流配置，一键触发", true);
-      card.divider();
-      card.buttons([
-        { text: "⬅️ 返回", back: true },
+      card.systemButtons([
         { text: "创建预设", url: `${baseUrl}/user/settings` },
       ]);
       return card.build();
@@ -343,8 +339,7 @@ export default defineCardPage({
       card.divider();
     }
 
-    card.buttons([
-      { text: "⬅️ 返回", back: true },
+    card.systemButtons([
       { text: "管理预设", url: `${baseUrl}/user/settings` },
     ]);
 
