@@ -1,8 +1,9 @@
-import { defineCardPage, EnhancedCardBuilder, asyncTask, guards, requireBinding, requireRepoPermission } from "~~/server/card-kit";
+import { defineCardPage, asyncTask, guards, requireBinding, requireRepoPermission } from "~~/server/card-kit";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { parseWorkflowYaml, extractInputs, type WorkflowInputDef } from "~~/server/utils/workflow-yaml";
 import { getActiveAccount } from "~~/server/services/account.service";
 import { getUserGiteaTokens } from "~~/server/services/auth.service";
+import { dispatchAndPoll, buildDispatchErrorCard, buildTriggerResultCard } from "~~/server/utils/workflow-trigger";
 
 export default defineCardPage({
   name: "cp:trigger-wf",
@@ -154,7 +155,6 @@ export default defineCardPage({
     return asyncTask(
       `**仓库**: ${owner}/${repo}\n**分支**: ${branch}\n**工作流**: ${workflowFileName}\n\n⏳ 正在触发工作流，请稍候...`,
       async () => {
-        // Dispatch workflow
         const gitea = useGiteaSdk({
           userTokenProvider: async () => {
             const user = await getActiveAccount(openId);
@@ -163,76 +163,22 @@ export default defineCardPage({
         });
         const giteaService = await gitea.role("admin");
 
+        let result;
         try {
-          await giteaService.dispatchWorkflow(owner, repo, workflowFileName, branch, inputs);
+          result = await dispatchAndPoll(giteaService, { owner, repo, workflowFileName, branch, inputs });
         } catch (err) {
           console.error("[cp:trigger-wf] dispatchWorkflow error:", err);
-          const errObj = err as { data?: { message?: string }; message?: string };
-          const msg = errObj?.data?.message || errObj?.message || "触发工作流失败";
-          await ctx.update(
-            new EnhancedCardBuilder({ title: "❌ 触发失败", theme: "red" }, "")
-              .text(msg, true)
-              .build(),
-          );
+          await ctx.update(buildDispatchErrorCard(err));
           return;
         }
 
-        // 4. Poll for new run
-        let newRunId: number | null = null;
-        let newRunNumber: number | null = null;
-        let latestRunId = 0;
-
-        try {
-          const runs = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 5);
-          const latestRun = runs.workflow_runs?.find((run: { path?: string }) => run.path?.includes(workflowFileName));
-          if (latestRun) {
-            latestRunId = latestRun.id;
-          }
-        } catch {
-          // Ignore
-        }
-
-        for (let i = 0; i < 10; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          try {
-            const runs = await giteaService.getRepoWorkflowRuns(owner, repo, 1, 5);
-            const newRun = runs.workflow_runs?.find((run: { path?: string; id: number }) => {
-              return run.path?.includes(workflowFileName) && run.id > latestRunId;
-            });
-            if (newRun) {
-              newRunId = newRun.id;
-              newRunNumber = newRun.run_number;
-              break;
-            }
-          } catch {
-            // Continue polling
-          }
-        }
-
-        // 5. Show result
-        const config = useRuntimeConfig();
-        const baseUrl = config.public.appUrl as string;
-        const resultCard = new EnhancedCardBuilder(
-          {
-            title: newRunId ? "✅ 工作流已触发" : "⚠️ 工作流已提交",
-            theme: newRunId ? "green" : "orange",
-          },
-          "",
-        );
-
-        const resultLines = [
-          `**仓库**: ${owner}/${repo}`,
-          `**分支**: ${branch}`,
-          `**工作流**: ${workflowFileName}`,
-        ];
-
-        if (newRunId) {
-          resultLines.push(`**运行编号**: #${newRunNumber}`);
-          resultLines.push(`[查看运行详情](${baseUrl}/${owner}/${repo}/actions/runs/${newRunId})`);
-        }
-
-        resultCard.text(resultLines.join("\n"), true);
-        await ctx.update(resultCard.build());
+        await ctx.update(buildTriggerResultCard({
+          repoFullName: `${owner}/${repo}`,
+          branch,
+          workflowPath: workflowFileName,
+          runId: result.runId,
+          runNumber: result.runNumber,
+        }));
       },
     );
   },

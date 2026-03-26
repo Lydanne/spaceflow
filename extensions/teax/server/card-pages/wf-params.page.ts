@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { defineCardPage, navigate, asyncTask, EnhancedCardBuilder } from "~~/server/card-kit";
+import { defineCardPage, navigate, asyncTask } from "~~/server/card-kit";
 import { useGiteaSdk } from "~~/server/utils/gitea";
+import { buildDispatchErrorCard, buildTriggerResultCard } from "~~/server/utils/workflow-trigger";
 import * as yaml from "yaml";
 
 export default defineCardPage({
@@ -173,38 +174,28 @@ export default defineCardPage({
     return asyncTask(
       `**仓库**: ${repoFullName}\n**工作流**: ${workflowName}\n\n⏳ 正在触发工作流，请稍候...`,
       async () => {
-        const updateCard = ctx.update;
-
         try {
           const gitea = await useGiteaSdk().role("admin");
           await gitea.dispatchWorkflow(owner!, repo!, workflowPath, branch, inputs);
         } catch (err) {
           console.error("[wf:params] dispatchWorkflow error:", err);
-          const errObj = err as { data?: { message?: string }; message?: string };
-          const msg = errObj?.data?.message || errObj?.message || "触发工作流失败";
-          await updateCard(
-            new EnhancedCardBuilder({ title: "❌ 触发失败", theme: "red" }, "")
-              .text(msg, true)
-              .build(),
-          );
+          await ctx.update(buildDispatchErrorCard(err));
           return;
         }
 
-        await updateCard(
-          new EnhancedCardBuilder({ title: "✅ 工作流已触发", theme: "green" }, "")
-            .text(
-              [
-                `**仓库**: ${repoFullName}`,
-                `**分支**: ${branch}`,
-                `**工作流**: ${workflowName}`,
-                Object.keys(inputs).length > 0
-                  ? `**参数**: ${Object.entries(inputs).map(([k, v]) => `${k}=${v}`).join(", ")}`
-                  : "",
-              ].filter(Boolean).join("\n"),
-              true,
-            )
-            .build(),
-        );
+        const extraLines: string[] = [];
+        if (Object.keys(inputs).length > 0) {
+          extraLines.push(`**参数**: ${Object.entries(inputs).map(([k, v]) => `${k}=${v}`).join(", ")}`);
+        }
+
+        await ctx.update(buildTriggerResultCard({
+          repoFullName,
+          branch,
+          workflowPath: workflowName,
+          runId: null,
+          runNumber: null,
+          extraLines,
+        }));
       },
     );
   },

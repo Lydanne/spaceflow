@@ -3,6 +3,7 @@ import { useDB, schema } from "~~/server/db";
 import { defineCardPage, navigate, asyncTask, EnhancedCardBuilder, requireBinding } from "~~/server/card-kit";
 import { resolvePresetByShareToken } from "~~/server/utils/resolve-preset";
 import { useGiteaSdk } from "~~/server/utils/gitea";
+import { dispatchAndPoll, buildDispatchErrorCard, buildTriggerResultCard } from "~~/server/utils/workflow-trigger";
 import { getActiveAccount } from "~~/server/services/account.service";
 import { parseWorkflowYaml, extractInputs, type WorkflowInputDef } from "~~/server/utils/workflow-yaml";
 import { queryUserPermissionGroups, rowGrantsPermission } from "~~/server/utils/permission";
@@ -263,52 +264,23 @@ export default defineCardPage({
           }
         }
 
-        // Get latest run ID for polling
-        let latestRunId = 0;
+        // Dispatch + poll for new run
+        let result;
         try {
-          const runs = await gitea.getRepoWorkflowRuns(owner, repoName, 1, 5);
-          const latestRun = runs.workflow_runs?.find((run) => run.path?.includes(workflowFileName));
-          if (latestRun) {
-            latestRunId = latestRun.id;
-          }
-        } catch {
-          // Ignore
-        }
-
-        // Dispatch workflow
-        try {
-          await gitea.dispatchWorkflow(owner, repoName, workflowFileName, finalBranch, finalInputs as Record<string, string | number | boolean>);
+          result = await dispatchAndPoll(gitea, {
+            owner,
+            repo: repoName,
+            workflowFileName,
+            branch: finalBranch,
+            inputs: finalInputs as Record<string, string | number | boolean>,
+          });
         } catch (err) {
           console.error("[preset:console] dispatchWorkflow error:", err);
-          const errObj = err as { data?: { message?: string }; message?: string };
-          const msg = errObj?.data?.message || errObj?.message || "触发工作流失败";
-          await updateCard(
-            new EnhancedCardBuilder({ title: "❌ 触发失败", theme: "red" }, "")
-              .text(msg, true)
-              .build(),
-          );
+          await updateCard(buildDispatchErrorCard(err));
           return;
         }
 
-        // Poll for new run ID
-        let newRunId: number | null = null;
-        let newRunNumber: number | null = null;
-        for (let i = 0; i < 10; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          try {
-            const runs = await gitea.getRepoWorkflowRuns(owner, repoName, 1, 5);
-            const newRun = runs.workflow_runs?.find((run) => {
-              return run.path?.includes(workflowFileName) && run.id > latestRunId;
-            });
-            if (newRun) {
-              newRunId = newRun.id;
-              newRunNumber = newRun.run_number;
-              break;
-            }
-          } catch {
-            // Continue polling
-          }
-        }
+        const { runId: newRunId, runNumber: newRunNumber } = result;
 
         // Update database
         const db = useDB();
@@ -368,36 +340,23 @@ export default defineCardPage({
         }
 
         // Build result card
-        const baseUrl = config.public.appUrl as string;
-        const resultCard = new EnhancedCardBuilder(
-          {
-            title: newRunId ? "✅ 工作流已触发" : "⚠️ 工作流已提交",
-            theme: newRunId ? "green" : "orange",
-          },
-          "",
-        );
-
-        const resultLines = [
-          `**仓库**: ${repo.full_name}`,
-          `**分支**: ${finalBranch}`,
-          `**工作流**: ${preset.workflow_path}`,
-        ];
-
-        if (newRunId) {
-          resultLines.push(`**运行编号**: #${newRunNumber}`);
-          resultLines.push(`[查看运行详情](${baseUrl}/${owner}/${repoName}/actions/runs/${newRunId})`);
-        }
-
+        const extraLines: string[] = [];
         if (lockInfo) {
-          resultLines.push("");
+          extraLines.push("");
           const unlockText = lockInfo.auto_unlock_at
             ? new Date(lockInfo.auto_unlock_at).toLocaleString("zh-CN")
             : "手动解锁";
-          resultLines.push(`🔒 已自动锁定 (将在 ${unlockText} 解锁)`);
+          extraLines.push(`🔒 已自动锁定 (将在 ${unlockText} 解锁)`);
         }
 
-        resultCard.text(resultLines.join("\n"), true);
-        await updateCard(resultCard.build());
+        await updateCard(buildTriggerResultCard({
+          repoFullName: repo.full_name,
+          branch: finalBranch,
+          workflowPath: preset.workflow_path,
+          runId: newRunId,
+          runNumber: newRunNumber,
+          extraLines,
+        }));
       },
     );
   },
