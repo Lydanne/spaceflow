@@ -7,6 +7,7 @@ import {
 import { sendFeishuChatCardMessage } from "~~/server/utils/feishu-sdk";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { getActiveAccount } from "~~/server/services/account.service";
+import { bindRoute } from "~~/server/card-kit";
 
 // ─── 指令上下文 ─────────────────────────────────────────
 
@@ -481,146 +482,7 @@ registerCommand({
   aliases: ["/presets", "预设", "工作流预设"],
   description: "查看我的工作流预设",
   usage: "/presets",
-  handler: async (ctx) => {
-    const activeUser = await getActiveAccount(ctx.senderOpenId);
-    if (!activeUser) {
-      await replyFeishuMessage(ctx.messageId, "❌ 请先在 Teax 中绑定飞书账号");
-      return;
-    }
-
-    const db = useDB();
-    const config = useRuntimeConfig();
-    const baseUrl = config.public.appUrl;
-
-    const groups = await db
-      .select({
-        id: schema.workflowPresetGroups.id,
-        name: schema.workflowPresetGroups.name,
-        description: schema.workflowPresetGroups.description,
-        share_token: schema.workflowPresetGroups.share_token,
-      })
-      .from(schema.workflowPresetGroups)
-      .where(eq(schema.workflowPresetGroups.created_by, activeUser.id))
-      .limit(10);
-
-    const groupIds = groups.map((g) => g.id);
-    let groupPresets: Array<{
-      id: string;
-      name: string;
-      branch: string;
-      group_id: string | null;
-      share_token: string;
-    }> = [];
-    if (groupIds.length > 0) {
-      const { inArray } = await import("drizzle-orm");
-      groupPresets = await db
-        .select({
-          id: schema.workflowPresets.id,
-          name: schema.workflowPresets.name,
-          branch: schema.workflowPresets.branch,
-          group_id: schema.workflowPresets.group_id,
-          share_token: schema.workflowPresets.share_token,
-        })
-        .from(schema.workflowPresets)
-        .where(inArray(schema.workflowPresets.group_id, groupIds))
-        .limit(50);
-    }
-
-    const presetsByGroup = new Map<string, typeof groupPresets>();
-    for (const p of groupPresets) {
-      if (!p.group_id) continue;
-      const list = presetsByGroup.get(p.group_id) ?? [];
-      list.push(p);
-      presetsByGroup.set(p.group_id, list);
-    }
-
-    const standalonePresets = await db
-      .select({
-        id: schema.workflowPresets.id,
-        name: schema.workflowPresets.name,
-        branch: schema.workflowPresets.branch,
-        share_token: schema.workflowPresets.share_token,
-        repository: {
-          full_name: schema.repositories.full_name,
-        },
-      })
-      .from(schema.workflowPresets)
-      .innerJoin(
-        schema.repositories,
-        eq(schema.workflowPresets.repository_id, schema.repositories.id),
-      )
-      .where(eq(schema.workflowPresets.created_by, activeUser.id))
-      .limit(10);
-
-    const { EnhancedCardBuilder } = await import("~~/server/card-kit");
-
-    if (groups.length === 0 && standalonePresets.length === 0) {
-      const card = new EnhancedCardBuilder(
-        { title: "📦 工作流预设", theme: "blue" },
-        "",
-      )
-        .text(
-          "您还没有创建工作流预设\n\n工作流预设可以保存常用的工作流配置，方便快速触发",
-          true,
-        )
-        .divider()
-        .text("💡 在仓库的 **Workflows** 页面可以创建预设组", true)
-        .build();
-      await replyFeishuCardMessage(ctx.messageId, card);
-      return;
-    }
-
-    const contentParts: string[] = [];
-
-    if (groups.length > 0) {
-      contentParts.push("**📁 预设组**\n");
-      for (const g of groups) {
-        const shareUrl = g.share_token
-          ? `${baseUrl}/workflow-groups/${g.share_token}`
-          : "";
-        const header = shareUrl
-          ? `• **${g.name}** — [分享链接](${shareUrl})`
-          : `• **${g.name}**`;
-        contentParts.push(header);
-
-        const presets = presetsByGroup.get(g.id) ?? [];
-        for (const p of presets) {
-          const presetUrl = `${baseUrl}/workflows/${p.share_token}`;
-          contentParts.push(`  └ [${p.name}](${presetUrl}) (${p.branch})`);
-        }
-        if (presets.length === 0) {
-          contentParts.push("  └ (暂无预设)");
-        }
-      }
-    }
-
-    if (standalonePresets.length > 0) {
-      if (groups.length > 0) {
-        contentParts.push("\n");
-      }
-      contentParts.push("**📋 独立预设**\n");
-      for (const p of standalonePresets) {
-        const repo = p.repository?.full_name ?? "";
-        const repoName = repo ? ` (${repo})` : "";
-        const shareUrl = p.share_token ? `${baseUrl}/workflows/${p.share_token}` : "";
-        if (shareUrl) {
-          contentParts.push(`• **${p.name}**${repoName} — [触发](${shareUrl})`);
-        } else {
-          contentParts.push(`• **${p.name}**${repoName}`);
-        }
-      }
-    }
-
-    const totalCount = groups.length + standalonePresets.length;
-    const card = new EnhancedCardBuilder(
-      { title: `📦 工作流预设 (${totalCount})`, theme: "blue" },
-      "",
-    )
-      .text(contentParts.join("\n"), true)
-      .build();
-
-    await replyFeishuCardMessage(ctx.messageId, card);
-  },
+  handler: bindRoute("preset:list"),
 });
 
 // ─── /run <token> ──────────────────────────────────────────
@@ -677,19 +539,7 @@ registerCommand({
   aliases: ["/test-form", "测试表单"],
   description: "测试飞书卡片 JSON 2.0 表单组件",
   usage: "/test-form",
-  handler: async (ctx) => {
-    const { cardRouter, ensurePages } = await import("~~/server/card-kit");
-    await ensurePages();
-    const card = await cardRouter.dispatch({
-      openId: ctx.senderOpenId,
-      actionValue: JSON.stringify({ __page: "test:form" }),
-      token: "",
-      updateCard: async () => {},
-    });
-    if (card) {
-      await replyFeishuCardMessage(ctx.messageId, card);
-    }
-  },
+  handler: bindRoute("test:form"),
 });
 
 // ─── 卡片交互处理 ─────────────────────────────────────────

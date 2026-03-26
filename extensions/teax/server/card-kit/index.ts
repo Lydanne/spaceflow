@@ -24,6 +24,42 @@ export function defineCardPage<
   return def;
 }
 
+// ─── bindRoute ──────────────────────────
+
+export interface BotCommandContext {
+  messageId: string;
+  chatId: string;
+  chatType: string;
+  senderOpenId: string;
+  text: string;
+}
+
+/**
+ * 创建一个 handler，自动绑定到指定的 card-page
+ * 用法：handler: bindRoute("preset:list")
+ */
+export function bindRoute(
+  page: string,
+  params?: Record<string, unknown>,
+): (ctx: BotCommandContext, _args: string[]) => Promise<void> {
+  return async (ctx, _args) => {
+    const { replyFeishuCardMessage } = await import("~~/server/services/messaging");
+    await ensurePages();
+    const card = await cardRouter.dispatch({
+      openId: ctx.senderOpenId,
+      actionValue: JSON.stringify({
+        __page: page,
+        __params: params,
+      }),
+      token: "",
+      updateCard: async () => {},
+    });
+    if (card) {
+      await replyFeishuCardMessage(ctx.messageId, card);
+    }
+  };
+}
+
 // ─── 确保 card-pages 注册 ──────────────────────────
 // Nitro dev HMR 会重新执行模块导致 cardRouter 为空实例。
 // 此函数显式 import 各 page 的 default export 并注册到 *当前* cardRouter，
@@ -44,6 +80,7 @@ export async function ensurePages(): Promise<void> {
     import("~~/server/card-pages/test-form.page"),
     import("~~/server/card-pages/test-result.page"),
     import("~~/server/card-pages/preset-console.page"),
+    import("~~/server/card-pages/preset-list.page"),
     import("~~/server/card-pages/wf-select.page"),
     import("~~/server/card-pages/wf-params.page"),
     import("~~/server/card-pages/approval-pending.page"),
