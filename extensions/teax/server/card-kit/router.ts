@@ -63,6 +63,24 @@ export class CardRouter {
     this.globalBeforeEach.push(guard);
   }
 
+  private createDiBindings(initial?: Map<unknown, unknown>): {
+    store: Map<unknown, unknown>;
+    provide: (key: unknown, value: unknown) => void;
+    inject: <T = unknown>(key: unknown, fallback?: T) => T | undefined;
+  } {
+    const store = initial ?? new Map<unknown, unknown>();
+    const provide = (key: unknown, value: unknown): void => {
+      store.set(key, value);
+    };
+    const inject = <T = unknown>(key: unknown, fallback?: T): T | undefined => {
+      if (store.has(key)) {
+        return store.get(key) as T;
+      }
+      return fallback;
+    };
+    return { store, provide, inject };
+  }
+
   /**
    * 渲染指定页面，返回 CardJSON。
    * 用于 asyncTask task 内的异步跳转（ctx.navigate 底层调用此方法）。
@@ -78,10 +96,22 @@ export class CardRouter {
     }
     const params = opts.params ?? {};
     const data = page.data?.() ?? {};
+    const di = this.createDiBindings();
+    const guardCtx: NavigationGuardContext = {
+      openId: opts.openId,
+      to: { page: page.name, params },
+      from: null,
+      provide: di.provide,
+      inject: di.inject,
+    };
+    const blocked = await this.runBeforeEnter(page, guardCtx);
+    if (blocked !== undefined) return blocked;
     const renderCtx = this.buildRenderContext(page, {
       openId: opts.openId,
       params,
       data,
+      provide: di.provide,
+      inject: di.inject,
     });
     return page.render(renderCtx);
   }
@@ -110,12 +140,15 @@ export class CardRouter {
     try {
       const params = current.params || {};
       const data = this.resolveData(page, encoded);
+      const di = this.createDiBindings();
 
       // ─── beforeEnter 守卫 ───
       const guardCtx: NavigationGuardContext = {
         openId: input.openId,
         to: { page: page.name, params },
         from: null,
+        provide: di.provide,
+        inject: di.inject,
       };
       const blocked = await this.runBeforeEnter(page, guardCtx, input);
       if (blocked !== undefined) return blocked;
@@ -131,6 +164,8 @@ export class CardRouter {
           action: "form_submit",
           formValue: input.formValue,
           formName: (encoded.__formName as string) || null,
+          provide: di.provide,
+          inject: di.inject,
         });
         const card = await this.handleActionResult(page, ctx, await page.onAction?.(ctx), input);
         return this.injectDebug(card, { stack: encoded.__stack, action: "form_submit", data: encoded.__data });
@@ -147,6 +182,8 @@ export class CardRouter {
           action: encoded.__action,
           formValue: null,
           formName: null,
+          provide: di.provide,
+          inject: di.inject,
         });
         const card = await this.handleActionResult(page, ctx, await page.onAction?.(ctx), input);
         return this.injectDebug(card, { stack: encoded.__stack, action: encoded.__action, data: encoded.__data });
@@ -158,6 +195,8 @@ export class CardRouter {
         params,
         data,
         stack,
+        provide: di.provide,
+        inject: di.inject,
       });
       const card = await page.render(renderCtx);
 
@@ -212,6 +251,8 @@ export class CardRouter {
       params: Record<string, unknown>;
       data: Record<string, unknown>;
       stack?: StackEntry[];
+      provide: (key: unknown, value: unknown) => void;
+      inject: <T = unknown>(key: unknown, fallback?: T) => T | undefined;
     },
   ): CardRenderContext {
     const stack = opts.stack ?? [];
@@ -220,6 +261,8 @@ export class CardRouter {
       params: opts.params,
       data: opts.data,
       stack,
+      provide: opts.provide,
+      inject: opts.inject,
       card: (config: CardConfig) =>
         new EnhancedCardBuilder(config, page.name, opts.data, opts.params, stack),
     };
@@ -239,6 +282,8 @@ export class CardRouter {
       token: string;
       updateCard: (card: CardJSON) => Promise<void>;
       sendCard?: (card: CardJSON) => Promise<void>;
+      provide: (key: unknown, value: unknown) => void;
+      inject: <T = unknown>(key: unknown, fallback?: T) => T | undefined;
     },
   ): CardActionContext {
     const pageName = page.name;
@@ -248,6 +293,8 @@ export class CardRouter {
       params: opts.params,
       data: opts.data,
       stack,
+      provide: opts.provide,
+      inject: opts.inject,
       card: (config: CardConfig) =>
         new EnhancedCardBuilder(config, pageName, opts.data, opts.params, stack),
       type: opts.type,
@@ -311,6 +358,8 @@ export class CardRouter {
         params: target.params || {},
         data: targetData,
         stack: backStack,
+        provide: ctx.provide,
+        inject: ctx.inject,
       });
       return targetPage.render(renderCtx);
     }
@@ -328,6 +377,8 @@ export class CardRouter {
         openId: ctx.openId,
         to: { page: navResult.page, params: navResult.params },
         from: { page: page.name, params: ctx.params },
+        provide: ctx.provide,
+        inject: ctx.inject,
       };
 
       // beforeLeave 守卫（当前页面）
@@ -353,6 +404,8 @@ export class CardRouter {
         params: navResult.params,
         data: targetData,
         stack: targetStack,
+        provide: ctx.provide,
+        inject: ctx.inject,
       });
       const card = await targetPage.render(renderCtx);
 
@@ -448,6 +501,8 @@ export class CardRouter {
         openId,
         params: navResult.params,
         data: redirectData,
+        provide: guardCtx.provide,
+        inject: guardCtx.inject,
       });
       return { blocked: true, card: await redirectPage.render(renderCtx) };
     }

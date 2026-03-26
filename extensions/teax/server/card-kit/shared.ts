@@ -123,9 +123,9 @@ export function guards(...fns: BeforeEnterGuard[]): BeforeEnterGuard {
  * 未绑定时渲染"未绑定账号"提示卡片。
  */
 export function requireBinding(): BeforeEnterGuard {
-  return async ({ openId }) => {
+  return async (ctx) => {
     const { getActiveAccount } = await import("~~/server/services/account.service");
-    const user = await getActiveAccount(openId);
+    const user = await getActiveAccount(ctx.openId);
     if (!user) {
       const config = useRuntimeConfig();
       const baseUrl = config.public.appUrl as string;
@@ -133,6 +133,8 @@ export function requireBinding(): BeforeEnterGuard {
         .text(`请先在 Teax 中绑定飞书账号\n\n[前往绑定](${baseUrl}/user/settings)`, true)
         .build();
     }
+
+    ctx.provide(requireBinding, user);
   };
 }
 

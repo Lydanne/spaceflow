@@ -36,6 +36,10 @@ export interface NavigationGuardContext {
   to: { page: string; params: Record<string, unknown> };
   /** 来源页面名称（首次进入时为 null） */
   from: { page: string; params: Record<string, unknown> } | null;
+  /** 注入上下文数据，供同次路由流程后续阶段读取 */
+  provide: (key: unknown, value: unknown) => void;
+  /** 读取上下文数据；若不存在则返回 fallback */
+  inject: <T = unknown>(key: unknown, fallback?: T) => T | undefined;
 }
 
 /**
@@ -109,6 +113,10 @@ export interface CardRenderContext<
   card: (config: CardConfig) => EnhancedCardBuilderInterface;
   /** 当前页面栈（只读） */
   stack: readonly StackEntry[];
+  /** 注入上下文数据，供当前流程后续读取 */
+  provide: (key: unknown, value: unknown) => void;
+  /** 读取 beforeEnter/上游阶段注入的数据 */
+  inject: <T = unknown>(key: unknown, fallback?: T) => T | undefined;
 }
 
 /** 交互上下文（按钮点击 + 表单提交统一） */
