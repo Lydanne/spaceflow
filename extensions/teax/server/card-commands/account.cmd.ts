@@ -1,4 +1,4 @@
-import { registerCardCommand } from "~~/server/card-kit/commands";
+import { registerCardCommand } from "~~/server/card-kit";
 
 registerCardCommand({
   name: "account",

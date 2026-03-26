@@ -2,7 +2,7 @@
  * 卡片命令系统 — 工具类
  *
  * 类型定义、注册表、消息分发。
- * 各 .cmd.ts 直接从 ~~/server/card-kit/commands 导入 registerCardCommand。
+ * 各 .cmd.ts 直接从 ~~/server/card-kit 导入 registerCardCommand。
  */
 
 import type { CardJSON } from "./types";
