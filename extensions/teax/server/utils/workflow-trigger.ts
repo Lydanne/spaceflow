@@ -196,23 +196,21 @@ export interface RenderWorkflowFormOptions {
   formName: string;
   /** 提交按钮文案（默认 "🚀 触发工作流"） */
   submitText?: string;
-  /** 锁定的 input key 集合（不渲染为表单控件） */
+  /** 锁定的 input key 集合（渲染为 disabled 只读控件） */
   lockedInputs?: Set<string>;
-  /** 锁定参数的预设值（用于展示） */
+  /** 锁定参数的预设值 */
   lockedValues?: Record<string, unknown>;
 }
 
 /**
  * 在 card builder 上渲染工作流触发表单：分支选择 + workflow inputs + 提交按钮。
- * 返回被锁定（跳过渲染）的字段列表，调用方可自行展示。
+ * 锁定的参数会渲染为 disabled 只读控件（带 🔒 提示）。
  */
 export function renderWorkflowForm(
   card: EnhancedCardBuilderInterface,
   data: WorkflowFormData,
   opts: RenderWorkflowFormOptions,
-): Array<{ label: string; value: string }> {
-  const lockedFields: Array<{ label: string; value: string }> = [];
-
+): void {
   card.form(opts.formName);
 
   // 分支选择
@@ -231,33 +229,30 @@ export function renderWorkflowForm(
   if (data.inputDefs) {
     for (const [key, def] of Object.entries(data.inputDefs)) {
       const label = def.description || key;
-
-      // 锁定参数跳过
-      if (opts.lockedInputs?.has(key)) {
-        lockedFields.push({
-          label,
-          value: String(opts.lockedValues?.[key] ?? def.default ?? "-"),
-        });
-        continue;
-      }
+      const isLocked = opts.lockedInputs?.has(key);
+      const lockedValue = isLocked ? String(opts.lockedValues?.[key] ?? def.default ?? "") : undefined;
 
       if (def.type === "choice" && def.options?.length) {
-        const defaultValue = def.default != null ? String(def.default) : undefined;
+        const defaultValue = isLocked ? lockedValue : (def.default != null ? String(def.default) : undefined);
         card.select({
           name: key,
           label,
           placeholder: `选择 ${key}`,
           required: def.required || false,
+          disabled: isLocked ? "🔒 该参数已锁定" : undefined,
           options: def.options.map((o) => ({ label: o, value: o })),
           initial_option: defaultValue,
         });
       } else if (def.type === "boolean") {
-        const boolDefault = def.default != null ? (def.default ? "true" : "false") : undefined;
+        const boolDefault = isLocked
+          ? lockedValue
+          : (def.default != null ? (def.default ? "true" : "false") : undefined);
         card.select({
           name: key,
           label,
           placeholder: `选择 ${key}`,
           required: def.required || false,
+          disabled: isLocked ? "🔒 该参数已锁定" : undefined,
           options: [
             { label: "是", value: "true" },
             { label: "否", value: "false" },
@@ -269,8 +264,9 @@ export function renderWorkflowForm(
           name: key,
           label,
           placeholder: def.default ? String(def.default) : `输入 ${key}`,
-          required: def.required || false,
-          default_value: def.default ? String(def.default) : undefined,
+          required: isLocked ? false : (def.required || false),
+          default_value: isLocked ? lockedValue : (def.default ? String(def.default) : undefined),
+          disabled: isLocked ? "🔒 该参数已锁定" : undefined,
         });
       }
     }
@@ -280,6 +276,4 @@ export function renderWorkflowForm(
     submit: { text: opts.submitText || "🚀 触发工作流", type: "primary" },
   });
   card.endForm();
-
-  return lockedFields;
 }

@@ -72,6 +72,7 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
       label: config.label || config.name,
       placeholder: config.placeholder,
       required: config.required,
+      disabled: config.disabled,
       options: config.options,
       initial_option: config.initial_option,
     });

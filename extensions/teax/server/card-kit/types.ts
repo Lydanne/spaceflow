@@ -205,8 +205,8 @@ export interface InputV2Config {
   auto_resize?: boolean;
   max_rows?: number;
   show_icon?: boolean;
-  disabled?: boolean;
-  disabled_tips?: string;
+  /** true 或 string（提示文案）时禁用 */
+  disabled?: boolean | string;
   margin?: string;
 }
 
@@ -216,6 +216,8 @@ export interface SelectConfig {
   label?: string;
   placeholder?: string;
   required?: boolean;
+  /** true 或 string（提示文案）时禁用，用只读 input 替代 */
+  disabled?: boolean | string;
   options: Array<{ label: string; value: string }>;
   /** 默认选中项的 value */
   initial_option?: string;

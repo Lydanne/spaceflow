@@ -52,18 +52,11 @@ export default defineCardPage({
     card.divider();
 
     const lockedInputs = new Set<string>(preset.locked_inputs || []);
-    const lockedFields = renderWorkflowForm(card, formData, {
+    renderWorkflowForm(card, formData, {
       formName: "preset_form",
       lockedInputs,
       lockedValues: preset.inputs as Record<string, unknown>,
     });
-
-    // Locked fields outside form
-    if (lockedFields.length > 0) {
-      card.divider();
-      card.text("**🔒 锁定参数**", true);
-      card.fields(lockedFields);
-    }
 
     return card.build();
   },

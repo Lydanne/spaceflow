@@ -45,10 +45,8 @@ interface InputConfigV2 {
   default_value?: string;
   /** 是否必填。仅在表单容器中生效。 */
   required?: boolean;
-  /** 是否禁用。 */
-  disabled?: boolean;
-  /** 禁用提示文案。 */
-  disabled_tips?: string;
+  /** true 或 string（提示文案）时禁用 */
+  disabled?: boolean | string;
   /** 输入框宽度：default / fill / 如 "200px"。 */
   width?: string;
   /** 最大文本长度，1~1000，默认 1000。 */
@@ -209,36 +207,53 @@ export class FeishuCardBuilder {
     label?: string;
     placeholder?: string;
     required?: boolean;
+    /** true 或 string（提示文案）时禁用，用只读 input 替代 */
+    disabled?: boolean | string;
     options: Array<{ label: string; value: string }>;
     /** 默认选中项的 value */
     initial_option?: string;
   }): this {
-    const options = config.options.map((opt) => ({
-      text: {
-        tag: "plain_text",
-        content: opt.label,
-      },
-      value: opt.value,
-    }));
-
     // select_static 不支持 label 属性，用前置 markdown 模拟
     if (config.label) {
-      const labelText = config.required ? `**${config.label}** <font color='red'>*</font>` : `**${config.label}**`;
+      let labelText = config.required ? `**${config.label}** <font color='red'>*</font>` : `**${config.label}**`;
+      if (typeof config.disabled === "string") {
+        labelText += `  <font color='grey'>${config.disabled}</font>`;
+      }
       this.pushElement({ tag: "markdown", content: labelText });
     }
+
+    // disabled 时用只读 input 替代 select
+    if (config.disabled) {
+      const displayValue = config.initial_option
+        ? (config.options.find((o) => o.value === config.initial_option)?.label || config.initial_option)
+        : "";
+      const element: CardElement = {
+        tag: "input",
+        name: config.name,
+        disabled: true,
+        default_value: displayValue,
+        placeholder: { tag: "plain_text", content: config.placeholder || "请选择" },
+      };
+      if (typeof config.disabled === "string") {
+        element.disabled_tips = { tag: "plain_text", content: config.disabled };
+      }
+      this.pushElement(element);
+      return this;
+    }
+
+    const options = config.options.map((opt) => ({
+      text: { tag: "plain_text", content: opt.label },
+      value: opt.value,
+    }));
 
     const element: CardElement = {
       tag: "select_static",
       name: config.name,
       required: config.required || false,
-      placeholder: {
-        tag: "plain_text",
-        content: config.placeholder || "请选择",
-      },
+      placeholder: { tag: "plain_text", content: config.placeholder || "请选择" },
       options,
     };
 
-    // JSON 2.0: 使用 initial_option 属性设置默认选中
     if (config.initial_option !== undefined) {
       element.initial_option = config.initial_option;
     }
@@ -304,7 +319,10 @@ export class FeishuCardBuilder {
    */
   addInputV2(config: InputConfigV2): this {
     if (config.label) {
-      const labelText = config.required ? `**${config.label}** <font color='red'>*</font>` : `**${config.label}**`;
+      let labelText = config.required ? `**${config.label}** <font color='red'>*</font>` : `**${config.label}**`;
+      if (typeof config.disabled === "string") {
+        labelText += `  <font color='grey'>${config.disabled}</font>`;
+      }
       this.pushElement({ tag: "markdown", content: labelText });
     }
     const element: CardElement = {
@@ -331,12 +349,12 @@ export class FeishuCardBuilder {
     }
     if (config.disabled) {
       element.disabled = true;
-    }
-    if (config.disabled_tips) {
-      element.disabled_tips = {
-        tag: "plain_text",
-        content: config.disabled_tips,
-      };
+      if (typeof config.disabled === "string") {
+        element.disabled_tips = {
+          tag: "plain_text",
+          content: config.disabled,
+        };
+      }
     }
     if (config.width) {
       element.width = config.width;
