@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { defineCardPage, navigate } from "~~/server/card-kit";
+import { defineCardPage, navigate, asyncTask, EnhancedCardBuilder } from "~~/server/card-kit";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import * as yaml from "yaml";
 
@@ -169,57 +169,43 @@ export default defineCardPage({
       }
     }
 
-    // Show loading
-    {
-      const { EnhancedCardBuilder } = await import("~~/server/card-kit");
-      const loadingCard = new EnhancedCardBuilder(
-        { title: "🚀 触发工作流", theme: "blue" },
-        "",
-      )
-        .text("⏳ 正在触发工作流，请稍候...", true)
-        .build();
-      await ctx.updateCard(loadingCard);
-    }
+    // Return AsyncTaskResult
+    return asyncTask(
+      `**仓库**: ${repoFullName}\n**工作流**: ${workflowName}\n\n⏳ 正在触发工作流，请稍候...`,
+      async () => {
+        const updateCard = ctx.updateCard;
 
-    // Dispatch workflow
-    try {
-      const gitea = await useGiteaSdk().role("admin");
-      await gitea.dispatchWorkflow(owner!, repo!, workflowPath, branch, inputs);
-    } catch (err) {
-      console.error("[wf:params] dispatchWorkflow error:", err);
-      const errObj = err as { data?: { message?: string }; message?: string };
-      const msg = errObj?.data?.message || errObj?.message || "触发工作流失败";
-      const { EnhancedCardBuilder } = await import("~~/server/card-kit");
-      const card = new EnhancedCardBuilder(
-        { title: "❌ 触发失败", theme: "red" },
-        "",
-      )
-        .text(msg, true)
-        .build();
-      await ctx.updateCard(card);
-      return undefined;
-    }
+        try {
+          const gitea = await useGiteaSdk().role("admin");
+          await gitea.dispatchWorkflow(owner!, repo!, workflowPath, branch, inputs);
+        } catch (err) {
+          console.error("[wf:params] dispatchWorkflow error:", err);
+          const errObj = err as { data?: { message?: string }; message?: string };
+          const msg = errObj?.data?.message || errObj?.message || "触发工作流失败";
+          await updateCard(
+            new EnhancedCardBuilder({ title: "❌ 触发失败", theme: "red" }, "")
+              .text(msg, true)
+              .build(),
+          );
+          return;
+        }
 
-    // Build success card
-    const { EnhancedCardBuilder } = await import("~~/server/card-kit");
-    const resultCard = new EnhancedCardBuilder(
-      { title: "✅ 工作流已触发", theme: "green" },
-      "",
-    )
-      .text(
-        [
-          `**仓库**: ${repoFullName}`,
-          `**分支**: ${branch}`,
-          `**工作流**: ${workflowName}`,
-          Object.keys(inputs).length > 0
-            ? `**参数**: ${Object.entries(inputs).map(([k, v]) => `${k}=${v}`).join(", ")}`
-            : "",
-        ].filter(Boolean).join("\n"),
-        true,
-      )
-      .build();
-
-    await ctx.updateCard(resultCard);
-    return undefined;
+        await updateCard(
+          new EnhancedCardBuilder({ title: "✅ 工作流已触发", theme: "green" }, "")
+            .text(
+              [
+                `**仓库**: ${repoFullName}`,
+                `**分支**: ${branch}`,
+                `**工作流**: ${workflowName}`,
+                Object.keys(inputs).length > 0
+                  ? `**参数**: ${Object.entries(inputs).map(([k, v]) => `${k}=${v}`).join(", ")}`
+                  : "",
+              ].filter(Boolean).join("\n"),
+              true,
+            )
+            .build(),
+        );
+      },
+    );
   },
 });
