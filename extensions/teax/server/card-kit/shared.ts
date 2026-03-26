@@ -1,0 +1,212 @@
+/**
+ * card-kit 工具方法
+ *
+ * navigate / back / toast / asyncTask / guards / requireBinding / requireRepoPermission / renderCardPage
+ */
+
+import { encodeStackEntry } from "./stack";
+import { EnhancedCardBuilder } from "./builder";
+import type {
+  AsyncTaskResult,
+  BackResult,
+  CardInteractionContext,
+  CardJSON,
+  GuardResult,
+  NavigateOpts,
+  NavigateResult,
+  NavigationGuardContext,
+  ToastResult,
+} from "./types";
+
+// ─── renderCardPage（外部服务调用入口） ──────────────────────────
+
+/**
+ * 渲染指定卡片页面，自动处理 ensurePages + dispatch。
+ * 适用于机器人指令、链接处理等需要从外部获取卡片 JSON 的场景。
+ */
+export async function renderCardPage(
+  ctx: { openId: string },
+  page: string,
+  params?: Record<string, unknown>,
+): Promise<CardJSON | undefined> {
+  const { cardRouter, ensurePages } = await import("./index");
+  await ensurePages();
+  return cardRouter.dispatch({
+    openId: ctx.openId,
+    actionValue: JSON.stringify({
+      __stack: [encodeStackEntry(page, params ?? {})],
+    }),
+    token: "",
+    updateCard: async () => {},
+  });
+}
+
+// ─── navigate ──────────────────────────
+
+export function navigate(
+  page: string,
+  params: Record<string, unknown> = {},
+  opts?: NavigateOpts,
+): NavigateResult {
+  return {
+    __type: "navigate",
+    page,
+    params,
+    data: opts?.data,
+    newMessage: opts?.newMessage,
+    mode: opts?.mode,
+  };
+}
+
+// ─── back ──────────────────────────
+
+export function back(): BackResult {
+  return { __type: "back" };
+}
+
+// ─── toast ──────────────────────────
+
+export function toast(
+  type: "success" | "info" | "warning" | "error",
+  content: string,
+): ToastResult {
+  return {
+    __type: "toast",
+    type,
+    content,
+  };
+}
+
+// ─── asyncTask ──────────────────────────
+
+/**
+ * 创建异步任务结果：立即返回 loading 卡片，后台执行 task。
+ * task 内通过闭包访问 ctx.update 更新最终结果。
+ * @param loading - loading 提示文本（自动构建蓝色卡片）或完整的 CardJSON
+ * @param task - 后台异步任务
+ */
+export function asyncTask(
+  loading: string | CardJSON,
+  task: () => Promise<void>,
+): AsyncTaskResult {
+  const loadingCard = typeof loading === "string"
+    ? new EnhancedCardBuilder({ title: "⏳ 请稍候", theme: "blue" }, "")
+        .text(loading, true)
+        .build()
+    : loading;
+  return {
+    __type: "async_task",
+    loadingCard,
+    task,
+  };
+}
+
+// ─── 导航守卫工厂 ──────────────────────────
+
+type BeforeEnterGuard = (ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>;
+
+/**
+ * 组合多个 beforeEnter 守卫（类似 vue-router 数组守卫）。
+ * 按顺序执行，任一守卫拦截则停止。
+ */
+export function guards(...fns: BeforeEnterGuard[]): BeforeEnterGuard {
+  return async (ctx) => {
+    for (const fn of fns) {
+      const result = await fn(ctx);
+      if (result !== undefined && result !== true) return result;
+    }
+  };
+}
+
+/**
+ * 守卫：要求用户已绑定飞书账号。
+ * 未绑定时渲染"未绑定账号"提示卡片。
+ */
+export function requireBinding(): BeforeEnterGuard {
+  return async ({ openId }) => {
+    const { getActiveAccount } = await import("~~/server/services/account.service");
+    const user = await getActiveAccount(openId);
+    if (!user) {
+      const config = useRuntimeConfig();
+      const baseUrl = config.public.appUrl as string;
+      return new EnhancedCardBuilder({ title: "🔗 未绑定账号", theme: "orange" }, "")
+        .text(`请先在 Teax 中绑定飞书账号\n\n[前往绑定](${baseUrl}/user/settings)`, true)
+        .build();
+    }
+  };
+}
+
+/**
+ * 守卫：要求用户对仓库拥有指定权限。
+ * 从 params 中读取 owner/repo（或 repoFullName）定位仓库。
+ * @param permission - 权限标识，如 "actions:trigger"
+ */
+export function requireRepoPermission(permission: string): BeforeEnterGuard {
+  return async ({ openId, to }) => {
+    const { getActiveAccount } = await import("~~/server/services/account.service");
+    const { queryUserPermissionGroups, rowGrantsPermission } = await import("~~/server/utils/permission");
+    const { useDB, schema } = await import("~~/server/db");
+    const { eq } = await import("drizzle-orm");
+
+    const user = await getActiveAccount(openId);
+    if (!user) return; // requireBinding 应先执行
+
+    // 支持 params.owner + params.repo 或 params.repoFullName
+    let fullName: string;
+    if (to.params.owner && to.params.repo) {
+      fullName = `${to.params.owner}/${to.params.repo}`;
+    } else if (to.params.repoFullName) {
+      fullName = to.params.repoFullName as string;
+    } else {
+      return; // 无仓库信息，跳过
+    }
+
+    const db = useDB();
+    const [repoRecord] = await db
+      .select({ id: schema.repositories.id, organization_id: schema.repositories.organization_id })
+      .from(schema.repositories)
+      .where(eq(schema.repositories.full_name, fullName))
+      .limit(1);
+
+    if (!repoRecord) {
+      return new EnhancedCardBuilder({ title: "❌ 仓库不存在", theme: "red" }, "")
+        .text("该仓库未在系统中注册", true)
+        .build();
+    }
+
+    const groups = await queryUserPermissionGroups(user.id, repoRecord.organization_id);
+    const hasPermission = groups.some((g) => rowGrantsPermission(g, permission, repoRecord.id));
+    if (!hasPermission) {
+      return new EnhancedCardBuilder({ title: "❌ 无权限", theme: "red" }, "")
+        .text(`您没有执行此操作的权限 (${permission})`, true)
+        .build();
+    }
+  };
+}
+
+// ─── 卡片交互处理 ──────────────────────────
+
+export async function handleCardInteraction(
+  ctx: CardInteractionContext,
+): Promise<Record<string, unknown> | undefined> {
+  const { cardRouter, ensurePages } = await import("./index");
+  await ensurePages();
+  const formVal = (ctx.action.form_value ?? ctx.action.form_values) as
+    | Record<string, string>
+    | undefined;
+  const noop = async () => {};
+  const cardResult = await cardRouter.dispatch({
+    openId: ctx.openId,
+    actionValue: ctx.action.value,
+    formValue: formVal,
+    token: ctx.token,
+    updateCard: ctx.updateCard || noop,
+    sendCard: ctx.sendCard,
+  });
+  if (cardResult) {
+    if (ctx.updateCard) {
+      await ctx.updateCard(cardResult);
+    }
+  }
+  return undefined;
+}

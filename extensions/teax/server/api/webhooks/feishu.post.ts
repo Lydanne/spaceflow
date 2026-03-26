@@ -1,5 +1,5 @@
 import { verifyFeishuEventSignature } from "~~/server/utils/feishu-sdk";
-import { handleBotCommand, handleCardAction } from "~~/server/services/bot-command.service";
+import { handleBotMessage, handleCardInteraction, hasLinkMatch } from "~~/server/card-kit";
 import { handleFeishuApprovalEvent } from "~~/server/services/approval.service";
 
 interface FeishuEventPayload {
@@ -177,21 +177,14 @@ export default defineEventHandler(async (event) => {
     // 去除 @bot 的 mention 前缀
     textContent = textContent.replace(/@_user_\d+\s*/g, "").trim();
 
-    // 异步处理：先尝试链接处理器，再走命令处理
+    // 异步处理：统一走 handleBotMessage（内部先匹配链接，再匹配指令）
     (async () => {
-      const { handleLinkMessage } = await import("~~/server/utils/link-handler");
-      await import("~~/server/services/bot-link-handlers");
-      const linkHandled = await handleLinkMessage({
-        text: textContent,
-        senderOpenId: senderId,
-        messageId: msg.message_id,
-        chatId: msg.chat_id,
-        chatType: msg.chat_type,
-      });
-      if (linkHandled) return;
+      const { ensureCommands } = await import("~~/server/card-kit");
+      await ensureCommands();
 
-      if (!isTextMessage) return;
-      await handleBotCommand({
+      if (!isTextMessage && !hasLinkMatch(textContent)) return;
+
+      await handleBotMessage({
         messageId: msg.message_id,
         chatId: msg.chat_id,
         chatType: msg.chat_type,
@@ -223,7 +216,7 @@ export default defineEventHandler(async (event) => {
       try {
         const { sendFeishuCardMessage, replyFeishuCardMessage } = await import("~~/server/utils/feishu-sdk");
         // handleCardAction 内部会通过 updateCard 回调更新卡片
-        await handleCardAction({
+        await handleCardInteraction({
           action: action as Record<string, unknown>,
           openId,
           token,

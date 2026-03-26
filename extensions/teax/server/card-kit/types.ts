@@ -336,3 +336,11 @@ export interface EncodedValue {
   __formName?: string;
   __newMessage?: boolean;
 }
+
+export interface CardInteractionContext {
+  action: Record<string, unknown>;
+  openId: string;
+  token: string;
+  updateCard?: (card: Record<string, unknown>) => Promise<void>;
+  sendCard?: (card: Record<string, unknown>) => Promise<void>;
+}

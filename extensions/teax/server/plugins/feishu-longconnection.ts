@@ -189,32 +189,14 @@ async function handleMessageEvent(data: {
       `[feishu-ws] 📨 Message from ${senderId}: ${textContent || "(empty)"}`,
     );
 
-    // 1. 优先尝试链接处理器（支持 text 和 post 消息）
-    const { handleLinkMessage } = await import("~~/server/utils/link-handler");
-    // 确保 link handlers 已注册（触发 bot-link-handlers 模块加载）
-    await import("~~/server/services/bot-link-handlers");
-
-    const linkHandled = await handleLinkMessage({
-      text: textContent,
-      senderOpenId: senderId,
-      messageId: message.message_id,
-      chatId: message.chat_id,
-      chatType: message.chat_type,
-    });
-
-    if (linkHandled) {
+    // 确保命令已注册
+    const { ensureCommands, hasLinkMatch, handleBotMessage } = await import("~~/server/card-kit");
+    await ensureCommands();
+    if (!isTextMessage && !hasLinkMatch(textContent)) {
       return;
     }
 
-    // 2. 仅文本消息继续走命令处理
-    if (!isTextMessage) {
-      return;
-    }
-
-    // 调用指令处理(空文本也处理,用于显示控制面板)
-    const { handleBotCommand }
-      = await import("~~/server/services/bot-command.service");
-    await handleBotCommand({
+    await handleBotMessage({
       messageId: message.message_id,
       chatId: message.chat_id,
       chatType: message.chat_type,
@@ -270,14 +252,14 @@ async function handleCardActionEvent(
       cardUpdater = createCardUpdater("long", openMessageId);
     }
 
-    const { handleCardAction }
-      = await import("~~/server/services/bot-command.service");
+    const { handleCardInteraction }
+      = await import("~~/server/card-kit");
     const { sendFeishuCardMessage, replyFeishuCardMessage }
       = await import("~~/server/utils/feishu-sdk");
 
     // handleCardAction 内部会通过 updateCard 回调更新卡片，
     // 其返回值可能是 toast 等响应对象，需要透传给飞书。
-    const result = await handleCardAction({
+    const result = await handleCardInteraction({
       action: action as Record<string, unknown>,
       openId,
       token,
