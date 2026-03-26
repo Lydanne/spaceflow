@@ -61,13 +61,14 @@ export async function ensurePages(): Promise<void> {
 export function navigate(
   page: string,
   params: Record<string, unknown> = {},
-  opts?: { data?: Record<string, unknown> },
+  opts?: { data?: Record<string, unknown>; newMessage?: boolean },
 ): NavigateResult {
   return {
     __type: "navigate",
     page,
     params,
     data: opts?.data,
+    newMessage: opts?.newMessage,
   };
 }
 

@@ -221,12 +221,16 @@ export default defineEventHandler(async (event) => {
       }
 
       try {
+        const { sendFeishuCardMessage } = await import("~~/server/utils/feishu-sdk");
         // handleCardAction 内部会通过 updateCard 回调更新卡片
         await handleCardAction({
           action: action as Record<string, unknown>,
           openId,
           token,
           updateCard: cardUpdater?.updateCard,
+          sendCard: async (card) => {
+            await sendFeishuCardMessage(openId, card);
+          },
         });
 
         // 等待卡片更新完成后再返回

@@ -272,6 +272,8 @@ async function handleCardActionEvent(
 
     const { handleCardAction }
       = await import("~~/server/services/bot-command.service");
+    const { sendFeishuCardMessage }
+      = await import("~~/server/utils/feishu-sdk");
 
     // handleCardAction 内部会通过 updateCard 回调更新卡片，
     // 其返回值可能是 toast 等响应对象，需要透传给飞书。
@@ -280,6 +282,9 @@ async function handleCardActionEvent(
       openId,
       token,
       updateCard: cardUpdater?.updateCard,
+      sendCard: async (card) => {
+        await sendFeishuCardMessage(openId, card);
+      },
     });
 
     // 有显式返回值则透传（如 toast），否则返回空对象告诉飞书不做额外处理

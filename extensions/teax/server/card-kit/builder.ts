@@ -170,14 +170,18 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
 
   button(text: string, opts?: ButtonOpts): this {
     if (opts?.navigate) {
+      const navValue: Record<string, unknown> = {
+        __page: opts.navigate[0],
+        __params: opts.navigate[1] || {},
+      };
+      if (opts.navigate[2]?.newMessage) {
+        navValue.__newMessage = true;
+      }
       this.inner.addButtons([
         {
           text,
           type: opts.type,
-          value: {
-            __page: opts.navigate[0],
-            __params: opts.navigate[1] || {},
-          },
+          value: navValue,
           rawValue: true,
         },
       ]);
@@ -217,13 +221,17 @@ export class EnhancedCardBuilder implements EnhancedCardBuilderInterface {
 
     for (const btn of items) {
       if (btn.navigate) {
+        const navValue: Record<string, unknown> = {
+          __page: btn.navigate[0],
+          __params: btn.navigate[1] || {},
+        };
+        if (btn.navigate[2]?.newMessage) {
+          navValue.__newMessage = true;
+        }
         rawButtons.push({
           text: btn.text,
           type: btn.type,
-          value: {
-            __page: btn.navigate[0],
-            __params: btn.navigate[1] || {},
-          },
+          value: navValue,
           rawValue: true,
         });
       } else if (btn.url) {

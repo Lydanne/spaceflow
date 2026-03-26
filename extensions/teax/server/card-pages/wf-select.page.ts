@@ -114,6 +114,6 @@ export default defineCardPage({
       repoFullName,
       workflowPath: workflowData.path,
       workflowName: workflowData.name,
-    });
+    }, { newMessage: true });
   },
 });

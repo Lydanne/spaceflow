@@ -700,6 +700,8 @@ export interface CardActionContext {
   token: string;
   /** 可选的卡片更新回调，用于在处理过程中实时更新卡片 */
   updateCard?: (card: Record<string, unknown>) => Promise<void>;
+  /** 发送新卡片消息回调（newMessage 模式使用） */
+  sendCard?: (card: Record<string, unknown>) => Promise<void>;
 }
 
 export async function handleCardAction(
@@ -720,6 +722,7 @@ export async function handleCardAction(
     formValue: formVal,
     token: ctx.token,
     updateCard: updateCard || noop,
+    sendCard: ctx.sendCard,
   });
   if (cardResult) {
     if (updateCard) {

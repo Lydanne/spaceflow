@@ -121,11 +121,11 @@ export interface CardActionContext<
   /** 更新当前卡片 */
   update: (card: CardJSON) => Promise<void>;
   /**
-   * 异步跳转：渲染目标页面并 update。
+   * 异步跳转：渲染目标页面并 update（或 sendCard）。
    * 适用于 asyncTask task 内需要"跳转"到另一个页面的场景。
-   * 等价于：renderPage(page, params) → update(cardJSON)
+   * opts.newMessage 为 true 时发送新卡片消息而非更新当前卡片。
    */
-  navigate: (page: string, params?: Record<string, unknown>) => Promise<void>;
+  navigate: (page: string, params?: Record<string, unknown>, opts?: { newMessage?: boolean }) => Promise<void>;
 }
 
 // ─── 返回值 ──────────────────────────
@@ -136,6 +136,8 @@ export interface NavigateResult {
   page: string;
   params: Record<string, unknown>;
   data?: Record<string, unknown>;
+  /** 为 true 时发送新卡片消息而非更新当前卡片 */
+  newMessage?: boolean;
 }
 
 /** toast() 返回值 */
@@ -167,8 +169,8 @@ export type CardActionResult
 /** 按钮配置 */
 export interface ButtonOpts {
   type?: "default" | "primary" | "danger";
-  /** 跳转到指定页面 [pageName, params] */
-  navigate?: [string, Record<string, unknown>?];
+  /** 跳转到指定页面 [pageName, params?, opts?] */
+  navigate?: [string, Record<string, unknown>?, { newMessage?: boolean }?];
   /** 按钮行为标识，回调到当前页面 onAction */
   action?: string;
   /** 额外参数（与 action 配合使用） */
@@ -294,4 +296,5 @@ export interface EncodedValue {
   __action?: string;
   __data?: Record<string, unknown>;
   __formName?: string;
+  __newMessage?: boolean;
 }

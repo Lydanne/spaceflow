@@ -24,6 +24,8 @@ interface DispatchInput {
   token: string;
   /** 更新卡片回调 */
   updateCard: (card: CardJSON) => Promise<void>;
+  /** 发送新卡片消息回调（newMessage 模式使用） */
+  sendCard?: (card: CardJSON) => Promise<void>;
 }
 
 export class CardRouter {
@@ -109,7 +111,7 @@ export class CardRouter {
           formValue: input.formValue,
           formName: (encoded.__formName as string) || null,
         });
-        return this.handleActionResult(page, ctx, await page.onAction?.(ctx));
+        return this.handleActionResult(page, ctx, await page.onAction?.(ctx), input);
       }
 
       if (encoded.__action) {
@@ -123,7 +125,7 @@ export class CardRouter {
           formValue: null,
           formName: null,
         });
-        return this.handleActionResult(page, ctx, await page.onAction?.(ctx));
+        return this.handleActionResult(page, ctx, await page.onAction?.(ctx), input);
       }
 
       // ─── 纯 navigate ───
@@ -132,7 +134,14 @@ export class CardRouter {
         params,
         data,
       });
-      return page.render(renderCtx);
+      const card = await page.render(renderCtx);
+
+      // newMessage 模式：发送新卡片消息而非更新当前卡片
+      if (encoded.__newMessage && card && input.sendCard) {
+        await input.sendCard(card);
+        return undefined;
+      }
+      return card;
     } catch (err) {
       console.error(`[CardRouter] error in page "${encoded.__page}":`, err);
       return this.buildErrorCard(err);
@@ -200,6 +209,7 @@ export class CardRouter {
       formName: string | null;
       token: string;
       updateCard: (card: CardJSON) => Promise<void>;
+      sendCard?: (card: CardJSON) => Promise<void>;
     },
   ): CardActionContext {
     const pageName = page.name;
@@ -221,13 +231,17 @@ export class CardRouter {
       formName: opts.formName,
       token: opts.token,
       update: opts.updateCard,
-      navigate: async (targetPage: string, targetParams?: Record<string, unknown>) => {
+      navigate: async (targetPage: string, targetParams?: Record<string, unknown>, navOpts?: { newMessage?: boolean }) => {
         const card = await this.renderPage(targetPage, {
           openId: opts.openId,
           params: targetParams,
         });
         if (card) {
-          await opts.updateCard(card);
+          if (navOpts?.newMessage && opts.sendCard) {
+            await opts.sendCard(card);
+          } else {
+            await opts.updateCard(card);
+          }
         }
       },
     };
@@ -237,6 +251,7 @@ export class CardRouter {
     page: CardPageDef,
     ctx: CardActionContext,
     result: CardActionResult,
+    input?: DispatchInput,
   ): Promise<CardJSON | undefined> {
     if (!result) return undefined;
 
@@ -275,7 +290,14 @@ export class CardRouter {
         params: navResult.params,
         data: targetData,
       });
-      return targetPage.render(renderCtx);
+      const card = await targetPage.render(renderCtx);
+
+      // newMessage 模式：发送新卡片消息而非更新当前卡片
+      if (navResult.newMessage && card && input?.sendCard) {
+        await input.sendCard(card);
+        return undefined;
+      }
+      return card;
     }
 
     // AsyncTaskResult → 立即返回 loadingCard，后台执行 task
