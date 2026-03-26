@@ -13,6 +13,10 @@ export default defineCardPage({
       .card({ title: `📦 ${owner}/${repo}`, theme: "blue" })
       .text("**请选择功能**", true)
       .divider()
+      .button("🎯 Presets", {
+        type: "primary",
+        navigate: ["preset:list", { owner, repo }],
+      })
       .button("🚀 Actions", {
         type: "primary",
         navigate: ["cp:actions", { owner, repo }],
