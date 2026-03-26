@@ -1,7 +1,116 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { defineCardPage, guards, requireBinding, type EnhancedButtonConfig } from "~~/server/card-kit";
+import { defineCardPage, guards, requireBinding, type EnhancedButtonConfig, type CardRenderContext } from "~~/server/card-kit";
 import { getActiveAccountId } from "~~/server/utils/feishu-active-account";
+
+// ─── 单预设组渲染 ──────────────────────────
+
+async function renderSingleGroup(
+  ctx: CardRenderContext,
+  db: ReturnType<typeof useDB>,
+  baseUrl: string,
+  groupToken: string,
+  activeUserId: string,
+) {
+  // 通过 share_token 查询预设组
+  const [group] = await db
+    .select({
+      id: schema.workflowPresetGroups.id,
+      name: schema.workflowPresetGroups.name,
+      description: schema.workflowPresetGroups.description,
+      share_token: schema.workflowPresetGroups.share_token,
+    })
+    .from(schema.workflowPresetGroups)
+    .where(eq(schema.workflowPresetGroups.share_token, groupToken))
+    .limit(1);
+
+  if (!group) {
+    const card = ctx.card({ title: "❌ 预设组不存在", theme: "red" });
+    card.text("该预设组不存在或已被删除", true);
+    card.buttons([{ text: "⬅️ 返回", back: true }]);
+    return card.build();
+  }
+
+  // 查询组内预设（含锁定状态 + 锁定者用户名）
+  const presets = await db
+    .select({
+      id: schema.workflowPresets.id,
+      name: schema.workflowPresets.name,
+      share_token: schema.workflowPresets.share_token,
+      branch: schema.workflowPresets.branch,
+      workflow_path: schema.workflowPresets.workflow_path,
+      locked_by: schema.workflowPresets.locked_by,
+      locked_at: schema.workflowPresets.locked_at,
+      locker_username: schema.users.gitea_username,
+    })
+    .from(schema.workflowPresets)
+    .leftJoin(schema.users, eq(schema.workflowPresets.locked_by, schema.users.id))
+    .where(eq(schema.workflowPresets.group_id, group.id))
+    .limit(20);
+
+  // 分组：我正在使用 vs 其他
+  const myPresets = presets.filter((p) => p.locked_by === activeUserId);
+  const otherPresets = presets.filter((p) => p.locked_by !== activeUserId);
+
+  const card = ctx.card({ title: `📦 ${group.name}`, theme: "blue" });
+
+  if (group.description) {
+    card.text(group.description, true);
+    card.divider();
+  }
+
+  if (presets.length === 0) {
+    card.text("该预设组内暂无预设", true);
+  } else {
+    // 我正在使用的预设（置顶）
+    if (myPresets.length > 0) {
+      card.text("**🟢 我正在使用**", true);
+      for (const p of myPresets) {
+        card.buttons([{
+          text: `▶️ ${p.name} (${p.branch})`,
+          type: "primary",
+          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
+        }]);
+      }
+      card.divider();
+    }
+
+    // 其他预设
+    if (otherPresets.length > 0) {
+      if (myPresets.length > 0) {
+        card.text("**其他预设**", true);
+      }
+      for (const p of otherPresets) {
+        if (p.locked_by) {
+          // 被他人锁定
+          card.text(`🔒 **${p.name}** (${p.branch}) — 被 ${p.locker_username ?? "未知用户"} 使用中`, true);
+          card.buttons([{
+            text: `${p.name}`,
+            type: "default",
+            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
+          }]);
+        } else {
+          // 空闲
+          card.buttons([{
+            text: `🔵 ${p.name} (${p.branch})`,
+            type: "primary",
+            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
+          }]);
+        }
+      }
+    }
+  }
+
+  card.divider();
+  card.buttons([
+    { text: "⬅️ 返回", back: true },
+    { text: "在浏览器中打开", url: `${baseUrl}/workflow-groups/${groupToken}` },
+  ]);
+
+  return card.build();
+}
+
+// ─── 页面定义 ──────────────────────────
 
 export default defineCardPage({
   name: "preset-list",
@@ -21,6 +130,14 @@ export default defineCardPage({
         .text("请先在 Teax 中绑定飞书账号", true)
         .build();
     }
+
+    // ─── 单预设组模式（通过 groupToken 参数进入） ──────
+    const groupToken = ctx.params.groupToken as string | undefined;
+    if (groupToken) {
+      return renderSingleGroup(ctx, db, baseUrl, groupToken, activeUserId);
+    }
+
+    // ─── 完整列表模式 ──────
 
     // 获取用户所属的组织
     const userOrgs = await db

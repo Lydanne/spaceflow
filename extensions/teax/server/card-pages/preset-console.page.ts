@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { defineCardPage, navigate, asyncTask, EnhancedCardBuilder, requireBinding } from "~~/server/card-kit";
+import { defineCardPage, navigate, asyncTask, toast, EnhancedCardBuilder, requireBinding } from "~~/server/card-kit";
+import { getActiveAccountId } from "~~/server/utils/feishu-active-account";
 import { resolvePresetByShareToken } from "~~/server/utils/resolve-preset";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { dispatchAndPoll, buildDispatchErrorCard, buildTriggerResultCard, fetchWorkflowFormData, renderWorkflowForm } from "~~/server/utils/workflow-trigger";
@@ -58,17 +59,62 @@ export default defineCardPage({
       lockedValues: preset.inputs as Record<string, unknown>,
     });
 
-    // 底部链接
+    // 锁定状态提示
+    const activeUserId = await getActiveAccountId(ctx.openId);
+    if (preset.group_id && preset.locked_by) {
+      card.divider();
+      if (preset.locked_by === activeUserId) {
+        const unlockText = preset.auto_unlock_at
+          ? `自动解锁: ${new Date(preset.auto_unlock_at).toLocaleString("zh-CN")}`
+          : "手动解锁";
+        card.text(`🔒 已锁定（${unlockText}）`, true);
+      } else {
+        const db = useDB();
+        const [locker] = await db
+          .select({ name: schema.users.gitea_username })
+          .from(schema.users)
+          .where(eq(schema.users.id, preset.locked_by))
+          .limit(1);
+        card.text(`🔒 已被 **${locker?.name ?? "未知用户"}** 锁定`, true);
+      }
+    }
+
+    // 底部按钮
     const config = useRuntimeConfig();
     const presetUrl = `${config.public.appUrl}/workflows/${preset.share_token}`;
     card.divider();
-    card.button("🔗 查看预设详情", { url: presetUrl });
+
+    if (preset.group_id && preset.locked_by === activeUserId) {
+      card.buttons([
+        { text: "� 解锁", type: "danger", action: "unlock" },
+        { text: "🔗 查看详情", url: presetUrl },
+      ]);
+    } else {
+      card.button("�� 查看预设详情", { url: presetUrl });
+    }
 
     return card.build();
   },
 
   async onAction(ctx) {
     const shareToken = ctx.params.shareToken as string;
+
+    // 处理解锁操作
+    if (ctx.action === "unlock") {
+      const activeUserId = await getActiveAccountId(ctx.openId);
+      if (!activeUserId) return navigate("preset-console", { shareToken });
+
+      const db = useDB();
+      await db
+        .update(schema.workflowPresets)
+        .set({ locked_by: null, locked_at: null, auto_unlock_at: null })
+        .where(
+          eq(schema.workflowPresets.share_token, shareToken),
+        );
+
+      return toast("success", "✅ 已解锁");
+    }
+
     const formValue = ctx.formValue || {};
 
     // 1. Resolve preset

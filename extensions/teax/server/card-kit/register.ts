@@ -123,6 +123,7 @@ export async function ensureCommands(): Promise<void> {
     import("~~/server/card-commands/run.cmd"),
     import("~~/server/card-commands/test-form.cmd"),
     import("~~/server/card-commands/preset-link.cmd"),
+    import("~~/server/card-commands/preset-group-link.cmd"),
   ]);
   for (const mod of mods) {
     const def = mod.default;
