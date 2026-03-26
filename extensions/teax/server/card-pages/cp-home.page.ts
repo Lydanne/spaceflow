@@ -3,7 +3,7 @@ import { useDB, schema } from "~~/server/db";
 import { defineCardPage } from "~~/server/card-kit";
 
 export default defineCardPage({
-  name: "cp:home",
+  name: "cp-home",
 
   async render(ctx) {
     const db = useDB();
@@ -53,7 +53,7 @@ export default defineCardPage({
 
     for (const org of userOrgs) {
       card.button(`📁 ${org.org_name}`, {
-        navigate: ["cp:repos", { orgName: org.org_name }],
+        navigate: ["cp-repos", { orgName: org.org_name }],
       });
     }
 

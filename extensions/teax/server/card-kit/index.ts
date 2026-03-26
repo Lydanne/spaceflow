@@ -1,10 +1,12 @@
 import { CardRouter } from "./router";
 import type {
   AsyncTaskResult,
+  BackResult,
   CardActionResult,
   CardJSON,
   CardPageDef,
   GuardResult,
+  NavigateOpts,
   NavigateResult,
   NavigationGuardContext,
   ToastResult,
@@ -37,8 +39,8 @@ export interface BotCommandContext {
 /**
  * 创建一个 handler，自动绑定到指定的 card-page
  * 用法：
- *   handler: bindRoute("preset:list")  // 无参数
- *   handler: bindRoute("preset:console", args => ({ shareToken: args[0] }))  // 动态参数
+ *   handler: bindRoute("preset-list")  // 无参数
+ *   handler: bindRoute("preset-console", args => ({ shareToken: args[0] }))  // 动态参数
  */
 export function bindRoute(
   page: string,
@@ -51,8 +53,7 @@ export function bindRoute(
     const card = await cardRouter.dispatch({
       openId: ctx.senderOpenId,
       actionValue: JSON.stringify({
-        __page: page,
-        __params: params,
+        __stack: [{ page, params }],
       }),
       token: "",
       updateCard: async () => {},
@@ -108,7 +109,7 @@ export async function ensurePages(): Promise<void> {
 export function navigate(
   page: string,
   params: Record<string, unknown> = {},
-  opts?: { data?: Record<string, unknown>; newMessage?: boolean },
+  opts?: NavigateOpts,
 ): NavigateResult {
   return {
     __type: "navigate",
@@ -116,7 +117,14 @@ export function navigate(
     params,
     data: opts?.data,
     newMessage: opts?.newMessage,
+    mode: opts?.mode,
   };
+}
+
+// ─── back ──────────────────────────
+
+export function back(): BackResult {
+  return { __type: "back" };
 }
 
 // ─── toast ──────────────────────────
@@ -243,17 +251,22 @@ export function requireRepoPermission(permission: string): BeforeEnterGuard {
 
 export type {
   AsyncTaskResult,
+  BackResult,
   CardActionResult,
   CardJSON,
   CardPageDef,
   GuardResult,
+  NavigateOpts,
   NavigateResult,
   NavigationGuardContext,
+  StackEntry,
   ToastResult,
 };
 
 export type {
+  ButtonNavigateOpts,
   ButtonOpts,
+  ButtonType,
   CardActionContext,
   CardConfig,
   CardElement,
@@ -267,5 +280,6 @@ export type {
   SelectConfig,
 } from "./types";
 
-export { EnhancedCardBuilder, ColumnBuilder, ColumnSetBuilder } from "./builder";
+export { EnhancedCardBuilder, ColumnBuilder, ColumnSetBuilder, MAX_STACK_DEPTH } from "./builder";
 export { CardRouter } from "./router";
+export type { DispatchInput } from "./router";

@@ -1,7 +1,7 @@
 import { defineCardPage } from "~~/server/card-kit";
 
 export default defineCardPage({
-  name: "cp:feature",
+  name: "cp-feature",
 
   async render(ctx) {
     const owner = ctx.params.owner as string;
@@ -18,7 +18,7 @@ export default defineCardPage({
       .text(`**${label}**\n\n[在浏览器中打开](${url})`, true)
       .divider()
       .button("⬅️ 返回", {
-        navigate: ["cp:repo-menu", { owner, repo }],
+        navigate: ["cp-repo-menu", { owner, repo }],
       })
       .build();
   },

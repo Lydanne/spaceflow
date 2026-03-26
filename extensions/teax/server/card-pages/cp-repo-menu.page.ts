@@ -1,7 +1,7 @@
 import { defineCardPage } from "~~/server/card-kit";
 
 export default defineCardPage({
-  name: "cp:repo-menu",
+  name: "cp-repo-menu",
 
   async render(ctx) {
     const owner = ctx.params.owner as string;
@@ -15,20 +15,20 @@ export default defineCardPage({
       .divider()
       .button("🎯 Presets", {
         type: "primary",
-        navigate: ["preset:list", { owner, repo }],
+        navigate: ["preset-list", { owner, repo }],
       })
       .button("🚀 Actions", {
         type: "primary",
-        navigate: ["cp:actions", { owner, repo }],
+        navigate: ["cp-actions", { owner, repo }],
       })
       .button("🤖 Agents", {
-        navigate: ["cp:feature", { owner, repo, feature: "agents" }],
+        navigate: ["cp-feature", { owner, repo, feature: "agents" }],
       })
       .button("📄 Pages", {
-        navigate: ["cp:feature", { owner, repo, feature: "pages" }],
+        navigate: ["cp-feature", { owner, repo, feature: "pages" }],
       })
       .button("⚙️ 设置", {
-        navigate: ["cp:feature", { owner, repo, feature: "settings" }],
+        navigate: ["cp-feature", { owner, repo, feature: "settings" }],
       })
       .divider()
       .text(`**快捷链接**\n[在网页中打开](${baseUrl}/${owner}/${repo})`, true)
@@ -36,11 +36,11 @@ export default defineCardPage({
       .buttons([
         {
           text: "⬅️ 返回仓库列表",
-          navigate: ["cp:repos", { orgName: owner }],
+          navigate: ["cp-repos", { orgName: owner }],
         },
         {
           text: "🏠 返回首页",
-          navigate: ["cp:home"],
+          navigate: ["cp-home"],
         },
       ])
       .build();

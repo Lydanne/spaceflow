@@ -1,7 +1,7 @@
 import { defineCardPage } from "~~/server/card-kit";
 
 export default defineCardPage({
-  name: "account:guide",
+  name: "account-guide",
 
   async render(ctx) {
     const config = useRuntimeConfig();
@@ -16,7 +16,7 @@ export default defineCardPage({
       .divider()
       .text(`[立即前往绑定](${baseUrl}/user/settings)`, true)
       .divider()
-      .button("⬅️ 返回", { navigate: ["account:home"] })
+      .button("⬅️ 返回", { navigate: ["account-home"] })
       .build();
   },
 });

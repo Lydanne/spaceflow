@@ -5,7 +5,7 @@ import { useGiteaSdk, botLogin } from "~~/server/utils/gitea";
 import { buildDispatchErrorCard, buildTriggerResultCard, fetchWorkflowFormData, renderWorkflowForm } from "~~/server/utils/workflow-trigger";
 
 export default defineCardPage({
-  name: "wf:params",
+  name: "wf-params",
 
   async render(ctx) {
     const repoFullName = ctx.params.repoFullName as string;
@@ -58,7 +58,7 @@ export default defineCardPage({
 
     const branch = formValue.branch;
     if (!branch) {
-      return navigate("wf:params", {
+      return navigate("wf-params", {
         repoFullName,
         workflowPath,
         workflowName,
@@ -80,7 +80,7 @@ export default defineCardPage({
           const gitea = await useGiteaSdk(botLogin(ctx.openId)).role("fallback-admin");
           await gitea.dispatchWorkflow(owner!, repo!, workflowPath, branch, inputs);
         } catch (err) {
-          console.error("[wf:params] dispatchWorkflow error:", err);
+          console.error("[wf-params] dispatchWorkflow error:", err);
           await ctx.update(buildDispatchErrorCard(err));
           return;
         }

@@ -26,7 +26,7 @@ function createMockEvent(userId: string) {
 }
 
 export default defineCardPage({
-  name: "approval:pending",
+  name: "approval-pending",
 
   async render(ctx) {
     const flowId = ctx.params.flowId as string;
@@ -171,7 +171,7 @@ export default defineCardPage({
         }
       }
     } catch (err) {
-      console.error("[approval:pending] action error:", err);
+      console.error("[approval-pending] action error:", err);
       const errorMessage = err instanceof Error ? err.message : "操作失败";
       const { EnhancedCardBuilder } = await import("~~/server/card-kit");
       const errorCard = new EnhancedCardBuilder(

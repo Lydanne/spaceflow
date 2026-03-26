@@ -3,7 +3,7 @@ import { useGiteaSdk, botLogin } from "~~/server/utils/gitea";
 import { dispatchAndPoll, buildDispatchErrorCard, buildTriggerResultCard, fetchWorkflowFormData, renderWorkflowForm } from "~~/server/utils/workflow-trigger";
 
 export default defineCardPage({
-  name: "cp:trigger-wf",
+  name: "cp-trigger-wf",
 
   beforeEnter: guards(
     requireBinding(),
@@ -27,7 +27,7 @@ export default defineCardPage({
     renderWorkflowForm(card, formData, { formName: "trigger_wf_form", submitText: "🚀 触发" });
 
     card.divider();
-    card.button("⬅️ 返回", { navigate: ["cp:actions", { owner, repo }] });
+    card.button("⬅️ 返回", { navigate: ["cp-actions", { owner, repo }] });
 
     return card.build();
   },
@@ -58,7 +58,7 @@ export default defineCardPage({
         try {
           result = await dispatchAndPoll(giteaService, { owner, repo, workflowFileName, branch, inputs });
         } catch (err) {
-          console.error("[cp:trigger-wf] dispatchWorkflow error:", err);
+          console.error("[cp-trigger-wf] dispatchWorkflow error:", err);
           await ctx.update(buildDispatchErrorCard(err));
           return;
         }

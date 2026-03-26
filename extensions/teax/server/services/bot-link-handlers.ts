@@ -22,8 +22,7 @@ registerLinkRoute(
       const card = await cardRouter.dispatch({
         openId: ctx.senderOpenId,
         actionValue: JSON.stringify({
-          __page: "preset:console",
-          __params: { shareToken: token },
+          __stack: [{ page: "preset-console", params: { shareToken: token } }],
         }),
         token: "",
         updateCard: async () => {},

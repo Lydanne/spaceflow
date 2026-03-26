@@ -4,7 +4,7 @@ import { defineCardPage, navigate } from "~~/server/card-kit";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 
 export default defineCardPage({
-  name: "wf:select",
+  name: "wf-select",
 
   async render(ctx) {
     const repoFullName = ctx.params.repoFullName as string;
@@ -100,17 +100,17 @@ export default defineCardPage({
     const workflowJson = formValue.workflow;
 
     if (!workflowJson) {
-      return navigate("wf:select", { repoFullName });
+      return navigate("wf-select", { repoFullName });
     }
 
     let workflowData: { path: string; name: string };
     try {
       workflowData = JSON.parse(workflowJson) as { path: string; name: string };
     } catch {
-      return navigate("wf:select", { repoFullName });
+      return navigate("wf-select", { repoFullName });
     }
 
-    return navigate("wf:params", {
+    return navigate("wf-params", {
       repoFullName,
       workflowPath: workflowData.path,
       workflowName: workflowData.name,

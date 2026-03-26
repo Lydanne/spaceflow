@@ -1,7 +1,7 @@
 import { defineCardPage } from "~~/server/card-kit";
 
 export default defineCardPage({
-  name: "account:unbound",
+  name: "account-unbound",
 
   async render(ctx) {
     const username = ctx.params.username as string | undefined;
@@ -17,7 +17,7 @@ export default defineCardPage({
       .divider()
       .button("📖 查看绑定教程", {
         type: "primary",
-        navigate: ["account:guide"],
+        navigate: ["account-guide"],
       })
       .build();
   },

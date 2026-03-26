@@ -7,7 +7,7 @@ import {
 } from "~~/server/utils/feishu-active-account";
 
 export default defineCardPage({
-  name: "account:home",
+  name: "account-home",
 
   async render(ctx) {
     const db = useDB();
@@ -39,7 +39,7 @@ export default defineCardPage({
         .divider()
         .button("📖 查看绑定教程", {
           type: "primary",
-          navigate: ["account:guide"],
+          navigate: ["account-guide"],
         })
         .build();
     }
@@ -132,7 +132,7 @@ export default defineCardPage({
       {
         text: "➕ 绑定更多账户",
         type: "primary",
-        navigate: ["account:guide"],
+        navigate: ["account-guide"],
       },
     ]);
 
@@ -144,7 +144,7 @@ export default defineCardPage({
 
     switch (ctx.action) {
       case "refresh": {
-        return navigate("account:home");
+        return navigate("account-home");
       }
 
       case "switch_account": {
@@ -153,7 +153,7 @@ export default defineCardPage({
         if (userId) {
           await setActiveAccountId(ctx.openId, userId);
         }
-        return navigate("account:home", { switchedTo: username });
+        return navigate("account-home", { switchedTo: username });
       }
 
       case "unbind_feishu": {
@@ -177,11 +177,11 @@ export default defineCardPage({
           .limit(1);
 
         if (remaining.length > 0) {
-          return navigate("account:home");
+          return navigate("account-home");
         }
 
         // 所有绑定都已解除 — 显示解绑成功页
-        return navigate("account:unbound", {
+        return navigate("account-unbound", {
           username: ctx.params.username,
         });
       }

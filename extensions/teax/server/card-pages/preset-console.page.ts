@@ -15,7 +15,7 @@ async function checkUserPermission(userId: string, orgId: string, permission: st
 }
 
 export default defineCardPage({
-  name: "preset:console",
+  name: "preset-console",
 
   beforeEnter: requireBinding(),
 
@@ -76,7 +76,7 @@ export default defineCardPage({
     try {
       resolved = await resolvePresetByShareToken(shareToken);
     } catch {
-      return navigate("preset:console", { shareToken });
+      return navigate("preset-console", { shareToken });
     }
     const { preset, repo, owner, repoName } = resolved;
 
@@ -175,7 +175,7 @@ export default defineCardPage({
             inputs: finalInputs as Record<string, string | number | boolean>,
           });
         } catch (err) {
-          console.error("[preset:console] dispatchWorkflow error:", err);
+          console.error("[preset-console] dispatchWorkflow error:", err);
           await updateCard(buildDispatchErrorCard(err));
           return;
         }

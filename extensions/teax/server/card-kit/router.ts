@@ -1,6 +1,7 @@
-import { EnhancedCardBuilder } from "./builder";
+import { EnhancedCardBuilder, MAX_STACK_DEPTH } from "./builder";
 import type {
   AsyncTaskResult,
+  BackResult,
   CardActionContext,
   CardActionResult,
   CardConfig,
@@ -11,9 +12,19 @@ import type {
   GuardResult,
   NavigateResult,
   NavigationGuardContext,
+  StackEntry,
+  ToastResult,
 } from "./types";
 
-interface DispatchInput {
+/** 类型辨别：判断 CardActionResult 的 __type */
+function isResultType<T extends { __type: string }>(
+  result: CardActionResult,
+  type: T["__type"],
+): result is T {
+  return typeof result === "object" && result !== null && "__type" in result && (result as T).__type === type;
+}
+
+export interface DispatchInput {
   /** 用户 open_id */
   openId: string;
   /** action.value（JSON 字符串或对象） */
@@ -31,6 +42,9 @@ interface DispatchInput {
 export class CardRouter {
   private pages = new Map<string, CardPageDef>();
   private globalBeforeEach: Array<(ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>> = [];
+
+  /** 开启后在卡片底部渲染内部调试数据（stack、params、data 等） */
+  debug = true;
 
   get pageCount(): number {
     return this.pages.size;
@@ -77,18 +91,23 @@ export class CardRouter {
    */
   async dispatch(input: DispatchInput): Promise<CardJSON | undefined> {
     const encoded = this.parseValue(input.actionValue);
-    if (!encoded || !encoded.__page) {
+    if (!encoded || !encoded.__stack || encoded.__stack.length === 0) {
       return undefined;
     }
 
-    const page = this.pages.get(encoded.__page);
+    // 栈顶 = 当前/目标页面
+    const current = encoded.__stack[encoded.__stack.length - 1]!;
+    // 历史栈 = 栈顶之下的所有项
+    const stack = encoded.__stack.slice(0, -1);
+
+    const page = this.pages.get(current.page);
     if (!page) {
-      console.warn(`[CardRouter] page "${encoded.__page}" not found`);
+      console.warn(`[CardRouter] page "${current.page}" not found`);
       return undefined;
     }
 
     try {
-      const params = encoded.__params || {};
+      const params = current.params || {};
       const data = this.resolveData(page, encoded);
 
       // ─── beforeEnter 守卫 ───
@@ -106,12 +125,14 @@ export class CardRouter {
           ...input,
           params,
           data,
+          stack,
           type: "form_submit",
           action: "form_submit",
           formValue: input.formValue,
           formName: (encoded.__formName as string) || null,
         });
-        return this.handleActionResult(page, ctx, await page.onAction?.(ctx), input);
+        const card = await this.handleActionResult(page, ctx, await page.onAction?.(ctx), input);
+        return this.injectDebug(card, { stack: encoded.__stack, action: "form_submit", data: encoded.__data });
       }
 
       if (encoded.__action) {
@@ -120,12 +141,14 @@ export class CardRouter {
           ...input,
           params,
           data,
+          stack,
           type: "button",
           action: encoded.__action,
           formValue: null,
           formName: null,
         });
-        return this.handleActionResult(page, ctx, await page.onAction?.(ctx), input);
+        const card = await this.handleActionResult(page, ctx, await page.onAction?.(ctx), input);
+        return this.injectDebug(card, { stack: encoded.__stack, action: encoded.__action, data: encoded.__data });
       }
 
       // ─── 纯 navigate ───
@@ -133,6 +156,7 @@ export class CardRouter {
         openId: input.openId,
         params,
         data,
+        stack,
       });
       const card = await page.render(renderCtx);
 
@@ -141,9 +165,9 @@ export class CardRouter {
         await input.sendCard(card);
         return undefined;
       }
-      return card;
+      return this.injectDebug(card, { stack: encoded.__stack, action: encoded.__action, data: encoded.__data });
     } catch (err) {
-      console.error(`[CardRouter] error in page "${encoded.__page}":`, err);
+      console.error(`[CardRouter] error in page "${current.page}":`, err);
       return this.buildErrorCard(err);
     }
   }
@@ -163,7 +187,7 @@ export class CardRouter {
       }
     }
 
-    if (typeof current === "object" && current !== null && "__page" in current) {
+    if (typeof current === "object" && current !== null && "__stack" in current) {
       return current as EncodedValue;
     }
 
@@ -186,14 +210,17 @@ export class CardRouter {
       openId: string;
       params: Record<string, unknown>;
       data: Record<string, unknown>;
+      stack?: StackEntry[];
     },
   ): CardRenderContext {
+    const stack = opts.stack ?? [];
     return {
       openId: opts.openId,
       params: opts.params,
       data: opts.data,
+      stack,
       card: (config: CardConfig) =>
-        new EnhancedCardBuilder(config, page.name, opts.data, opts.params),
+        new EnhancedCardBuilder(config, page.name, opts.data, opts.params, stack),
     };
   }
 
@@ -203,6 +230,7 @@ export class CardRouter {
       openId: string;
       params: Record<string, unknown>;
       data: Record<string, unknown>;
+      stack?: StackEntry[];
       type: "button" | "form_submit";
       action: string;
       formValue: Record<string, string> | null;
@@ -213,12 +241,14 @@ export class CardRouter {
     },
   ): CardActionContext {
     const pageName = page.name;
+    const stack = opts.stack ?? [];
     return {
       openId: opts.openId,
       params: opts.params,
       data: opts.data,
+      stack,
       card: (config: CardConfig) =>
-        new EnhancedCardBuilder(config, pageName, opts.data),
+        new EnhancedCardBuilder(config, pageName, opts.data, opts.params, stack),
       type: opts.type,
       action: opts.action,
       setData: (partial) => ({
@@ -244,6 +274,17 @@ export class CardRouter {
           }
         }
       },
+      back: async () => {
+        if (stack.length === 0) return;
+        const target = stack[stack.length - 1]!;
+        const card = await this.renderPage(target.page, {
+          openId: opts.openId,
+          params: target.params,
+        });
+        if (card) {
+          await opts.updateCard(card);
+        }
+      },
     };
   }
 
@@ -255,13 +296,27 @@ export class CardRouter {
   ): Promise<CardJSON | undefined> {
     if (!result) return undefined;
 
+    // BackResult → pop 栈顶并渲染
+    if (isResultType<BackResult>(result, "back")) {
+      const stack = ctx.stack as StackEntry[];
+      if (stack.length === 0) return undefined;
+      const target = stack[stack.length - 1]!;
+      const backStack = stack.slice(0, -1);
+      const targetPage = this.pages.get(target.page);
+      if (!targetPage) return undefined;
+      const targetData = targetPage.data?.() ?? {};
+      const renderCtx = this.buildRenderContext(targetPage, {
+        openId: ctx.openId,
+        params: target.params || {},
+        data: targetData,
+        stack: backStack,
+      });
+      return targetPage.render(renderCtx);
+    }
+
     // NavigateResult → beforeLeave + beforeEnter + 调用目标页面的 render
-    if (
-      typeof result === "object"
-      && "__type" in result
-      && result.__type === "navigate"
-    ) {
-      const navResult = result as NavigateResult;
+    if (isResultType<NavigateResult>(result, "navigate")) {
+      const navResult = result;
       const targetPage = this.pages.get(navResult.page);
       if (!targetPage) {
         console.warn(`[CardRouter] navigate target "${navResult.page}" not found`);
@@ -284,11 +339,19 @@ export class CardRouter {
       const enterBlocked = await this.runBeforeEnter(targetPage, guardCtx);
       if (enterBlocked !== undefined) return enterBlocked;
 
+      // 构建目标页面的栈
+      let targetStack = ctx.stack as StackEntry[];
+      if (navResult.mode === "push") {
+        targetStack = [...targetStack, { page: page.name, params: ctx.params }];
+        if (targetStack.length > MAX_STACK_DEPTH) targetStack = targetStack.slice(-MAX_STACK_DEPTH);
+      }
+
       const targetData = navResult.data ?? targetPage.data?.() ?? {};
       const renderCtx = this.buildRenderContext(targetPage, {
         openId: ctx.openId,
         params: navResult.params,
         data: targetData,
+        stack: targetStack,
       });
       const card = await targetPage.render(renderCtx);
 
@@ -301,12 +364,8 @@ export class CardRouter {
     }
 
     // AsyncTaskResult → 立即返回 loadingCard，后台执行 task
-    if (
-      typeof result === "object"
-      && "__type" in result
-      && result.__type === "async_task"
-    ) {
-      const asyncResult = result as AsyncTaskResult;
+    if (isResultType<AsyncTaskResult>(result, "async_task")) {
+      const asyncResult = result;
       asyncResult.task().catch((err) => {
         console.error(`[CardRouter] async task error:`, err);
       });
@@ -314,11 +373,7 @@ export class CardRouter {
     }
 
     // ToastResult → 返回飞书 toast 格式
-    if (
-      typeof result === "object"
-      && "__type" in result
-      && result.__type === "toast"
-    ) {
+    if (isResultType<ToastResult>(result, "toast")) {
       return {
         toast: {
           type: result.type,
@@ -376,8 +431,9 @@ export class CardRouter {
     // NavigateResult → 重定向
     if (
       typeof guardResult === "object"
+      && guardResult !== null
       && "__type" in guardResult
-      && guardResult.__type === "navigate"
+      && (guardResult as NavigateResult).__type === "navigate"
     ) {
       const navResult = guardResult as NavigateResult;
       const redirectPage = this.pages.get(navResult.page);
@@ -396,6 +452,35 @@ export class CardRouter {
     }
     // CardJSON → 替代卡片
     return { blocked: true, card: guardResult as CardJSON };
+  }
+
+  /** debug 模式：在卡片底部追加内部数据 */
+  private injectDebug(
+    card: CardJSON | undefined,
+    info: { stack?: StackEntry[]; action?: string; data?: Record<string, unknown> },
+  ): CardJSON | undefined {
+    if (!this.debug || !card) return card;
+
+    const debugObj: Record<string, unknown> = { stack: info.stack };
+    if (info.action) debugObj.action = info.action;
+    if (info.data && Object.keys(info.data).length > 0) debugObj.data = info.data;
+
+    const debugElements = [
+      { tag: "hr" },
+      {
+        tag: "div",
+        text: { tag: "lark_md", content: `🐛 **Debug**\n\`\`\`json\n${JSON.stringify(debugObj, null, 2)}\n\`\`\`` },
+      },
+    ];
+
+    // JSON 2.0: body.elements / JSON 1.0: elements
+    const body = card.body as Record<string, unknown> | undefined;
+    if (body && Array.isArray(body.elements)) {
+      body.elements.push(...debugElements);
+    } else if (Array.isArray(card.elements)) {
+      (card.elements as unknown[]).push(...debugElements);
+    }
+    return card;
   }
 
   private buildErrorCard(err: unknown): CardJSON {

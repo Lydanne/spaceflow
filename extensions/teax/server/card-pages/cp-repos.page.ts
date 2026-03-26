@@ -3,7 +3,7 @@ import { useDB, schema } from "~~/server/db";
 import { defineCardPage } from "~~/server/card-kit";
 
 export default defineCardPage({
-  name: "cp:repos",
+  name: "cp-repos",
 
   async render(ctx) {
     const orgName = ctx.params.orgName as string;
@@ -39,7 +39,7 @@ export default defineCardPage({
         .card({ title: `📁 ${orgName}`, theme: "blue" })
         .text("该组织还没有仓库", true)
         .divider()
-        .button("⬅️ 返回", { navigate: ["cp:home"] })
+        .button("⬅️ 返回", { navigate: ["cp-home"] })
         .build();
     }
 
@@ -49,12 +49,12 @@ export default defineCardPage({
 
     for (const repo of repos) {
       card.button(`📦 ${repo.name}`, {
-        navigate: ["cp:repo-menu", { owner: orgName, repo: repo.name }],
+        navigate: ["cp-repo-menu", { owner: orgName, repo: repo.name }],
       });
     }
 
     card.divider();
-    card.button("⬅️ 返回", { navigate: ["cp:home"] });
+    card.button("⬅️ 返回", { navigate: ["cp-home"] });
 
     return card.build();
   },

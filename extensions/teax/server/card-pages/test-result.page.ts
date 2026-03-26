@@ -1,7 +1,7 @@
 import { defineCardPage, navigate } from "~~/server/card-kit";
 
 export default defineCardPage({
-  name: "test:result",
+  name: "test-result",
 
   async render(ctx) {
     const username = ctx.params.username as string || "(未填写)";
@@ -24,13 +24,13 @@ export default defineCardPage({
       .divider()
       .text(`*原始 form_value：*\n\`\`\`${raw}\`\`\``, true)
       .divider()
-      .button("🔄 重新填写", { navigate: ["test:form"] })
+      .button("🔄 重新填写", { navigate: ["test-form"] })
       .build();
   },
 
   async onAction(ctx) {
     if (ctx.action === "back_to_form") {
-      return navigate("test:form");
+      return navigate("test-form");
     }
   },
 });

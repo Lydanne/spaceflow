@@ -16,6 +16,19 @@ export interface CardElement {
   [key: string]: unknown;
 }
 
+// ─── 页面栈 ──────────────────────────
+
+/** 页面栈条目（记录页面名+参数，用于 back() 返回） */
+export interface StackEntry {
+  page: string;
+  params?: Record<string, unknown>;
+}
+
+/** back() 返回值，从栈中弹出上一页并渲染 */
+export interface BackResult {
+  __type: "back";
+}
+
 // ─── 导航守卫 ──────────────────────────
 
 /** 导航守卫上下文（类似 vue-router 的 to/from） */
@@ -43,7 +56,7 @@ export type GuardResult = boolean | CardJSON | NavigateResult | undefined;
 export interface CardPageDef<
   D extends Record<string, unknown> = Record<string, unknown>,
 > {
-  /** 页面唯一标识，作为路由地址。建议格式: "module:page"，如 "cp:home" */
+  /** 页面唯一标识，作为路由地址。建议格式: "module-page"，如 "cp-home" */
   name: string;
 
   /**
@@ -97,6 +110,8 @@ export interface CardRenderContext<
   data: D;
   /** 创建 EnhancedCardBuilder，自动绑定 pageName + data */
   card: (config: CardConfig) => EnhancedCardBuilderInterface;
+  /** 当前页面栈（只读） */
+  stack: readonly StackEntry[];
 }
 
 /** 交互上下文（按钮点击 + 表单提交统一） */
@@ -126,6 +141,8 @@ export interface CardActionContext<
    * opts.newMessage 为 true 时发送新卡片消息而非更新当前卡片。
    */
   navigate: (page: string, params?: Record<string, unknown>, opts?: { newMessage?: boolean }) => Promise<void>;
+  /** 返回上一页（pop 栈顶，渲染并 update） */
+  back: () => Promise<void>;
 }
 
 // ─── 返回值 ──────────────────────────
@@ -138,6 +155,8 @@ export interface NavigateResult {
   data?: Record<string, unknown>;
   /** 为 true 时发送新卡片消息而非更新当前卡片 */
   newMessage?: boolean;
+  /** push: 将当前页面压入栈（可 back 返回）；replace: 不压栈（默认） */
+  mode?: "push" | "replace";
 }
 
 /** toast() 返回值 */
@@ -159,6 +178,7 @@ export interface AsyncTaskResult {
 /** onAction 的返回值 */
 export type CardActionResult
   = | NavigateResult
+    | BackResult
     | ToastResult
     | AsyncTaskResult
     | CardJSON
@@ -166,22 +186,41 @@ export type CardActionResult
 
 // ─── Builder 配置 ──────────────────────────
 
+/** 按钮类型 */
+export type ButtonType = "default" | "primary" | "danger";
+
+/** navigate 按钮的选项（元组第三参数） */
+export interface ButtonNavigateOpts {
+  newMessage?: boolean;
+  mode?: "push" | "replace";
+}
+
 /** 按钮配置 */
 export interface ButtonOpts {
-  type?: "default" | "primary" | "danger";
+  type?: ButtonType;
   /** 跳转到指定页面 [pageName, params?, opts?] */
-  navigate?: [string, Record<string, unknown>?, { newMessage?: boolean }?];
+  navigate?: [string, Record<string, unknown>?, ButtonNavigateOpts?];
   /** 按钮行为标识，回调到当前页面 onAction */
   action?: string;
   /** 额外参数（与 action 配合使用） */
   params?: Record<string, unknown>;
   /** 打开外部链接，不触发回调 */
   url?: string;
+  /** 返回上一页（从栈中 pop） */
+  back?: boolean;
 }
 
 /** 批量按钮配置 */
 export interface EnhancedButtonConfig extends ButtonOpts {
   text: string;
+}
+
+/** navigate() 辅助函数选项 */
+export interface NavigateOpts {
+  data?: Record<string, unknown>;
+  newMessage?: boolean;
+  /** push: 将当前页面压入栈；replace: 不压栈（默认） */
+  mode?: "push" | "replace";
 }
 
 /** 输入框配置 */
@@ -265,6 +304,8 @@ export interface EnhancedCardBuilderInterface {
   }): this;
   button(text: string, opts?: ButtonOpts): this;
   buttons(items: EnhancedButtonConfig[]): this;
+  /** 返回上一页按钮（从栈中 pop，栈为空时不渲染） */
+  backButton(text?: string, opts?: { type?: ButtonType }): this;
   build(): CardJSON;
 }
 
@@ -291,8 +332,8 @@ export interface ColumnSetBuilderInterface {
 // ─── value 编码保留字段 ──────────────────────────
 
 export interface EncodedValue {
-  __page: string;
-  __params?: Record<string, unknown>;
+  /** 页面栈，栈顶（最后一项）= 当前/目标页面 */
+  __stack: StackEntry[];
   __action?: string;
   __data?: Record<string, unknown>;
   __formName?: string;

@@ -1,10 +1,10 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { defineCardPage, guards, requireBinding } from "~~/server/card-kit";
+import { defineCardPage, guards, requireBinding, type EnhancedButtonConfig } from "~~/server/card-kit";
 import { getActiveAccountId } from "~~/server/utils/feishu-active-account";
 
 export default defineCardPage({
-  name: "preset:list",
+  name: "preset-list",
 
   beforeEnter: guards(requireBinding()),
 
@@ -166,12 +166,12 @@ export default defineCardPage({
       card.text("**🌐 组织内公开预设**", true);
       card.divider();
 
-      const btns = publicPresets.map((p) => {
+      const btns: EnhancedButtonConfig[] = publicPresets.map((p) => {
         const repo = p.repository?.full_name ?? "";
         return {
           text: `${p.name} (${repo})`,
-          type: "primary" as const,
-          navigate: ["preset:console", { shareToken: p.share_token }, { newMessage: true }] as [string, Record<string, unknown>, { newMessage: boolean }],
+          type: "primary",
+          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
         };
       });
       for (let i = 0; i < btns.length; i += 2) {
@@ -190,12 +190,12 @@ export default defineCardPage({
         card.text(`**${g.name}**${g.description ? ` ${g.description}` : ""}`, true);
 
         // 预设按钮（每行2个）
-        const btns = presets.slice(0, 4).map((p) => {
+        const btns: EnhancedButtonConfig[] = presets.slice(0, 4).map((p) => {
           const wf = p.workflow_path.replace(/^\.gitea\/workflows\/|\.ya?ml$/gi, "");
           return {
             text: `${p.name} (${p.branch})`,
-            type: "primary" as const,
-            navigate: ["preset:console", { shareToken: p.share_token }, { newMessage: true }] as [string, Record<string, unknown>, { newMessage: boolean }],
+            type: "primary",
+            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
           };
         });
         for (let i = 0; i < btns.length; i += 2) {
@@ -209,12 +209,12 @@ export default defineCardPage({
     if (standalonePresets.length > 0) {
       card.text("**独立预设**", true);
 
-      const btns = standalonePresets.map((p) => {
+      const btns: EnhancedButtonConfig[] = standalonePresets.map((p) => {
         const repo = p.repository?.full_name ?? "";
         return {
           text: `${p.name} (${repo} ${p.branch})`,
-          type: "primary" as const,
-          navigate: ["preset:console", { shareToken: p.share_token }, { newMessage: true }] as [string, Record<string, unknown>, { newMessage: boolean }],
+          type: "primary",
+          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: true }],
         };
       });
       for (let i = 0; i < btns.length; i += 2) {

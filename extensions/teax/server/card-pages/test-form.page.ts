@@ -1,7 +1,7 @@
 import { defineCardPage, navigate } from "~~/server/card-kit";
 
 export default defineCardPage({
-  name: "test:form",
+  name: "test-form",
 
   async render(_ctx) {
     return _ctx
@@ -75,7 +75,7 @@ export default defineCardPage({
         ? priorityMap[priorityKey] || priorityKey
         : "(未选择)";
 
-      return navigate("test:result", {
+      return navigate("test-result", {
         username,
         password,
         address,

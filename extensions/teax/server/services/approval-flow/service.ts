@@ -289,8 +289,7 @@ async function sendApprovalCard(
       const card = await cardRouter.dispatch({
         openId,
         actionValue: JSON.stringify({
-          __page: "approval:pending",
-          __params: { flowId: flow.id },
+          __stack: [{ page: "approval-pending", params: { flowId: flow.id } }],
         }),
         token: "",
         updateCard: async () => {},

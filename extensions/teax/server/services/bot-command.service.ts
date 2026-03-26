@@ -43,7 +43,7 @@ registerCommand({
   aliases: ["/account", "账户", "我的账户"],
   description: "查看账户信息和飞书绑定状态",
   usage: "/account",
-  handler: bindRoute("account:home"),
+  handler: bindRoute("account-home"),
 });
 
 // ─── /status <owner/repo> ────────────────────────────────
@@ -67,7 +67,7 @@ registerCommand({
   aliases: ["/actions", "工作流"],
   description: "触发仓库工作流(交互式)",
   usage: "/actions <owner/repo>",
-  handler: bindRoute("wf:select", (args) => {
+  handler: bindRoute("wf-select", (args) => {
     const repoFullName = args[0];
     if (!repoFullName?.includes("/")) return undefined;
     return { repoFullName };
@@ -121,7 +121,7 @@ registerCommand({
   aliases: ["/presets", "预设", "工作流预设"],
   description: "查看我的工作流预设",
   usage: "/presets",
-  handler: bindRoute("preset:list"),
+  handler: bindRoute("preset-list"),
 });
 
 // ─── /run <token> ──────────────────────────────────────────
@@ -131,7 +131,7 @@ registerCommand({
   aliases: ["/run", "运行"],
   description: "通过预设 Token 触发工作流",
   usage: "/run <preset_token>",
-  handler: bindRoute("preset:console", (args) => {
+  handler: bindRoute("preset-console", (args) => {
     const token = args[0];
     if (!token) return undefined;
     return { shareToken: token };
@@ -145,7 +145,7 @@ registerCommand({
   aliases: ["/test-form", "测试表单"],
   description: "测试飞书卡片 JSON 2.0 表单组件",
   usage: "/test-form",
-  handler: bindRoute("test:form"),
+  handler: bindRoute("test-form"),
 });
 
 // ─── 卡片交互处理 ─────────────────────────────────────────
@@ -200,7 +200,7 @@ export async function handleBotCommand(ctx: BotCommandContext): Promise<void> {
     await ensurePages();
     const card = await cardRouter.dispatch({
       openId: ctx.senderOpenId,
-      actionValue: JSON.stringify({ __page: "cp:home" }),
+      actionValue: JSON.stringify({ __stack: [{ page: "cp-home" }] }),
       token: "",
       updateCard: async () => {},
     });

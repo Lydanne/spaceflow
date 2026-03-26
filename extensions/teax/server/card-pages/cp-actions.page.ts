@@ -1,4 +1,4 @@
-import { defineCardPage } from "~~/server/card-kit";
+import { defineCardPage, type EnhancedButtonConfig } from "~~/server/card-kit";
 import { useGiteaSdk, botLogin } from "~~/server/utils/gitea";
 
 function getStatusEmoji(status: string, conclusion: string | null): string {
@@ -20,7 +20,7 @@ function formatTimeAgo(dateStr: string): string {
 }
 
 export default defineCardPage({
-  name: "cp:actions",
+  name: "cp-actions",
 
   async render(ctx) {
     const owner = ctx.params.owner as string;
@@ -52,7 +52,7 @@ export default defineCardPage({
       const wfResponse = await giteaService.getRepoWorkflows(owner, repo);
       workflows = wfResponse.workflows ?? [];
     } catch (error) {
-      console.error("[cp:actions] Failed to fetch data:", error);
+      console.error("[cp-actions] Failed to fetch data:", error);
     }
 
     const card = ctx.card({
@@ -66,10 +66,10 @@ export default defineCardPage({
       card.divider();
 
       // 显示可用的 workflow 按钮
-      const workflowButtons = workflows.map((wf) => ({
+      const workflowButtons: EnhancedButtonConfig[] = workflows.map((wf) => ({
         text: wf.name.replace(/\.ya?ml$/, ""),
-        type: "default" as const,
-        navigate: ["cp:trigger-wf", { owner, repo, workflowPath: wf.path }, { newMessage: true }] as [string, Record<string, unknown>, { newMessage: boolean }],
+        type: "default",
+        navigate: ["cp-trigger-wf", { owner, repo, workflowPath: wf.path }, { newMessage: true }],
       }));
 
       // 每4个一组显示按钮
@@ -111,7 +111,7 @@ export default defineCardPage({
 
     card.divider();
     card.button("⬅️ 返回", {
-      navigate: ["cp:repo-menu", { owner, repo }],
+      navigate: ["cp-repo-menu", { owner, repo }],
     });
 
     return card.build();
