@@ -36,15 +36,18 @@ export interface BotCommandContext {
 
 /**
  * 创建一个 handler，自动绑定到指定的 card-page
- * 用法：handler: bindRoute("preset:list")
+ * 用法：
+ *   handler: bindRoute("preset:list")  // 无参数
+ *   handler: bindRoute("preset:console", args => ({ shareToken: args[0] }))  // 动态参数
  */
 export function bindRoute(
   page: string,
-  params?: Record<string, unknown>,
-): (ctx: BotCommandContext, _args: string[]) => Promise<void> {
-  return async (ctx, _args) => {
+  paramsFromArgs?: (args: string[]) => Record<string, unknown> | undefined,
+): (ctx: BotCommandContext, args: string[]) => Promise<void> {
+  return async (ctx, args) => {
     const { replyFeishuCardMessage } = await import("~~/server/services/messaging");
     await ensurePages();
+    const params = paramsFromArgs?.(args);
     const card = await cardRouter.dispatch({
       openId: ctx.senderOpenId,
       actionValue: JSON.stringify({
@@ -84,6 +87,13 @@ export async function ensurePages(): Promise<void> {
     import("~~/server/card-pages/wf-select.page"),
     import("~~/server/card-pages/wf-params.page"),
     import("~~/server/card-pages/approval-pending.page"),
+    // 新增的 card-pages
+    import("~~/server/card-pages/help.page"),
+    import("~~/server/card-pages/status.page"),
+    import("~~/server/card-pages/repos.page"),
+    import("~~/server/card-pages/orgs.page"),
+    import("~~/server/card-pages/notify.page"),
+    import("~~/server/card-pages/approvals.page"),
   ]);
   for (const mod of pages) {
     const def = mod.default;
