@@ -87,6 +87,7 @@ export async function ensurePages(): Promise<void> {
     import("~~/server/card-pages/test-result.page"),
     import("~~/server/card-pages/preset-console.page"),
     import("~~/server/card-pages/preset-list.page"),
+    import("~~/server/card-pages/preset-group.page"),
     import("~~/server/card-pages/wf-select.page"),
     import("~~/server/card-pages/wf-params.page"),
     import("~~/server/card-pages/approval-pending.page"),

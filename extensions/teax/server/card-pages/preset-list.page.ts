@@ -1,114 +1,27 @@
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { defineCardPage, guards, requireBinding, type EnhancedButtonConfig, type CardRenderContext } from "~~/server/card-kit";
+import { defineCardPage, guards, requireBinding, type EnhancedButtonConfig } from "~~/server/card-kit";
 import { getActiveAccountId } from "~~/server/utils/feishu-active-account";
 
-// ─── 单预设组渲染 ──────────────────────────
-
-async function renderSingleGroup(
-  ctx: CardRenderContext,
-  db: ReturnType<typeof useDB>,
-  baseUrl: string,
-  groupToken: string,
+function getPresetStatus(
   activeUserId: string,
-) {
-  // 通过 share_token 查询预设组
-  const [group] = await db
-    .select({
-      id: schema.workflowPresetGroups.id,
-      name: schema.workflowPresetGroups.name,
-      description: schema.workflowPresetGroups.description,
-      share_token: schema.workflowPresetGroups.share_token,
-    })
-    .from(schema.workflowPresetGroups)
-    .where(eq(schema.workflowPresetGroups.share_token, groupToken))
-    .limit(1);
-
-  if (!group) {
-    const card = ctx.card({ title: "❌ 预设组不存在", theme: "red" });
-    card.text("该预设组不存在或已被删除", true);
-    card.systemButtons();
-    return card.build();
+  lockedBy: string | null,
+  lockerUsername: string | null,
+): { emoji: string; label: string; rank: number } {
+  if (lockedBy === activeUserId) {
+    return { emoji: "🟢", label: "我正在使用", rank: 0 };
   }
-
-  // 查询组内预设（含锁定状态 + 锁定者用户名）
-  const presets = await db
-    .select({
-      id: schema.workflowPresets.id,
-      name: schema.workflowPresets.name,
-      share_token: schema.workflowPresets.share_token,
-      branch: schema.workflowPresets.branch,
-      workflow_path: schema.workflowPresets.workflow_path,
-      locked_by: schema.workflowPresets.locked_by,
-      locked_at: schema.workflowPresets.locked_at,
-      locker_username: schema.users.gitea_username,
-    })
-    .from(schema.workflowPresets)
-    .leftJoin(schema.users, eq(schema.workflowPresets.locked_by, schema.users.id))
-    .where(eq(schema.workflowPresets.group_id, group.id))
-    .limit(20);
-
-  // 分组：我正在使用 vs 其他
-  const myPresets = presets.filter((p) => p.locked_by === activeUserId);
-  const otherPresets = presets.filter((p) => p.locked_by !== activeUserId);
-
-  const card = ctx.card({ title: `📦 ${group.name}`, theme: "blue" });
-
-  if (group.description) {
-    card.text(group.description, true);
-    card.divider();
+  if (lockedBy) {
+    return {
+      emoji: "🔒",
+      label: `被 ${lockerUsername ?? "其他成员"} 使用中`,
+      rank: 2,
+    };
   }
-
-  if (presets.length === 0) {
-    card.text("该预设组内暂无预设", true);
-  } else {
-    // 我正在使用的预设（置顶）
-    if (myPresets.length > 0) {
-      card.text("**🟢 我正在使用**", true);
-      for (const p of myPresets) {
-        card.buttons([{
-          text: `▶️ ${p.name} (${p.branch})`,
-          type: "primary",
-          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
-        }]);
-      }
-      card.divider();
-    }
-
-    // 其他预设
-    if (otherPresets.length > 0) {
-      if (myPresets.length > 0) {
-        card.text("**其他预设**", true);
-      }
-      for (const p of otherPresets) {
-        if (p.locked_by) {
-          // 被他人锁定
-          card.text(`🔒 **${p.name}** (${p.branch}) — 被 ${p.locker_username ?? "未知用户"} 使用中`, true);
-          card.buttons([{
-            text: `${p.name}`,
-            type: "default",
-            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
-          }]);
-        } else {
-          // 空闲
-          card.buttons([{
-            text: `🔵 ${p.name} (${p.branch})`,
-            type: "primary",
-            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
-          }]);
-        }
-      }
-    }
-  }
-
-  card.systemButtons([
-    { text: "在浏览器中打开", url: `${baseUrl}/workflow-groups/${groupToken}` },
-  ]);
-
-  return card.build();
+  return { emoji: "⚪", label: "空闲可用", rank: 1 };
 }
 
-// ─── 页面定义 ──────────────────────────
+// ─── 控制面板入口场景 ──────────────────────────
 
 export default defineCardPage({
   name: "preset-list",
@@ -119,6 +32,9 @@ export default defineCardPage({
     const db = useDB();
     const config = useRuntimeConfig();
     const baseUrl = config.public.appUrl;
+    const owner = ctx.params.owner as string | undefined;
+    const repo = ctx.params.repo as string | undefined;
+    const repoFullName = owner && repo ? `${owner}/${repo}` : undefined;
 
     // 获取当前活跃账户 ID
     const activeUserId = await getActiveAccountId(ctx.openId);
@@ -128,14 +44,6 @@ export default defineCardPage({
         .text("请先在 Teax 中绑定飞书账号", true)
         .build();
     }
-
-    // ─── 单预设组模式（通过 groupToken 参数进入） ──────
-    const groupToken = ctx.params.groupToken as string | undefined;
-    if (groupToken) {
-      return renderSingleGroup(ctx, db, baseUrl, groupToken, activeUserId);
-    }
-
-    // ─── 完整列表模式 ──────
 
     // 获取用户所属的组织
     const userOrgs = await db
@@ -150,7 +58,7 @@ export default defineCardPage({
 
     const userOrgIds = userOrgs.map((o) => o.id);
 
-    // 查询用户的预设组
+    // 查询我的预设组
     const groups = await db
       .select({
         id: schema.workflowPresetGroups.id,
@@ -160,50 +68,46 @@ export default defineCardPage({
       })
       .from(schema.workflowPresetGroups)
       .where(eq(schema.workflowPresetGroups.created_by, activeUserId))
-      .limit(10);
+      .limit(12);
 
-    // 查询预设组内的预设
     const groupIds = groups.map((g) => g.id);
     let groupPresets: Array<{
-      id: string;
       name: string;
-      share_token: string;
-      group_id: string | null;
       branch: string;
-      workflow_path: string;
+      group_id: string | null;
+      locked_by: string | null;
+      locker_username: string | null;
     }> = [];
     if (groupIds.length > 0) {
       groupPresets = await db
         .select({
-          id: schema.workflowPresets.id,
           name: schema.workflowPresets.name,
-          share_token: schema.workflowPresets.share_token,
-          group_id: schema.workflowPresets.group_id,
           branch: schema.workflowPresets.branch,
-          workflow_path: schema.workflowPresets.workflow_path,
+          group_id: schema.workflowPresets.group_id,
+          locked_by: schema.workflowPresets.locked_by,
+          locker_username: schema.users.gitea_username,
         })
         .from(schema.workflowPresets)
+        .leftJoin(schema.users, eq(schema.workflowPresets.locked_by, schema.users.id))
         .where(inArray(schema.workflowPresets.group_id, groupIds))
-        .limit(50);
+        .limit(160);
     }
 
-    // 按 group_id 分组
     const presetsByGroup = new Map<string, typeof groupPresets>();
-    for (const p of groupPresets) {
-      if (!p.group_id) continue;
-      const list = presetsByGroup.get(p.group_id) ?? [];
-      list.push(p);
-      presetsByGroup.set(p.group_id, list);
+    for (const preset of groupPresets) {
+      if (!preset.group_id) continue;
+      const list = presetsByGroup.get(preset.group_id) ?? [];
+      list.push(preset);
+      presetsByGroup.set(preset.group_id, list);
     }
 
-    // 查询独立预设 (group_id IS NULL 且是用户创建的)
+    // 查询独立预设
     const standalonePresets = await db
       .select({
         id: schema.workflowPresets.id,
         name: schema.workflowPresets.name,
         share_token: schema.workflowPresets.share_token,
         branch: schema.workflowPresets.branch,
-        workflow_path: schema.workflowPresets.workflow_path,
         repository: {
           full_name: schema.repositories.full_name,
         },
@@ -221,16 +125,13 @@ export default defineCardPage({
       )
       .limit(10);
 
-    // 查询组内公开的预设（is_public = true 且 organization_id 在用户所属组织内）
+    // 查询组织公开预设
     let publicPresets: Array<{
       id: string;
       name: string;
       share_token: string;
       branch: string;
-      workflow_path: string;
-      created_by: string | null;
       repository: { full_name: string };
-      organization: { name: string; full_name: string | null };
     }> = [];
     if (userOrgIds.length > 0) {
       publicPresets = await db
@@ -239,36 +140,38 @@ export default defineCardPage({
           name: schema.workflowPresets.name,
           share_token: schema.workflowPresets.share_token,
           branch: schema.workflowPresets.branch,
-          workflow_path: schema.workflowPresets.workflow_path,
-          created_by: schema.workflowPresets.created_by,
           repository: { full_name: schema.repositories.full_name },
-          organization: {
-            name: schema.organizations.name,
-            full_name: schema.organizations.full_name,
-          },
         })
         .from(schema.workflowPresets)
         .innerJoin(
           schema.repositories,
           eq(schema.workflowPresets.repository_id, schema.repositories.id),
         )
-        .innerJoin(
-          schema.organizations,
-          eq(schema.workflowPresets.organization_id, schema.organizations.id),
-        )
         .where(
           and(
             eq(schema.workflowPresets.is_public, true),
             inArray(schema.workflowPresets.organization_id, userOrgIds),
-            isNull(schema.workflowPresets.group_id), // 只查独立预设，组内预设在组级别处理
+            isNull(schema.workflowPresets.group_id),
           ),
         )
-        .limit(20);
+        .limit(10);
     }
 
-    const card = ctx.card({ title: "📦 工作流预设", theme: "blue" });
+    const card = ctx.card({
+      title: repoFullName ? `🎯 ${repoFullName} · 预设面板` : "🎯 预设面板",
+      theme: "blue",
+    });
 
-    // 空状态
+    if (repoFullName) {
+      card.text("**场景：从控制面板进入**", true);
+      card.buttons([{
+        text: "选择当前仓库工作流",
+        type: "primary",
+        navigate: ["wf-select", { repoFullName }, { newMessage: false }],
+      }]);
+      card.divider();
+    }
+
     if (groups.length === 0 && standalonePresets.length === 0 && publicPresets.length === 0) {
       card.text("暂无预设\n\n预设可保存常用工作流配置，一键触发", true);
       card.systemButtons([
@@ -277,66 +180,77 @@ export default defineCardPage({
       return card.build();
     }
 
-    // 组内公开预设（放在最上面）
-    if (publicPresets.length > 0) {
-      card.text("**🌐 组织内公开预设**", true);
-      card.divider();
+    card.text("**我的预设组**", true);
+    card.divider();
 
-      const btns: EnhancedButtonConfig[] = publicPresets.map((p) => {
-        const repo = p.repository?.full_name ?? "";
-        return {
-          text: `${p.name} (${repo})`,
-          type: "primary",
-          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
-        };
-      });
-      for (let i = 0; i < btns.length; i += 2) {
-        card.buttons(btns.slice(i, i + 2));
-      }
-      card.divider();
-    }
-
-    // 预设组：组名 + 预设按钮
-    if (groups.length > 0) {
-      for (const g of groups) {
-        const presets = presetsByGroup.get(g.id) ?? [];
-        if (presets.length === 0) continue;
-
-        // 组名
-        card.text(`**${g.name}**${g.description ? ` ${g.description}` : ""}`, true);
-
-        // 预设按钮（每行2个）
-        const btns: EnhancedButtonConfig[] = presets.slice(0, 4).map((p) => {
-          const wf = p.workflow_path.replace(/^\.gitea\/workflows\/|\.ya?ml$/gi, "");
-          return {
-            text: `${p.name} (${p.branch})`,
-            type: "primary",
-            navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
-          };
+    if (groups.length === 0) {
+      card.text("暂无预设组", true);
+    } else {
+      const groupButtons: EnhancedButtonConfig[] = [];
+      for (const group of groups) {
+        const groupItems = (presetsByGroup.get(group.id) ?? []).sort((a, b) => {
+          const aStatus = getPresetStatus(activeUserId, a.locked_by, a.locker_username);
+          const bStatus = getPresetStatus(activeUserId, b.locked_by, b.locker_username);
+          if (aStatus.rank !== bStatus.rank) {
+            return aStatus.rank - bStatus.rank;
+          }
+          return a.name.localeCompare(b.name, "zh-CN");
         });
-        for (let i = 0; i < btns.length; i += 2) {
-          card.buttons(btns.slice(i, i + 2));
-        }
-        card.divider();
+
+        const summary = groupItems.reduce((acc, item) => {
+          const status = getPresetStatus(activeUserId, item.locked_by, item.locker_username);
+          if (status.rank === 0) acc.mine += 1;
+          else if (status.rank === 1) acc.idle += 1;
+          else acc.busy += 1;
+          return acc;
+        }, { mine: 0, idle: 0, busy: 0 });
+
+        groupButtons.push({
+          text: `📁 ${group.name} (🟢${summary.mine}/⚪${summary.idle}/🔒${summary.busy})`,
+          type: "default",
+          navigate: ["preset-group", { groupToken: group.share_token }, { newMessage: false }],
+        });
+      }
+
+      for (let i = 0; i < groupButtons.length; i += 2) {
+        card.buttons(groupButtons.slice(i, i + 2));
       }
     }
 
-    // 独立预设：按钮显示仓库+分支
-    if (standalonePresets.length > 0) {
-      card.text("**独立预设**", true);
-
-      const btns: EnhancedButtonConfig[] = standalonePresets.map((p) => {
-        const repo = p.repository?.full_name ?? "";
+    card.divider();
+    card.text("**独立预设**", true);
+    if (standalonePresets.length === 0) {
+      card.text("暂无独立预设", true);
+    } else {
+      const standaloneButtons: EnhancedButtonConfig[] = standalonePresets.map((preset) => {
+        const repoName = preset.repository?.full_name ?? "";
         return {
-          text: `${p.name} (${repo} ${p.branch})`,
+          text: `📌 ${preset.name} (${repoName} ${preset.branch})`,
           type: "primary",
-          navigate: ["preset-console", { shareToken: p.share_token }, { newMessage: false }],
+          navigate: ["preset-console", { shareToken: preset.share_token }, { newMessage: false }],
         };
       });
-      for (let i = 0; i < btns.length; i += 2) {
-        card.buttons(btns.slice(i, i + 2));
+      for (let i = 0; i < standaloneButtons.length; i += 2) {
+        card.buttons(standaloneButtons.slice(i, i + 2));
       }
-      card.divider();
+    }
+
+    card.divider();
+    card.text("**组织公开预设**", true);
+    if (publicPresets.length === 0) {
+      card.text("暂无组织公开预设", true);
+    } else {
+      const publicButtons: EnhancedButtonConfig[] = publicPresets.map((preset) => {
+        const repoName = preset.repository?.full_name ?? "";
+        return {
+          text: `🌐 ${preset.name} (${repoName} ${preset.branch})`,
+          type: "default",
+          navigate: ["preset-console", { shareToken: preset.share_token }, { newMessage: false }],
+        };
+      });
+      for (let i = 0; i < publicButtons.length; i += 2) {
+        card.buttons(publicButtons.slice(i, i + 2));
+      }
     }
 
     card.systemButtons([
