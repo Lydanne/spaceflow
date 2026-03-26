@@ -152,7 +152,7 @@ export interface NavigateResult {
   data?: Record<string, unknown>;
   /** 为 true 时发送新卡片消息而非更新当前卡片 */
   newMessage?: boolean;
-  /** push: 将当前页面压入栈（可 back 返回）；replace: 不压栈（默认） */
+  /** push: 将当前页面压入栈（默认，可 back 返回）；replace: 不压栈 */
   mode?: "push" | "replace";
 }
 
@@ -218,7 +218,7 @@ export interface EnhancedButtonConfig extends ButtonOpts {
 export interface NavigateOpts {
   data?: Record<string, unknown>;
   newMessage?: boolean;
-  /** push: 将当前页面压入栈；replace: 不压栈（默认） */
+  /** push: 将当前页面压入栈（默认）；replace: 不压栈 */
   mode?: "push" | "replace";
 }
 

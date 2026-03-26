@@ -45,7 +45,7 @@ export default defineCardPage({
         .card({ title: "❌ 参数缺失", theme: "red" })
         .text("缺少预设组标识", true)
         .button("返回预设组列表", {
-          navigate: ["preset-list", {}, { newMessage: false }],
+          navigate: ["preset-list", {}, { newMessage: false, mode: "push" }],
         })
         .build();
     }
@@ -66,7 +66,7 @@ export default defineCardPage({
         .card({ title: "❌ 预设组不存在", theme: "red" })
         .text("该预设组不存在或已被删除", true)
         .button("返回预设组列表", {
-          navigate: ["preset-list", {}, { newMessage: false }],
+          navigate: ["preset-list", {}, { newMessage: false, mode: "push" }],
         })
         .build();
     }
@@ -123,7 +123,7 @@ export default defineCardPage({
         return {
           text: `${status.emoji} ${preset.name} · ${preset.branch}`,
           type: status.rank === 2 ? "default" : "primary",
-          navigate: ["preset-console", { shareToken: preset.share_token }, { newMessage: false }],
+          navigate: ["preset-console", { shareToken: preset.share_token }, { newMessage: false, mode: "push" }],
         };
       });
 

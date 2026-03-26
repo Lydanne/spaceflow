@@ -257,8 +257,8 @@ export default defineCardPage({
       const publicButtons: EnhancedButtonConfig[] = publicItems.map((item) => {
         const emoji = item.kind === "group" ? "📁" : "📌";
         const navigate: EnhancedButtonConfig["navigate"] = item.kind === "group"
-          ? ["preset-group", { groupToken: item.share_token }, { newMessage: false }]
-          : ["preset-console", { shareToken: item.share_token }, { newMessage: false }];
+          ? ["preset-group", { groupToken: item.share_token }, { newMessage: false, mode: "push" }]
+          : ["preset-console", { shareToken: item.share_token }, { newMessage: false, mode: "push" }];
         const repoMeta = item.kind === "group"
           ? `🟡${item.summary.busy}/🟢${item.summary.mine}/⚪${item.summary.idle}`
           : `${item.repo_name} ${item.branch}`;
@@ -303,7 +303,7 @@ export default defineCardPage({
         groupButtons.push({
           text: `📁 ${group.name} (🟡${summary.busy}/🟢${summary.mine}/⚪${summary.idle})`,
           type: "default",
-          navigate: ["preset-group", { groupToken: group.share_token }, { newMessage: false }],
+          navigate: ["preset-group", { groupToken: group.share_token }, { newMessage: false, mode: "push" }],
         });
       }
 
@@ -322,7 +322,7 @@ export default defineCardPage({
         return {
           text: `📌 ${preset.name} (${repoName} ${preset.branch})`,
           type: "default",
-          navigate: ["preset-console", { shareToken: preset.share_token }, { newMessage: false }],
+          navigate: ["preset-console", { shareToken: preset.share_token }, { newMessage: false, mode: "push" }],
         };
       });
       for (let i = 0; i < standaloneButtons.length; i += 2) {

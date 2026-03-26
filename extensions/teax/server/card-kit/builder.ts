@@ -37,8 +37,8 @@ function buildNavValue(
 ): Record<string, unknown> {
   const target = encodeStackEntry(nav[0], nav[1]);
   let stack: StackEntry[];
-  if (nav[2]?.mode === "push") {
-    // push: 保留历史栈 + 当前页面 + 目标页面
+  if (nav[2]?.mode !== "replace") {
+    // 默认 push: 保留历史栈 + 当前页面 + 目标页面
     stack = [...ctx.stack, encodeStackEntry(ctx.pageName, ctx.params), target];
     stack = stack.slice(-MAX_STACK_DEPTH);
   } else {
