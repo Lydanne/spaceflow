@@ -146,6 +146,7 @@ const showCreateGroupModal = ref(false);
 const groupName = ref("");
 const groupDescription = ref("");
 const groupAutoUnlockMinutes = ref(60);
+const groupIsPublic = ref(false);
 const creatingGroup = ref(false);
 
 // 当前选中 workflow 的信息（用于 dispatch modal）
@@ -261,8 +262,10 @@ async function savePreset() {
 
 // 打开创建预设组模态框
 function openCreateGroupModal() {
-  // 如果侧边栏已选中某个 workflow，默认选它
-  selectedWorkflow.value = activeWorkflowPath.value || "";
+  // 保留当前已选 workflow；若没有，再回退到侧边栏选中项
+  if (!selectedWorkflow.value) {
+    selectedWorkflow.value = activeWorkflowPath.value || "";
+  }
   if (!selectedBranch.value) selectedBranch.value = defaultBranch.value;
   clearInputValues();
   if (selectedWorkflow.value) {
@@ -273,6 +276,7 @@ function openCreateGroupModal() {
   groupName.value = "";
   groupDescription.value = "";
   groupAutoUnlockMinutes.value = 60;
+  groupIsPublic.value = false;
   showCreateGroupModal.value = true;
 }
 
@@ -288,6 +292,10 @@ interface CreateGroupResult {
 
 async function createPresetGroup() {
   if (!groupName.value.trim()) return;
+  if (!selectedWorkflow.value || !selectedBranch.value) {
+    toast.add({ title: "请先选择 Workflow 和分支", color: "warning" });
+    return;
+  }
   creatingGroup.value = true;
   try {
     // 先获取仓库 ID
@@ -305,6 +313,7 @@ async function createPresetGroup() {
           default_branch: selectedBranch.value,
           default_inputs: { ...inputValues },
           auto_unlock_minutes: groupAutoUnlockMinutes.value,
+          is_public: groupIsPublic.value,
         },
       },
     );
@@ -1016,6 +1025,16 @@ function workflowFileName(path: string): string {
               <p class="text-xs text-gray-400 mt-1">
                 子预设被锁定后，超过此时间将自动解锁
               </p>
+            </div>
+
+            <div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div>
+                <label class="text-sm font-medium">公开到组织</label>
+                <p class="text-xs text-gray-400">
+                  开启后，组织内所有成员都可以使用此预设组
+                </p>
+              </div>
+              <USwitch v-model="groupIsPublic" />
             </div>
 
             <div class="flex justify-end gap-2 pt-2">

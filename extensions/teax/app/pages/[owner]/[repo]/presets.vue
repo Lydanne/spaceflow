@@ -5,6 +5,7 @@ import type { PresetGroupItem } from "~/components/preset/PresetGroupCard.vue";
 const route = useRoute();
 const owner = route.params.owner as string;
 const repo = route.params.repo as string;
+const { user } = useUserSession();
 
 interface RepoPresetItem {
   id: string;
@@ -48,6 +49,25 @@ const { data, pending, refresh } = await useFetch<{
 const orgPresets = computed(() => data.value?.org_presets ?? []);
 const myPresets = computed(() => data.value?.my_presets ?? []);
 const presetGroups = computed(() => data.value?.preset_groups ?? []);
+
+type OrgPresetCardItem
+  = | (RepoPresetGroupItem & { kind: "group" })
+    | (RepoPresetItem & { kind: "preset" });
+
+const orgPresetCards = computed<OrgPresetCardItem[]>(() => {
+  const publicGroups = presetGroups.value
+    .filter((group) => group.is_public)
+    .map((group) => ({ ...group, kind: "group" as const }));
+
+  const publicPresets = orgPresets.value
+    .map((preset) => ({ ...preset, kind: "preset" as const }));
+
+  return [...publicGroups, ...publicPresets];
+});
+
+const myPrivatePresetGroups = computed(() =>
+  presetGroups.value.filter((group) => !group.is_public && group.created_by === user.value?.id),
+);
 
 const toast = useToast();
 
@@ -97,6 +117,51 @@ async function togglePresetPublic(preset: RepoPresetItem) {
 //   }
 // }
 
+function canManagePreset(preset: RepoPresetItem): boolean {
+  return preset.created_by === user.value?.id || user.value?.is_admin === true;
+}
+
+function canManageGroup(group: RepoPresetGroupItem): boolean {
+  return group.created_by === user.value?.id || user.value?.is_admin === true;
+}
+
+async function toggleGroupPublic(group: RepoPresetGroupItem) {
+  if (!canManageGroup(group)) {
+    toast.add({ title: "无权限修改该预设组", color: "warning" });
+    return;
+  }
+  try {
+    await $fetch(`/api/orgs/${owner}/preset-groups/${group.id}`, {
+      method: "PATCH",
+      body: { is_public: !group.is_public },
+    });
+    toast.add({
+      title: group.is_public ? "已设为私有" : "已设为公开",
+      color: "success",
+    });
+    await refresh();
+  } catch {
+    toast.add({ title: "操作失败", color: "error" });
+  }
+}
+
+async function deleteGroup(group: RepoPresetGroupItem) {
+  if (!canManageGroup(group)) {
+    toast.add({ title: "无权限删除该预设组", color: "warning" });
+    return;
+  }
+  if (!confirm(`确定要删除预设组「${group.name}」吗？`)) return;
+  try {
+    await $fetch(`/api/user/workflow-preset-groups/${group.id}`, {
+      method: "DELETE",
+    });
+    toast.add({ title: "删除成功", color: "success" });
+    await refresh();
+  } catch {
+    toast.add({ title: "删除失败", color: "error" });
+  }
+}
+
 // 删除预设
 async function deletePreset(preset: RepoPresetItem) {
   if (!confirm(`确定要删除预设「${preset.name}」吗？`)) return;
@@ -128,57 +193,65 @@ async function deletePreset(preset: RepoPresetItem) {
     <template v-else>
       <!-- 组织预设 -->
       <div
-        v-if="orgPresets.length > 0"
+        v-if="orgPresetCards.length > 0"
         class="space-y-3"
       >
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">
-            组织预设 ({{ orgPresets.length }})
+            组织预设 ({{ orgPresetCards.length }})
           </h3>
         </div>
-        <div class="space-y-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           <div
-            v-for="preset in orgPresets"
-            :key="preset.id"
-            class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+            v-for="item in orgPresetCards"
+            :key="`${item.kind}-${item.id}`"
+            class="rounded-lg border border-gray-200 dark:border-gray-700 p-3 min-h-[180px] flex flex-col justify-between hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
           >
-            <div class="flex-1 min-w-0">
+            <div class="space-y-2 min-w-0">
               <div class="flex items-center gap-2">
                 <UIcon
-                  name="i-lucide-pin"
-                  class="w-4 h-4 text-primary-500 flex-shrink-0"
+                  :name="item.kind === 'group' ? 'i-lucide-folder' : 'i-lucide-pin'"
+                  :class="item.kind === 'group' ? 'text-blue-500' : 'text-primary-500'"
+                  class="w-4 h-4 flex-shrink-0"
                 />
-                <span class="font-medium truncate">{{ preset.name }}</span>
+                <span class="font-medium truncate">{{ item.name }}</span>
                 <UBadge
-                  color="success"
+                  :color="item.kind === 'group' ? 'info' : 'success'"
                   variant="subtle"
                   size="xs"
                 >
-                  公开
+                  {{ item.kind === "group" ? "组预设" : "预设" }}
                 </UBadge>
               </div>
-              <div class="text-xs text-gray-500 mt-1 flex items-center gap-2">
-                <span class="font-mono">{{ preset.branch }}</span>
+
+              <div class="text-xs text-gray-500 flex items-center gap-2">
+                <span class="font-mono">{{ item.kind === "group" ? item.default_branch : item.branch }}</span>
                 <span class="text-gray-300">·</span>
-                <span class="truncate">{{ preset.workflow_path }}</span>
+                <span class="truncate">{{ item.workflow_path }}</span>
               </div>
+
+              <div class="text-xs text-gray-400">
+                {{ item.kind === "group" ? "组织公开预设组" : "组织公开预设" }}
+              </div>
+
               <div
-                v-if="preset.creator"
-                class="text-xs text-gray-400 mt-1"
+                v-if="item.creator"
+                class="text-xs text-gray-400"
               >
-                by @{{ preset.creator.username }}
+                by @{{ item.creator.username }}
               </div>
             </div>
-            <div class="flex items-center gap-2 flex-shrink-0 ml-4">
+
+            <div class="flex items-center gap-2 mt-3">
               <UButton
                 icon="i-lucide-link"
                 color="neutral"
                 variant="ghost"
                 size="sm"
-                @click="copyPresetUrl(preset)"
+                @click="item.kind === 'group' ? copyGroupUrl(item) : copyPresetUrl(item)"
               />
               <NuxtLink
-                :to="`/workflows/${preset.share_token}`"
+                :to="item.kind === 'group' ? `/workflow-groups/${item.share_token}` : `/workflows/${item.share_token}`"
                 target="_blank"
               >
                 <UButton
@@ -188,6 +261,22 @@ async function deletePreset(preset: RepoPresetItem) {
                   size="sm"
                 />
               </NuxtLink>
+              <UButton
+                v-if="item.kind === 'group' ? canManageGroup(item) : canManagePreset(item)"
+                :icon="item.is_public ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+                :color="item.is_public ? 'warning' : 'success'"
+                variant="ghost"
+                size="sm"
+                @click="item.kind === 'group' ? toggleGroupPublic(item) : togglePresetPublic(item)"
+              />
+              <UButton
+                v-if="item.kind === 'group' ? canManageGroup(item) : canManagePreset(item)"
+                icon="i-lucide-trash-2"
+                color="error"
+                variant="ghost"
+                size="sm"
+                @click="item.kind === 'group' ? deleteGroup(item) : deletePreset(item)"
+              />
             </div>
           </div>
         </div>
@@ -271,17 +360,17 @@ async function deletePreset(preset: RepoPresetItem) {
 
       <!-- 预设组 -->
       <div
-        v-if="presetGroups.length > 0"
+        v-if="myPrivatePresetGroups.length > 0"
         class="space-y-3"
       >
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">
-            预设组 ({{ presetGroups.length }})
+            我的预设组 ({{ myPrivatePresetGroups.length }})
           </h3>
         </div>
         <div class="space-y-2">
           <div
-            v-for="group in presetGroups"
+            v-for="group in myPrivatePresetGroups"
             :key="group.id"
             class="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
           >
@@ -331,6 +420,22 @@ async function deletePreset(preset: RepoPresetItem) {
                   size="sm"
                 />
               </NuxtLink>
+              <UButton
+                v-if="canManageGroup(group)"
+                :icon="group.is_public ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+                :color="group.is_public ? 'warning' : 'success'"
+                variant="ghost"
+                size="sm"
+                @click="toggleGroupPublic(group)"
+              />
+              <UButton
+                v-if="canManageGroup(group)"
+                icon="i-lucide-trash-2"
+                color="error"
+                variant="ghost"
+                size="sm"
+                @click="deleteGroup(group)"
+              />
             </div>
           </div>
         </div>
@@ -338,7 +443,7 @@ async function deletePreset(preset: RepoPresetItem) {
 
       <!-- 全部为空时的提示 -->
       <div
-        v-if="orgPresets.length === 0 && myPresets.length === 0 && presetGroups.length === 0"
+        v-if="orgPresetCards.length === 0 && myPresets.length === 0 && myPrivatePresetGroups.length === 0"
         class="text-center py-12"
       >
         <UIcon
