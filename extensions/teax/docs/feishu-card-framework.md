@@ -279,6 +279,144 @@ render(ctx) 时：
 - **navigate 不携带 data** — 跳转到其他页面时 data 不传递（data 是 per-page 的），目标页面用自己的 `data()` 初始值
 - **无 data() 的页面** — `ctx.data` 为 `{}`，按钮 value 中不编码 `__data`
 
+### 7. 异步任务 — asyncTask（解决飞书回调超时）
+
+飞书卡片回调有约 3 秒超时限制。对于触发工作流、轮询运行状态等耗时操作，如果在 `onAction` 中同步等待会导致超时和 UI 闪烁。`asyncTask` 解决了这个问题：
+
+```typescript
+import { defineCardPage, asyncTask } from "~~/server/card-kit";
+
+export default defineCardPage({
+  name: "cp:trigger-wf",
+
+  async onAction(ctx) {
+    // asyncTask 立即返回 loading 卡片（飞书 3 秒内渲染），
+    // task 在后台异步执行，通过闭包访问 ctx.updateCard 更新最终结果。
+    return asyncTask(
+      `**仓库**: ${owner}/${repo}\n\n⏳ 正在触发工作流，请稍候...`,
+      async () => {
+        // 耗时操作：dispatch + 轮询
+        await giteaService.dispatchWorkflow(owner, repo, workflow, branch, inputs);
+
+        // 轮询完成后更新卡片
+        await ctx.updateCard(
+          new EnhancedCardBuilder({ title: "✅ 工作流已触发", theme: "green" }, "")
+            .text(`运行编号: #${runNumber}`)
+            .build(),
+        );
+      },
+    );
+  },
+});
+```
+
+**`asyncTask(loading, task)` 参数：**
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `loading` | `string \| CardJSON` | 字符串时自动构建蓝色 loading 卡片；也可传完整 CardJSON |
+| `task` | `() => Promise<void>` | 后台异步任务，通过闭包访问 `ctx.updateCard` |
+
+**执行流程：**
+
+```text
+onAction 返回 AsyncTaskResult
+  → CardRouter 立即返回 loadingCard（飞书渲染 loading 状态）
+  → task() 在后台执行（fire-and-forget）
+  → task 内通过 ctx.updateCard() 更新最终结果
+  → 如果 task 抛异常，CardRouter 自动 catch 并打印日志
+```
+
+### 8. 导航守卫 — beforeEnter / beforeLeave（参考 vue-router）
+
+CardKit 支持页面级和全局级导航守卫，用于权限检查、登录验证等场景，避免在每个 `onAction` / `render` 中重复编写检查逻辑。
+
+#### 守卫类型
+
+```typescript
+/** 导航守卫上下文（类似 vue-router 的 to/from） */
+interface NavigationGuardContext {
+  openId: string;
+  to: { page: string; params: Record<string, unknown> };
+  from: { page: string; params: Record<string, unknown> } | null;
+}
+
+/**
+ * 守卫返回值（参考 vue-router）：
+ * - undefined / true → 放行
+ * - false → 阻止导航（保持当前卡片）
+ * - CardJSON → 阻止并渲染替代卡片
+ * - NavigateResult → 重定向到另一个页面
+ */
+type GuardResult = boolean | CardJSON | NavigateResult | undefined;
+```
+
+#### 页面级守卫
+
+```typescript
+import { defineCardPage, guards, requireBinding, requireRepoPermission } from "~~/server/card-kit";
+
+export default defineCardPage({
+  name: "cp:trigger-wf",
+
+  // 组合多个守卫（类似 vue-router 数组守卫）
+  beforeEnter: guards(
+    requireBinding(),                        // 要求已绑定飞书账号
+    requireRepoPermission("actions:trigger"), // 要求仓库操作权限
+  ),
+
+  // beforeLeave: 仅在 onAction 返回 NavigateResult 时触发
+  // beforeLeave({ to, from }) { ... },
+
+  async render(ctx) { ... },
+  async onAction(ctx) { ... },
+});
+```
+
+#### 全局守卫
+
+```typescript
+import { cardRouter } from "~~/server/card-kit";
+
+// 类似 vue-router router.beforeEach
+cardRouter.beforeEach(async ({ openId }) => {
+  const user = await getActiveAccount(openId);
+  if (!user) return false; // 阻止所有未绑定用户的访问
+});
+```
+
+#### 执行流程
+
+```text
+dispatch(input)
+  │
+  ├─ 解析目标页面
+  │
+  ├─ 【全局 beforeEach】依次执行所有全局守卫
+  │   └─ 任一拦截 → 返回替代卡片或阻止
+  │
+  ├─ 【页面 beforeEnter】目标页面.beforeEnter(ctx)
+  │   └─ 拦截 → 返回替代卡片或阻止
+  │
+  ├─ render / onAction 正常执行
+  │   │
+  │   └─ onAction 返回 NavigateResult →
+  │       ├─ 【beforeLeave】当前页面.beforeLeave(ctx)
+  │       │   └─ 拦截 → 返回替代卡片或阻止
+  │       ├─ 【全局 beforeEach】
+  │       └─ 【页面 beforeEnter】目标页面.beforeEnter(ctx)
+  │
+  └─ 最终渲染目标页面 render()
+```
+
+#### 内置守卫工厂
+
+| 工厂函数 | 说明 |
+| --- | --- |
+| `requireBinding()` | 检查飞书账号绑定，未绑定时渲染"未绑定账号"提示卡片 |
+| `requireRepoPermission(permission)` | 检查仓库操作权限，从 `params.owner/repo` 或 `params.repoFullName` 定位仓库 |
+| `guards(...fns)` | 组合多个守卫，按序执行，任一拦截即停 |
+
 ## 架构设计
 
 ### 文件结构
@@ -351,15 +489,23 @@ server/
       ├─ 解码状态：value.__data 存在？
       │    → ctx.data = __data
       │    否则 → ctx.data = page.data?.() ?? {}
-      ├─ 注入 ctx.card = (config) => new EnhancedCardBuilder(config, pageName, ctx.data)
-      ├─ 注入 ctx.setData = (partial) => navigate(pageName, ctx.params, { data: merge(ctx.data, partial) })
+      │
+      ├─ 【守卫】全局 beforeEach → 页面 beforeEnter
+      │    → 拦截时直接返回替代卡片 / 重定向 / undefined
+      │
+      ├─ 注入 ctx.card / ctx.setData / ctx.updateCard
       ├─ form_value 存在？
       │    → 调用 page.onAction(ctx)，ctx.type="form_submit"，ctx.formValue={...}
       ├─ value.__action 存在？
       │    → 调用 page.onAction(ctx)，ctx.type="button"，ctx.action=__action
       ├─ 都不存在？（纯 navigate）
       │    → 调用目标页面的 render(ctx)
-      └─ 如果返回 NavigateResult，则调用目标页面的 render()
+      │
+      └─ 处理 onAction 返回值：
+           ├─ NavigateResult → beforeLeave(当前) → beforeEach + beforeEnter(目标) → render(目标)
+           ├─ AsyncTaskResult → 立即返回 loadingCard，后台执行 task()
+           ├─ ToastResult → 返回飞书 toast 格式
+           └─ CardJSON → 直接返回
 ```
 
 #### 表单提交路由
@@ -662,6 +808,29 @@ class EnhancedCardBuilder {
 ```typescript
 // card-kit/types.ts
 
+// ─── 导航守卫 ──────────────────────────
+
+/** 导航守卫上下文（类似 vue-router 的 to/from） */
+export interface NavigationGuardContext {
+  /** 当前用户 openId */
+  openId: string;
+  /** 目标页面名称 */
+  to: { page: string; params: Record<string, unknown> };
+  /** 来源页面名称（首次进入时为 null） */
+  from: { page: string; params: Record<string, unknown> } | null;
+}
+
+/**
+ * 导航守卫返回值（参考 vue-router）：
+ * - undefined / true → 放行
+ * - false → 阻止导航（保持当前卡片）
+ * - CardJSON → 阻止并渲染替代卡片
+ * - NavigateResult → 重定向到另一个页面
+ */
+export type GuardResult = boolean | CardJSON | NavigateResult | undefined;
+
+// ─── 页面定义 ──────────────────────────
+
 /** 卡片页面定义 */
 export interface CardPageDef<D extends Record<string, unknown> = Record<string, unknown>> {
   /** 页面唯一标识，作为路由地址。建议格式: "module:page"，如 "cp:home" */
@@ -674,6 +843,18 @@ export interface CardPageDef<D extends Record<string, unknown> = Record<string, 
    */
   data?: () => D;
 
+  /**
+   * 进入页面前的导航守卫（类似 vue-router beforeEnter）。
+   * 在 render 和 onAction 之前执行。
+   */
+  beforeEnter?: (ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>;
+
+  /**
+   * 离开页面时的导航守卫（类似 vue-router beforeRouteLeave）。
+   * 仅在 onAction 返回 NavigateResult 时触发。
+   */
+  beforeLeave?: (ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>;
+
   /** 渲染卡片。ctx.data 包含当前状态，ctx.params 来自 navigate() 参数。 */
   render: (ctx: CardRenderContext<D>) => Promise<CardJSON>;
 
@@ -684,7 +865,7 @@ export interface CardPageDef<D extends Record<string, unknown> = Record<string, 
    * - ctx.data 当前状态，ctx.setData() 更新状态并重渲染
    * - ctx.formValue 取表单数据（仅 form_submit 时有值）
    */
-  onAction?: (ctx: CardActionContext<D>) => Promise<CardActionResult>;
+  onAction?: (ctx: CardActionContext<D>) => CardActionResult | Promise<CardActionResult>;
 }
 
 // ─── 上下文 ──────────────────────────
@@ -733,16 +914,25 @@ export interface NavigateResult {
 
 /** Toast 提示结果 */
 export interface ToastResult {
-  toast: {
-    type: "success" | "info" | "warning" | "error";
-    content: string;
-  };
+  __type: "toast";
+  type: "success" | "info" | "warning" | "error";
+  content: string;
+}
+
+/** 异步任务结果：立即返回 loading 卡片，后台执行 task */
+export interface AsyncTaskResult {
+  __type: "async_task";
+  /** 立即返回给飞书渲染的 loading 卡片 */
+  loadingCard: CardJSON;
+  /** 后台异步执行的任务，通过闭包访问 ctx.updateCard 更新最终结果 */
+  task: () => Promise<void>;
 }
 
 /** Action handler 返回值 */
 export type CardActionResult =
   | NavigateResult
   | ToastResult
+  | AsyncTaskResult
   | CardJSON
   | undefined;
 
@@ -1124,11 +1314,13 @@ export default defineCardPage({
 | Phase 3：控制面板 | ✅ | `cp:home` / `cp:repos` / `cp:repo-menu` / `cp:actions` / `cp:feature` |
 | Phase 4：账户 + 预设 | ✅ | `account:*` / `preset:console` / `wf:*` / `approval:pending` |
 | Phase 5：清理 | ✅ | 旧 if-else 分发、CardStateMachine、手写 JSON 1.0 卡片、死代码全部删除 |
+| Phase 6：异步任务 | ✅ | `AsyncTaskResult` + `asyncTask()` 辅助方法，`cp-trigger-wf` / `preset-console` / `wf-params` 迁移 |
+| Phase 7：导航守卫 | ✅ | `beforeEnter` / `beforeLeave` / 全局 `beforeEach`，内置守卫 `requireBinding()` / `requireRepoPermission()` / `guards()` |
 
 ## 安全考虑
 
 - **路由参数不存敏感数据** — `__params` 会被序列化到 action.value（明文 JSON），不要放密码/token 等。shareToken 等敏感标识应存 Redis，只传 Redis key
-- **权限检查在 handler 内** — 每个 page 的 render / onAction 内各自校验用户权限
+- **权限检查通过导航守卫集中管理** — 使用 `beforeEnter` 守卫（如 `requireBinding()`、`requireRepoPermission()`）统一校验用户权限，避免在每个 render / onAction 中重复编写
 - **参数大小限制** — 飞书 action.value 有大小限制（约 2KB），大数据走 Redis
 - **幂等性** — 飞书回调可能重试，用户也可能连点多次。审批/触发等副作用操作必须在 onAction 中做幂等检查（如检查状态是否已变更）
 - **全局错误处理** — `cardRouter.dispatch()` 内部应 try-catch 包装 `onAction` / `render` 调用，异常时返回通用错误卡片或 toast，而不是让飞书显示原始错误

@@ -1,20 +1,16 @@
-import { defineCardPage, EnhancedCardBuilder, asyncTask } from "~~/server/card-kit";
+import { defineCardPage, EnhancedCardBuilder, asyncTask, guards, requireBinding, requireRepoPermission } from "~~/server/card-kit";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { parseWorkflowYaml, extractInputs, type WorkflowInputDef } from "~~/server/utils/workflow-yaml";
 import { getActiveAccount } from "~~/server/services/account.service";
 import { getUserGiteaTokens } from "~~/server/services/auth.service";
-import { queryUserPermissionGroups, rowGrantsPermission } from "~~/server/utils/permission";
-import { useDB, schema } from "~~/server/db";
-import { eq } from "drizzle-orm";
-
-// --- Helper: permission check without H3Event ---
-async function checkUserPermission(userId: string, orgId: string, permission: string, repositoryId?: string): Promise<boolean> {
-  const groups = await queryUserPermissionGroups(userId, orgId);
-  return groups.some((group) => rowGrantsPermission(group, permission, repositoryId));
-}
 
 export default defineCardPage({
   name: "cp:trigger-wf",
+
+  beforeEnter: guards(
+    requireBinding(),
+    requireRepoPermission("actions:trigger"),
+  ),
 
   async render(ctx) {
     const owner = ctx.params.owner as string;
@@ -158,47 +154,7 @@ export default defineCardPage({
     return asyncTask(
       `**仓库**: ${owner}/${repo}\n**分支**: ${branch}\n**工作流**: ${workflowFileName}\n\n⏳ 正在触发工作流，请稍候...`,
       async () => {
-        // 1. Check user binding
-        const activeUser = await getActiveAccount(openId);
-        if (!activeUser) {
-          const config = useRuntimeConfig();
-          const baseUrl = config.public.appUrl as string;
-          await ctx.updateCard(
-            new EnhancedCardBuilder({ title: "🔗 未绑定账号", theme: "orange" }, "")
-              .text(`请先在 Teax 中绑定飞书账号\n\n[前往绑定](${baseUrl}/user/settings)`, true)
-              .build(),
-          );
-          return;
-        }
-
-        // 2. Check permission
-        const db = useDB();
-        const [repoRecord] = await db
-          .select({ id: schema.repositories.id, organization_id: schema.repositories.organization_id })
-          .from(schema.repositories)
-          .where(eq(schema.repositories.full_name, `${owner}/${repo}`))
-          .limit(1);
-
-        if (!repoRecord) {
-          await ctx.updateCard(
-            new EnhancedCardBuilder({ title: "❌ 仓库不存在", theme: "red" }, "")
-              .text("该仓库未在系统中注册", true)
-              .build(),
-          );
-          return;
-        }
-
-        const canTrigger = await checkUserPermission(activeUser.id, repoRecord.organization_id, "actions:trigger", repoRecord.id);
-        if (!canTrigger) {
-          await ctx.updateCard(
-            new EnhancedCardBuilder({ title: "❌ 无权限", theme: "red" }, "")
-              .text("您没有触发此工作流的权限", true)
-              .build(),
-          );
-          return;
-        }
-
-        // 3. Dispatch workflow
+        // Dispatch workflow
         const gitea = useGiteaSdk({
           userTokenProvider: async () => {
             const user = await getActiveAccount(openId);

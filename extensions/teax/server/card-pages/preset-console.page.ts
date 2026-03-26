@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { defineCardPage, navigate, asyncTask, EnhancedCardBuilder } from "~~/server/card-kit";
+import { defineCardPage, navigate, asyncTask, EnhancedCardBuilder, requireBinding } from "~~/server/card-kit";
 import { resolvePresetByShareToken } from "~~/server/utils/resolve-preset";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { getActiveAccount } from "~~/server/services/account.service";
@@ -16,6 +16,8 @@ async function checkUserPermission(userId: string, orgId: string, permission: st
 
 export default defineCardPage({
   name: "preset:console",
+
+  beforeEnter: requireBinding(),
 
   async render(ctx) {
     const shareToken = ctx.params.shareToken as string;
@@ -202,18 +204,9 @@ export default defineCardPage({
       async () => {
         const updateCard = ctx.updateCard;
 
-        // Check user binding
+        // Check user (binding already verified by beforeEnter)
         const activeUser = await getActiveAccount(openId);
-        if (!activeUser) {
-          const config = useRuntimeConfig();
-          const baseUrl = config.public.appUrl as string;
-          await updateCard(
-            new EnhancedCardBuilder({ title: "🔗 未绑定账号", theme: "orange" }, "")
-              .text(`请先在 Teax 中绑定飞书账号\n\n[前往绑定](${baseUrl}/user/settings)`, true)
-              .build(),
-          );
-          return;
-        }
+        if (!activeUser) return;
 
         // Check permission
         const canTrigger = await checkUserPermission(activeUser.id, repo.organization_id, "actions:trigger", repo.id);

@@ -16,6 +16,27 @@ export interface CardElement {
   [key: string]: unknown;
 }
 
+// ─── 导航守卫 ──────────────────────────
+
+/** 导航守卫上下文（类似 vue-router 的 to/from） */
+export interface NavigationGuardContext {
+  /** 当前用户 openId */
+  openId: string;
+  /** 目标页面名称 */
+  to: { page: string; params: Record<string, unknown> };
+  /** 来源页面名称（首次进入时为 null） */
+  from: { page: string; params: Record<string, unknown> } | null;
+}
+
+/**
+ * 导航守卫返回值（参考 vue-router）：
+ * - `undefined | true` → 放行
+ * - `false` → 阻止导航（保持当前卡片，返回 undefined）
+ * - `CardJSON` → 阻止并渲染替代卡片
+ * - `NavigateResult` → 重定向到另一个页面
+ */
+export type GuardResult = boolean | CardJSON | NavigateResult | undefined;
+
 // ─── 页面定义 ──────────────────────────
 
 /** 卡片页面定义 */
@@ -31,6 +52,25 @@ export interface CardPageDef<
    * 点击时飞书原样返回，实现零存储状态管理。
    */
   data?: () => D;
+
+  /**
+   * 进入页面前的导航守卫（类似 vue-router beforeEnter）。
+   * 在 render 和 onAction 之前执行。
+   * - 返回 undefined / true → 放行
+   * - 返回 false → 阻止
+   * - 返回 CardJSON → 渲染替代卡片
+   * - 返回 NavigateResult → 重定向
+   */
+  beforeEnter?: (ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>;
+
+  /**
+   * 离开页面时的导航守卫（类似 vue-router beforeRouteLeave）。
+   * 仅在 onAction 返回 NavigateResult 时触发。
+   * - 返回 undefined / true → 放行
+   * - 返回 false → 阻止导航
+   * - 返回 CardJSON → 渲染替代卡片
+   */
+  beforeLeave?: (ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>;
 
   /** 渲染卡片。ctx.data 包含当前状态，ctx.params 来自 navigate() 参数。 */
   render: (ctx: CardRenderContext<D>) => Promise<CardJSON>;
