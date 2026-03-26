@@ -58,6 +58,12 @@ export default defineCardPage({
       lockedValues: preset.inputs as Record<string, unknown>,
     });
 
+    // 底部链接
+    const config = useRuntimeConfig();
+    const presetUrl = `${config.public.appUrl}/workflows/${preset.share_token}`;
+    card.divider();
+    card.button("🔗 查看预设详情", { url: presetUrl });
+
     return card.build();
   },
 

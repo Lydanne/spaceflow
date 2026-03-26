@@ -97,7 +97,7 @@ export default defineCardPage({
         const shortSha = run.head_sha.substring(0, 7);
         const runUrl = `${baseUrl}/${owner}/${repo}/actions/runs/${run.id}`;
         card.text(
-          `${emoji} [**${run.display_title}**](${runUrl})\n分支: ${run.head_branch} · ${shortSha}\n时间: ${timeAgo}`,
+          `${emoji} [${run.display_title}](${runUrl})\n分支: ${run.head_branch} · ${shortSha}\n时间: ${timeAgo}`,
           true,
         );
       }
