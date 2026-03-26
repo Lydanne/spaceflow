@@ -15,6 +15,8 @@ export const users = pgTable("users", {
   ...baseColumns(),
 });
 
+export type User = typeof users.$inferSelect;
+
 export const userFeishu = pgTable("user_feishu", {
   id: uuid("id").primaryKey().defaultRandom(),
   user_id: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),

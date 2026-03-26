@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { defineCardPage, guards, requireBinding, type EnhancedButtonConfig } from "~~/server/card-kit";
 import { useDB, schema } from "~~/server/db";
+import type { User } from "../db/schema";
 
 function getPresetStatus(
   activeUserId: string,
@@ -30,7 +31,7 @@ export default defineCardPage({
     const config = useRuntimeConfig();
     const baseUrl = config.public.appUrl;
 
-    const activeUser = ctx.inject<{ id?: string }>(requireBinding);
+    const activeUser = ctx.inject<User>(requireBinding);
     const activeUserId = activeUser?.id;
     if (!activeUserId) {
       return ctx
