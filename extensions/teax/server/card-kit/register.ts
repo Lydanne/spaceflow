@@ -83,6 +83,7 @@ export async function ensurePages(): Promise<void> {
     import("~~/server/card-pages/account-home.page"),
     import("~~/server/card-pages/account-guide.page"),
     import("~~/server/card-pages/account-unbound.page"),
+    import("~~/server/card-pages/binding-required.page"),
     import("~~/server/card-pages/test-form.page"),
     import("~~/server/card-pages/test-result.page"),
     import("~~/server/card-pages/preset-console.page"),

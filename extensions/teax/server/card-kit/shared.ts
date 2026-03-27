@@ -127,11 +127,11 @@ export function requireBinding(): BeforeEnterGuard {
     const { getActiveAccount } = await import("~~/server/services/account.service");
     const user = await getActiveAccount(ctx.openId);
     if (!user) {
-      const config = useRuntimeConfig();
-      const baseUrl = config.public.appUrl as string;
-      return new EnhancedCardBuilder({ title: "🔗 未绑定账号", theme: "orange" }, "")
-        .text(`请先在 Teax 中绑定飞书账号\n\n[前往绑定](${baseUrl}/user/settings)`, true)
-        .build();
+      return navigate("binding-required", {
+        from: ctx.to.page,
+      }, {
+        mode: "replace",
+      });
     }
 
     ctx.provide(requireBinding, user);

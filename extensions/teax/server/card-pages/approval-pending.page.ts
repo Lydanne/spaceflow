@@ -1,9 +1,10 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { defineCardPage } from "~~/server/card-kit";
+import { defineCardPage, requireBinding } from "~~/server/card-kit";
 import { approveFlow, rejectFlow } from "~~/server/services/approval-flow/service";
 import { updateCardMessage } from "~~/server/utils/feishu-sdk";
 import type { H3Event } from "h3";
+import type { User } from "~~/server/db/schema";
 
 /**
  * 创建模拟的 H3Event（审批流程需要）
@@ -27,6 +28,8 @@ function createMockEvent(userId: string) {
 
 export default defineCardPage({
   name: "approval-pending",
+
+  beforeEnter: requireBinding(),
 
   async render(ctx) {
     const flowId = ctx.params.flowId as string;
@@ -103,39 +106,21 @@ export default defineCardPage({
   async onAction(ctx) {
     const flowId = ctx.params.flowId as string;
     const actionType = ctx.action; // "approve" or "reject"
+    const activeUser = ctx.inject<User>(requireBinding);
 
-    if (!flowId || !actionType) {
+    if (!flowId || !actionType || !activeUser?.id) {
       return undefined;
     }
 
-    // 查找用户
     const db = useDB();
-    const [feishuBinding] = await db
-      .select({ user_id: schema.userFeishu.user_id })
-      .from(schema.userFeishu)
-      .where(eq(schema.userFeishu.feishu_open_id, ctx.openId))
-      .limit(1);
-
-    if (!feishuBinding?.user_id) {
-      const { EnhancedCardBuilder } = await import("~~/server/card-kit");
-      const card = new EnhancedCardBuilder(
-        { title: "❌ 未绑定账号", theme: "red" },
-        "",
-      )
-        .text("未找到关联的用户账号", true)
-        .build();
-      await ctx.update(card);
-      return undefined;
-    }
-
-    const mockEvent = createMockEvent(feishuBinding.user_id);
+    const mockEvent = createMockEvent(activeUser.id);
 
     try {
       const { EnhancedCardBuilder } = await import("~~/server/card-kit");
       let resultCard: Record<string, unknown>;
 
       if (actionType === "approve") {
-        await approveFlow(mockEvent, flowId, feishuBinding.user_id);
+        await approveFlow(mockEvent, flowId, activeUser.id);
         resultCard = new EnhancedCardBuilder(
           { title: "✅ 审批已通过", theme: "green" },
           "",
@@ -143,7 +128,7 @@ export default defineCardPage({
           .text("操作已完成", true)
           .build();
       } else if (actionType === "reject") {
-        await rejectFlow(mockEvent, flowId, feishuBinding.user_id);
+        await rejectFlow(mockEvent, flowId, activeUser.id);
         resultCard = new EnhancedCardBuilder(
           { title: "❌ 审批已拒绝", theme: "red" },
           "",

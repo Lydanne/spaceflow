@@ -1,7 +1,6 @@
 import { eq, desc } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { defineCardPage, requireBinding } from "~~/server/card-kit";
-import type { User } from "~~/server/db/schema";
 
 export default defineCardPage({
   name: "approvals",
@@ -10,14 +9,6 @@ export default defineCardPage({
 
   async render(ctx) {
     const db = useDB();
-    const activeUser = ctx.inject<User>(requireBinding);
-
-    if (!activeUser) {
-      return ctx
-        .card({ title: "❌ 未绑定", theme: "red" })
-        .text("请先在 Teax 中绑定飞书账号", true)
-        .build();
-    }
 
     const pendingApprovals = await db
       .select({

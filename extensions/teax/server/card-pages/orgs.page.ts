@@ -10,16 +10,9 @@ export default defineCardPage({
 
   async render(ctx) {
     const db = useDB();
-    const activeUser = ctx.inject<User>(requireBinding);
+    const activeUser = ctx.inject<User>(requireBinding)!;
     const config = useRuntimeConfig();
     const baseUrl = config.public.appUrl;
-
-    if (!activeUser) {
-      return ctx
-        .card({ title: "❌ 未绑定", theme: "red" })
-        .text("请先在 Teax 中绑定飞书账号", true)
-        .build();
-    }
 
     const orgs = await db
       .selectDistinct({

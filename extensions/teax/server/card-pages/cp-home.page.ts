@@ -1,29 +1,16 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { defineCardPage } from "~~/server/card-kit";
+import { defineCardPage, requireBinding } from "~~/server/card-kit";
+import type { User } from "~~/server/db/schema";
 
 export default defineCardPage({
   name: "cp-home",
 
+  beforeEnter: requireBinding(),
+
   async render(ctx) {
     const db = useDB();
-
-    // 获取用户绑定
-    const [binding] = await db
-      .select({ user_id: schema.userFeishu.user_id })
-      .from(schema.userFeishu)
-      .where(eq(schema.userFeishu.feishu_open_id, ctx.openId))
-      .limit(1);
-
-    if (!binding?.user_id) {
-      return ctx
-        .card({ title: "🔒 未绑定账号", theme: "orange" })
-        .text(
-          "请先绑定 Gitea 账号才能使用控制面板\n\n访问 Teax 网站进行绑定",
-          true,
-        )
-        .build();
-    }
+    const activeUser = ctx.inject<User>(requireBinding)!;
 
     // 获取用户的组织列表
     const userOrgs = await db
@@ -37,7 +24,7 @@ export default defineCardPage({
         schema.organizations,
         eq(schema.teams.organization_id, schema.organizations.id),
       )
-      .where(eq(schema.teamMembers.user_id, binding.user_id))
+      .where(eq(schema.teamMembers.user_id, activeUser.id))
       .limit(20);
 
     if (userOrgs.length === 0) {

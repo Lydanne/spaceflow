@@ -1,10 +1,12 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { defineCardPage, navigate } from "~~/server/card-kit";
+import { defineCardPage, navigate, requireBinding } from "~~/server/card-kit";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 
 export default defineCardPage({
   name: "wf-select",
+
+  beforeEnter: requireBinding(),
 
   async render(ctx) {
     const repoFullName = ctx.params.repoFullName as string;
@@ -23,20 +25,7 @@ export default defineCardPage({
         .build();
     }
 
-    // 验证用户绑定
     const db = useDB();
-    const [binding] = await db
-      .select({ user_id: schema.userFeishu.user_id })
-      .from(schema.userFeishu)
-      .where(eq(schema.userFeishu.feishu_open_id, ctx.openId))
-      .limit(1);
-
-    if (!binding?.user_id) {
-      return ctx
-        .card({ title: "❌ 未绑定账号", theme: "orange" })
-        .text("请先在 Teax 中绑定飞书账号", true)
-        .build();
-    }
 
     // 验证仓库
     const [repoRecord] = await db

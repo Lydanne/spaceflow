@@ -10,14 +10,7 @@ export default defineCardPage({
 
   async render(ctx) {
     const db = useDB();
-    const activeUser = ctx.inject<User>(requireBinding);
-
-    if (!activeUser) {
-      return ctx
-        .card({ title: "❌ 未绑定", theme: "red" })
-        .text("请先在 Teax 中绑定飞书账号", true)
-        .build();
-    }
+    const activeUser = ctx.inject<User>(requireBinding)!;
 
     const [binding] = await db
       .select({

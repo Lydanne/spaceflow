@@ -36,14 +36,7 @@ export default defineCardPage({
     const repo = ctx.params.repo as string | undefined;
     const repoFullName = owner && repo ? `${owner}/${repo}` : undefined;
 
-    const activeUser = ctx.inject<User>(requireBinding);
-    const activeUserId = activeUser?.id;
-    if (!activeUserId) {
-      return ctx
-        .card({ title: "🔒 未绑定账号", theme: "orange" })
-        .text("请先在 Teax 中绑定飞书账号", true)
-        .build();
-    }
+    const activeUserId = ctx.inject<User>(requireBinding)!.id;
 
     // 获取用户所属的组织
     const userOrgs = await db
