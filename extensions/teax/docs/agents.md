@@ -764,6 +764,12 @@ Repo Session 支持人工接管：
 - worktree 生命周期管理
 - 日志流与会话详情页
 
+当前实现状态（2026-03-27）：
+
+- 已落地仓库级 Runtime 生命周期 API（查询 / 启动 / 停止）
+- 已落地 Session 创建 -> worktree 准备 -> 运行 -> 停止清理 -> 重试重建闭环
+- 已落地会话事件流与会话详情页（含运行态与 worktree 状态展示）
+
 ### Phase 2（系统级）
 
 - System Runtime 启动即存在

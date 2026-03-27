@@ -95,3 +95,13 @@ export const listAgentSessionEventsQuerySchema = z.object({
 });
 
 export type ListAgentSessionEventsQuery = z.infer<typeof listAgentSessionEventsQuerySchema>;
+
+/**
+ * 停止仓库 runtime 请求体。
+ * force=true 时会先清理活跃 worktree 再停止 runtime。
+ */
+export const stopRepoRuntimeBodySchema = z.object({
+  force: z.boolean().optional().default(false),
+});
+
+export type StopRepoRuntimeBody = z.infer<typeof stopRepoRuntimeBodySchema>;

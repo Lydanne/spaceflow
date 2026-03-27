@@ -23,6 +23,12 @@ export default defineNuxtConfig({
     feishuApprovalCode: process.env.FEISHU_APPROVAL_CODE || "",
     giteaServiceToken: process.env.GITEA_SERVICE_TOKEN || "",
     tokenEncryptSecret: process.env.TOKEN_ENCRYPT_SECRET || "",
+    // Agent Runtime（P1）配置
+    agentRuntimeMode: process.env.AGENT_RUNTIME_MODE || "mock",
+    agentRuntimeRoot: process.env.AGENT_RUNTIME_ROOT || ".teax-agent-runtime",
+    agentRuntimeGitBin: process.env.AGENT_RUNTIME_GIT_BIN || "git",
+    agentRuntimeKeepWorktreeOnStop: process.env.AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP === "true",
+    agentRuntimeAllowMockFallback: process.env.AGENT_RUNTIME_ALLOW_MOCK_FALLBACK !== "false",
     session: {
       password: process.env.NUXT_SESSION_PASSWORD || "",
     },

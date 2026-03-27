@@ -25,6 +25,8 @@ export const agentSessions = pgTable(
     repository_id: uuid("repository_id")
       .notNull()
       .references(() => repositories.id, { onDelete: "cascade" }),
+    // 归属的 Runtime（每仓库一个 runtime）
+    runtime_id: uuid("runtime_id"),
     scope: varchar("scope", { length: 32 }).notNull().default("repo"),
     parent_session_id: uuid("parent_session_id"),
     // 会话标题（展示用），可为空
@@ -56,6 +58,7 @@ export const agentSessions = pgTable(
   },
   (table) => [
     index("idx_agent_sessions_repository_id").on(table.repository_id),
+    index("idx_agent_sessions_runtime_id").on(table.runtime_id),
     index("idx_agent_sessions_creator_id").on(table.creator_id),
     index("idx_agent_sessions_status").on(table.status),
     index("idx_agent_sessions_visibility").on(table.visibility),

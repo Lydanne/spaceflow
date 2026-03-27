@@ -1,5 +1,10 @@
 import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
 import { schema, useDB } from "~~/server/db";
+import {
+  cleanupSessionWorktree,
+  getSessionWorktreeBySessionId,
+  prepareRepoSessionWorktree,
+} from "~~/server/services/agent-runtime.service";
 
 /**
  * 当前请求执行主体。
@@ -259,7 +264,55 @@ export async function createAgentSession(params: {
     },
   });
 
-  return created;
+  await appendSessionEvent({
+    sessionId: created.id,
+    type: "session_preparing",
+    actorType: "system",
+    actorId: "runtime",
+  });
+
+  let prepared: Awaited<ReturnType<typeof prepareRepoSessionWorktree>>;
+  try {
+    prepared = await prepareRepoSessionWorktree({
+      repositoryId: params.repositoryId,
+      sessionId: created.id,
+      baseBranch: params.baseBranch,
+      workingBranch: params.workingBranch,
+      actorId: params.creatorId,
+    });
+  } catch (error) {
+    await appendSessionEvent({
+      sessionId: created.id,
+      type: "worktree_prepare_failed",
+      actorType: "system",
+      actorId: "runtime",
+      payload: {
+        error: (error as { message?: string })?.message || "prepare failed",
+      },
+    });
+    throw error;
+  }
+
+  await appendSessionEvent({
+    sessionId: created.id,
+    type: "worktree_prepared",
+    actorType: "system",
+    actorId: "runtime",
+    payload: {
+      session_path: prepared.sessionPath,
+      base_branch: prepared.baseBranch,
+      working_branch: prepared.workingBranch,
+      mode: prepared.mode,
+    },
+  });
+
+  const [latest] = await db
+    .select()
+    .from(schema.agentSessions)
+    .where(eq(schema.agentSessions.id, created.id))
+    .limit(1);
+
+  return latest || created;
 }
 
 /**
@@ -304,9 +357,11 @@ export async function listAgentSessions(params: {
       title: schema.agentSessions.title,
       visibility: schema.agentSessions.visibility,
       creator_id: schema.agentSessions.creator_id,
+      runtime_id: schema.agentSessions.runtime_id,
       status: schema.agentSessions.status,
       base_branch: schema.agentSessions.base_branch,
       working_branch: schema.agentSessions.working_branch,
+      session_path: schema.agentSessions.session_path,
       created_at: schema.agentSessions.created_at,
       updated_at: schema.agentSessions.updated_at,
     })
@@ -351,6 +406,23 @@ export async function getAgentSessionDetail(params: {
     .where(eq(schema.agentSessionMessages.session_id, session.id));
 
   const myParticipant = await getParticipant(session.id, params.actor.userId);
+  const worktree = await getSessionWorktreeBySessionId({
+    repositoryId: params.repositoryId,
+    sessionId: session.id,
+  });
+  const [runtime] = session.runtime_id
+    ? await db
+        .select({
+          id: schema.agentRuntimes.id,
+          status: schema.agentRuntimes.status,
+          provider: schema.agentRuntimes.provider,
+          last_heartbeat_at: schema.agentRuntimes.last_heartbeat_at,
+          runtime_key: schema.agentRuntimes.runtime_key,
+        })
+        .from(schema.agentRuntimes)
+        .where(eq(schema.agentRuntimes.id, session.runtime_id))
+        .limit(1)
+    : [null];
 
   return {
     ...session,
@@ -358,6 +430,13 @@ export async function getAgentSessionDetail(params: {
     message_count: toNumber(messageCountRow?.count),
     my_role: myParticipant?.role || (session.creator_id === params.actor.userId ? "owner" : null),
     my_can_chat: myParticipant?.can_chat ?? session.creator_id === params.actor.userId,
+    runtime_status: runtime?.status || null,
+    runtime_provider: runtime?.provider || null,
+    runtime_last_heartbeat_at: runtime?.last_heartbeat_at || null,
+    runtime_key: runtime?.runtime_key || null,
+    worktree_status: worktree?.status || null,
+    worktree_path: worktree?.worktree_path || session.session_path || null,
+    worktree_last_error: worktree?.last_error || null,
   };
 }
 
@@ -818,7 +897,7 @@ export async function stopAgentSession(params: {
   if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
     throw createError({ statusCode: 403, message: "Only session owner can stop session" });
   }
-  if (session.status === "stopped" || session.status === "completed" || session.status === "failed") {
+  if (session.status === "stopped" || session.status === "completed") {
     return session;
   }
 
@@ -841,11 +920,33 @@ export async function stopAgentSession(params: {
     throw createError({ statusCode: 404, message: "Agent session not found" });
   }
 
+  let cleanupResult: Awaited<ReturnType<typeof cleanupSessionWorktree>> | null = null;
+  try {
+    cleanupResult = await cleanupSessionWorktree({
+      repositoryId: params.repositoryId,
+      sessionId: session.id,
+      actorId: params.actor.userId,
+    });
+  } catch (error) {
+    await appendSessionEvent({
+      sessionId: session.id,
+      type: "worktree_cleanup_failed",
+      actorType: "system",
+      actorId: "runtime",
+      payload: {
+        error: (error as { message?: string })?.message || "cleanup failed",
+      },
+    });
+  }
+
   await appendSessionEvent({
     sessionId: session.id,
     type: "session_stopped",
     actorType: "user",
     actorId: params.actor.userId,
+    payload: {
+      worktree_removed: cleanupResult?.removed || false,
+    },
   });
 
   return updated;
@@ -869,12 +970,23 @@ export async function retryAgentSession(params: {
     });
   }
 
+  try {
+    await cleanupSessionWorktree({
+      repositoryId: params.repositoryId,
+      sessionId: session.id,
+      actorId: params.actor.userId,
+    });
+  } catch {
+    // 历史 worktree 清理失败不阻断重试，由后续 prepare 流程兜底处理。
+  }
+
   const [updated] = await db
     .update(schema.agentSessions)
     .set({
       status: "created",
       started_at: null,
       finished_at: null,
+      session_path: null,
       updated_at: new Date(),
     })
     .where(
@@ -896,7 +1008,55 @@ export async function retryAgentSession(params: {
     actorId: params.actor.userId,
   });
 
-  return updated;
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "session_preparing",
+    actorType: "system",
+    actorId: "runtime",
+  });
+
+  let prepared: Awaited<ReturnType<typeof prepareRepoSessionWorktree>>;
+  try {
+    prepared = await prepareRepoSessionWorktree({
+      repositoryId: params.repositoryId,
+      sessionId: session.id,
+      baseBranch: session.base_branch,
+      workingBranch: session.working_branch || undefined,
+      actorId: params.actor.userId,
+    });
+  } catch (error) {
+    await appendSessionEvent({
+      sessionId: session.id,
+      type: "worktree_prepare_failed",
+      actorType: "system",
+      actorId: "runtime",
+      payload: {
+        error: (error as { message?: string })?.message || "retry prepare failed",
+      },
+    });
+    throw error;
+  }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "worktree_prepared",
+    actorType: "system",
+    actorId: "runtime",
+    payload: {
+      session_path: prepared.sessionPath,
+      base_branch: prepared.baseBranch,
+      working_branch: prepared.workingBranch,
+      mode: prepared.mode,
+    },
+  });
+
+  const [latest] = await db
+    .select()
+    .from(schema.agentSessions)
+    .where(eq(schema.agentSessions.id, session.id))
+    .limit(1);
+
+  return latest || updated;
 }
 
 export async function listAgentSessionEvents(params: {

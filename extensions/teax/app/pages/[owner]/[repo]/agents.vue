@@ -4,9 +4,11 @@ interface AgentSessionSummary {
   title: string | null;
   visibility: "public" | "private";
   creator_id: string;
+  runtime_id: string | null;
   status: string;
   base_branch: string;
   working_branch: string | null;
+  session_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -26,6 +28,13 @@ interface AgentSessionDetail extends AgentSessionSummary {
   message_count: number;
   my_role: "owner" | "collaborator" | "viewer" | null;
   my_can_chat: boolean;
+  runtime_status: string | null;
+  runtime_provider: string | null;
+  runtime_last_heartbeat_at: string | null;
+  runtime_key: string | null;
+  worktree_status: string | null;
+  worktree_path: string | null;
+  worktree_last_error: string | null;
 }
 
 interface AgentSessionParticipant {
@@ -76,6 +85,25 @@ interface PaginatedResponse<T> {
   hasMore: boolean;
 }
 
+interface RepoRuntimeSummary {
+  repository_id: string;
+  repository_full_name: string;
+  mode: "local" | "mock";
+  root_dir: string;
+  repo_root_path: string;
+  sessions_root_dir: string;
+  runtime: {
+    id: string;
+    status: string;
+    provider: string;
+    runtime_key: string | null;
+    last_heartbeat_at: string | null;
+  } | null;
+  runtime_status: string;
+  active_session_count: number;
+  active_worktree_count: number;
+}
+
 const props = defineProps<{
   owner: string;
   repo: string;
@@ -84,6 +112,7 @@ const props = defineProps<{
 const toast = useToast();
 const { user } = useUserSession();
 const sessionsApiBase = `/api/repos/${props.owner}/${props.repo}/agents/sessions`;
+const runtimeApiBase = `/api/repos/${props.owner}/${props.repo}/agents/runtime`;
 
 const { data: sessionListResp, pending: sessionListPending, refresh: refreshSessionList } = await useFetch<
   PaginatedResponse<AgentSessionSummary>
@@ -94,7 +123,12 @@ const { data: sessionListResp, pending: sessionListPending, refresh: refreshSess
   },
 });
 
+const { data: runtimeSummaryResp, pending: runtimeSummaryPending, refresh: refreshRuntimeSummary } = await useFetch<
+  RepoRuntimeSummary
+>(runtimeApiBase);
+
 const sessions = computed(() => sessionListResp.value?.data ?? []);
+const runtimeSummary = computed(() => runtimeSummaryResp.value || null);
 const selectedSessionId = ref<string | null>(null);
 
 const sessionDetail = ref<AgentSessionDetail | null>(null);
@@ -115,7 +149,11 @@ const stopLoading = ref(false);
 const retryLoading = ref(false);
 const visibilityLoading = ref(false);
 const pinningMessageId = ref<string | null>(null);
+const runtimeStartLoading = ref(false);
+const runtimeStopLoading = ref(false);
+const runtimeForceStopLoading = ref(false);
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
+let autoRefreshTick = 0;
 
 const createForm = reactive({
   title: "",
@@ -245,6 +283,14 @@ function actorTypeColor(type: string): "info" | "success" | "warning" | "error" 
   return "neutral";
 }
 
+function runtimeStatusColor(status: string): "info" | "success" | "warning" | "error" | "neutral" {
+  if (status === "running") return "success";
+  if (status === "starting") return "warning";
+  if (status === "stopped") return "neutral";
+  if (status === "failed") return "error";
+  return "neutral";
+}
+
 async function loadSessionContext(sessionId: string) {
   sessionContextPending.value = true;
   sessionContextError.value = "";
@@ -306,10 +352,14 @@ function startAutoRefresh() {
 
   autoRefreshTimer = setInterval(() => {
     const sessionId = selectedSessionId.value;
+    autoRefreshTick += 1;
     if (!sessionId) return;
     if (sessionContextPending.value || sendPromptLoading.value || createLoading.value) return;
 
     void refreshSessionRealtime(sessionId);
+    if (autoRefreshTick % 3 === 0) {
+      void refreshRuntimeSummary();
+    }
   }, 6000);
 }
 
@@ -366,7 +416,7 @@ async function createSession() {
     resetCreateForm();
     toast.add({ title: "会话创建成功", color: "success" });
 
-    await refreshSessionList();
+    await Promise.all([refreshSessionList(), refreshRuntimeSummary()]);
     selectedSessionId.value = created.id;
     await loadSessionContext(created.id);
   } catch (error: unknown) {
@@ -379,6 +429,45 @@ async function createSession() {
 async function refreshCurrentSession() {
   if (!selectedSessionId.value) return;
   await loadSessionContext(selectedSessionId.value);
+}
+
+async function startRuntime() {
+  runtimeStartLoading.value = true;
+  try {
+    await $fetch(`${runtimeApiBase}/start`, {
+      method: "POST",
+    });
+    toast.add({ title: "Runtime 已启动", color: "success" });
+    await refreshRuntimeSummary();
+  } catch (error: unknown) {
+    toast.add({ title: getErrorMessage(error, "启动 Runtime 失败"), color: "error" });
+  } finally {
+    runtimeStartLoading.value = false;
+  }
+}
+
+async function stopRuntime(force: boolean) {
+  if (force) {
+    runtimeForceStopLoading.value = true;
+  } else {
+    runtimeStopLoading.value = true;
+  }
+
+  try {
+    await $fetch(`${runtimeApiBase}/stop`, {
+      method: "POST",
+      body: {
+        force,
+      },
+    });
+    toast.add({ title: force ? "Runtime 已强制停止" : "Runtime 已停止", color: "success" });
+    await Promise.all([refreshRuntimeSummary(), refreshSessionList(), refreshCurrentSession()]);
+  } catch (error: unknown) {
+    toast.add({ title: getErrorMessage(error, "停止 Runtime 失败"), color: "error" });
+  } finally {
+    runtimeStopLoading.value = false;
+    runtimeForceStopLoading.value = false;
+  }
 }
 
 async function submitPrompt() {
@@ -394,7 +483,7 @@ async function submitPrompt() {
     });
 
     promptDraft.value = "";
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "发送消息失败"), color: "error" });
   } finally {
@@ -409,7 +498,7 @@ async function joinSession() {
   try {
     await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/join`, { method: "POST" });
     toast.add({ title: "已加入会话", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "加入会话失败"), color: "error" });
   } finally {
@@ -424,7 +513,7 @@ async function leaveSession() {
   try {
     await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/leave`, { method: "POST" });
     toast.add({ title: "已退出会话", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "退出会话失败"), color: "error" });
   } finally {
@@ -439,7 +528,7 @@ async function stopSession() {
   try {
     await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/stop`, { method: "POST" });
     toast.add({ title: "会话已停止", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "停止会话失败"), color: "error" });
   } finally {
@@ -454,7 +543,7 @@ async function retrySession() {
   try {
     await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/retry`, { method: "POST" });
     toast.add({ title: "会话已重试", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "重试会话失败"), color: "error" });
   } finally {
@@ -474,7 +563,7 @@ async function updateVisibility() {
       },
     });
     toast.add({ title: "会话可见性已更新", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "更新可见性失败"), color: "error" });
   } finally {
@@ -529,6 +618,106 @@ async function pinMessage(messageId: string) {
         </UButton>
       </div>
     </div>
+
+    <UCard>
+      <template #header>
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <h3 class="text-sm font-semibold">
+              Repo Runtime
+            </h3>
+            <UBadge
+              :color="runtimeStatusColor(runtimeSummary?.runtime_status || 'stopped')"
+              variant="subtle"
+            >
+              {{ runtimeSummary?.runtime_status || "stopped" }}
+            </UBadge>
+            <UBadge
+              color="neutral"
+              variant="soft"
+            >
+              {{ runtimeSummary?.mode || "mock" }}
+            </UBadge>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-refresh-cw"
+              :loading="runtimeSummaryPending"
+              @click="refreshRuntimeSummary"
+            >
+              刷新
+            </UButton>
+            <UButton
+              icon="i-lucide-play"
+              color="primary"
+              :loading="runtimeStartLoading"
+              :disabled="runtimeSummary?.runtime_status === 'running'"
+              @click="startRuntime"
+            >
+              启动
+            </UButton>
+            <UButton
+              icon="i-lucide-square"
+              color="warning"
+              variant="soft"
+              :loading="runtimeStopLoading"
+              :disabled="runtimeSummary?.runtime_status !== 'running'"
+              @click="stopRuntime(false)"
+            >
+              停止
+            </UButton>
+            <UButton
+              icon="i-lucide-octagon-x"
+              color="error"
+              variant="ghost"
+              :loading="runtimeForceStopLoading"
+              :disabled="runtimeSummary?.runtime_status !== 'running'"
+              @click="stopRuntime(true)"
+            >
+              强制停止
+            </UButton>
+          </div>
+        </div>
+      </template>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
+          <p class="text-gray-500 mb-1">
+            活跃会话
+          </p>
+          <p class="font-medium text-sm">
+            {{ runtimeSummary?.active_session_count ?? 0 }}
+          </p>
+        </div>
+        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
+          <p class="text-gray-500 mb-1">
+            活跃 Worktree
+          </p>
+          <p class="font-medium text-sm">
+            {{ runtimeSummary?.active_worktree_count ?? 0 }}
+          </p>
+        </div>
+        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
+          <p class="text-gray-500 mb-1">
+            Runtime Key
+          </p>
+          <p class="font-medium text-sm truncate">
+            {{ runtimeSummary?.runtime?.runtime_key || "-" }}
+          </p>
+        </div>
+        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
+          <p class="text-gray-500 mb-1">
+            心跳
+          </p>
+          <p class="font-medium text-sm truncate">
+            {{ formatDateTime(runtimeSummary?.runtime?.last_heartbeat_at || null) }}
+          </p>
+        </div>
+      </div>
+    </UCard>
 
     <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
       <div class="xl:col-span-4">
@@ -696,6 +885,20 @@ async function pinMessage(messageId: string) {
                   >
                     我的角色: {{ sessionDetail.my_role || "未加入" }}
                   </UBadge>
+                  <UBadge
+                    v-if="sessionDetail.runtime_status"
+                    :color="runtimeStatusColor(sessionDetail.runtime_status)"
+                    variant="soft"
+                  >
+                    Runtime: {{ sessionDetail.runtime_status }}
+                  </UBadge>
+                  <UBadge
+                    v-if="sessionDetail.worktree_status"
+                    color="neutral"
+                    variant="soft"
+                  >
+                    Worktree: {{ sessionDetail.worktree_status }}
+                  </UBadge>
                 </div>
               </div>
             </template>
@@ -733,6 +936,24 @@ async function pinMessage(messageId: string) {
                     {{ formatDateTime(sessionDetail.updated_at) }}
                   </p>
                 </div>
+              </div>
+
+              <div
+                v-if="sessionDetail.worktree_path || sessionDetail.worktree_last_error"
+                class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-1 text-xs"
+              >
+                <p
+                  v-if="sessionDetail.worktree_path"
+                  class="text-gray-500"
+                >
+                  Worktree 路径：{{ sessionDetail.worktree_path }}
+                </p>
+                <p
+                  v-if="sessionDetail.worktree_last_error"
+                  class="text-red-500"
+                >
+                  Worktree 错误：{{ sessionDetail.worktree_last_error }}
+                </p>
               </div>
 
               <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
