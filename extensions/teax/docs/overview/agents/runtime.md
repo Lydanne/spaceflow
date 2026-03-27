@@ -25,9 +25,7 @@
 
 | 变量名 | 默认值 | 说明 |
 | --- | --- | --- |
-| `AGENT_RUNTIME_MODE` | `docker` | 运行模式：`docker` / `local` |
 | `AGENT_RUNTIME_ROOT` | `.teax-agent-runtime` | Runtime 根目录 |
-| `AGENT_RUNTIME_GIT_BIN` | `git` | Git 可执行文件路径 |
 | `AGENT_RUNTIME_DOCKER_BIN` | `docker` | Docker 可执行文件路径 |
 | `AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE` | `docker/base/node24-vscode-browser.Dockerfile` | 基础镜像 Dockerfile |
 | `AGENT_RUNTIME_DOCKER_BASE_BUILD_CONTEXT` | `.` | 基础镜像 build context |
@@ -39,20 +37,6 @@
 | `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP` | `false` | 停止会话时是否保留 worktree 目录 |
 
 #### 参数详解
-
-##### `AGENT_RUNTIME_MODE`
-
-- 类型：`string`
-- 可选值：`docker`、`local`
-- 默认值：`docker`
-- 生效范围：全局
-- 行为说明：
-  - `docker`：为仓库启动容器 runtime，worktree 通过 `docker exec git ...` 管理
-  - `local`：直接在宿主机执行 `git clone/fetch/worktree`
-  - 传入非法值时会自动回落到 `docker`
-- 推荐：
-  - 生产：`docker`
-  - 无 Docker 场景临时调试：`local`
 
 ##### `AGENT_RUNTIME_ROOT`
 
@@ -67,17 +51,6 @@
   - 若配置为相对路径，会按服务进程当前工作目录解析为绝对路径
 - 推荐：
   - 生产使用持久化磁盘绝对路径，例如 `/data/teax-agent-runtime`
-
-##### `AGENT_RUNTIME_GIT_BIN`
-
-- 类型：`string`
-- 默认值：`git`
-- 生效范围：`local` 模式
-- 行为说明：
-  - 指定执行 Git 命令的二进制路径
-  - 典型命令包含：`clone`、`fetch`、`worktree add/remove/prune`
-- 推荐：
-  - 默认 `git` 即可；自定义安装时可填绝对路径（如 `/usr/bin/git`）
 
 ##### `AGENT_RUNTIME_DOCKER_BIN`
 
@@ -182,7 +155,7 @@
 
 - 类型：`boolean`（环境变量字符串，仅 `"true"` 为 true）
 - 默认值：`false`
-- 生效范围：`local/docker` 模式
+- 生效范围：`docker` 模式
 - 行为说明：
   - `false`：停止会话时清理 worktree 目录，并将记录标记为 `removed`
   - `true`：停止会话时保留目录，便于排查/复盘
@@ -190,10 +163,7 @@
   - 生产默认 `false`
   - 需要定位问题时临时改为 `true`
 
-建议：
-
-- 默认使用 `docker`。
-- 需要用宿主机 Git 执行时可切到 `local`。
+建议：默认使用 `docker`。
 
 ### 2.2 数据库落库
 
@@ -213,15 +183,7 @@ pnpm dev
 
 ## 3. 运行模式说明
 
-### 3.1 local 模式
-
-- 执行真实 git 流程：`clone/fetch/worktree add/worktree remove`
-- 需要宿主机具备：
-  - 可执行的 `git`
-  - 仓库 `clone_url` 对应的访问权限
-- 准备失败会直接返回错误并将会话标记为 `failed`
-
-### 3.2 docker 模式
+### 3.1 docker 模式
 
 - 默认模式
 - 启动 runtime 时会按“两段构建”拉起仓库容器（每仓库一个容器）：
@@ -280,7 +242,7 @@ Runtime 与 Session 相关接口权限如下：
 返回要点：
 
 - `runtime_status`：`running/stopped/...`
-- `mode`：`local/docker`
+- `mode`：`docker`
 - `active_session_count`
 - `active_worktree_count`
 
@@ -365,13 +327,14 @@ failed/stopped --retry--> preparing -> running
 
 处理：调用 `POST /runtime/stop` 并传 `{"force": true}`。
 
-### 9.2 local 模式下会话创建失败
+### 9.2 docker 模式下会话创建失败
 
 优先检查：
 
-1. `AGENT_RUNTIME_GIT_BIN` 是否可执行
-2. `clone_url` 是否可访问（凭据/网络）
-3. `AGENT_RUNTIME_ROOT` 是否有读写权限
+1. `AGENT_RUNTIME_DOCKER_BIN` 是否可执行
+2. Docker daemon 是否正常运行、当前用户是否有权限访问 Docker
+3. `clone_url` 是否可访问（凭据/网络）
+4. `AGENT_RUNTIME_ROOT` 是否有读写权限
 
 请修复环境后重试。
 
@@ -383,7 +346,7 @@ failed/stopped --retry--> preparing -> running
 
 ## 10. 生产建议
 
-- 生产建议使用 `docker`，必要时再切 `local`
+- 生产建议使用 `docker`
 - 建议将 `AGENT_RUNTIME_ROOT` 指向持久化磁盘
 - 结合系统监控采集以下指标：
   - runtime 状态变化

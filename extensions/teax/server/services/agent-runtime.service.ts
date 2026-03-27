@@ -9,19 +9,15 @@ import { schema, useDB } from "~~/server/db";
 const execFileAsync = promisify(execFile);
 const repoLocks = new Map<string, Promise<void>>();
 
-type RuntimeMode = "local" | "docker";
-
 /**
  * Runtime 全局解析配置。
  * - rootDir/repo/session 为宿主机目录
  * - dockerWorkspaceRoot 为容器内工作根目录（默认 /runtime）
  */
 interface RuntimeResolvedConfig {
-  mode: RuntimeMode;
   rootDir: string;
   reposRootDir: string;
   sessionsRootDir: string;
-  gitBin: string;
   dockerBin: string;
   dockerBaseDockerfilePath: string;
   dockerBaseBuildContext: string;
@@ -86,14 +82,10 @@ interface AgentRuntimeDockerMetadata {
 }
 
 /**
- * 解析运行时配置（支持 local/docker 双模式）。
- * - local：真实执行 git worktree（需宿主具备 git 和仓库访问权限）
- * - docker：按仓库构建并启动容器，worktree 通过 docker exec 执行
+ * 解析运行时配置（固定 docker 模式）。
  */
 function resolveRuntimeConfig(): RuntimeResolvedConfig {
   const config = useRuntimeConfig();
-  const rawMode = String(config.agentRuntimeMode || "docker");
-  const mode: RuntimeMode = rawMode === "local" || rawMode === "docker" ? rawMode : "docker";
   const rawRoot = String(config.agentRuntimeRoot || ".teax-agent-runtime");
   const rootDir = isAbsolute(rawRoot) ? rawRoot : resolve(process.cwd(), rawRoot);
   const rawDockerfile = String(config.agentRuntimeDockerfile || "").trim();
@@ -118,11 +110,9 @@ function resolveRuntimeConfig(): RuntimeResolvedConfig {
     : resolve(process.cwd());
 
   return {
-    mode,
     rootDir,
     reposRootDir: join(rootDir, "repos"),
     sessionsRootDir: join(rootDir, "sessions"),
-    gitBin: String(config.agentRuntimeGitBin || "git"),
     dockerBin: String(config.agentRuntimeDockerBin || "docker"),
     dockerBaseDockerfilePath,
     dockerBaseBuildContext,
@@ -172,18 +162,6 @@ async function pathExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-async function runGit(args: string[], cwd?: string) {
-  const config = resolveRuntimeConfig();
-  const { stdout, stderr } = await execFileAsync(config.gitBin, args, {
-    cwd,
-    maxBuffer: 10 * 1024 * 1024,
-  });
-  return {
-    stdout: (stdout || "").trim(),
-    stderr: (stderr || "").trim(),
-  };
 }
 
 async function runDocker(args: string[], cwd?: string) {
@@ -529,8 +507,7 @@ async function stopAndRemoveDockerContainer(containerName: string) {
 
 /**
  * 确保仓库 runtime 可用。
- * - local：维护 runtime 记录
- * - docker：构建并启动仓库级容器，然后落库状态
+ * 固定 docker 模式：构建并启动仓库级容器，然后落库状态。
  */
 export async function ensureRepoRuntime(params: {
   repositoryId: string;
@@ -553,36 +530,34 @@ export async function ensureRepoRuntime(params: {
       .limit(1);
 
     const runtimeKey = existing?.runtime_key || buildRepoRuntimeKey(params.repositoryId);
-    const provider: RuntimeMode = runtimeConfig.mode;
+    const provider = "docker";
     let metadata: Record<string, unknown> = {
       ...(existing?.metadata as Record<string, unknown> || {}),
       root_dir: runtimeConfig.rootDir,
       repo_root_path: paths.repoRootPath,
       sessions_root_dir: runtimeConfig.sessionsRootDir,
-      mode: runtimeConfig.mode,
+      mode: "docker",
     };
 
-    if (runtimeConfig.mode === "docker") {
-      const dockerRuntime = await ensureDockerRuntimeContainer({
-        repository,
-        runtimeKey,
-      });
-      const dockerMetadata: AgentRuntimeDockerMetadata = {
-        container_name: dockerRuntime.containerName,
-        container_id: dockerRuntime.containerId,
-        meta_repo_local_path: join(runtimeConfig.rootDir, ".teax"),
-        meta_repo_container_path: posix.join(runtimeConfig.dockerWorkspaceRoot, ".teax"),
-        base_image_tag: dockerRuntime.baseImageTag,
-        base_dockerfile_path: dockerRuntime.baseDockerfilePath,
-        image_tag: dockerRuntime.imageTag,
-        dockerfile_path: dockerRuntime.dockerfilePath,
-        build_context: dockerRuntime.buildContext,
-      };
-      metadata = {
-        ...metadata,
-        docker: dockerMetadata,
-      };
-    }
+    const dockerRuntime = await ensureDockerRuntimeContainer({
+      repository,
+      runtimeKey,
+    });
+    const dockerMetadata: AgentRuntimeDockerMetadata = {
+      container_name: dockerRuntime.containerName,
+      container_id: dockerRuntime.containerId,
+      meta_repo_local_path: join(runtimeConfig.rootDir, ".teax"),
+      meta_repo_container_path: posix.join(runtimeConfig.dockerWorkspaceRoot, ".teax"),
+      base_image_tag: dockerRuntime.baseImageTag,
+      base_dockerfile_path: dockerRuntime.baseDockerfilePath,
+      image_tag: dockerRuntime.imageTag,
+      dockerfile_path: dockerRuntime.dockerfilePath,
+      build_context: dockerRuntime.buildContext,
+    };
+    metadata = {
+      ...metadata,
+      docker: dockerMetadata,
+    };
 
     if (existing) {
       const [updated] = await db
@@ -630,104 +605,6 @@ export async function ensureRepoRuntime(params: {
       mode: provider,
     };
   });
-}
-
-async function prepareWorktreeInLocalMode(params: {
-  repository: RepositorySnapshot;
-  sessionId: string;
-  runtimeId: string;
-  baseBranch: string;
-  workingBranch: string;
-  actorId: string;
-}) {
-  const db = useDB();
-  const paths = buildRepoPaths(params.repository, params.sessionId);
-  const repoGitDirPath = join(paths.repoRootPath, ".git");
-
-  await mkdir(paths.repoRootPath, { recursive: true });
-  await mkdir(resolveRuntimeConfig().sessionsRootDir, { recursive: true });
-
-  if (!await pathExists(repoGitDirPath)) {
-    await rm(paths.repoRootPath, { recursive: true, force: true });
-    await runGit(["clone", "--no-checkout", params.repository.clone_url, paths.repoRootPath]);
-  } else {
-    await runGit(["remote", "set-url", "origin", params.repository.clone_url], paths.repoRootPath);
-  }
-
-  await runGit(["fetch", "origin", "--prune"], paths.repoRootPath);
-
-  if (await pathExists(paths.sessionPath)) {
-    try {
-      await runGit(["worktree", "remove", "--force", paths.sessionPath], paths.repoRootPath);
-    } catch {
-      // 忽略历史脏状态，后续直接强制清理目录
-    }
-    await rm(paths.sessionPath, { recursive: true, force: true });
-  }
-
-  await runGit(
-    [
-      "worktree",
-      "add",
-      "-B",
-      params.workingBranch,
-      paths.sessionPath,
-      `origin/${params.baseBranch}`,
-    ],
-    paths.repoRootPath,
-  );
-  await runGit(["worktree", "prune"], paths.repoRootPath);
-
-  const [headResult, branchResult] = await Promise.all([
-    runGit(["rev-parse", "HEAD"], paths.sessionPath),
-    runGit(["rev-parse", "--abbrev-ref", "HEAD"], paths.sessionPath),
-  ]);
-
-  const [upserted] = await db
-    .insert(schema.agentSessionWorktrees)
-    .values({
-      session_id: params.sessionId,
-      repository_id: params.repository.id,
-      runtime_id: params.runtimeId,
-      base_branch: params.baseBranch,
-      working_branch: params.workingBranch,
-      worktree_path: paths.sessionPath,
-      status: "active",
-      prepared_at: new Date(),
-      metadata: {
-        mode: "local",
-        head: headResult.stdout,
-        checked_out_branch: branchResult.stdout,
-      },
-      row_creator: params.actorId,
-    })
-    .onConflictDoUpdate({
-      target: [schema.agentSessionWorktrees.session_id],
-      set: {
-        repository_id: params.repository.id,
-        runtime_id: params.runtimeId,
-        base_branch: params.baseBranch,
-        working_branch: params.workingBranch,
-        worktree_path: paths.sessionPath,
-        status: "active",
-        prepared_at: new Date(),
-        removed_at: null,
-        last_error: null,
-        metadata: {
-          mode: "local",
-          head: headResult.stdout,
-          checked_out_branch: branchResult.stdout,
-        },
-        updated_at: new Date(),
-      },
-    })
-    .returning();
-
-  return {
-    sessionPath: paths.sessionPath,
-    worktree: upserted,
-    mode: "local" as const,
-  };
 }
 
 async function prepareWorktreeInDockerMode(params: {
@@ -916,32 +793,15 @@ export async function prepareRepoSessionWorktree(params: {
 
   return withRepositoryLock(params.repositoryId, async () => {
     try {
-      let prepared:
-        | Awaited<ReturnType<typeof prepareWorktreeInLocalMode>>
-        | Awaited<ReturnType<typeof prepareWorktreeInDockerMode>>;
-
-      if (runtimeResult.mode === "local") {
-        prepared = await prepareWorktreeInLocalMode({
-          repository,
-          sessionId: params.sessionId,
-          runtimeId: runtimeResult.runtime.id,
-          baseBranch,
-          workingBranch,
-          actorId: params.actorId,
-        });
-      } else if (runtimeResult.mode === "docker") {
-        prepared = await prepareWorktreeInDockerMode({
-          repository,
-          sessionId: params.sessionId,
-          runtimeId: runtimeResult.runtime.id,
-          runtimeKey: runtimeResult.runtime.runtime_key || buildRepoRuntimeKey(params.repositoryId),
-          baseBranch,
-          workingBranch,
-          actorId: params.actorId,
-        });
-      } else {
-        throw createError({ statusCode: 500, message: `Unsupported runtime mode: ${runtimeResult.mode}` });
-      }
+      const prepared = await prepareWorktreeInDockerMode({
+        repository,
+        sessionId: params.sessionId,
+        runtimeId: runtimeResult.runtime.id,
+        runtimeKey: runtimeResult.runtime.runtime_key || buildRepoRuntimeKey(params.repositoryId),
+        baseBranch,
+        workingBranch,
+        actorId: params.actorId,
+      });
 
       await db
         .update(schema.agentSessions)
@@ -1029,7 +889,6 @@ export async function cleanupSessionWorktree(params: {
 
   return withRepositoryLock(params.repositoryId, async () => {
     const sessionPath = worktree.worktree_path;
-    const repoRootPath = buildRepoPaths(repository, params.sessionId).repoRootPath;
     const containerPaths = buildRepoContainerPaths(repository, params.sessionId);
     const shouldDeletePath = !runtimeConfig.keepWorktreeOnStop;
     const [runtime] = worktree.runtime_id
@@ -1042,17 +901,9 @@ export async function cleanupSessionWorktree(params: {
           .where(eq(schema.agentRuntimes.id, worktree.runtime_id))
           .limit(1)
       : [null];
-    const runtimeProvider = (runtime?.provider || runtimeConfig.mode) as RuntimeMode;
+    const runtimeProvider = runtime?.provider || "docker";
     const runtimeKey = runtime?.runtime_key || buildRepoRuntimeKey(params.repositoryId);
 
-    if (runtimeProvider === "local" && shouldDeletePath) {
-      try {
-        await runGit(["worktree", "remove", "--force", sessionPath], repoRootPath);
-        await runGit(["worktree", "prune"], repoRootPath);
-      } catch {
-        // 失败时降级为目录清理，避免残留阻塞后续会话
-      }
-    }
     if (runtimeProvider === "docker" && shouldDeletePath) {
       try {
         await runDockerExec(runtimeKey, [
@@ -1147,7 +998,7 @@ export async function getRepoRuntimeSummary(params: {
   return {
     repository_id: repository.id,
     repository_full_name: repository.full_name,
-    mode: runtimeConfig.mode,
+    mode: "docker",
     root_dir: runtimeConfig.rootDir,
     repo_root_path: paths.repoRootPath,
     sessions_root_dir: runtimeConfig.sessionsRootDir,

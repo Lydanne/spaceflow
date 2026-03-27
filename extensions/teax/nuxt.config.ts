@@ -24,9 +24,7 @@ export default defineNuxtConfig({
     giteaServiceToken: process.env.GITEA_SERVICE_TOKEN || "",
     tokenEncryptSecret: process.env.TOKEN_ENCRYPT_SECRET || "",
     // Agent Runtime（P1）配置
-    agentRuntimeMode: process.env.AGENT_RUNTIME_MODE || "docker",
     agentRuntimeRoot: process.env.AGENT_RUNTIME_ROOT || ".teax-agent-runtime",
-    agentRuntimeGitBin: process.env.AGENT_RUNTIME_GIT_BIN || "git",
     agentRuntimeDockerBin: process.env.AGENT_RUNTIME_DOCKER_BIN || "docker",
     agentRuntimeDockerBaseDockerfile:
       process.env.AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE
