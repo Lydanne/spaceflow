@@ -65,3 +65,12 @@ export const createAgentSessionMessageBodySchema = z.object({
 });
 
 export type CreateAgentSessionMessageBody = z.infer<typeof createAgentSessionMessageBodySchema>;
+
+/**
+ * 修改会话可见性请求体。
+ */
+export const updateAgentSessionVisibilityBodySchema = z.object({
+  visibility: agentSessionVisibilitySchema,
+});
+
+export type UpdateAgentSessionVisibilityBody = z.infer<typeof updateAgentSessionVisibilityBodySchema>;

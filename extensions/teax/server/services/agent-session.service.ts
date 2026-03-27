@@ -620,3 +620,115 @@ export async function pinAgentSessionMessage(params: {
 
   return pinned;
 }
+
+export async function updateAgentSessionVisibility(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+  visibility: "public" | "private";
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    throw createError({ statusCode: 403, message: "Only session owner can change visibility" });
+  }
+
+  const [updated] = await db
+    .update(schema.agentSessions)
+    .set({
+      visibility: params.visibility,
+      updated_at: new Date(),
+    })
+    .where(
+      and(
+        eq(schema.agentSessions.id, session.id),
+        eq(schema.agentSessions.repository_id, params.repositoryId),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    throw createError({ statusCode: 404, message: "Agent session not found" });
+  }
+
+  return updated;
+}
+
+export async function stopAgentSession(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    throw createError({ statusCode: 403, message: "Only session owner can stop session" });
+  }
+  if (session.status === "stopped" || session.status === "completed" || session.status === "failed") {
+    return session;
+  }
+
+  const [updated] = await db
+    .update(schema.agentSessions)
+    .set({
+      status: "stopped",
+      finished_at: new Date(),
+      updated_at: new Date(),
+    })
+    .where(
+      and(
+        eq(schema.agentSessions.id, session.id),
+        eq(schema.agentSessions.repository_id, params.repositoryId),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    throw createError({ statusCode: 404, message: "Agent session not found" });
+  }
+
+  return updated;
+}
+
+export async function retryAgentSession(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    throw createError({ statusCode: 403, message: "Only session owner can retry session" });
+  }
+  if (session.status !== "failed" && session.status !== "stopped") {
+    throw createError({
+      statusCode: 400,
+      message: "Only failed or stopped sessions can be retried",
+    });
+  }
+
+  const [updated] = await db
+    .update(schema.agentSessions)
+    .set({
+      status: "created",
+      started_at: null,
+      finished_at: null,
+      updated_at: new Date(),
+    })
+    .where(
+      and(
+        eq(schema.agentSessions.id, session.id),
+        eq(schema.agentSessions.repository_id, params.repositoryId),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    throw createError({ statusCode: 404, message: "Agent session not found" });
+  }
+
+  return updated;
+}
