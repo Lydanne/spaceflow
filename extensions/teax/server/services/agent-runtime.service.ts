@@ -144,6 +144,26 @@ function toNumber(value: unknown): number {
   return Number(value ?? 0);
 }
 
+function stringifyForShell(part: string): string {
+  if (!part) return "''";
+  if (/^[a-zA-Z0-9._/:=@-]+$/.test(part)) {
+    return part;
+  }
+  return JSON.stringify(part);
+}
+
+function formatCommand(bin: string, args: string[]): string {
+  return [bin, ...args].map((part) => stringifyForShell(part)).join(" ");
+}
+
+function logRuntimeStep(step: string, payload?: Record<string, unknown>) {
+  if (payload && Object.keys(payload).length > 0) {
+    console.info(`[agent-runtime] ${step}`, payload);
+    return;
+  }
+  console.info(`[agent-runtime] ${step}`);
+}
+
 async function pathExists(path: string): Promise<boolean> {
   try {
     await access(path, fsConstants.F_OK);
@@ -155,14 +175,40 @@ async function pathExists(path: string): Promise<boolean> {
 
 async function runDocker(args: string[], cwd?: string) {
   const config = resolveRuntimeConfig();
-  const { stdout, stderr } = await execFileAsync(config.dockerBin, args, {
-    cwd,
-    maxBuffer: 20 * 1024 * 1024,
+  const commandText = formatCommand(config.dockerBin, args);
+  const startedAt = Date.now();
+  logRuntimeStep("run command", {
+    command: commandText,
+    cwd: cwd || process.cwd(),
   });
-  return {
-    stdout: (stdout || "").trim(),
-    stderr: (stderr || "").trim(),
-  };
+  try {
+    const { stdout, stderr } = await execFileAsync(config.dockerBin, args, {
+      cwd,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+    const cleanedStdout = (stdout || "").trim();
+    const cleanedStderr = (stderr || "").trim();
+    logRuntimeStep("command success", {
+      command: commandText,
+      duration_ms: Date.now() - startedAt,
+      stderr: cleanedStderr || undefined,
+    });
+    return {
+      stdout: cleanedStdout,
+      stderr: cleanedStderr,
+    };
+  } catch (error) {
+    const stdout = ((error as { stdout?: string })?.stdout || "").trim();
+    const stderr = ((error as { stderr?: string })?.stderr || "").trim();
+    console.error("[agent-runtime] command failed", {
+      command: commandText,
+      duration_ms: Date.now() - startedAt,
+      stdout: stdout || undefined,
+      stderr: stderr || undefined,
+      message: (error as { message?: string })?.message || "unknown",
+    });
+    throw error;
+  }
 }
 
 async function runDockerExec(containerName: string, command: string[]) {
@@ -379,6 +425,12 @@ async function ensureDockerRuntimeContainer(params: {
   const containerSessionsRoot = posix.join(runtimeConfig.dockerWorkspaceRoot, "sessions");
   // 容器内元数据挂载点：${AGENT_RUNTIME_ROOT}/.teax
   const containerMetaRepoRoot = posix.join(runtimeConfig.dockerWorkspaceRoot, ".teax");
+  logRuntimeStep("runtime bootstrap begin", {
+    repository_id: params.repository.id,
+    repository_full_name: params.repository.full_name,
+    runtime_key: params.runtimeKey,
+    image_tag: imageTag,
+  });
 
   await mkdir(runtimeConfig.reposRootDir, { recursive: true });
   await mkdir(runtimeConfig.sessionsRootDir, { recursive: true });
@@ -386,6 +438,11 @@ async function ensureDockerRuntimeContainer(params: {
 
   const existing = await inspectDockerContainer(containerName);
   if (existing?.running) {
+    logRuntimeStep("runtime bootstrap reuse running container", {
+      container_name: containerName,
+      container_id: existing.containerId,
+      image_tag: existing.imageTag || imageTag,
+    });
     const repoBuildSpec = await ensureRepoDockerfileAndContext({
       repository: params.repository,
     });
@@ -402,6 +459,9 @@ async function ensureDockerRuntimeContainer(params: {
   }
 
   if (!runtimeConfig.dockerBuildOnStart && existing && !existing.running) {
+    logRuntimeStep("runtime bootstrap start existing stopped container", {
+      container_name: containerName,
+    });
     const repoBuildSpec = await ensureRepoDockerfileAndContext({
       repository: params.repository,
     });
@@ -429,6 +489,11 @@ async function ensureDockerRuntimeContainer(params: {
 
   if (runtimeConfig.dockerBuildOnStart || !existing) {
     // 第一步：先构建基础镜像。
+    logRuntimeStep("runtime bootstrap step 1/4 build base image", {
+      dockerfile: baseBuildSpec.dockerfilePath,
+      context: baseBuildSpec.buildContext,
+      image_tag: baseBuildSpec.imageTag,
+    });
     await runDocker([
       "build",
       "-f",
@@ -438,6 +503,14 @@ async function ensureDockerRuntimeContainer(params: {
       baseBuildSpec.buildContext,
     ]);
     // 第二步：再基于基础镜像构建仓库运行镜像。
+    logRuntimeStep("runtime bootstrap step 2/4 build repo image", {
+      dockerfile: repoBuildSpec.dockerfilePath,
+      source_dockerfile: repoBuildSpec.sourceDockerfilePath,
+      dockerfile_source: repoBuildSpec.dockerfileSource,
+      context: repoBuildSpec.buildContext,
+      image_tag: imageTag,
+      base_image_tag: baseBuildSpec.imageTag,
+    });
     await runDocker([
       "build",
       "-f",
@@ -451,9 +524,20 @@ async function ensureDockerRuntimeContainer(params: {
   }
 
   if (existing) {
+    logRuntimeStep("runtime bootstrap step 3/4 remove old container", {
+      container_name: containerName,
+    });
     await stopAndRemoveDockerContainer(containerName);
   }
 
+  logRuntimeStep("runtime bootstrap step 4/4 run container", {
+    container_name: containerName,
+    image_tag: imageTag,
+    mount_repo_root: runtimeConfig.reposRootDir,
+    mount_session_root: runtimeConfig.sessionsRootDir,
+    mount_meta_repo: metaRepoLocalPath,
+    workspace_root: runtimeConfig.dockerWorkspaceRoot,
+  });
   await runDocker([
     "run",
     "-d",
@@ -490,6 +574,11 @@ async function ensureDockerRuntimeContainer(params: {
   if (!checked?.running) {
     throw createError({ statusCode: 500, message: `Failed to start docker runtime: ${containerName}` });
   }
+  logRuntimeStep("runtime bootstrap completed", {
+    container_name: containerName,
+    container_id: checked.containerId,
+    image_tag: checked.imageTag || imageTag,
+  });
 
   return {
     containerName,
@@ -527,12 +616,20 @@ export async function ensureRepoRuntime(params: {
   const runtimeConfig = resolveRuntimeConfig();
   const metaRepoConfig = resolveAgentMetaRepoConfig();
   const repository = await getRepositoryById(params.repositoryId);
+  logRuntimeStep("ensure repo runtime begin", {
+    repository_id: params.repositoryId,
+    actor_id: params.actorId,
+    repository_full_name: repository.full_name,
+  });
 
   await mkdir(runtimeConfig.reposRootDir, { recursive: true });
   await mkdir(runtimeConfig.sessionsRootDir, { recursive: true });
 
   const paths = buildRepoPaths(repository, "placeholder-session-id");
   return withRepositoryLock(params.repositoryId, async () => {
+    logRuntimeStep("ensure repo runtime lock acquired", {
+      repository_id: params.repositoryId,
+    });
     const now = new Date();
     const [existing] = await db
       .select()
