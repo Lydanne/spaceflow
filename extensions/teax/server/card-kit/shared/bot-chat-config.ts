@@ -1,12 +1,7 @@
-export interface BotChatConfig {
-  atPageHome: string;
-  allowCommand: boolean;
-}
-
-export interface ResolveBotChatConfigInput {
-  chatId: string;
-  chatType: string;
-}
+import type {
+  BotChatConfig,
+  ResolveBotChatConfigInput,
+} from "../types";
 
 export const DEFAULT_BOT_HOME_PAGE = "cp-home";
 

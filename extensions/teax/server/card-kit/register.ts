@@ -6,7 +6,12 @@
  */
 
 import { CardRouter } from "./router";
-import type { CardPageDef, CardJSON } from "./types";
+import type {
+  BotMessageContext,
+  CardCommandDef,
+  CardPageDef,
+  CardJSON,
+} from "./types";
 import { encodeStackEntry } from "./stack";
 import {
   DEFAULT_BOT_HOME_PAGE,
@@ -16,32 +21,6 @@ import {
 // ━━━ 全局单例 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export const cardRouter = new CardRouter();
-
-// ━━━ 类型定义 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-export interface BotMessageContext {
-  messageId: string;
-  chatId: string;
-  chatType: string;
-  senderOpenId: string;
-  text: string;
-}
-
-export interface CardCommandDef {
-  name: string;
-  description: string;
-  usage?: string;
-  /** 文本指令别名（如 ["/help", "帮助"]） */
-  aliases?: string[];
-  /** 链接匹配正则 */
-  linkPattern?: RegExp;
-  /** 目标卡片页面 */
-  page: string;
-  /** 从指令参数提取 params */
-  paramsFromArgs?: (args: string[]) => Record<string, unknown> | undefined;
-  /** 从链接正则匹配提取 params */
-  paramsFromMatch?: (match: RegExpMatchArray) => Record<string, unknown> | undefined;
-}
 
 // ━━━ define 函数（纯声明，不注册） ━━━━━━━━━━━━━━━━━━━
 

@@ -1,5 +1,6 @@
 import { EnhancedCardBuilder } from "./builder";
-import { navigateTo, type BeforeEnterGuard } from "./shared/index";
+import { navigateTo } from "./shared/index";
+import type { BeforeEnterGuard } from "./types";
 
 /**
  * 守卫：要求用户已绑定飞书账号。

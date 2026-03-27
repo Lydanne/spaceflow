@@ -1,11 +1,6 @@
 import type {
-  GuardResult,
-  NavigationGuardContext,
+  BeforeEnterGuard,
 } from "../types";
-
-export type BeforeEnterGuard = (
-  ctx: NavigationGuardContext,
-) => GuardResult | Promise<GuardResult>;
 
 export function guards(...fns: BeforeEnterGuard[]): BeforeEnterGuard {
   return async (ctx) => {

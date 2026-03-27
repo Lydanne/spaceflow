@@ -1,6 +1,10 @@
 import { EnhancedCardBuilder, MAX_STACK_DEPTH } from "./builder";
 import { decodeStackEntry, encodeStackEntry } from "./stack";
 import type {
+  CardActionNavigateOpts,
+  CardActionType,
+  CardFormValue,
+  CardParams,
   AsyncTaskResult,
   BackResult,
   CardActionContext,
@@ -15,6 +19,7 @@ import type {
   NavigationGuardContext,
   StackEntry,
   ToastResult,
+  DispatchInput,
 } from "./types";
 
 /** 类型辨别：判断 CardActionResult 的 __type */
@@ -23,21 +28,6 @@ function isResultType<T extends { __type: string }>(
   type: T["__type"],
 ): result is T {
   return typeof result === "object" && result !== null && "__type" in result && (result as T).__type === type;
-}
-
-export interface DispatchInput {
-  /** 用户 open_id */
-  openId: string;
-  /** action.value（JSON 字符串或对象） */
-  actionValue: unknown;
-  /** action.form_value（表单提交时有值） */
-  formValue?: Record<string, string>;
-  /** 飞书回调 token */
-  token: string;
-  /** 更新卡片回调 */
-  updateCard: (card: CardJSON) => Promise<void>;
-  /** 发送新卡片消息回调（newMessage 模式使用） */
-  sendCard?: (card: CardJSON) => Promise<void>;
 }
 
 export class CardRouter {
@@ -87,7 +77,7 @@ export class CardRouter {
    */
   async renderPage(
     pageName: string,
-    opts: { openId: string; params?: Record<string, unknown> },
+    opts: { openId: string; params?: CardParams },
   ): Promise<CardJSON | undefined> {
     const page = this.pages.get(pageName);
     if (!page) {
@@ -248,8 +238,8 @@ export class CardRouter {
     page: CardPageDef,
     opts: {
       openId: string;
-      params: Record<string, unknown>;
-      data: Record<string, unknown>;
+      params: CardParams;
+      data: CardParams;
       stack?: StackEntry[];
       provide: (key: unknown, value: unknown) => void;
       inject: <T = unknown>(key: unknown, fallback?: T) => T | undefined;
@@ -272,12 +262,12 @@ export class CardRouter {
     page: CardPageDef,
     opts: {
       openId: string;
-      params: Record<string, unknown>;
-      data: Record<string, unknown>;
+      params: CardParams;
+      data: CardParams;
       stack?: StackEntry[];
-      type: "button" | "form_submit";
+      type: CardActionType;
       action: string;
-      formValue: Record<string, string> | null;
+      formValue: CardFormValue | null;
       formName: string | null;
       token: string;
       updateCard: (card: CardJSON) => Promise<void>;
@@ -309,7 +299,7 @@ export class CardRouter {
       formName: opts.formName,
       token: opts.token,
       update: opts.updateCard,
-      navigate: async (targetPage: string, targetParams?: Record<string, unknown>, navOpts?: { newMessage?: boolean }) => {
+      navigate: async (targetPage: string, targetParams?: CardParams, navOpts?: CardActionNavigateOpts) => {
         const card = await this.renderPage(targetPage, {
           openId: opts.openId,
           params: targetParams,
