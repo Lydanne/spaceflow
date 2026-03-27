@@ -11,11 +11,11 @@ import type {
   BackResult,
   CardInteractionContext,
   CardJSON,
-  GuardResult,
   NavigateOpts,
   NavigateResult,
   NavigationGuardContext,
   ToastResult,
+  GuardResult,
 } from "./types";
 
 // ─── renderCardPage（外部服务调用入口） ──────────────────────────
@@ -101,9 +101,20 @@ export function asyncTask(
   };
 }
 
-// ─── 导航守卫工厂 ──────────────────────────
+export type BeforeEnterGuard = (ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>;
 
-type BeforeEnterGuard = (ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>;
+export function navigateTo(
+  page: string,
+  params: Record<string, unknown> = {},
+  opts?: { mode?: "push" | "replace" },
+): NavigateResult {
+  return {
+    __type: "navigate",
+    page,
+    params,
+    mode: opts?.mode,
+  };
+}
 
 /**
  * 组合多个 beforeEnter 守卫（类似 vue-router 数组守卫）。
@@ -114,74 +125,6 @@ export function guards(...fns: BeforeEnterGuard[]): BeforeEnterGuard {
     for (const fn of fns) {
       const result = await fn(ctx);
       if (result !== undefined && result !== true) return result;
-    }
-  };
-}
-
-/**
- * 守卫：要求用户已绑定飞书账号。
- * 未绑定时渲染"未绑定账号"提示卡片。
- */
-export function requireBinding(): BeforeEnterGuard {
-  return async (ctx) => {
-    const { getActiveAccount } = await import("~~/server/services/account.service");
-    const user = await getActiveAccount(ctx.openId);
-    if (!user) {
-      return navigate("binding-required", {
-        from: ctx.to.page,
-      }, {
-        mode: "replace",
-      });
-    }
-
-    ctx.provide(requireBinding, user);
-  };
-}
-
-/**
- * 守卫：要求用户对仓库拥有指定权限。
- * 从 params 中读取 owner/repo（或 repoFullName）定位仓库。
- * @param permission - 权限标识，如 "actions:trigger"
- */
-export function requireRepoPermission(permission: string): BeforeEnterGuard {
-  return async ({ openId, to }) => {
-    const { getActiveAccount } = await import("~~/server/services/account.service");
-    const { queryUserPermissionGroups, rowGrantsPermission } = await import("~~/server/utils/permission");
-    const { useDB, schema } = await import("~~/server/db");
-    const { eq } = await import("drizzle-orm");
-
-    const user = await getActiveAccount(openId);
-    if (!user) return; // requireBinding 应先执行
-
-    // 支持 params.owner + params.repo 或 params.repoFullName
-    let fullName: string;
-    if (to.params.owner && to.params.repo) {
-      fullName = `${to.params.owner}/${to.params.repo}`;
-    } else if (to.params.repoFullName) {
-      fullName = to.params.repoFullName as string;
-    } else {
-      return; // 无仓库信息，跳过
-    }
-
-    const db = useDB();
-    const [repoRecord] = await db
-      .select({ id: schema.repositories.id, organization_id: schema.repositories.organization_id })
-      .from(schema.repositories)
-      .where(eq(schema.repositories.full_name, fullName))
-      .limit(1);
-
-    if (!repoRecord) {
-      return new EnhancedCardBuilder({ title: "❌ 仓库不存在", theme: "red" }, "")
-        .text("该仓库未在系统中注册", true)
-        .build();
-    }
-
-    const groups = await queryUserPermissionGroups(user.id, repoRecord.organization_id);
-    const hasPermission = groups.some((g) => rowGrantsPermission(g, permission, repoRecord.id));
-    if (!hasPermission) {
-      return new EnhancedCardBuilder({ title: "❌ 无权限", theme: "red" }, "")
-        .text(`您没有执行此操作的权限 (${permission})`, true)
-        .build();
     }
   };
 }
