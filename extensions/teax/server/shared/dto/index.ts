@@ -7,3 +7,4 @@ export * from "./common.dto";
 export * from "./approval.dto";
 export * from "./workflow-preset.dto";
 export * from "./actions.dto";
+export * from "./agent-session.dto";
