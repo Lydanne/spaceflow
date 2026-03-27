@@ -1,5 +1,3 @@
-import { eq } from "drizzle-orm";
-import { useDB, schema } from "~~/server/db";
 import {
   defineCardPage,
   navigate,
@@ -22,10 +20,12 @@ import {
   rowGrantsPermission,
 } from "~~/server/utils/permission";
 import {
-  buildTriggerLockRefresh,
-  recordAutoLockHistory,
-  recordTriggerHistory,
-} from "~~/server/services/preset-lock.service";
+  buildRunConfig,
+  getLockerDisplayName,
+  pickInputOverridesFromForm,
+  persistPresetTriggerResult,
+  unlockPresetByShareToken,
+} from "~~/server/services/preset-run.service";
 import type { User } from "~~/server/db/schema";
 
 // --- Helper: permission check without H3Event ---
@@ -120,13 +120,8 @@ export default defineCardPage({
           : "手动解锁";
         card.text(`🔒 已锁定（${unlockText}）`, true);
       } else {
-        const db = useDB();
-        const [locker] = await db
-          .select({ name: schema.users.gitea_username })
-          .from(schema.users)
-          .where(eq(schema.users.id, preset.locked_by))
-          .limit(1);
-        card.text(`🔒 已被 **${locker?.name ?? "未知用户"}** 锁定`, true);
+        const lockerName = await getLockerDisplayName(preset.locked_by);
+        card.text(`🔒 已被 **${lockerName}** 锁定`, true);
       }
     }
 
@@ -152,12 +147,7 @@ export default defineCardPage({
     // 处理解锁操作
     if (ctx.action === "unlock") {
       if (!activeUserId) return navigate("preset-console", { shareToken });
-
-      const db = useDB();
-      await db
-        .update(schema.workflowPresets)
-        .set({ locked_by: null, locked_at: null, auto_unlock_at: null })
-        .where(eq(schema.workflowPresets.share_token, shareToken));
+      await unlockPresetByShareToken(shareToken);
 
       return toast("success", "✅ 已解锁");
     }
@@ -194,31 +184,14 @@ export default defineCardPage({
         }
 
         const { preset, repo, owner, repoName } = resolved;
-        const isLockedByOther = !!(
-          preset.group_id
-          && preset.locked_by
-          && preset.locked_by !== activeUser.id
-        );
-        const canModifyOverride = !isLockedByOther;
-
-        // 使用最新数据库配置计算最终执行参数，避免并发情况下用旧值触发
-        const finalInputs: Record<string, unknown> = {
-          ...(preset.inputs as Record<string, unknown>),
-        };
-        let finalBranch = preset.branch;
-
-        if (canModifyOverride && preset.allow_input_override) {
-          const lockedInputs = new Set<string>(preset.locked_inputs || []);
-          for (const [key, value] of Object.entries(formValue)) {
-            if (key === "branch") continue;
-            if (lockedInputs.has(key)) continue;
-            finalInputs[key] = value;
-          }
-        }
-
-        if (canModifyOverride && preset.allow_branch_override && formValue.branch) {
-          finalBranch = String(formValue.branch);
-        }
+        const { finalInputs, finalBranch, canModifyOverride } = buildRunConfig({
+          preset,
+          actorId: activeUser.id,
+          branchOverride: formValue.branch,
+          inputOverrides: pickInputOverridesFromForm(
+            formValue as Record<string, unknown>,
+          ),
+        });
 
         // Check permission
         const canTrigger = await checkUserPermission(
@@ -291,9 +264,6 @@ export default defineCardPage({
 
         const { runId: newRunId, runNumber: newRunNumber } = result;
 
-        // Update database
-        const db = useDB();
-        const config = useRuntimeConfig();
         let lockInfo: {
           locked_by: string;
           locked_at: string;
@@ -301,64 +271,37 @@ export default defineCardPage({
         } | null = null;
 
         if (newRunId) {
-          const updateData: Record<string, unknown> = {
-            current_run_id: newRunId,
-            last_triggered_by: activeUser.id,
-          };
+          const persistInputs: Record<string, unknown> = { ...finalInputs };
+          const persistedBranch = preset.allow_sync_override
+            && canModifyOverride
+            && preset.allow_branch_override
+            ? finalBranch
+            : preset.branch;
+          const persistedInputs = preset.allow_sync_override
+            && canModifyOverride
+            && preset.allow_input_override
+            ? (persistInputs as Record<string, string | boolean | number>)
+            : preset.inputs;
 
-          // 允许同步时，按覆盖后的值回写配置（仅允许锁定者/可修改者）
-          if (preset.allow_sync_override && canModifyOverride) {
-            if (preset.allow_branch_override) {
-              updateData.branch = finalBranch;
-            }
-            if (preset.allow_input_override) {
-              updateData.inputs = finalInputs;
-            }
-          }
-
-          // 子预设每次触发都刷新锁定时间和自动解锁时间
-          if (preset.group_id) {
-            const [group] = await db
-              .select({
-                auto_unlock_minutes:
-                  schema.workflowPresetGroups.auto_unlock_minutes,
-              })
-              .from(schema.workflowPresetGroups)
-              .where(eq(schema.workflowPresetGroups.id, preset.group_id))
-              .limit(1);
-            const lockRefresh = buildTriggerLockRefresh({
-              currentLockedBy: preset.locked_by,
-              actorId: activeUser.id,
-              autoUnlockMinutes: group?.auto_unlock_minutes,
-            });
-            updateData.locked_by = lockRefresh.lockOwner;
-            updateData.locked_at = lockRefresh.lockedAt;
-            updateData.auto_unlock_at = lockRefresh.autoUnlockAt;
-            lockInfo = lockRefresh.lockInfo;
-          }
-
-          await db
-            .update(schema.workflowPresets)
-            .set(updateData)
-            .where(eq(schema.workflowPresets.id, preset.id));
-
-          // Record history for sub-presets
-          if (preset.group_id) {
-            await recordTriggerHistory(preset.id, activeUser.id, {
-              run_id: newRunId,
-              run_number: newRunNumber,
-              branch: finalBranch,
-              inputs: finalInputs,
-            });
-
-            if (lockInfo) {
-              await recordAutoLockHistory(
-                preset.id,
-                activeUser.id,
-                lockInfo.auto_unlock_at,
-              );
-            }
-          }
+          const persistResult = await persistPresetTriggerResult({
+            preset: {
+              ...preset,
+              branch: persistedBranch,
+              inputs: persistedInputs,
+            },
+            actorId: activeUser.id,
+            runId: newRunId,
+            runNumber: newRunNumber,
+            branch: finalBranch,
+            inputs: persistInputs,
+            syncBranchToPreset: persistedBranch !== preset.branch
+              ? persistedBranch
+              : undefined,
+            syncInputsToPreset: persistedInputs !== preset.inputs
+              ? (persistedInputs as Record<string, unknown>)
+              : undefined,
+          });
+          lockInfo = persistResult.lock_info;
         }
 
         // Build result card
