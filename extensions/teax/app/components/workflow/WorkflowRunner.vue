@@ -14,6 +14,7 @@ const props = defineProps<{
 }>();
 
 const toast = useToast();
+const { user } = useUserSession();
 
 // 响应式 data 引用
 const dataRef = computed(() => props.data);
@@ -77,6 +78,12 @@ const tempInputs = ref<Record<string, string>>({});
 // 用户可修改的分支
 const overrideBranch = ref("");
 
+const canModifyOverride = computed(() => {
+  const lockedBy = props.data.preset.locked_by;
+  if (!props.data.group || !lockedBy) return true;
+  return lockedBy === user.value?.id;
+});
+
 // 初始化
 watch(
   () => props.data.preset,
@@ -120,6 +127,7 @@ async function saveInputs() {
 async function syncOverrideToDb() {
   console.log("[syncOverrideToDb] allow_sync_override:", props.data.preset.allow_sync_override);
   if (!props.data.preset.allow_sync_override) return;
+  if (!canModifyOverride.value) return;
 
   try {
     console.log("[syncOverrideToDb] syncing...", { branch: overrideBranch.value, inputs: overrideInputs.value });
@@ -138,6 +146,7 @@ async function syncOverrideToDb() {
 
 // 是否有可编辑的参数（任何参数未被锁定）
 const hasEditableInputs = computed(() => {
+  if (!canModifyOverride.value) return false;
   if (!props.data.preset.allow_input_override) return false;
   const inputKeys = Object.keys(props.data.preset.inputs || {});
   const lockedInputs = props.data.preset.locked_inputs || [];
@@ -176,7 +185,7 @@ async function triggerRun() {
           body.inputs = editableInputs;
         }
       }
-      if (props.data.preset.allow_branch_override) {
+      if (canModifyOverride.value && props.data.preset.allow_branch_override) {
         body.branch = overrideBranch.value;
       }
     }
@@ -231,6 +240,7 @@ const ctx: WorkflowRunnerContext = {
   toggleHistory,
   overrideInputs,
   overrideBranch,
+  canModifyOverride,
   hasEditableInputs,
   showEditInputsModal,
   tempInputs,

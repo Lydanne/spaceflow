@@ -90,6 +90,8 @@ export interface TriggerResultCardOptions {
   workflowPath: string;
   runId: number | null;
   runNumber: number | null;
+  /** 本次运行参数（可选） */
+  runInputs?: Record<string, unknown>;
   /** 追加到结果卡片末尾的额外行 */
   extraLines?: string[];
 }
@@ -100,7 +102,7 @@ export interface TriggerResultCardOptions {
 export function buildTriggerResultCard(
   opts: TriggerResultCardOptions,
 ): CardJSON {
-  const { repoFullName, branch, workflowPath, runId, runNumber, extraLines }
+  const { repoFullName, branch, workflowPath, runId, runNumber, runInputs, extraLines }
     = opts;
   const config = useRuntimeConfig();
   const baseUrl = config.public.appUrl as string;
@@ -118,6 +120,17 @@ export function buildTriggerResultCard(
     `**分支**: ${branch}`,
     `**工作流**: ${workflowPath}`,
   ];
+
+  const inputEntries = Object.entries(runInputs || {});
+  if (inputEntries.length > 0) {
+    lines.push("**运行参数**:");
+    for (const [key, value] of inputEntries) {
+      const displayValue = typeof value === "string"
+        ? value
+        : JSON.stringify(value);
+      lines.push(`- ${key}: \`${displayValue}\``);
+    }
+  }
 
   if (runId) {
     lines.push(`**运行编号**: #${runNumber}`);

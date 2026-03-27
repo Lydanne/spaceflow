@@ -9,7 +9,6 @@ import {
 import { resolvePresetByShareToken } from "~~/server/utils/resolve-preset";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import {
-  dispatchAndPoll,
   buildDispatchErrorCard,
   buildTriggerResultCard,
   fetchWorkflowFormData,
@@ -20,12 +19,10 @@ import {
   rowGrantsPermission,
 } from "~~/server/utils/permission";
 import {
-  buildRunConfig,
   getLockerDisplayName,
-  pickInputOverridesFromForm,
-  persistPresetTriggerResult,
   unlockPresetByShareToken,
 } from "~~/server/services/preset-run.service";
+import { runWorkflowWithPreset } from "~~/server/services/workflow-run.service";
 import type { User } from "~~/server/db/schema";
 
 // --- Helper: permission check without H3Event ---
@@ -184,14 +181,6 @@ export default defineCardPage({
         }
 
         const { preset, repo, owner, repoName } = resolved;
-        const { finalInputs, finalBranch, canModifyOverride } = buildRunConfig({
-          preset,
-          actorId: activeUser.id,
-          branchOverride: formValue.branch,
-          inputOverrides: pickInputOverridesFromForm(
-            formValue as Record<string, unknown>,
-          ),
-        });
 
         // Check permission
         const canTrigger = await checkUserPermission(
@@ -209,100 +198,51 @@ export default defineCardPage({
           return;
         }
 
-        // Check if already running
         const gitea = await useGiteaSdk().role("fallback-admin");
-        const workflowFileName
-          = preset.workflow_path.split("/").pop() || preset.workflow_path;
-
-        if (preset.current_run_id) {
-          try {
-            const currentRun = await gitea.getWorkflowRun(
-              owner,
-              repoName,
-              preset.current_run_id,
-            );
-            const isRunning = [
-              "running",
-              "waiting",
-              "queued",
-              "in_progress",
-            ].includes(currentRun?.status || "");
-            if (isRunning) {
-              await updateCard(
-                new EnhancedCardBuilder(
-                  { title: "⏳ 工作流运行中", theme: "orange" },
-                  "",
-                )
-                  .text(
-                    `当前有一个正在运行的工作流 (Run #${currentRun?.run_number})\n请等待完成后再试`,
-                    true,
-                  )
-                  .build(),
-              );
-              return;
-            }
-          } catch {
-            // Run may have been deleted, continue
-          }
-        }
-
-        // Dispatch + poll for new run
-        let result;
+        const inputOverrides = Object.fromEntries(
+          Object.entries(formValue as Record<string, unknown>).filter(([key]) => key !== "branch"),
+        );
+        let runResult: Awaited<ReturnType<typeof runWorkflowWithPreset>>;
         try {
-          result = await dispatchAndPoll(gitea, {
+          runResult = await runWorkflowWithPreset({
+            preset,
             owner,
-            repo: repoName,
-            workflowFileName,
-            branch: finalBranch,
-            inputs: finalInputs as Record<string, string | number | boolean>,
+            repoName,
+            actorId: activeUser.id,
+            gitea,
+            branchOverride: formValue.branch,
+            inputOverrides,
+            allowSyncToPreset: true,
           });
         } catch (err) {
+          const statusCode = (err as { statusCode?: number }).statusCode;
+          if (statusCode === 409) {
+            const runNumber = (err as { data?: { run_number?: number } })?.data?.run_number;
+            const message = runNumber
+              ? `当前有一个正在运行的工作流 (Run #${runNumber})\n请等待完成后再试`
+              : ((err as { message?: string })?.message || "当前有一个正在运行的工作流，请等待完成后再试");
+            await updateCard(
+              new EnhancedCardBuilder(
+                { title: "⏳ 工作流运行中", theme: "orange" },
+                "",
+              )
+                .text(message, true)
+                .build(),
+            );
+            return;
+          }
           console.error("[preset-console] dispatchWorkflow error:", err);
           await updateCard(buildDispatchErrorCard(err));
           return;
         }
 
-        const { runId: newRunId, runNumber: newRunNumber } = result;
-
-        let lockInfo: {
-          locked_by: string;
-          locked_at: string;
-          auto_unlock_at: string | null;
-        } | null = null;
-
-        if (newRunId) {
-          const persistInputs: Record<string, unknown> = { ...finalInputs };
-          const persistedBranch = preset.allow_sync_override
-            && canModifyOverride
-            && preset.allow_branch_override
-            ? finalBranch
-            : preset.branch;
-          const persistedInputs = preset.allow_sync_override
-            && canModifyOverride
-            && preset.allow_input_override
-            ? (persistInputs as Record<string, string | boolean | number>)
-            : preset.inputs;
-
-          const persistResult = await persistPresetTriggerResult({
-            preset: {
-              ...preset,
-              branch: persistedBranch,
-              inputs: persistedInputs,
-            },
-            actorId: activeUser.id,
-            runId: newRunId,
-            runNumber: newRunNumber,
-            branch: finalBranch,
-            inputs: persistInputs,
-            syncBranchToPreset: persistedBranch !== preset.branch
-              ? persistedBranch
-              : undefined,
-            syncInputsToPreset: persistedInputs !== preset.inputs
-              ? (persistedInputs as Record<string, unknown>)
-              : undefined,
-          });
-          lockInfo = persistResult.lock_info;
-        }
+        const {
+          runId: newRunId,
+          runNumber: newRunNumber,
+          finalBranch,
+          finalInputs,
+          lockInfo,
+        } = runResult;
 
         // Build result card
         const extraLines: string[] = [];
@@ -321,6 +261,7 @@ export default defineCardPage({
             workflowPath: preset.workflow_path,
             runId: newRunId,
             runNumber: newRunNumber,
+            runInputs: finalInputs,
             extraLines,
           }),
         );

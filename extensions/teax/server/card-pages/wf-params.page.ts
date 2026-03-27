@@ -87,18 +87,13 @@ export default defineCardPage({
           return;
         }
 
-        const extraLines: string[] = [];
-        if (Object.keys(inputs).length > 0) {
-          extraLines.push(`**参数**: ${Object.entries(inputs).map(([k, v]) => `${k}=${v}`).join(", ")}`);
-        }
-
         await ctx.update(buildTriggerResultCard({
           repoFullName,
           branch,
           workflowPath: workflowName,
           runId: null,
           runNumber: null,
-          extraLines,
+          runInputs: inputs,
         }));
       },
     );

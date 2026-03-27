@@ -68,6 +68,7 @@ export default defineCardPage({
           workflowPath: workflowFileName,
           runId: result.runId,
           runNumber: result.runNumber,
+          runInputs: inputs,
         }));
       },
     );

@@ -103,6 +103,7 @@ export interface WorkflowRunnerContext {
   // 输入参数
   overrideInputs: Ref<Record<string, string>>;
   overrideBranch: Ref<string>;
+  canModifyOverride: ComputedRef<boolean>;
   hasEditableInputs: ComputedRef<boolean>;
   showEditInputsModal: Ref<boolean>;
   tempInputs: Ref<Record<string, string>>;

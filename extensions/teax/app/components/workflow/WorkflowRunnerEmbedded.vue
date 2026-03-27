@@ -33,6 +33,7 @@ const {
   toggleHistory,
   overrideInputs,
   overrideBranch,
+  canModifyOverride,
   hasEditableInputs,
   openEditInputsModal,
   isTriggering,
@@ -134,6 +135,7 @@ function toggleLogs() {
           v-model="overrideBranch"
           :items="data.branches.map((b) => ({ label: b, value: b }))"
           value-key="value"
+          :disabled="!canModifyOverride"
           size="sm"
           class="flex-1"
         />

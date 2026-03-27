@@ -32,6 +32,7 @@ const {
   toggleHistory,
   overrideInputs,
   overrideBranch,
+  canModifyOverride,
   hasEditableInputs,
   openEditInputsModal,
   isTriggering,
@@ -128,7 +129,7 @@ function statusIconClass(status: string, conclusion: string | null): string {
           v-model="overrideBranch"
           :items="data.branches.map((b) => ({ label: b, value: b }))"
           value-key="value"
-          :disabled="!data.preset.allow_branch_override"
+          :disabled="!data.preset.allow_branch_override || !canModifyOverride"
           size="lg"
           class="lg:min-w-[228px]"
         />
