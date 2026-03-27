@@ -1059,6 +1059,52 @@ export async function retryAgentSession(params: {
   return latest || updated;
 }
 
+export async function deleteAgentSession(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    throw createError({ statusCode: 403, message: "Only session owner can delete session" });
+  }
+
+  let cleanupResult: Awaited<ReturnType<typeof cleanupSessionWorktree>> | null = null;
+  try {
+    cleanupResult = await cleanupSessionWorktree({
+      repositoryId: params.repositoryId,
+      sessionId: session.id,
+      actorId: params.actor.userId,
+    });
+  } catch {
+    // 删除会话时，worktree 清理失败不阻断主删除流程。
+  }
+
+  const [deleted] = await db
+    .delete(schema.agentSessions)
+    .where(
+      and(
+        eq(schema.agentSessions.id, session.id),
+        eq(schema.agentSessions.repository_id, params.repositoryId),
+      ),
+    )
+    .returning({
+      id: schema.agentSessions.id,
+    });
+
+  if (!deleted) {
+    throw createError({ statusCode: 404, message: "Agent session not found" });
+  }
+
+  return {
+    deleted: true,
+    session_id: deleted.id,
+    worktree_removed: cleanupResult?.removed || false,
+  };
+}
+
 export async function listAgentSessionEvents(params: {
   repositoryId: string;
   sessionId: string;

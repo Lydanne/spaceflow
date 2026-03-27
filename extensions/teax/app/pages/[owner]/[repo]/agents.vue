@@ -147,6 +147,7 @@ const joinLoading = ref(false);
 const leaveLoading = ref(false);
 const stopLoading = ref(false);
 const retryLoading = ref(false);
+const deleteLoading = ref(false);
 const visibilityLoading = ref(false);
 const pinningMessageId = ref<string | null>(null);
 const runtimeStartLoading = ref(false);
@@ -549,6 +550,23 @@ async function retrySession() {
     toast.add({ title: getErrorMessage(error, "重试会话失败"), color: "error" });
   } finally {
     retryLoading.value = false;
+  }
+}
+
+async function deleteSession() {
+  if (!selectedSessionId.value) return;
+  if (!confirm("确认删除该会话吗？删除后无法恢复。")) return;
+
+  deleteLoading.value = true;
+  try {
+    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}`, { method: "DELETE" });
+    toast.add({ title: "会话已删除", color: "success" });
+    selectedSessionId.value = null;
+    await Promise.all([refreshSessionList(), refreshRuntimeSummary()]);
+  } catch (error: unknown) {
+    toast.add({ title: getErrorMessage(error, "删除会话失败"), color: "error" });
+  } finally {
+    deleteLoading.value = false;
   }
 }
 
@@ -999,6 +1017,17 @@ async function pinMessage(messageId: string) {
                   @click="retrySession"
                 >
                   重试
+                </UButton>
+
+                <UButton
+                  v-if="canManageSession"
+                  icon="i-lucide-trash-2"
+                  color="error"
+                  variant="soft"
+                  :loading="deleteLoading"
+                  @click="deleteSession"
+                >
+                  删除会话
                 </UButton>
 
                 <div
