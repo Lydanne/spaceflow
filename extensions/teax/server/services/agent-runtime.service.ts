@@ -1,13 +1,11 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import { dirname, isAbsolute, join, posix, resolve } from "node:path";
-import { promisify } from "node:util";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { schema, useDB } from "~~/server/db";
 import { resolveAgentMetaRepoConfig } from "~~/server/services/agent-meta-config.service";
 
-const execFileAsync = promisify(execFile);
 const repoLocks = new Map<string, Promise<void>>();
 const AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG = "teax-agent-runtime:base";
 
@@ -176,40 +174,164 @@ async function runDocker(args: string[], cwd?: string, options?: { suppressError
   const config = resolveRuntimeConfig();
   const commandText = formatCommand(config.dockerBin, args);
   const startedAt = Date.now();
+  const MAX_CAPTURE_BYTES = 20 * 1024 * 1024;
   logRuntimeStep("run command", {
     command: commandText,
     cwd: cwd || process.cwd(),
   });
-  try {
-    const { stdout, stderr } = await execFileAsync(config.dockerBin, args, {
+  return await new Promise<{ stdout: string; stderr: string }>((resolvePromise, rejectPromise) => {
+    const child = spawn(config.dockerBin, args, {
       cwd,
-      maxBuffer: 20 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"],
     });
-    const cleanedStdout = (stdout || "").trim();
-    const cleanedStderr = (stderr || "").trim();
-    logRuntimeStep("command success", {
-      command: commandText,
-      duration_ms: Date.now() - startedAt,
-      stderr: cleanedStderr || undefined,
-    });
-    return {
-      stdout: cleanedStdout,
-      stderr: cleanedStderr,
+
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+    let stdoutRemainder = "";
+    let stderrRemainder = "";
+    let stdoutTruncated = false;
+    let stderrTruncated = false;
+
+    const appendCapture = (
+      current: string,
+      incoming: string,
+      truncated: boolean,
+    ): { next: string; truncated: boolean } => {
+      if (truncated || incoming.length === 0) {
+        return { next: current, truncated };
+      }
+      const remaining = MAX_CAPTURE_BYTES - Buffer.byteLength(current);
+      if (remaining <= 0) {
+        return { next: current, truncated: true };
+      }
+      const incomingBytes = Buffer.byteLength(incoming);
+      if (incomingBytes <= remaining) {
+        return { next: current + incoming, truncated: false };
+      }
+      return {
+        next: current + Buffer.from(incoming).subarray(0, remaining).toString("utf8"),
+        truncated: true,
+      };
     };
-  } catch (error) {
-    const stdout = ((error as { stdout?: string })?.stdout || "").trim();
-    const stderr = ((error as { stderr?: string })?.stderr || "").trim();
-    if (!options?.suppressErrorLog) {
-      console.error("[agent-runtime] command failed", {
-        command: commandText,
-        duration_ms: Date.now() - startedAt,
-        stdout: stdout || undefined,
-        stderr: stderr || undefined,
-        message: (error as { message?: string })?.message || "unknown",
-      });
-    }
-    throw error;
-  }
+
+    const emitLines = (
+      streamType: "stdout" | "stderr",
+      text: string,
+    ) => {
+      if (!text) return;
+      const isStdout = streamType === "stdout";
+      const merged = (isStdout ? stdoutRemainder : stderrRemainder) + text;
+      const lines = merged.split(/\r?\n/);
+      const remainder = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        console.info(`[agent-runtime] command ${streamType}`, {
+          command: commandText,
+          line,
+        });
+      }
+      if (isStdout) {
+        stdoutRemainder = remainder;
+      } else {
+        stderrRemainder = remainder;
+      }
+    };
+
+    child.stdout?.on("data", (chunk: Buffer | string) => {
+      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      const captured = appendCapture(stdoutBuffer, text, stdoutTruncated);
+      stdoutBuffer = captured.next;
+      stdoutTruncated = captured.truncated;
+      emitLines("stdout", text);
+    });
+
+    child.stderr?.on("data", (chunk: Buffer | string) => {
+      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      const captured = appendCapture(stderrBuffer, text, stderrTruncated);
+      stderrBuffer = captured.next;
+      stderrTruncated = captured.truncated;
+      emitLines("stderr", text);
+    });
+
+    child.on("error", (error) => {
+      if (!options?.suppressErrorLog) {
+        console.error("[agent-runtime] command spawn failed", {
+          command: commandText,
+          duration_ms: Date.now() - startedAt,
+          message: error.message,
+        });
+      }
+      rejectPromise(error);
+    });
+
+    child.on("close", (code, signal) => {
+      if (stdoutRemainder.trim()) {
+        console.info("[agent-runtime] command stdout", {
+          command: commandText,
+          line: stdoutRemainder.trim(),
+        });
+      }
+      if (stderrRemainder.trim()) {
+        console.info("[agent-runtime] command stderr", {
+          command: commandText,
+          line: stderrRemainder.trim(),
+        });
+      }
+
+      if (stdoutTruncated) {
+        console.info("[agent-runtime] command stdout truncated", {
+          command: commandText,
+          limit_bytes: MAX_CAPTURE_BYTES,
+        });
+      }
+      if (stderrTruncated) {
+        console.info("[agent-runtime] command stderr truncated", {
+          command: commandText,
+          limit_bytes: MAX_CAPTURE_BYTES,
+        });
+      }
+
+      const cleanedStdout = stdoutBuffer.trim();
+      const cleanedStderr = stderrBuffer.trim();
+
+      if (code === 0) {
+        logRuntimeStep("command success", {
+          command: commandText,
+          duration_ms: Date.now() - startedAt,
+        });
+        resolvePromise({
+          stdout: cleanedStdout,
+          stderr: cleanedStderr,
+        });
+        return;
+      }
+
+      const message = `Command failed (${code ?? signal ?? "unknown"}): ${commandText}`;
+      const error = new Error(message) as Error & {
+        stdout?: string;
+        stderr?: string;
+        code?: number | null;
+        signal?: NodeJS.Signals | null;
+      };
+      error.stdout = cleanedStdout;
+      error.stderr = cleanedStderr;
+      error.code = code;
+      error.signal = signal;
+
+      if (!options?.suppressErrorLog) {
+        console.error("[agent-runtime] command failed", {
+          command: commandText,
+          duration_ms: Date.now() - startedAt,
+          code,
+          signal,
+          stdout: cleanedStdout || undefined,
+          stderr: cleanedStderr || undefined,
+          message,
+        });
+      }
+      rejectPromise(error);
+    });
+  });
 }
 
 async function runDockerExec(containerName: string, command: string[]) {
