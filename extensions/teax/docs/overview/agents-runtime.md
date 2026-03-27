@@ -31,8 +31,6 @@
 | `AGENT_RUNTIME_DOCKER_BASE_BUILD_CONTEXT` | `.` | 基础镜像 build context |
 | `AGENT_RUNTIME_DOCKER_BASE_IMAGE` | `teax-agent-runtime:base-local` | 基础镜像 tag（本地构建产物） |
 | `AGENT_RUNTIME_DOCKER_BUILD_ON_START` | `true` | 启动仓库 runtime 时是否自动 `docker build` |
-| `AGENT_RUNTIME_DOCKERFILE` | 空 | 自定义 Dockerfile 路径（可选） |
-| `AGENT_RUNTIME_DOCKER_BUILD_CONTEXT` | 空 | 自定义 docker build context（可选） |
 | `AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT` | `/runtime` | 容器内挂载工作根目录 |
 | `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP` | `false` | 停止会话时是否保留 worktree 目录 |
 
@@ -111,30 +109,15 @@
   - 开发阶段：`true`
   - 追求启动速度且镜像已预热：`false`
 
-##### `AGENT_RUNTIME_DOCKERFILE`
+##### 仓库 Dockerfile 来源（固定来自 `.teax`）
 
-- 类型：`string`（路径）
-- 默认值：空
-- 生效范围：`docker` 模式
-- 行为说明：
-  - 指定“第二段构建”的仓库 Dockerfile
-  - 系统会读取该文件并重写第一个 `FROM` 为 `FROM ${TEAX_BASE_IMAGE}`，写入生成文件后再构建
-  - 若为空，系统会生成最小仓库 Dockerfile（仅 `FROM ${TEAX_BASE_IMAGE}` + `WORKDIR`）
-- 推荐：
-  - 需要仓库级工具链扩展时配置此项
-
-##### `AGENT_RUNTIME_DOCKER_BUILD_CONTEXT`
-
-- 类型：`string`（路径）
-- 默认值：空
-- 生效范围：`docker` 模式
-- 行为说明：
-  - 仓库镜像构建 context
-  - 为空时：
-    - 若配置了 `AGENT_RUNTIME_DOCKERFILE`，默认使用该 Dockerfile 所在目录
-    - 否则使用系统生成目录 `${AGENT_RUNTIME_ROOT}/docker-build/<repositoryId>`
-- 推荐：
-  - Dockerfile 需要访问仓库内文件时，显式指定对应 context 根目录
+- 不再支持通过环境变量指定 `AGENT_RUNTIME_DOCKERFILE` / `AGENT_RUNTIME_DOCKER_BUILD_CONTEXT`
+- Runtime 启动时会按以下顺序在元数据仓库目录中查找：
+  1. `${AGENT_RUNTIME_ROOT}/.teax/projects/{owner}/{repo}/Dockerfile`
+  2. `${AGENT_RUNTIME_ROOT}/.teax/globals/Dockerfile`
+  3. 若都不存在，使用系统生成的最小 Dockerfile（仅 `FROM ${TEAX_BASE_IMAGE}` + `WORKDIR`）
+- 命中来源后，build context 固定为该 Dockerfile 所在目录
+- 系统会将首个 `FROM` 改写为 `FROM ${TEAX_BASE_IMAGE}`，确保仓库运行镜像总是基于当前本地构建的基础镜像 tag（`AGENT_RUNTIME_DOCKER_BASE_IMAGE`）
 
 ##### `AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT`
 
@@ -188,7 +171,7 @@ pnpm dev
 - 默认模式
 - 启动 runtime 时会按“两段构建”拉起仓库容器（每仓库一个容器）：
   1. 先基于 `AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE` 构建 `AGENT_RUNTIME_DOCKER_BASE_IMAGE`
-  2. 再使用仓库 Dockerfile 构建 repo image（首个 `FROM` 会改写为 `FROM ${TEAX_BASE_IMAGE}`）
+  2. 再使用 `.teax` 仓库中的 Dockerfile 构建 repo image（首个 `FROM` 会改写为 `FROM ${TEAX_BASE_IMAGE}`）
   3. 最后基于 repo image 启动 runtime 容器
 - 会话 worktree 通过 `docker exec git ...` 在容器中执行
 - 宿主机仅需具备 Docker，仓库目录、sessions 目录与元数据目录会挂载进容器

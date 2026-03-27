@@ -23,6 +23,15 @@ export default defineNuxtConfig({
     feishuApprovalCode: process.env.FEISHU_APPROVAL_CODE || "",
     giteaServiceToken: process.env.GITEA_SERVICE_TOKEN || "",
     tokenEncryptSecret: process.env.TOKEN_ENCRYPT_SECRET || "",
+    // Agents 元数据仓库与提交身份配置
+    agentMetaRepoUrl: process.env.AGENT_META_REPO_URL || "",
+    agentMetaRepoBranch: process.env.AGENT_META_REPO_BRANCH || "main",
+    agentMetaRepoAuthType: process.env.AGENT_META_REPO_AUTH_TYPE || "token",
+    agentMetaRepoTokenRaw: process.env.AGENT_META_REPO_TOKEN || "",
+    agentMetaRepoToken: process.env.AGENT_META_REPO_TOKEN || process.env.AGENT_BOT_TOKEN || "",
+    agentBotUsername: process.env.AGENT_BOT_USERNAME || "TeaxBot",
+    agentBotEmail: process.env.AGENT_BOT_EMAIL || "teaxbot@local",
+    agentBotToken: process.env.AGENT_BOT_TOKEN || "",
     // Agent Runtime（P1）配置
     agentRuntimeRoot: process.env.AGENT_RUNTIME_ROOT || ".teax-agent-runtime",
     agentRuntimeDockerBin: process.env.AGENT_RUNTIME_DOCKER_BIN || "docker",
@@ -32,8 +41,6 @@ export default defineNuxtConfig({
     agentRuntimeDockerBaseBuildContext: process.env.AGENT_RUNTIME_DOCKER_BASE_BUILD_CONTEXT || ".",
     agentRuntimeDockerBaseImage: process.env.AGENT_RUNTIME_DOCKER_BASE_IMAGE || "teax-agent-runtime:base-local",
     agentRuntimeDockerBuildOnStart: process.env.AGENT_RUNTIME_DOCKER_BUILD_ON_START !== "false",
-    agentRuntimeDockerfile: process.env.AGENT_RUNTIME_DOCKERFILE || "",
-    agentRuntimeDockerBuildContext: process.env.AGENT_RUNTIME_DOCKER_BUILD_CONTEXT || "",
     agentRuntimeDockerWorkspaceRoot: process.env.AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT || "/runtime",
     agentRuntimeKeepWorktreeOnStop: process.env.AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP === "true",
     session: {

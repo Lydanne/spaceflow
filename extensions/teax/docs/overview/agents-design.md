@@ -116,6 +116,14 @@ Agent Control Plane
 4. 通过策略灰度到 System Runtime 或指定 Repo Runtime
 5. 验证通过后升级为默认镜像，失败可一键回滚到上一个 digest
 
+实现约束（当前）：
+
+- 不再支持通过运行时环境变量传入仓库 Dockerfile 路径（如 `AGENT_RUNTIME_DOCKERFILE`）
+- Repo Runtime 的第二段构建 Dockerfile 固定从 `.teax` 仓库读取：
+  - 优先 `/projects/{org}/{repo}/Dockerfile`
+  - 回退 `/globals/Dockerfile`
+- 构建时会统一绑定到当前本地基础镜像 tag（`AGENT_RUNTIME_DOCKER_BASE_IMAGE`）
+
 生成策略建议：
 
 - 基础模板：由 `globals/Dockerfile` 提供
@@ -146,14 +154,15 @@ Agent Control Plane
 | `AGENT_META_REPO_URL` | `https://gitea.example.com/.teax/.teax.git` | 元数据仓库地址（clone/fetch/push 目标） |
 | `AGENT_META_REPO_BRANCH` | `main` | 元数据仓库默认分支 |
 | `AGENT_META_REPO_AUTH_TYPE` | `token` | 鉴权方式（当前建议 token） |
-| `AGENT_META_REPO_TOKEN` | `***` | 元数据仓库写入令牌（可直接使用 TeaxBot Token） |
+| `AGENT_META_REPO_TOKEN` | 空（可选） | 元数据仓库写入令牌；不传时自动回退 `AGENT_BOT_TOKEN` |
 | `AGENT_BOT_USERNAME` | `TeaxBot` | 机器人提交用户名 |
 | `AGENT_BOT_EMAIL` | `teaxbot@local` | 机器人提交邮箱 |
 | `AGENT_BOT_TOKEN` | `***` | TeaxBot Token（用于提交与状态回写） |
 
 说明：
 
-- `AGENT_META_REPO_TOKEN` 与 `AGENT_BOT_TOKEN` 可合并为同一令牌（若权限模型允许）
+- 令牌解析优先级：`AGENT_META_REPO_TOKEN`（若传入） > `AGENT_BOT_TOKEN`
+- 因此 `AGENT_META_REPO_TOKEN` 可不配置，默认直接使用 `AGENT_BOT_TOKEN`
 - 所有敏感参数应存放在密钥管理，不写入元数据仓库
 
 目录约定（固定）：
@@ -214,7 +223,7 @@ Agent Control Plane
 
 1. 在 Gitea 手动创建（或指定已有）`TeaxBot` 账号
 2. 手动生成最小权限访问令牌
-3. 在平台配置中传入 `AGENT_BOT_TOKEN`（或统一使用 `AGENT_META_REPO_TOKEN`）
+3. 在平台配置中至少传入 `AGENT_BOT_TOKEN`；若需对元数据仓库使用独立令牌，再额外传 `AGENT_META_REPO_TOKEN`
 4. 配置提交身份（`AGENT_BOT_USERNAME` / `AGENT_BOT_EMAIL`）
 
 `TeaxBot` 默认职责：

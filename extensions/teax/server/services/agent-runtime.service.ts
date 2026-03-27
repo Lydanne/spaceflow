@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, posix, resolve } from "node:path";
 import { promisify } from "node:util";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { schema, useDB } from "~~/server/db";
+import { resolveAgentMetaRepoConfig } from "~~/server/services/agent-meta-config.service";
 
 const execFileAsync = promisify(execFile);
 const repoLocks = new Map<string, Promise<void>>();
@@ -23,8 +24,6 @@ interface RuntimeResolvedConfig {
   dockerBaseBuildContext: string;
   dockerBaseImage: string;
   dockerBuildOnStart: boolean;
-  dockerfilePath: string;
-  dockerBuildContext: string;
   dockerWorkspaceRoot: string;
   keepWorktreeOnStop: boolean;
 }
@@ -55,6 +54,7 @@ interface DockerRuntimeEnsureResult {
   baseDockerfilePath: string;
   dockerfilePath: string;
   buildContext: string;
+  dockerfileSource: "projects" | "globals" | "generated";
 }
 
 interface RepositorySnapshot {
@@ -79,6 +79,7 @@ interface AgentRuntimeDockerMetadata {
   image_tag: string;
   dockerfile_path: string;
   build_context: string;
+  dockerfile_source: "projects" | "globals" | "generated";
 }
 
 /**
@@ -88,18 +89,8 @@ function resolveRuntimeConfig(): RuntimeResolvedConfig {
   const config = useRuntimeConfig();
   const rawRoot = String(config.agentRuntimeRoot || ".teax-agent-runtime");
   const rootDir = isAbsolute(rawRoot) ? rawRoot : resolve(process.cwd(), rawRoot);
-  const rawDockerfile = String(config.agentRuntimeDockerfile || "").trim();
-  const rawDockerBuildContext = String(config.agentRuntimeDockerBuildContext || "").trim();
   const rawBaseDockerfile = String(config.agentRuntimeDockerBaseDockerfile || "").trim();
   const rawBaseBuildContext = String(config.agentRuntimeDockerBaseBuildContext || "").trim();
-  const dockerfilePath = rawDockerfile
-    ? (isAbsolute(rawDockerfile) ? rawDockerfile : resolve(process.cwd(), rawDockerfile))
-    : "";
-  const dockerBuildContext = rawDockerBuildContext
-    ? (isAbsolute(rawDockerBuildContext)
-        ? rawDockerBuildContext
-        : resolve(process.cwd(), rawDockerBuildContext))
-    : "";
   const dockerBaseDockerfilePath = rawBaseDockerfile
     ? (isAbsolute(rawBaseDockerfile) ? rawBaseDockerfile : resolve(process.cwd(), rawBaseDockerfile))
     : "";
@@ -118,8 +109,6 @@ function resolveRuntimeConfig(): RuntimeResolvedConfig {
     dockerBaseBuildContext,
     dockerBaseImage: String(config.agentRuntimeDockerBaseImage || "teax-agent-runtime:base-local"),
     dockerBuildOnStart: config.agentRuntimeDockerBuildOnStart !== false,
-    dockerfilePath,
-    dockerBuildContext,
     dockerWorkspaceRoot: String(config.agentRuntimeDockerWorkspaceRoot || "/runtime"),
     keepWorktreeOnStop: config.agentRuntimeKeepWorktreeOnStop === true,
   };
@@ -330,20 +319,30 @@ async function ensureRepoDockerfileAndContext(params: {
   const generatedDockerfile = join(generatedContext, "Dockerfile.repo");
   await mkdir(generatedContext, { recursive: true });
 
-  if (runtimeConfig.dockerfilePath) {
-    if (!await pathExists(runtimeConfig.dockerfilePath)) {
-      throw createError({
-        statusCode: 500,
-        message: `Repository Dockerfile not found: ${runtimeConfig.dockerfilePath}`,
-      });
+  const repoSegments = params.repository.full_name.split("/").map((item) => item.trim()).filter(Boolean);
+  const dockerfileCandidates: Array<{ source: "projects" | "globals"; path: string }> = [
+    {
+      source: "projects",
+      path: join(runtimeConfig.rootDir, ".teax", "projects", ...repoSegments, "Dockerfile"),
+    },
+    {
+      source: "globals",
+      path: join(runtimeConfig.rootDir, ".teax", "globals", "Dockerfile"),
+    },
+  ];
+
+  for (const candidate of dockerfileCandidates) {
+    if (!await pathExists(candidate.path)) {
+      continue;
     }
-    const rawDockerfile = await readFile(runtimeConfig.dockerfilePath, "utf8");
+    const rawDockerfile = await readFile(candidate.path, "utf8");
     const rewrittenDockerfile = rewriteDockerfileToUseBaseImage(rawDockerfile);
     await writeFile(generatedDockerfile, rewrittenDockerfile);
     return {
       dockerfilePath: generatedDockerfile,
-      sourceDockerfilePath: runtimeConfig.dockerfilePath,
-      buildContext: runtimeConfig.dockerBuildContext || resolve(dirname(runtimeConfig.dockerfilePath)),
+      sourceDockerfilePath: candidate.path,
+      buildContext: resolve(dirname(candidate.path)),
+      dockerfileSource: candidate.source,
       generated: true,
     };
   }
@@ -361,7 +360,8 @@ async function ensureRepoDockerfileAndContext(params: {
   return {
     dockerfilePath: generatedDockerfile,
     sourceDockerfilePath: generatedDockerfile,
-    buildContext: runtimeConfig.dockerBuildContext || generatedContext,
+    buildContext: generatedContext,
+    dockerfileSource: "generated" as const,
     generated: true,
   };
 }
@@ -385,18 +385,25 @@ async function ensureDockerRuntimeContainer(params: {
 
   const existing = await inspectDockerContainer(containerName);
   if (existing?.running) {
+    const repoBuildSpec = await ensureRepoDockerfileAndContext({
+      repository: params.repository,
+    });
     return {
       containerName,
       containerId: existing.containerId,
       imageTag: existing.imageTag || imageTag,
       baseImageTag: runtimeConfig.dockerBaseImage,
       baseDockerfilePath: runtimeConfig.dockerBaseDockerfilePath || "",
-      dockerfilePath: runtimeConfig.dockerfilePath || "",
-      buildContext: runtimeConfig.dockerBuildContext || "",
+      dockerfilePath: repoBuildSpec.sourceDockerfilePath,
+      buildContext: repoBuildSpec.buildContext,
+      dockerfileSource: repoBuildSpec.dockerfileSource,
     };
   }
 
   if (!runtimeConfig.dockerBuildOnStart && existing && !existing.running) {
+    const repoBuildSpec = await ensureRepoDockerfileAndContext({
+      repository: params.repository,
+    });
     await runDocker(["start", containerName]);
     const started = await inspectDockerContainer(containerName);
     if (!started?.running) {
@@ -408,8 +415,9 @@ async function ensureDockerRuntimeContainer(params: {
       imageTag: started.imageTag || imageTag,
       baseImageTag: runtimeConfig.dockerBaseImage,
       baseDockerfilePath: runtimeConfig.dockerBaseDockerfilePath || "",
-      dockerfilePath: runtimeConfig.dockerfilePath || "",
-      buildContext: runtimeConfig.dockerBuildContext || "",
+      dockerfilePath: repoBuildSpec.sourceDockerfilePath,
+      buildContext: repoBuildSpec.buildContext,
+      dockerfileSource: repoBuildSpec.dockerfileSource,
     };
   }
 
@@ -490,6 +498,7 @@ async function ensureDockerRuntimeContainer(params: {
     baseDockerfilePath: baseBuildSpec.dockerfilePath,
     dockerfilePath: repoBuildSpec.sourceDockerfilePath,
     buildContext: repoBuildSpec.buildContext,
+    dockerfileSource: repoBuildSpec.dockerfileSource,
   };
 }
 
@@ -515,6 +524,7 @@ export async function ensureRepoRuntime(params: {
 }) {
   const db = useDB();
   const runtimeConfig = resolveRuntimeConfig();
+  const metaRepoConfig = resolveAgentMetaRepoConfig();
   const repository = await getRepositoryById(params.repositoryId);
 
   await mkdir(runtimeConfig.reposRootDir, { recursive: true });
@@ -537,6 +547,15 @@ export async function ensureRepoRuntime(params: {
       repo_root_path: paths.repoRootPath,
       sessions_root_dir: runtimeConfig.sessionsRootDir,
       mode: "docker",
+      meta_repo: {
+        url: metaRepoConfig.url || null,
+        branch: metaRepoConfig.branch,
+        auth_type: metaRepoConfig.authType,
+        token_source: metaRepoConfig.tokenSource,
+        token_configured: Boolean(metaRepoConfig.token),
+        bot_username: metaRepoConfig.botUsername,
+        bot_email: metaRepoConfig.botEmail,
+      },
     };
 
     const dockerRuntime = await ensureDockerRuntimeContainer({
@@ -553,6 +572,7 @@ export async function ensureRepoRuntime(params: {
       image_tag: dockerRuntime.imageTag,
       dockerfile_path: dockerRuntime.dockerfilePath,
       build_context: dockerRuntime.buildContext,
+      dockerfile_source: dockerRuntime.dockerfileSource,
     };
     metadata = {
       ...metadata,
