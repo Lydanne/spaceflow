@@ -130,6 +130,7 @@ export function buildTriggerResultCard(
         : JSON.stringify(value);
       lines.push(`- ${key}: \`${displayValue}\``);
     }
+    lines.push(""); // 参数列表后空一行
   }
 
   if (runId) {
