@@ -189,6 +189,11 @@ pnpm dev
 - `docker/base/node24-vscode.Dockerfile`
 - `docker/base/node24-vscode-browser.Dockerfile`
 
+说明：
+
+- 上述基础镜像都内置 `OpenCode CLI`（`opencode`，通过 `npm i -g opencode-ai@latest` 安装）
+- `node24-vscode*` 变体同时内置 `code-server`
+
 ## 4. 目录结构
 
 以 `AGENT_RUNTIME_ROOT=.teax-agent-runtime` 为例：

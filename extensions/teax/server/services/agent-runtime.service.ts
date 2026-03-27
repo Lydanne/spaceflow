@@ -297,6 +297,7 @@ async function ensureDockerBaseBuildSpec() {
       "RUN apt-get update && apt-get install -y --no-install-recommends \\",
       "    git ca-certificates curl wget openssh-client bash \\",
       "  && rm -rf /var/lib/apt/lists/*",
+      "RUN npm install -g opencode-ai@latest",
       "WORKDIR /runtime",
       "CMD [\"sleep\", \"infinity\"]",
       "",
@@ -1014,6 +1015,14 @@ export async function getRepoRuntimeSummary(params: {
     );
 
   const paths = buildRepoPaths(repository, "placeholder-session-id");
+  let runtimeStatus = runtime?.status || "stopped";
+
+  // docker 运行态以容器实时状态为准，避免 DB 状态陈旧导致前端误判。
+  if (runtime?.provider === "docker") {
+    const runtimeKey = runtime.runtime_key || buildRepoRuntimeKey(params.repositoryId);
+    const inspected = await inspectDockerContainer(runtimeKey);
+    runtimeStatus = inspected?.running ? "running" : "stopped";
+  }
 
   return {
     repository_id: repository.id,
@@ -1023,7 +1032,7 @@ export async function getRepoRuntimeSummary(params: {
     repo_root_path: paths.repoRootPath,
     sessions_root_dir: runtimeConfig.sessionsRootDir,
     runtime: runtime || null,
-    runtime_status: runtime?.status || "stopped",
+    runtime_status: runtimeStatus,
     active_session_count: toNumber(activeSessionCountRow?.count),
     active_worktree_count: toNumber(activeWorktreeCountRow?.count),
   };

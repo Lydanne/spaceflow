@@ -433,6 +433,7 @@ async function refreshCurrentSession() {
 
 async function startRuntime() {
   runtimeStartLoading.value = true;
+  toast.add({ title: "正在启动 Runtime，首次构建可能需要几分钟", color: "info" });
   try {
     await $fetch(`${runtimeApiBase}/start`, {
       method: "POST",
@@ -654,7 +655,7 @@ async function pinMessage(messageId: string) {
               icon="i-lucide-play"
               color="primary"
               :loading="runtimeStartLoading"
-              :disabled="runtimeSummary?.runtime_status === 'running'"
+              :disabled="runtimeStartLoading"
               @click="startRuntime"
             >
               启动
