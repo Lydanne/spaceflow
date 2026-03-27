@@ -220,6 +220,8 @@ export interface RenderWorkflowFormOptions {
   lockedInputs?: Set<string>;
   /** 锁定参数的预设值 */
   lockedValues?: Record<string, unknown>;
+  /** 参数初始值（优先于 workflow 默认值） */
+  initialValues?: Record<string, unknown>;
 }
 
 /**
@@ -256,30 +258,39 @@ export function renderWorkflowForm(
       const lockedValue = isLocked
         ? String(opts.lockedValues?.[key] ?? def.default ?? "")
         : undefined;
+      const initialValue = opts.initialValues?.[key];
 
       if (def.type === "choice" && def.options?.length) {
         const defaultValue = isLocked
           ? lockedValue
-          : def.default != null
-            ? String(def.default)
-            : undefined;
+          : initialValue != null
+            ? String(initialValue)
+            : def.default != null
+              ? String(def.default)
+              : undefined;
+        const optionValues = def.options.map((o) => String(o));
+        if (defaultValue && !optionValues.includes(defaultValue)) {
+          optionValues.unshift(defaultValue);
+        }
         card.select({
           name: key,
           label,
           placeholder: `选择 ${key}`,
           required: def.required || false,
           disabled: isLocked ? "🔒 该参数已锁定" : undefined,
-          options: def.options.map((o) => ({ label: o, value: o })),
+          options: optionValues.map((o) => ({ label: o, value: o })),
           initial_option: defaultValue,
         });
       } else if (def.type === "boolean") {
         const boolDefault = isLocked
           ? lockedValue
-          : def.default != null
-            ? def.default
-              ? "true"
-              : "false"
-            : undefined;
+          : initialValue != null
+            ? String(initialValue)
+            : def.default != null
+              ? def.default
+                ? "true"
+                : "false"
+              : undefined;
         card.select({
           name: key,
           label,
@@ -300,9 +311,11 @@ export function renderWorkflowForm(
           required: isLocked ? false : def.required || false,
           default_value: isLocked
             ? lockedValue
-            : def.default
-              ? String(def.default)
-              : undefined,
+            : initialValue != null
+              ? String(initialValue)
+              : def.default
+                ? String(def.default)
+                : undefined,
           disabled: isLocked ? "🔒 该参数已锁定" : undefined,
         });
       }

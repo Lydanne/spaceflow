@@ -138,6 +138,7 @@ async function syncOverrideToDb() {
 
 // 是否有可编辑的参数（任何参数未被锁定）
 const hasEditableInputs = computed(() => {
+  if (!props.data.preset.allow_input_override) return false;
   const inputKeys = Object.keys(props.data.preset.inputs || {});
   const lockedInputs = props.data.preset.locked_inputs || [];
   return inputKeys.some((key) => !lockedInputs.includes(key));

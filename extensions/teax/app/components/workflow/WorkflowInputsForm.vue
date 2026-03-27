@@ -29,6 +29,16 @@ function updateValue(key: string, value: string) {
   emit("update:modelValue", { ...props.modelValue, [key]: value });
 }
 
+function getChoiceItems(key: string, def: WorkflowInputDef): Array<{ label: string; value: string }> {
+  const options = (def.options || []).map((o) => String(o));
+  const currentValue = String(props.modelValue[key] ?? "");
+  const items = [...options];
+  if (currentValue && !items.includes(currentValue)) {
+    items.unshift(currentValue);
+  }
+  return items.map((option) => ({ label: option, value: option }));
+}
+
 function isLocked(key: string): boolean {
   return props.lockedInputs.includes(key);
 }
@@ -70,7 +80,7 @@ function toggleLock(key: string) {
         <USelect
           v-if="def.type === 'choice' && def.options"
           :model-value="modelValue[key]"
-          :items="def.options.map((o) => ({ label: o, value: o }))"
+          :items="getChoiceItems(key as string, def)"
           value-key="value"
           class="flex-1"
           :disabled="isLocked(key as string) && !showLockButton"

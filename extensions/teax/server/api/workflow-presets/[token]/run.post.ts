@@ -12,16 +12,26 @@ export default defineEventHandler(async (event) => {
 
   // 读取用户提交的覆盖参数
   const body = await readBody(event).catch(() => ({}));
-  let finalInputs = preset.inputs || {};
+  const finalInputs: Record<string, string | number | boolean> = { ...(preset.inputs || {}) };
   let finalBranch = preset.branch;
+  const isLockedByOther = !!(
+    preset.group_id
+    && preset.locked_by
+    && preset.locked_by !== session.user.id
+  );
+  const canModifyOverride = !isLockedByOther;
+  const lockedInputs = new Set<string>(preset.locked_inputs || []);
 
-  // 参数覆盖（仅当 allow_input_override 为 true 时生效）
-  if (preset.allow_input_override && body?.inputs) {
-    finalInputs = { ...finalInputs, ...body.inputs };
+  // 参数覆盖：受 allow_input_override 总开关控制；锁定字段不可改
+  if (canModifyOverride && preset.allow_input_override && body?.inputs && typeof body.inputs === "object") {
+    for (const [key, value] of Object.entries(body.inputs as Record<string, unknown>)) {
+      if (lockedInputs.has(key)) continue;
+      finalInputs[key] = value as string | number | boolean;
+    }
   }
 
-  // 分支覆盖（仅当 allow_branch_override 为 true 时生效）
-  if (preset.allow_branch_override && body?.branch) {
+  // 分支覆盖：遵循分支开关；被他人锁定时忽略用户提交
+  if (canModifyOverride && preset.allow_branch_override && body?.branch) {
     finalBranch = body.branch;
   }
 

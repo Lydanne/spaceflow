@@ -94,6 +94,11 @@ export default defineCardPage({
         lockedInputs.add(inputKey);
       }
     }
+    if (!preset.allow_input_override && formData.inputDefs) {
+      for (const inputKey of Object.keys(formData.inputDefs)) {
+        lockedInputs.add(inputKey);
+      }
+    }
     renderWorkflowForm(card, formData, {
       formName: "preset_form",
       disableBranch: isLockedByOther || !preset.allow_branch_override,
@@ -102,6 +107,7 @@ export default defineCardPage({
         : "🔒 该预设不允许修改分支",
       lockedInputs,
       lockedValues: preset.inputs as Record<string, unknown>,
+      initialValues: preset.inputs as Record<string, unknown>,
     });
 
     // 锁定状态提示
@@ -156,50 +162,62 @@ export default defineCardPage({
     }
 
     const formValue = ctx.formValue || {};
-
-    // 1. Resolve preset
-    let resolved: Awaited<ReturnType<typeof resolvePresetByShareToken>>;
-    try {
-      resolved = await resolvePresetByShareToken(shareToken);
-    } catch {
-      return navigate("preset-console", { shareToken });
-    }
-    const { preset, repo, owner, repoName } = resolved;
-    const isLockedByOther = !!(
-      preset.group_id
-      && preset.locked_by
-      && preset.locked_by !== activeUser.id
-    );
-    const canModifyOverride = !isLockedByOther;
-
-    // 2. Build final inputs and branch (synchronous)
-    const finalInputs: Record<string, unknown> = {
-      ...(preset.inputs as Record<string, unknown>),
-    };
-    let finalBranch = preset.branch;
-
-    if (canModifyOverride && preset.allow_input_override) {
-      const lockedInputs = new Set<string>(preset.locked_inputs || []);
-      for (const [key, value] of Object.entries(formValue)) {
-        if (key === "branch") continue;
-        if (lockedInputs.has(key)) continue;
-        finalInputs[key] = value;
-      }
-    }
-
-    if (canModifyOverride && preset.allow_branch_override && formValue.branch) {
-      finalBranch = formValue.branch;
-    }
-
     if (!activeUser) {
       return navigate("preset-console", { shareToken });
     }
 
+    // 1. Resolve preset（用于展示基础信息）
+    let initialResolved: Awaited<ReturnType<typeof resolvePresetByShareToken>>;
+    try {
+      initialResolved = await resolvePresetByShareToken(shareToken);
+    } catch {
+      return navigate("preset-console", { shareToken });
+    }
+    const { preset: initialPreset, repo: initialRepo } = initialResolved;
+
     // 3. Return AsyncTaskResult
     return asyncTask(
-      `**预设**: ${preset.name}\n**仓库**: ${repo.full_name}\n**分支**: ${finalBranch}\n\n⏳ 正在触发工作流，请稍候...`,
+      `**预设**: ${initialPreset.name}\n**仓库**: ${initialRepo.full_name}\n\n⏳ 正在触发工作流，请稍候...`,
       async () => {
         const updateCard = ctx.update;
+        let resolved: Awaited<ReturnType<typeof resolvePresetByShareToken>>;
+        try {
+          resolved = await resolvePresetByShareToken(shareToken);
+        } catch {
+          await updateCard(
+            new EnhancedCardBuilder({ title: "❌ 预设不存在", theme: "red" }, "")
+              .text("该预设可能已被删除，请返回重试", true)
+              .build(),
+          );
+          return;
+        }
+
+        const { preset, repo, owner, repoName } = resolved;
+        const isLockedByOther = !!(
+          preset.group_id
+          && preset.locked_by
+          && preset.locked_by !== activeUser.id
+        );
+        const canModifyOverride = !isLockedByOther;
+
+        // 使用最新数据库配置计算最终执行参数，避免并发情况下用旧值触发
+        const finalInputs: Record<string, unknown> = {
+          ...(preset.inputs as Record<string, unknown>),
+        };
+        let finalBranch = preset.branch;
+
+        if (canModifyOverride && preset.allow_input_override) {
+          const lockedInputs = new Set<string>(preset.locked_inputs || []);
+          for (const [key, value] of Object.entries(formValue)) {
+            if (key === "branch") continue;
+            if (lockedInputs.has(key)) continue;
+            finalInputs[key] = value;
+          }
+        }
+
+        if (canModifyOverride && preset.allow_branch_override && formValue.branch) {
+          finalBranch = String(formValue.branch);
+        }
 
         // Check permission
         const canTrigger = await checkUserPermission(
@@ -212,29 +230,6 @@ export default defineCardPage({
           await updateCard(
             new EnhancedCardBuilder({ title: "❌ 无权限", theme: "red" }, "")
               .text("您没有触发此工作流的权限", true)
-              .build(),
-          );
-          return;
-        }
-
-        // Check lock status
-        if (preset.locked_by && preset.locked_by !== activeUser.id) {
-          const db = useDB();
-          const [locker] = await db
-            .select({ name: schema.users.gitea_username })
-            .from(schema.users)
-            .where(eq(schema.users.id, preset.locked_by))
-            .limit(1);
-          const lockerName = locker?.name || "未知用户";
-          await updateCard(
-            new EnhancedCardBuilder(
-              { title: "🔒 预设已锁定", theme: "orange" },
-              "",
-            )
-              .text(
-                `预设已被 **${lockerName}** 锁定\n\n锁定时间: ${preset.locked_at ? new Date(preset.locked_at).toLocaleString("zh-CN") : "未知"}`,
-                true,
-              )
               .build(),
           );
           return;
