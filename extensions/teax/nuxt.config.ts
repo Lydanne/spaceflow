@@ -39,7 +39,6 @@ export default defineNuxtConfig({
       process.env.AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE
       || "docker/base/node24-vscode-browser.Dockerfile",
     agentRuntimeDockerBaseBuildContext: process.env.AGENT_RUNTIME_DOCKER_BASE_BUILD_CONTEXT || ".",
-    agentRuntimeDockerBaseImage: process.env.AGENT_RUNTIME_DOCKER_BASE_IMAGE || "teax-agent-runtime:base-local",
     agentRuntimeDockerBuildOnStart: process.env.AGENT_RUNTIME_DOCKER_BUILD_ON_START !== "false",
     agentRuntimeDockerWorkspaceRoot: process.env.AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT || "/runtime",
     agentRuntimeKeepWorktreeOnStop: process.env.AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP === "true",

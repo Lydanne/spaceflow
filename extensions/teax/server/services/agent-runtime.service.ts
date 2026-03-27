@@ -9,6 +9,7 @@ import { resolveAgentMetaRepoConfig } from "~~/server/services/agent-meta-config
 
 const execFileAsync = promisify(execFile);
 const repoLocks = new Map<string, Promise<void>>();
+const AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG = "teax-agent-runtime:base";
 
 /**
  * Runtime 全局解析配置。
@@ -22,7 +23,6 @@ interface RuntimeResolvedConfig {
   dockerBin: string;
   dockerBaseDockerfilePath: string;
   dockerBaseBuildContext: string;
-  dockerBaseImage: string;
   dockerBuildOnStart: boolean;
   dockerWorkspaceRoot: string;
   keepWorktreeOnStop: boolean;
@@ -107,7 +107,6 @@ function resolveRuntimeConfig(): RuntimeResolvedConfig {
     dockerBin: String(config.agentRuntimeDockerBin || "docker"),
     dockerBaseDockerfilePath,
     dockerBaseBuildContext,
-    dockerBaseImage: String(config.agentRuntimeDockerBaseImage || "teax-agent-runtime:base-local"),
     dockerBuildOnStart: config.agentRuntimeDockerBuildOnStart !== false,
     dockerWorkspaceRoot: String(config.agentRuntimeDockerWorkspaceRoot || "/runtime"),
     keepWorktreeOnStop: config.agentRuntimeKeepWorktreeOnStop === true,
@@ -305,13 +304,12 @@ function rewriteDockerfileToUseBaseImage(content: string) {
     }
     replaced = true;
     const stageAlias = fromMatch[1] || "";
-    return `FROM \${TEAX_BASE_IMAGE}${stageAlias}`;
+    return `FROM ${AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG}${stageAlias}`;
   });
 
-  const contentWithFrom = replaced
+  return replaced
     ? rewritten.join("\n")
-    : `FROM \${TEAX_BASE_IMAGE}\n${rewritten.join("\n")}`;
-  return `ARG TEAX_BASE_IMAGE\n${contentWithFrom}`;
+    : `FROM ${AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG}\n${rewritten.join("\n")}`;
 }
 
 async function ensureDockerBaseBuildSpec() {
@@ -327,7 +325,7 @@ async function ensureDockerBaseBuildSpec() {
     return {
       dockerfilePath: runtimeConfig.dockerBaseDockerfilePath,
       buildContext,
-      imageTag: runtimeConfig.dockerBaseImage,
+      imageTag: AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG,
       generated: false,
     };
   }
@@ -353,7 +351,7 @@ async function ensureDockerBaseBuildSpec() {
   return {
     dockerfilePath: generatedDockerfile,
     buildContext: runtimeConfig.dockerBaseBuildContext || generatedContext,
-    imageTag: runtimeConfig.dockerBaseImage,
+    imageTag: AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG,
     generated: true,
   };
 }
@@ -397,8 +395,7 @@ async function ensureRepoDockerfileAndContext(params: {
   await writeFile(
     generatedDockerfile,
     [
-      "ARG TEAX_BASE_IMAGE",
-      "FROM ${TEAX_BASE_IMAGE}",
+      `FROM ${AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG}`,
       "WORKDIR /runtime",
       "CMD [\"sleep\", \"infinity\"]",
       "",
@@ -450,7 +447,7 @@ async function ensureDockerRuntimeContainer(params: {
       containerName,
       containerId: existing.containerId,
       imageTag: existing.imageTag || imageTag,
-      baseImageTag: runtimeConfig.dockerBaseImage,
+      baseImageTag: AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG,
       baseDockerfilePath: runtimeConfig.dockerBaseDockerfilePath || "",
       dockerfilePath: repoBuildSpec.sourceDockerfilePath,
       buildContext: repoBuildSpec.buildContext,
@@ -474,7 +471,7 @@ async function ensureDockerRuntimeContainer(params: {
       containerName,
       containerId: started.containerId,
       imageTag: started.imageTag || imageTag,
-      baseImageTag: runtimeConfig.dockerBaseImage,
+      baseImageTag: AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG,
       baseDockerfilePath: runtimeConfig.dockerBaseDockerfilePath || "",
       dockerfilePath: repoBuildSpec.sourceDockerfilePath,
       buildContext: repoBuildSpec.buildContext,
@@ -517,8 +514,6 @@ async function ensureDockerRuntimeContainer(params: {
       repoBuildSpec.dockerfilePath,
       "-t",
       imageTag,
-      "--build-arg",
-      `TEAX_BASE_IMAGE=${baseBuildSpec.imageTag}`,
       repoBuildSpec.buildContext,
     ]);
   }

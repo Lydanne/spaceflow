@@ -122,7 +122,7 @@ Agent Control Plane
 - Repo Runtime 的第二段构建 Dockerfile 固定从 `.teax` 仓库读取：
   - 优先 `/projects/{org}/{repo}/Dockerfile`
   - 回退 `/globals/Dockerfile`
-- 构建时会统一绑定到当前本地基础镜像 tag（`AGENT_RUNTIME_DOCKER_BASE_IMAGE`）
+- 构建时会统一绑定到固定本地基础镜像 tag（`teax-agent-runtime:base`）
 
 生成策略建议：
 
