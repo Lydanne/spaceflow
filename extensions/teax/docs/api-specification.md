@@ -318,6 +318,6 @@ Teax 在 Gitea 基础上增加分页包装：
 
 ## 相关文档
 
-- [架构概览](./overview.md) - 系统整体架构和定位
+- [架构概览](./overview/index.md) - 系统整体架构和定位
 - [权限系统](./permission-system.md) - 权限模型和访问控制
 - [数据库设计](./database-design.md) - 完整的数据库 Schema

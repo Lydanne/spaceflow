@@ -211,6 +211,6 @@ jobs:
 
 ## 相关文档
 
-- [架构概览](./overview.md) - 系统整体架构
+- [架构概览](./overview/index.md) - 系统整体架构
 - [工作区](./workspace.md) - 容器化开发环境
 - [数据库设计](./database-design.md) - Agent 相关表结构

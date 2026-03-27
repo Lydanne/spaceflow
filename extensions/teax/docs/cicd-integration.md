@@ -209,6 +209,6 @@ interface WorkflowItem {
 
 ## 相关文档
 
-- [架构概览](./overview.md) - 系统整体架构
+- [架构概览](./overview/index.md) - 系统整体架构
 - [API 规范](./api-specification.md) - API 路径设计
 - [飞书集成](./feishu-integration.md) - Workflow 通知推送

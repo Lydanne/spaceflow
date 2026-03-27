@@ -486,6 +486,6 @@ async function checkUserPermission(
 
 ## 相关文档
 
-- [架构概览](./overview.md) - 系统整体架构和用户体系
+- [架构概览](./overview/index.md) - 系统整体架构和用户体系
 - [API 规范](./api-specification.md) - API 访问控制规范
 - [数据库设计](./database-design.md) - 权限相关表结构

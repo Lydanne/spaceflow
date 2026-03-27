@@ -165,7 +165,7 @@ pnpm dev
 - [部署指南](./docs/deployment.md) - 生产环境部署
 
 ### 设计文档
-- [架构概览](./docs/overview.md) - 系统架构和定位
+- [架构概览](./docs/overview/index.md) - 系统架构和定位
 - [API 规范](./docs/api-specification.md) - 前后端 API 设计
 - [权限系统](./docs/permission-system.md) - 权限模型和访问控制
 - [CI/CD 集成](./docs/cicd-integration.md) - Gitea Actions 集成

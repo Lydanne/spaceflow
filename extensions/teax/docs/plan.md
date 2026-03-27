@@ -307,7 +307,7 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)    Phase 6 (Week 11-13)
 | 前端路由重构为 Gitea 风格（`[orgName]/[projectName]`） | P0 | 4h | ✅ |
 | Service Token 环境变量方案（去除 DB 管理方案） | P0 | 2h | ✅ |
 | 组织级别同步 API（从 admin 迁移到 org 级别） | P0 | 2h | ✅ |
-| design.md 文档同步（与实际代码对齐） | P1 | 4h | ✅ |
+| overview/index.md 文档同步（与实际代码对齐） | P1 | 4h | ✅ |
 | plan.md 计划文档同步更新 | P1 | 2h | ✅ |
 | 小程序开发码管理 | P2 | 8h | ⬜ |
 | 小程序二维码生成（调用微信开放平台 API） | P2 | 4h | ⬜ |
@@ -329,7 +329,7 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)    Phase 6 (Week 11-13)
 - [x] DTO 验证全量迁移（Zod schema）
 - [x] 前端路由重构为 Gitea 风格
 - [x] Service Token 纯环境变量方案
-- [x] design.md / plan.md 文档同步
+- [x] overview/index.md / plan.md 文档同步
 - [ ] 生产环境部署
 - [ ] 监控告警
 - [ ] 用户文档
@@ -534,7 +534,7 @@ feature/*     ──────┴──────────────┴
 ## 下一步行动
 
 1. **已完成**：Phase 1-2 ✅，Phase 5 Week 9 ⚡ 部分完成（权限 + 代码质量 + 文档）
-2. **设计完成**：Phase 6 工作区功能设计已写入 design.md（技术选型 + 架构 + 数据模型 + API + 页面）
+2. **设计完成**：Phase 6 工作区功能设计已写入 `docs/overview/index.md`（技术选型 + 架构 + 数据模型 + API + 页面）
 3. **下一步**（按优先级）：
    - **Phase 3**（Week 5-6）：飞书集成 — 消息通知 + 机器人指令 + 审批流程
    - **Phase 6**（Week 11-13）：工作区 — 容器运行时 + 网关代理 + 前端页面

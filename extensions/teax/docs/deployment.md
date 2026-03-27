@@ -480,6 +480,6 @@ grafana:
 
 ## 相关文档
 
-- [架构概览](./overview.md) - 系统整体架构
+- [架构概览](./overview/index.md) - 系统整体架构
 - [数据库设计](./database-design.md) - 数据库配置
 - [工作区](./workspace.md) - Docker 容器管理
