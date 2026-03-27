@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
 import { schema, useDB } from "~~/server/db";
 
 /**
@@ -20,6 +20,56 @@ export interface AgentSessionPagination {
 
 function toNumber(value: unknown): number {
   return Number(value ?? 0);
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  const err = error as { code?: string; cause?: { code?: string } };
+  return err?.code === "23505" || err?.cause?.code === "23505";
+}
+
+/**
+ * 写入会话事件（失败不阻断主流程）。
+ */
+async function appendSessionEvent(params: {
+  sessionId: string;
+  type: string;
+  actorType: "user" | "agent" | "system" | "bot";
+  actorId: string;
+  payload?: Record<string, unknown>;
+}) {
+  const db = useDB();
+  try {
+    // 事件序号在会话内唯一；并发写入冲突时重试，避免活动日志丢失。
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const [maxSeqRow] = await db
+        .select({
+          maxSeq: sql<number>`COALESCE(MAX(${schema.agentSessionEvents.seq}), 0)`,
+        })
+        .from(schema.agentSessionEvents)
+        .where(eq(schema.agentSessionEvents.session_id, params.sessionId));
+
+      const nextSeq = toNumber(maxSeqRow?.maxSeq) + 1;
+
+      try {
+        await db.insert(schema.agentSessionEvents).values({
+          session_id: params.sessionId,
+          seq: nextSeq,
+          type: params.type,
+          payload: params.payload || {},
+          actor_type: params.actorType,
+          actor_id: params.actorId,
+        });
+        return;
+      } catch (error) {
+        if (isUniqueViolation(error) && attempt < 2) {
+          continue;
+        }
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.warn("[agent-session] append event failed:", error);
+  }
 }
 
 async function getSessionById(sessionId: string, repositoryId: string) {
@@ -197,6 +247,18 @@ export async function createAgentSession(params: {
     metadata: { initial: true },
   });
 
+  await appendSessionEvent({
+    sessionId: created.id,
+    type: "session_created",
+    actorType: "user",
+    actorId: params.creatorId,
+    payload: {
+      visibility: params.visibility,
+      base_branch: params.baseBranch,
+      working_branch: params.workingBranch || null,
+    },
+  });
+
   return created;
 }
 
@@ -363,6 +425,18 @@ export async function addAgentSessionParticipant(params: {
     })
     .returning();
 
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "participant_added",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      user_id: params.userId,
+      role: params.role,
+      can_chat: params.canChat,
+    },
+  });
+
   return participant;
 }
 
@@ -401,6 +475,18 @@ export async function updateAgentSessionParticipant(params: {
   if (!updated) {
     throw createError({ statusCode: 404, message: "Participant not found" });
   }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "participant_updated",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      user_id: params.targetUserId,
+      role: params.role,
+      can_chat: params.canChat,
+    },
+  });
 
   return updated;
 }
@@ -450,40 +536,68 @@ export async function createAgentSessionMessage(params: {
   const db = useDB();
   const session = await ensureSessionChatAllowed(params.sessionId, params.repositoryId, params.actor);
 
-  const created = await db.transaction(async (tx) => {
-    const [maxSeqRow] = await tx
-      .select({
-        maxSeq: sql<number>`COALESCE(MAX(${schema.agentSessionMessages.seq}), 0)`,
-      })
-      .from(schema.agentSessionMessages)
-      .where(eq(schema.agentSessionMessages.session_id, session.id));
+  let created: typeof schema.agentSessionMessages.$inferSelect | undefined;
 
-    const nextSeq = toNumber(maxSeqRow?.maxSeq) + 1;
+  // 消息序号在会话内唯一；多人并发发言时冲突重试，提升协作稳定性。
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      created = await db.transaction(async (tx) => {
+        const [maxSeqRow] = await tx
+          .select({
+            maxSeq: sql<number>`COALESCE(MAX(${schema.agentSessionMessages.seq}), 0)`,
+          })
+          .from(schema.agentSessionMessages)
+          .where(eq(schema.agentSessionMessages.session_id, session.id));
 
-    const [inserted] = await tx
-      .insert(schema.agentSessionMessages)
-      .values({
-        session_id: session.id,
-        seq: nextSeq,
-        actor_type: "user",
-        actor_id: params.actor.userId,
-        message_type: "user_prompt",
-        content: params.content,
-        metadata: params.metadata,
-      })
-      .returning();
+        const nextSeq = toNumber(maxSeqRow?.maxSeq) + 1;
 
-    await tx
-      .update(schema.agentSessions)
-      .set({ updated_at: new Date() })
-      .where(eq(schema.agentSessions.id, session.id));
+        const [inserted] = await tx
+          .insert(schema.agentSessionMessages)
+          .values({
+            session_id: session.id,
+            seq: nextSeq,
+            actor_type: "user",
+            actor_id: params.actor.userId,
+            message_type: "user_prompt",
+            content: params.content,
+            metadata: params.metadata,
+          })
+          .returning();
 
-    return inserted;
-  });
+        await tx
+          .update(schema.agentSessions)
+          .set({ updated_at: new Date() })
+          .where(eq(schema.agentSessions.id, session.id));
+
+        return inserted;
+      });
+
+      if (created) {
+        break;
+      }
+    } catch (error) {
+      if (isUniqueViolation(error) && attempt < 2) {
+        continue;
+      }
+      throw error;
+    }
+  }
 
   if (!created) {
     throw createError({ statusCode: 500, message: "Failed to create session message" });
   }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "message_created",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      message_id: created.id,
+      seq: created.seq,
+      message_type: created.message_type,
+    },
+  });
 
   return created;
 }
@@ -528,6 +642,17 @@ export async function joinAgentSession(params: {
     })
     .returning();
 
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "participant_joined",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      role,
+      can_chat: canChat,
+    },
+  });
+
   return joined;
 }
 
@@ -556,6 +681,13 @@ export async function leaveAgentSession(params: {
   if (!removed) {
     throw createError({ statusCode: 404, message: "You are not a participant of this session" });
   }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "participant_left",
+    actorType: "user",
+    actorId: params.actor.userId,
+  });
 
   return { success: true };
 }
@@ -618,6 +750,16 @@ export async function pinAgentSessionMessage(params: {
     )
     .returning();
 
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "message_pinned",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      message_id: params.messageId,
+    },
+  });
+
   return pinned;
 }
 
@@ -651,6 +793,16 @@ export async function updateAgentSessionVisibility(params: {
   if (!updated) {
     throw createError({ statusCode: 404, message: "Agent session not found" });
   }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "visibility_changed",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      visibility: params.visibility,
+    },
+  });
 
   return updated;
 }
@@ -688,6 +840,13 @@ export async function stopAgentSession(params: {
   if (!updated) {
     throw createError({ statusCode: 404, message: "Agent session not found" });
   }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "session_stopped",
+    actorType: "user",
+    actorId: params.actor.userId,
+  });
 
   return updated;
 }
@@ -730,5 +889,54 @@ export async function retryAgentSession(params: {
     throw createError({ statusCode: 404, message: "Agent session not found" });
   }
 
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "session_retried",
+    actorType: "user",
+    actorId: params.actor.userId,
+  });
+
   return updated;
+}
+
+export async function listAgentSessionEvents(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+  page: number;
+  limit: number;
+  afterSeq?: number;
+}) {
+  const db = useDB();
+  const session = await ensureSessionReadable(params.sessionId, params.repositoryId, params.actor);
+  const offset = (params.page - 1) * params.limit;
+
+  const conditions = [eq(schema.agentSessionEvents.session_id, session.id)];
+  if (params.afterSeq !== undefined) {
+    conditions.push(gt(schema.agentSessionEvents.seq, params.afterSeq));
+  }
+  const whereCondition = and(...conditions)!;
+
+  const events = await db
+    .select()
+    .from(schema.agentSessionEvents)
+    .where(whereCondition)
+    .orderBy(schema.agentSessionEvents.seq)
+    .limit(params.limit)
+    .offset(offset);
+
+  const [totalRow] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(schema.agentSessionEvents)
+    .where(whereCondition);
+
+  const total = toNumber(totalRow?.count);
+
+  return {
+    data: events,
+    total,
+    page: params.page,
+    limit: params.limit,
+    hasMore: offset + params.limit < total,
+  };
 }

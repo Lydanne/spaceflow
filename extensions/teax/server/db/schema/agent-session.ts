@@ -125,3 +125,30 @@ export const agentSessionMessages = pgTable(
     index("idx_agent_session_messages_actor").on(table.actor_type, table.actor_id),
   ],
 );
+
+/**
+ * 会话事件流表。
+ * 用于记录会话级操作时间线（可用于活动日志与前端实时拉流）。
+ */
+export const agentSessionEvents = pgTable(
+  "agent_session_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    session_id: uuid("session_id")
+      .notNull()
+      .references(() => agentSessions.id, { onDelete: "cascade" }),
+    // 会话内单调递增事件序号
+    seq: integer("seq").notNull(),
+    // 事件类型：session_created/message_created/visibility_changed/...
+    type: varchar("type", { length: 64 }).notNull(),
+    payload: jsonb("payload").default({}),
+    actor_type: varchar("actor_type", { length: 32 }).notNull(),
+    actor_id: varchar("actor_id", { length: 64 }).notNull(),
+    ...baseColumns(),
+  },
+  (table) => [
+    unique("agent_session_events_session_seq").on(table.session_id, table.seq),
+    index("idx_agent_session_events_session_id").on(table.session_id),
+    index("idx_agent_session_events_type").on(table.type),
+  ],
+);

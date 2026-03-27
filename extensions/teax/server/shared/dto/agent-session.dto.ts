@@ -74,3 +74,24 @@ export const updateAgentSessionVisibilityBodySchema = z.object({
 });
 
 export type UpdateAgentSessionVisibilityBody = z.infer<typeof updateAgentSessionVisibilityBodySchema>;
+
+/**
+ * prompt 接口请求体（兼容 prompt 字段命名）。
+ */
+export const createAgentSessionPromptBodySchema = z.object({
+  prompt: z.string().min(1).max(20000),
+  metadata: z.record(z.string(), z.unknown()).optional().default({}),
+});
+
+export type CreateAgentSessionPromptBody = z.infer<typeof createAgentSessionPromptBodySchema>;
+
+/**
+ * 会话事件查询参数。
+ */
+export const listAgentSessionEventsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  after_seq: z.coerce.number().int().min(1).optional(),
+});
+
+export type ListAgentSessionEventsQuery = z.infer<typeof listAgentSessionEventsQuerySchema>;
