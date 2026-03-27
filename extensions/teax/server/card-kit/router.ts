@@ -28,10 +28,10 @@ function isResultType<T extends { __type: string }>(
   type: T["__type"],
 ): result is T {
   return (
-    typeof result === "object" &&
-    result !== null &&
-    "__type" in result &&
-    (result as T).__type === type
+    typeof result === "object"
+    && result !== null
+    && "__type" in result
+    && (result as T).__type === type
   );
 }
 
@@ -42,7 +42,7 @@ export class CardRouter {
   > = [];
 
   /** 开启后在卡片底部渲染内部调试数据（stack、params、data 等） */
-  debug = false;
+  debug = true;
 
   get pageCount(): number {
     return this.pages.size;
@@ -253,9 +253,9 @@ export class CardRouter {
     }
 
     if (
-      typeof current === "object" &&
-      current !== null &&
-      "__stack" in current
+      typeof current === "object"
+      && current !== null
+      && "__stack" in current
     ) {
       return current as EncodedValue;
     }
@@ -545,10 +545,10 @@ export class CardRouter {
     }
     // NavigateResult → 重定向
     if (
-      typeof guardResult === "object" &&
-      guardResult !== null &&
-      "__type" in guardResult &&
-      (guardResult as NavigateResult).__type === "navigate"
+      typeof guardResult === "object"
+      && guardResult !== null
+      && "__type" in guardResult
+      && (guardResult as NavigateResult).__type === "navigate"
     ) {
       const navResult = guardResult as NavigateResult;
       const redirectPage = this.pages.get(navResult.page);

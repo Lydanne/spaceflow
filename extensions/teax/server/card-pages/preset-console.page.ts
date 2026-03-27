@@ -1,17 +1,43 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
-import { defineCardPage, navigate, asyncTask, toast, EnhancedCardBuilder, requireBinding } from "~~/server/card-kit";
+import {
+  defineCardPage,
+  navigate,
+  asyncTask,
+  toast,
+  EnhancedCardBuilder,
+  requireBinding,
+} from "~~/server/card-kit";
 import { resolvePresetByShareToken } from "~~/server/utils/resolve-preset";
 import { useGiteaSdk } from "~~/server/utils/gitea";
-import { dispatchAndPoll, buildDispatchErrorCard, buildTriggerResultCard, fetchWorkflowFormData, renderWorkflowForm } from "~~/server/utils/workflow-trigger";
-import { queryUserPermissionGroups, rowGrantsPermission } from "~~/server/utils/permission";
-import { recordAutoLockHistory, recordTriggerHistory } from "~~/server/services/preset-lock.service";
+import {
+  dispatchAndPoll,
+  buildDispatchErrorCard,
+  buildTriggerResultCard,
+  fetchWorkflowFormData,
+  renderWorkflowForm,
+} from "~~/server/utils/workflow-trigger";
+import {
+  queryUserPermissionGroups,
+  rowGrantsPermission,
+} from "~~/server/utils/permission";
+import {
+  recordAutoLockHistory,
+  recordTriggerHistory,
+} from "~~/server/services/preset-lock.service";
 import type { User } from "~~/server/db/schema";
 
 // --- Helper: permission check without H3Event ---
-async function checkUserPermission(userId: string, orgId: string, permission: string, repositoryId?: string): Promise<boolean> {
+async function checkUserPermission(
+  userId: string,
+  orgId: string,
+  permission: string,
+  repositoryId?: string,
+): Promise<boolean> {
   const groups = await queryUserPermissionGroups(userId, orgId);
-  return groups.some((group) => rowGrantsPermission(group, permission, repositoryId));
+  return groups.some((group) =>
+    rowGrantsPermission(group, permission, repositoryId),
+  );
 }
 
 export default defineCardPage({
@@ -48,15 +74,32 @@ export default defineCardPage({
     });
 
     const card = ctx.card({ title: `🚀 ${preset.name}`, theme: "blue" });
-    card.text(`**仓库**: ${repo.full_name}\n**工作流**: ${preset.workflow_path}`, true);
+    card.text(
+      `**仓库**: ${repo.full_name}\n**工作流**: ${preset.workflow_path}`,
+      true,
+    );
     card.divider();
 
     const activeUser = ctx.inject<User>(requireBinding);
     const activeUserId = activeUser?.id;
+    const isLockedByOther = !!(
+      preset.group_id
+      && preset.locked_by
+      && preset.locked_by !== activeUserId
+    );
 
     const lockedInputs = new Set<string>(preset.locked_inputs || []);
+    if (isLockedByOther && formData.inputDefs) {
+      for (const inputKey of Object.keys(formData.inputDefs)) {
+        lockedInputs.add(inputKey);
+      }
+    }
     renderWorkflowForm(card, formData, {
       formName: "preset_form",
+      disableBranch: isLockedByOther || !preset.allow_branch_override,
+      disableBranchReason: isLockedByOther
+        ? "🔒 当前预设被他人锁定，仅锁定者可修改"
+        : "🔒 该预设不允许修改分支",
       lockedInputs,
       lockedValues: preset.inputs as Record<string, unknown>,
     });
@@ -107,9 +150,7 @@ export default defineCardPage({
       await db
         .update(schema.workflowPresets)
         .set({ locked_by: null, locked_at: null, auto_unlock_at: null })
-        .where(
-          eq(schema.workflowPresets.share_token, shareToken),
-        );
+        .where(eq(schema.workflowPresets.share_token, shareToken));
 
       return toast("success", "✅ 已解锁");
     }
@@ -124,12 +165,20 @@ export default defineCardPage({
       return navigate("preset-console", { shareToken });
     }
     const { preset, repo, owner, repoName } = resolved;
+    const isLockedByOther = !!(
+      preset.group_id
+      && preset.locked_by
+      && preset.locked_by !== activeUser.id
+    );
+    const canModifyOverride = !isLockedByOther;
 
     // 2. Build final inputs and branch (synchronous)
-    const finalInputs: Record<string, unknown> = { ...(preset.inputs as Record<string, unknown>) };
+    const finalInputs: Record<string, unknown> = {
+      ...(preset.inputs as Record<string, unknown>),
+    };
     let finalBranch = preset.branch;
 
-    if (preset.allow_input_override) {
+    if (canModifyOverride && preset.allow_input_override) {
       const lockedInputs = new Set<string>(preset.locked_inputs || []);
       for (const [key, value] of Object.entries(formValue)) {
         if (key === "branch") continue;
@@ -138,7 +187,7 @@ export default defineCardPage({
       }
     }
 
-    if (preset.allow_branch_override && formValue.branch) {
+    if (canModifyOverride && preset.allow_branch_override && formValue.branch) {
       finalBranch = formValue.branch;
     }
 
@@ -153,7 +202,12 @@ export default defineCardPage({
         const updateCard = ctx.update;
 
         // Check permission
-        const canTrigger = await checkUserPermission(activeUser.id, repo.organization_id, "actions:trigger", repo.id);
+        const canTrigger = await checkUserPermission(
+          activeUser.id,
+          repo.organization_id,
+          "actions:trigger",
+          repo.id,
+        );
         if (!canTrigger) {
           await updateCard(
             new EnhancedCardBuilder({ title: "❌ 无权限", theme: "red" }, "")
@@ -173,7 +227,10 @@ export default defineCardPage({
             .limit(1);
           const lockerName = locker?.name || "未知用户";
           await updateCard(
-            new EnhancedCardBuilder({ title: "🔒 预设已锁定", theme: "orange" }, "")
+            new EnhancedCardBuilder(
+              { title: "🔒 预设已锁定", theme: "orange" },
+              "",
+            )
               .text(
                 `预设已被 **${lockerName}** 锁定\n\n锁定时间: ${preset.locked_at ? new Date(preset.locked_at).toLocaleString("zh-CN") : "未知"}`,
                 true,
@@ -185,15 +242,28 @@ export default defineCardPage({
 
         // Check if already running
         const gitea = await useGiteaSdk().role("fallback-admin");
-        const workflowFileName = preset.workflow_path.split("/").pop() || preset.workflow_path;
+        const workflowFileName
+          = preset.workflow_path.split("/").pop() || preset.workflow_path;
 
         if (preset.current_run_id) {
           try {
-            const currentRun = await gitea.getWorkflowRun(owner, repoName, preset.current_run_id);
-            const isRunning = ["running", "waiting", "queued", "in_progress"].includes(currentRun?.status || "");
+            const currentRun = await gitea.getWorkflowRun(
+              owner,
+              repoName,
+              preset.current_run_id,
+            );
+            const isRunning = [
+              "running",
+              "waiting",
+              "queued",
+              "in_progress",
+            ].includes(currentRun?.status || "");
             if (isRunning) {
               await updateCard(
-                new EnhancedCardBuilder({ title: "⏳ 工作流运行中", theme: "orange" }, "")
+                new EnhancedCardBuilder(
+                  { title: "⏳ 工作流运行中", theme: "orange" },
+                  "",
+                )
                   .text(
                     `当前有一个正在运行的工作流 (Run #${currentRun?.run_number})\n请等待完成后再试`,
                     true,
@@ -228,7 +298,11 @@ export default defineCardPage({
         // Update database
         const db = useDB();
         const config = useRuntimeConfig();
-        let lockInfo: { locked_by: string; locked_at: string; auto_unlock_at: string | null } | null = null;
+        let lockInfo: {
+          locked_by: string;
+          locked_at: string;
+          auto_unlock_at: string | null;
+        } | null = null;
 
         if (newRunId) {
           const updateData: Record<string, unknown> = {
@@ -236,10 +310,23 @@ export default defineCardPage({
             last_triggered_by: activeUser.id,
           };
 
+          // 允许同步时，按覆盖后的值回写配置（仅允许锁定者/可修改者）
+          if (preset.allow_sync_override && canModifyOverride) {
+            if (preset.allow_branch_override) {
+              updateData.branch = finalBranch;
+            }
+            if (preset.allow_input_override) {
+              updateData.inputs = finalInputs;
+            }
+          }
+
           // Auto-lock sub-presets
           if (preset.group_id && !preset.locked_by) {
             const [group] = await db
-              .select({ auto_unlock_minutes: schema.workflowPresetGroups.auto_unlock_minutes })
+              .select({
+                auto_unlock_minutes:
+                  schema.workflowPresetGroups.auto_unlock_minutes,
+              })
               .from(schema.workflowPresetGroups)
               .where(eq(schema.workflowPresetGroups.id, preset.group_id))
               .limit(1);
@@ -277,7 +364,11 @@ export default defineCardPage({
             });
 
             if (lockInfo) {
-              await recordAutoLockHistory(preset.id, activeUser.id, lockInfo.auto_unlock_at);
+              await recordAutoLockHistory(
+                preset.id,
+                activeUser.id,
+                lockInfo.auto_unlock_at,
+              );
             }
           }
         }
@@ -292,14 +383,16 @@ export default defineCardPage({
           extraLines.push(`🔒 已自动锁定 (将在 ${unlockText} 解锁)`);
         }
 
-        await updateCard(buildTriggerResultCard({
-          repoFullName: repo.full_name,
-          branch: finalBranch,
-          workflowPath: preset.workflow_path,
-          runId: newRunId,
-          runNumber: newRunNumber,
-          extraLines,
-        }));
+        await updateCard(
+          buildTriggerResultCard({
+            repoFullName: repo.full_name,
+            branch: finalBranch,
+            workflowPath: preset.workflow_path,
+            runId: newRunId,
+            runNumber: newRunNumber,
+            extraLines,
+          }),
+        );
       },
     );
   },

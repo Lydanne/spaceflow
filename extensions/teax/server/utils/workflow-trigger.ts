@@ -1,7 +1,11 @@
 import type { GiteaService } from "./gitea";
 import { EnhancedCardBuilder } from "../card-kit/builder";
 import type { CardJSON, EnhancedCardBuilderInterface } from "../card-kit/types";
-import { parseWorkflowYaml, extractInputs, type WorkflowInputDef } from "./workflow-yaml";
+import {
+  parseWorkflowYaml,
+  extractInputs,
+  type WorkflowInputDef,
+} from "./workflow-yaml";
 
 // ─── dispatch + poll ──────────────────────────
 
@@ -33,7 +37,9 @@ export async function dispatchAndPoll(
   let latestRunId = 0;
   try {
     const runs = await gitea.getRepoWorkflowRuns(owner, repo, 1, 5);
-    const latestRun = runs.workflow_runs?.find((run) => run.path?.includes(workflowFileName));
+    const latestRun = runs.workflow_runs?.find((run) =>
+      run.path?.includes(workflowFileName),
+    );
     if (latestRun) {
       latestRunId = latestRun.id;
     }
@@ -91,8 +97,11 @@ export interface TriggerResultCardOptions {
 /**
  * 构建触发结果卡片。
  */
-export function buildTriggerResultCard(opts: TriggerResultCardOptions): CardJSON {
-  const { repoFullName, branch, workflowPath, runId, runNumber, extraLines } = opts;
+export function buildTriggerResultCard(
+  opts: TriggerResultCardOptions,
+): CardJSON {
+  const { repoFullName, branch, workflowPath, runId, runNumber, extraLines }
+    = opts;
   const config = useRuntimeConfig();
   const baseUrl = config.public.appUrl as string;
 
@@ -112,7 +121,9 @@ export function buildTriggerResultCard(opts: TriggerResultCardOptions): CardJSON
 
   if (runId) {
     lines.push(`**运行编号**: #${runNumber}`);
-    lines.push(`[查看运行详情](${baseUrl}/${repoFullName}/actions/runs/${runId})`);
+    lines.push(
+      `[查看运行详情](${baseUrl}/${repoFullName}/actions/runs/${runId})`,
+    );
   }
 
   if (extraLines?.length) {
@@ -175,7 +186,12 @@ export async function fetchWorkflowFormData(
   // 解析 workflow inputs
   let inputDefs: Record<string, WorkflowInputDef> | null = null;
   try {
-    const content = await gitea.getFileContent(owner, repo, workflowPath, defaultBranch);
+    const content = await gitea.getFileContent(
+      owner,
+      repo,
+      workflowPath,
+      defaultBranch,
+    );
     if (content) {
       const doc = parseWorkflowYaml(content);
       if (doc) {
@@ -196,6 +212,10 @@ export interface RenderWorkflowFormOptions {
   formName: string;
   /** 提交按钮文案（默认 "🚀 触发工作流"） */
   submitText?: string;
+  /** 是否禁用分支选择 */
+  disableBranch?: boolean;
+  /** 分支禁用提示文案 */
+  disableBranchReason?: string;
   /** 锁定的 input key 集合（渲染为 disabled 只读控件） */
   lockedInputs?: Set<string>;
   /** 锁定参数的预设值 */
@@ -220,6 +240,9 @@ export function renderWorkflowForm(
       label: "分支",
       placeholder: "选择分支",
       required: true,
+      disabled: opts.disableBranch
+        ? opts.disableBranchReason || "🔒 当前不可修改分支"
+        : undefined,
       options: data.branches,
       initial_option: data.defaultBranch,
     });
@@ -230,10 +253,16 @@ export function renderWorkflowForm(
     for (const [key, def] of Object.entries(data.inputDefs)) {
       const label = def.description || key;
       const isLocked = opts.lockedInputs?.has(key);
-      const lockedValue = isLocked ? String(opts.lockedValues?.[key] ?? def.default ?? "") : undefined;
+      const lockedValue = isLocked
+        ? String(opts.lockedValues?.[key] ?? def.default ?? "")
+        : undefined;
 
       if (def.type === "choice" && def.options?.length) {
-        const defaultValue = isLocked ? lockedValue : (def.default != null ? String(def.default) : undefined);
+        const defaultValue = isLocked
+          ? lockedValue
+          : def.default != null
+            ? String(def.default)
+            : undefined;
         card.select({
           name: key,
           label,
@@ -246,7 +275,11 @@ export function renderWorkflowForm(
       } else if (def.type === "boolean") {
         const boolDefault = isLocked
           ? lockedValue
-          : (def.default != null ? (def.default ? "true" : "false") : undefined);
+          : def.default != null
+            ? def.default
+              ? "true"
+              : "false"
+            : undefined;
         card.select({
           name: key,
           label,
@@ -264,8 +297,12 @@ export function renderWorkflowForm(
           name: key,
           label,
           placeholder: def.default ? String(def.default) : `输入 ${key}`,
-          required: isLocked ? false : (def.required || false),
-          default_value: isLocked ? lockedValue : (def.default ? String(def.default) : undefined),
+          required: isLocked ? false : def.required || false,
+          default_value: isLocked
+            ? lockedValue
+            : def.default
+              ? String(def.default)
+              : undefined,
           disabled: isLocked ? "🔒 该参数已锁定" : undefined,
         });
       }

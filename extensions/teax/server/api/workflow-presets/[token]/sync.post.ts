@@ -14,12 +14,25 @@ const syncBodySchema = z.object({
  * 仅当 allow_sync_override 为 true 时生效
  */
 export default defineEventHandler(async (event) => {
-  await requireAuth(event);
+  const session = await requireAuth(event);
   const { preset } = await resolvePresetByToken(event);
 
   // 检查是否允许同步
   if (!preset.allow_sync_override) {
-    throw createError({ statusCode: 403, message: "Sync override not allowed" });
+    throw createError({
+      statusCode: 403,
+      message: "Sync override not allowed",
+    });
+  }
+
+  // 组预设仅允许锁定者同步（避免他人覆写配置）
+  if (preset.group_id && preset.locked_by !== session.user.id) {
+    throw createError({
+      statusCode: 403,
+      message: preset.locked_by
+        ? "Only the locker can sync this preset"
+        : "Preset must be locked before syncing overrides",
+    });
   }
 
   const body = await readValidatedBody(event, syncBodySchema.parse);
