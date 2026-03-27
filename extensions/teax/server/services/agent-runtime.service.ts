@@ -172,7 +172,7 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-async function runDocker(args: string[], cwd?: string) {
+async function runDocker(args: string[], cwd?: string, options?: { suppressErrorLog?: boolean }) {
   const config = resolveRuntimeConfig();
   const commandText = formatCommand(config.dockerBin, args);
   const startedAt = Date.now();
@@ -199,13 +199,15 @@ async function runDocker(args: string[], cwd?: string) {
   } catch (error) {
     const stdout = ((error as { stdout?: string })?.stdout || "").trim();
     const stderr = ((error as { stderr?: string })?.stderr || "").trim();
-    console.error("[agent-runtime] command failed", {
-      command: commandText,
-      duration_ms: Date.now() - startedAt,
-      stdout: stdout || undefined,
-      stderr: stderr || undefined,
-      message: (error as { message?: string })?.message || "unknown",
-    });
+    if (!options?.suppressErrorLog) {
+      console.error("[agent-runtime] command failed", {
+        command: commandText,
+        duration_ms: Date.now() - startedAt,
+        stdout: stdout || undefined,
+        stderr: stderr || undefined,
+        message: (error as { message?: string })?.message || "unknown",
+      });
+    }
     throw error;
   }
 }
@@ -279,14 +281,28 @@ async function inspectDockerContainer(containerName: string) {
       "--format",
       "{{.Id}}|{{.State.Running}}|{{.Config.Image}}",
       containerName,
-    ]);
+    ], undefined, {
+      suppressErrorLog: true,
+    });
     const [containerId, runningRaw, imageTag] = result.stdout.split("|");
     return {
       containerId: (containerId || "").trim(),
       running: (runningRaw || "").trim() === "true",
       imageTag: (imageTag || "").trim(),
     };
-  } catch {
+  } catch (error) {
+    const stderr = ((error as { stderr?: string })?.stderr || "").trim();
+    if (/no such object/i.test(stderr)) {
+      logRuntimeStep("docker inspect container not found", {
+        container_name: containerName,
+      });
+      return null;
+    }
+    console.error("[agent-runtime] docker inspect failed", {
+      container_name: containerName,
+      stderr: stderr || undefined,
+      message: (error as { message?: string })?.message || "unknown",
+    });
     return null;
   }
 }
