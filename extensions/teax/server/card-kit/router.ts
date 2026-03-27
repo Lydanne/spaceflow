@@ -27,15 +27,22 @@ function isResultType<T extends { __type: string }>(
   result: CardActionResult,
   type: T["__type"],
 ): result is T {
-  return typeof result === "object" && result !== null && "__type" in result && (result as T).__type === type;
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    "__type" in result &&
+    (result as T).__type === type
+  );
 }
 
 export class CardRouter {
   private pages = new Map<string, CardPageDef>();
-  private globalBeforeEach: Array<(ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>> = [];
+  private globalBeforeEach: Array<
+    (ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>
+  > = [];
 
   /** 开启后在卡片底部渲染内部调试数据（stack、params、data 等） */
-  debug = true;
+  debug = false;
 
   get pageCount(): number {
     return this.pages.size;
@@ -43,13 +50,17 @@ export class CardRouter {
 
   register(page: CardPageDef): void {
     if (this.pages.has(page.name)) {
-      console.warn(`[CardRouter] page "${page.name}" already registered, overwriting`);
+      console.warn(
+        `[CardRouter] page "${page.name}" already registered, overwriting`,
+      );
     }
     this.pages.set(page.name, page);
   }
 
   /** 注册全局前置守卫（类似 vue-router router.beforeEach） */
-  beforeEach(guard: (ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>): void {
+  beforeEach(
+    guard: (ctx: NavigationGuardContext) => GuardResult | Promise<GuardResult>,
+  ): void {
     this.globalBeforeEach.push(guard);
   }
 
@@ -117,7 +128,9 @@ export class CardRouter {
     }
 
     // 栈顶 = 当前/目标页面
-    const current = decodeStackEntry(encoded.__stack[encoded.__stack.length - 1]!);
+    const current = decodeStackEntry(
+      encoded.__stack[encoded.__stack.length - 1]!,
+    );
     // 历史栈 = 栈顶之下的所有项
     const stack = encoded.__stack.slice(0, -1);
 
@@ -157,8 +170,17 @@ export class CardRouter {
           provide: di.provide,
           inject: di.inject,
         });
-        const card = await this.handleActionResult(page, ctx, await page.onAction?.(ctx), input);
-        return this.injectDebug(card, { stack: encoded.__stack, action: "form_submit", data: encoded.__data });
+        const card = await this.handleActionResult(
+          page,
+          ctx,
+          await page.onAction?.(ctx),
+          input,
+        );
+        return this.injectDebug(card, {
+          stack: encoded.__stack,
+          action: "form_submit",
+          data: encoded.__data,
+        });
       }
 
       if (encoded.__action) {
@@ -175,8 +197,17 @@ export class CardRouter {
           provide: di.provide,
           inject: di.inject,
         });
-        const card = await this.handleActionResult(page, ctx, await page.onAction?.(ctx), input);
-        return this.injectDebug(card, { stack: encoded.__stack, action: encoded.__action, data: encoded.__data });
+        const card = await this.handleActionResult(
+          page,
+          ctx,
+          await page.onAction?.(ctx),
+          input,
+        );
+        return this.injectDebug(card, {
+          stack: encoded.__stack,
+          action: encoded.__action,
+          data: encoded.__data,
+        });
       }
 
       // ─── 纯 navigate ───
@@ -195,7 +226,11 @@ export class CardRouter {
         await input.sendCard(card);
         return undefined;
       }
-      return this.injectDebug(card, { stack: encoded.__stack, action: encoded.__action, data: encoded.__data });
+      return this.injectDebug(card, {
+        stack: encoded.__stack,
+        action: encoded.__action,
+        data: encoded.__data,
+      });
     } catch (err) {
       console.error(`[CardRouter] error in page "${current.page}":`, err);
       return this.buildErrorCard(err);
@@ -217,7 +252,11 @@ export class CardRouter {
       }
     }
 
-    if (typeof current === "object" && current !== null && "__stack" in current) {
+    if (
+      typeof current === "object" &&
+      current !== null &&
+      "__stack" in current
+    ) {
       return current as EncodedValue;
     }
 
@@ -254,7 +293,13 @@ export class CardRouter {
       provide: opts.provide,
       inject: opts.inject,
       card: (config: CardConfig) =>
-        new EnhancedCardBuilder(config, page.name, opts.data, opts.params, stack),
+        new EnhancedCardBuilder(
+          config,
+          page.name,
+          opts.data,
+          opts.params,
+          stack,
+        ),
     };
   }
 
@@ -286,7 +331,13 @@ export class CardRouter {
       provide: opts.provide,
       inject: opts.inject,
       card: (config: CardConfig) =>
-        new EnhancedCardBuilder(config, pageName, opts.data, opts.params, stack),
+        new EnhancedCardBuilder(
+          config,
+          pageName,
+          opts.data,
+          opts.params,
+          stack,
+        ),
       type: opts.type,
       action: opts.action,
       setData: (partial) => ({
@@ -299,7 +350,11 @@ export class CardRouter {
       formName: opts.formName,
       token: opts.token,
       update: opts.updateCard,
-      navigate: async (targetPage: string, targetParams?: CardParams, navOpts?: CardActionNavigateOpts) => {
+      navigate: async (
+        targetPage: string,
+        targetParams?: CardParams,
+        navOpts?: CardActionNavigateOpts,
+      ) => {
         const card = await this.renderPage(targetPage, {
           openId: opts.openId,
           params: targetParams,
@@ -359,7 +414,9 @@ export class CardRouter {
       const navResult = result;
       const targetPage = this.pages.get(navResult.page);
       if (!targetPage) {
-        console.warn(`[CardRouter] navigate target "${navResult.page}" not found`);
+        console.warn(
+          `[CardRouter] navigate target "${navResult.page}" not found`,
+        );
         return undefined;
       }
 
@@ -373,7 +430,10 @@ export class CardRouter {
 
       // beforeLeave 守卫（当前页面）
       if (page.beforeLeave) {
-        const leaveResolved = await this.resolveGuard(await page.beforeLeave(guardCtx), guardCtx);
+        const leaveResolved = await this.resolveGuard(
+          await page.beforeLeave(guardCtx),
+          guardCtx,
+        );
         if (leaveResolved.blocked) return leaveResolved.card;
       }
 
@@ -385,7 +445,8 @@ export class CardRouter {
       let targetStack = ctx.stack as StackEntry[];
       if (navResult.mode !== "replace") {
         targetStack = [...targetStack, encodeStackEntry(page.name, ctx.params)];
-        if (targetStack.length > MAX_STACK_DEPTH) targetStack = targetStack.slice(-MAX_STACK_DEPTH);
+        if (targetStack.length > MAX_STACK_DEPTH)
+          targetStack = targetStack.slice(-MAX_STACK_DEPTH);
       }
 
       const targetData = navResult.data ?? targetPage.data?.() ?? {};
@@ -441,12 +502,20 @@ export class CardRouter {
   ): Promise<CardJSON | undefined> {
     // 全局 beforeEach
     for (const guard of this.globalBeforeEach) {
-      const resolved = await this.resolveGuard(await guard(guardCtx), guardCtx, input);
+      const resolved = await this.resolveGuard(
+        await guard(guardCtx),
+        guardCtx,
+        input,
+      );
       if (resolved.blocked) return resolved.card;
     }
     // 页面 beforeEnter
     if (targetPage.beforeEnter) {
-      const resolved = await this.resolveGuard(await targetPage.beforeEnter(guardCtx), guardCtx, input);
+      const resolved = await this.resolveGuard(
+        await targetPage.beforeEnter(guardCtx),
+        guardCtx,
+        input,
+      );
       if (resolved.blocked) return resolved.card;
     }
     return undefined;
@@ -463,7 +532,9 @@ export class CardRouter {
     guardResult: GuardResult,
     guardCtx: NavigationGuardContext,
     input?: DispatchInput,
-  ): Promise<{ blocked: false } | { blocked: true; card: CardJSON | undefined }> {
+  ): Promise<
+    { blocked: false } | { blocked: true; card: CardJSON | undefined }
+  > {
     // 放行
     if (guardResult === undefined || guardResult === true) {
       return { blocked: false };
@@ -474,15 +545,17 @@ export class CardRouter {
     }
     // NavigateResult → 重定向
     if (
-      typeof guardResult === "object"
-      && guardResult !== null
-      && "__type" in guardResult
-      && (guardResult as NavigateResult).__type === "navigate"
+      typeof guardResult === "object" &&
+      guardResult !== null &&
+      "__type" in guardResult &&
+      (guardResult as NavigateResult).__type === "navigate"
     ) {
       const navResult = guardResult as NavigateResult;
       const redirectPage = this.pages.get(navResult.page);
       if (!redirectPage) {
-        console.warn(`[CardRouter] guard redirect target "${navResult.page}" not found`);
+        console.warn(
+          `[CardRouter] guard redirect target "${navResult.page}" not found`,
+        );
         return { blocked: true, card: undefined };
       }
       const redirectData = navResult.data ?? redirectPage.data?.() ?? {};
@@ -503,19 +576,27 @@ export class CardRouter {
   /** debug 模式：在卡片底部追加内部数据 */
   private injectDebug(
     card: CardJSON | undefined,
-    info: { stack?: StackEntry[]; action?: string; data?: Record<string, unknown> },
+    info: {
+      stack?: StackEntry[];
+      action?: string;
+      data?: Record<string, unknown>;
+    },
   ): CardJSON | undefined {
     if (!this.debug || !card) return card;
 
     const debugObj: Record<string, unknown> = { stack: info.stack };
     if (info.action) debugObj.action = info.action;
-    if (info.data && Object.keys(info.data).length > 0) debugObj.data = info.data;
+    if (info.data && Object.keys(info.data).length > 0)
+      debugObj.data = info.data;
 
     const debugElements = [
       { tag: "hr" },
       {
         tag: "div",
-        text: { tag: "lark_md", content: `🐛 **Debug**\n\`\`\`json\n${JSON.stringify(debugObj, null, 2)}\n\`\`\`` },
+        text: {
+          tag: "lark_md",
+          content: `🐛 **Debug**\n\`\`\`json\n${JSON.stringify(debugObj, null, 2)}\n\`\`\``,
+        },
       },
     ];
 
