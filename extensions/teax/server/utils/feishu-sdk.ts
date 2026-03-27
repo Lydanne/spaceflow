@@ -95,6 +95,37 @@ export async function sendFeishuChatCardMessage(
   return sendFeishuCardMessage(chatId, card, "chat_id");
 }
 
+export interface FeishuChatInfo {
+  chat_id: string;
+  description?: string;
+}
+
+export async function getFeishuChatInfo(chatId: string): Promise<FeishuChatInfo | undefined> {
+  const client = getFeishuClient();
+
+  const res = await client.im.chat.get({
+    path: {
+      chat_id: chatId,
+    },
+  });
+
+  if (res.code !== 0) {
+    console.error("Feishu get chat info error:", res.code, res.msg);
+    return;
+  }
+
+  const data = (res.data || {}) as Record<string, unknown>;
+  const chat = (data.chat || {}) as Record<string, unknown>;
+
+  const description = [data.description, data.chat_description, chat.description]
+    .find((v) => typeof v === "string") as string | undefined;
+
+  return {
+    chat_id: chatId,
+    description,
+  };
+}
+
 export async function updateCardMessage(
   messageId: string,
   card: FeishuInteractiveCard,

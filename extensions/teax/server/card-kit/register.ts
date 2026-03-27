@@ -8,6 +8,10 @@
 import { CardRouter } from "./router";
 import type { CardPageDef, CardJSON } from "./types";
 import { encodeStackEntry } from "./stack";
+import {
+  DEFAULT_BOT_HOME_PAGE,
+  resolveBotChatConfig,
+} from "./shared/bot-chat-config";
 
 // ━━━ 全局单例 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -163,6 +167,10 @@ async function render(
  */
 export async function handleBotMessage(ctx: BotMessageContext): Promise<void> {
   const { replyFeishuCardMessage, replyFeishuMessage } = await import("~~/server/services/messaging");
+  const chatConfig = await resolveBotChatConfig({
+    chatId: ctx.chatId,
+    chatType: ctx.chatType,
+  });
 
   // 1. 链接匹配（优先级最高）
   for (const cmd of commands) {
@@ -193,7 +201,13 @@ export async function handleBotMessage(ctx: BotMessageContext): Promise<void> {
   const text = ctx.text.trim();
 
   if (!text) {
-    const card = await render(ctx.senderOpenId, "cp-home");
+    let card: CardJSON | undefined;
+    try {
+      card = await render(ctx.senderOpenId, chatConfig.atPageHome);
+    } catch (error) {
+      console.error(`[card-command] render home page failed (${chatConfig.atPageHome}):`, error);
+      card = await render(ctx.senderOpenId, DEFAULT_BOT_HOME_PAGE);
+    }
     if (card) await replyFeishuCardMessage(ctx.messageId, card);
     return;
   }
@@ -207,6 +221,14 @@ export async function handleBotMessage(ctx: BotMessageContext): Promise<void> {
   );
 
   if (matched) {
+    if (!chatConfig.allowCommand) {
+      await replyFeishuMessage(
+        ctx.messageId,
+        "⚠️ 当前群未开启命令功能，请在群描述中添加 {allowCommand=true} 后重试",
+      );
+      return;
+    }
+
     try {
       const params = matched.paramsFromArgs?.(args);
       const card = await render(ctx.senderOpenId, matched.page, params);
