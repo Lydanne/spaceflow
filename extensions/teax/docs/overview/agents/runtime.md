@@ -38,6 +38,157 @@
 | `AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT` | `/runtime` | 容器内挂载工作根目录 |
 | `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP` | `false` | 停止会话时是否保留 worktree 目录 |
 
+#### 参数详解
+
+##### `AGENT_RUNTIME_MODE`
+
+- 类型：`string`
+- 可选值：`docker`、`local`
+- 默认值：`docker`
+- 生效范围：全局
+- 行为说明：
+  - `docker`：为仓库启动容器 runtime，worktree 通过 `docker exec git ...` 管理
+  - `local`：直接在宿主机执行 `git clone/fetch/worktree`
+  - 传入非法值时会自动回落到 `docker`
+- 推荐：
+  - 生产：`docker`
+  - 无 Docker 场景临时调试：`local`
+
+##### `AGENT_RUNTIME_ROOT`
+
+- 类型：`string`（路径）
+- 默认值：`.teax-agent-runtime`
+- 生效范围：全局
+- 行为说明：
+  - 作为 runtime 根目录，会生成：
+    - `repos/`（仓库主目录）
+    - `sessions/`（会话 worktree 目录）
+    - `docker-build/`（构建中间产物与生成 Dockerfile）
+  - 若配置为相对路径，会按服务进程当前工作目录解析为绝对路径
+- 推荐：
+  - 生产使用持久化磁盘绝对路径，例如 `/data/teax-agent-runtime`
+
+##### `AGENT_RUNTIME_GIT_BIN`
+
+- 类型：`string`
+- 默认值：`git`
+- 生效范围：`local` 模式
+- 行为说明：
+  - 指定执行 Git 命令的二进制路径
+  - 典型命令包含：`clone`、`fetch`、`worktree add/remove/prune`
+- 推荐：
+  - 默认 `git` 即可；自定义安装时可填绝对路径（如 `/usr/bin/git`）
+
+##### `AGENT_RUNTIME_DOCKER_BIN`
+
+- 类型：`string`
+- 默认值：`docker`
+- 生效范围：`docker` 模式
+- 行为说明：
+  - 指定 Docker CLI 可执行文件
+  - runtime 会调用 `docker build/run/start/stop/rm/exec/inspect`
+- 推荐：
+  - 默认 `docker`；特殊环境可填绝对路径
+
+##### `AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE`
+
+- 类型：`string`（路径）
+- 默认值：`docker/base/node24-vscode-browser.Dockerfile`
+- 生效范围：`docker` 模式
+- 行为说明：
+  - 用于“第一段构建”的基础镜像 Dockerfile
+  - 支持相对路径（按进程 cwd 解析）或绝对路径
+  - 若为空，系统会在 `${AGENT_RUNTIME_ROOT}/docker-build/base/Dockerfile.base` 生成一个默认基础 Dockerfile
+- 推荐：
+  - 显式指定项目内基线 Dockerfile，便于团队统一
+
+##### `AGENT_RUNTIME_DOCKER_BASE_BUILD_CONTEXT`
+
+- 类型：`string`（路径）
+- 默认值：`.`
+- 生效范围：`docker` 模式
+- 行为说明：
+  - 基础镜像构建时的 build context
+  - 支持相对路径或绝对路径
+- 推荐：
+  - 若基础 Dockerfile 会 `COPY` 项目文件，通常保持 `.` 即可
+
+##### `AGENT_RUNTIME_DOCKER_BASE_IMAGE`
+
+- 类型：`string`
+- 默认值：`teax-agent-runtime:base-local`
+- 生效范围：`docker` 模式
+- 行为说明：
+  - “第一段构建”产出的基础镜像 tag
+  - “第二段构建”会通过 `--build-arg TEAX_BASE_IMAGE=<该值>` 引用它
+- 推荐：
+  - 使用本地命名空间 tag；若做多环境区分可加后缀（如 `:base-prod`）
+
+##### `AGENT_RUNTIME_DOCKER_BUILD_ON_START`
+
+- 类型：`boolean`（环境变量字符串，`"false"` 以外都视为 true）
+- 默认值：`true`
+- 生效范围：`docker` 模式
+- 行为说明：
+  - `true`：启动 runtime 时执行两段构建并以新镜像重建容器
+  - `false`：
+    - 若容器已存在且处于停止状态，只执行 `docker start`
+    - 若容器不存在，仍会执行构建后再 `run`（因为需要首次镜像）
+- 推荐：
+  - 开发阶段：`true`
+  - 追求启动速度且镜像已预热：`false`
+
+##### `AGENT_RUNTIME_DOCKERFILE`
+
+- 类型：`string`（路径）
+- 默认值：空
+- 生效范围：`docker` 模式
+- 行为说明：
+  - 指定“第二段构建”的仓库 Dockerfile
+  - 系统会读取该文件并重写第一个 `FROM` 为 `FROM ${TEAX_BASE_IMAGE}`，写入生成文件后再构建
+  - 若为空，系统会生成最小仓库 Dockerfile（仅 `FROM ${TEAX_BASE_IMAGE}` + `WORKDIR`）
+- 推荐：
+  - 需要仓库级工具链扩展时配置此项
+
+##### `AGENT_RUNTIME_DOCKER_BUILD_CONTEXT`
+
+- 类型：`string`（路径）
+- 默认值：空
+- 生效范围：`docker` 模式
+- 行为说明：
+  - 仓库镜像构建 context
+  - 为空时：
+    - 若配置了 `AGENT_RUNTIME_DOCKERFILE`，默认使用该 Dockerfile 所在目录
+    - 否则使用系统生成目录 `${AGENT_RUNTIME_ROOT}/docker-build/<repositoryId>`
+- 推荐：
+  - Dockerfile 需要访问仓库内文件时，显式指定对应 context 根目录
+
+##### `AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT`
+
+- 类型：`string`（容器内路径）
+- 默认值：`/runtime`
+- 生效范围：`docker` 模式
+- 行为说明：
+  - 容器内工作根目录
+  - 宿主机会挂载：
+    - `${AGENT_RUNTIME_ROOT}/repos -> ${WORKSPACE_ROOT}/repos`
+    - `${AGENT_RUNTIME_ROOT}/sessions -> ${WORKSPACE_ROOT}/sessions`
+  - 会话 `git worktree` 命令在该目录树下执行
+- 推荐：
+  - 保持默认 `/runtime`，避免与系统目录冲突
+
+##### `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP`
+
+- 类型：`boolean`（环境变量字符串，仅 `"true"` 为 true）
+- 默认值：`false`
+- 生效范围：`local/docker` 模式
+- 行为说明：
+  - `false`：停止会话时清理 worktree 目录，并将记录标记为 `removed`
+  - `true`：停止会话时保留目录，便于排查/复盘
+- 推荐：
+  - 生产默认 `false`
+  - 需要定位问题时临时改为 `true`
+
 建议：
 
 - 默认使用 `docker`。
