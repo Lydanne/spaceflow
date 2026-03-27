@@ -78,8 +78,8 @@ Workflow 配置预设、分享链接和简化触发流程。
 - 会话模型（repo/system、分支、worktree、公开/私有、多人协作对话）
 - Runtime 基础工具链（Node.js 24、vscode-server、无头浏览器）
 - Runtime 动态扩展与 Dockerfile 覆盖构建机制
-- 默认组织“配置与状态仓库”自动创建与自动提交策略（`/globals`、`/projects/{org}/{name}`）
-- `TeaxBot` 账号自动创建与最小权限提交机制
+- 默认组织“配置与状态仓库”手动接入与自动提交策略（`/globals`、`/projects/{org}/{name}`）
+- `TeaxBot` 账号手动接入与最小权限提交机制
 - OpenCode 配置分层（globals + projects）与 MCP/skills/rules 合并策略
 - OpenCode 权限控制（工具/MCP/Secrets）与审批流
 - OpenCode 驱动流程和事件流

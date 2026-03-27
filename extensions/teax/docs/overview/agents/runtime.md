@@ -173,6 +173,7 @@
   - 宿主机会挂载：
     - `${AGENT_RUNTIME_ROOT}/repos -> ${WORKSPACE_ROOT}/repos`
     - `${AGENT_RUNTIME_ROOT}/sessions -> ${WORKSPACE_ROOT}/sessions`
+    - `${AGENT_RUNTIME_ROOT}/.teax -> ${WORKSPACE_ROOT}/.teax`
   - 会话 `git worktree` 命令在该目录树下执行
 - 推荐：
   - 保持默认 `/runtime`，避免与系统目录冲突
@@ -228,8 +229,14 @@ pnpm dev
   2. 再使用仓库 Dockerfile 构建 repo image（首个 `FROM` 会改写为 `FROM ${TEAX_BASE_IMAGE}`）
   3. 最后基于 repo image 启动 runtime 容器
 - 会话 worktree 通过 `docker exec git ...` 在容器中执行
-- 宿主机仅需具备 Docker，仓库目录与 sessions 目录会挂载进容器
+- 宿主机仅需具备 Docker，仓库目录、sessions 目录与元数据目录会挂载进容器
 - 停止 runtime 时会停止并移除该仓库容器
+
+容器内挂载关系（默认值）：
+
+- `${AGENT_RUNTIME_ROOT}/repos`
+- `${AGENT_RUNTIME_ROOT}/sessions`
+- `${AGENT_RUNTIME_ROOT}/.teax`（元数据仓库挂载点）
 
 内置基础 Dockerfile 目录：
 
@@ -243,6 +250,7 @@ pnpm dev
 
 ```text
 .teax-agent-runtime/
+├── .teax/                        # 元数据仓库本地目录（固定标准目录）
 ├── repos/
 │   └── {owner}/{repo}/          # 主仓目录
 └── sessions/

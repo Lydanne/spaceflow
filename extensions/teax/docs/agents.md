@@ -16,7 +16,7 @@
 - 系统启动后默认拉起一个系统级 Agent，用于跨仓库任务
 - Runtime 基础镜像内置 Node.js 24、vscode-server、无头浏览器等基础工具链
 - 支持后续动态扩展工具链，并生成新 Dockerfile 覆盖当前 Runtime 镜像
-- Runtime 配置与状态由 Gitea 默认组织中的默认仓库托管，系统自动创建并自动提交
+- Runtime 配置与状态由 Gitea 元数据仓库托管，资源手动接入并自动提交
 - OpenCode 配置、MCP、skills、rules 采用双层主模型：全局层 + 资源层（项目/仓库）
 
 ## 2. 双层 Agent 模型
@@ -127,14 +127,34 @@ Agent Control Plane
 - tag：`teax/agent-runtime:{scopeKey}-{timestamp}`
 - 生产绑定必须使用 digest，避免 tag 漂移
 
-### 4.5 Runtime 配置与状态仓库（Gitea 默认组织）
+### 4.5 Runtime 配置与状态仓库（手动接入）
 
-平台在首次启动时自动确保以下资源存在：
+该能力改为**手动接入模式**，平台不再自动创建组织、仓库与机器人账号。
 
-- 默认组织：`.teax`（可配置）
-- 默认仓库：`.teax`（可配置）
+接入前提（由用户或管理员预先创建）：
+
+- 元数据组织（示例：`.teax`）
+- 元数据仓库（示例：`.teax`）
+- 提交账号（示例：`TeaxBot`）及其访问令牌
 
 该仓库定位：**仅存储配置与状态元数据**，不存业务代码与构建二进制产物。
+
+接入参数（建议作为平台配置项）：
+
+| 参数 | 示例 | 说明 |
+| --- | --- | --- |
+| `AGENT_META_REPO_URL` | `https://gitea.example.com/.teax/.teax.git` | 元数据仓库地址（clone/fetch/push 目标） |
+| `AGENT_META_REPO_BRANCH` | `main` | 元数据仓库默认分支 |
+| `AGENT_META_REPO_AUTH_TYPE` | `token` | 鉴权方式（当前建议 token） |
+| `AGENT_META_REPO_TOKEN` | `***` | 元数据仓库写入令牌（可直接使用 TeaxBot Token） |
+| `AGENT_BOT_USERNAME` | `TeaxBot` | 机器人提交用户名 |
+| `AGENT_BOT_EMAIL` | `teaxbot@local` | 机器人提交邮箱 |
+| `AGENT_BOT_TOKEN` | `***` | TeaxBot Token（用于提交与状态回写） |
+
+说明：
+
+- `AGENT_META_REPO_TOKEN` 与 `AGENT_BOT_TOKEN` 可合并为同一令牌（若权限模型允许）
+- 所有敏感参数应存放在密钥管理，不写入元数据仓库
 
 目录约定（固定）：
 
@@ -180,7 +200,7 @@ Agent Control Plane
 - 构建任务原始日志全文
 - 运行时临时缓存与会话工作目录
 
-自动提交规则：
+提交与状态回写规则：
 
 - 系统使用专用账号 `TeaxBot` 提交
 - 每次配置变更自动 commit + push
@@ -188,14 +208,14 @@ Agent Control Plane
 - 每次构建与发布变更都回写对应目录 `state.json`
 - 关键状态快照（active image、会话计数、worktree 计数）自动提交
 
-### 4.9 TeaxBot 账号（自动创建）
+### 4.9 TeaxBot 账号（手动接入）
 
-平台启动时自动执行账号保障流程：
+平台不再自动创建 `TeaxBot`。改为手动准备并传入参数：
 
-1. 检查 Gitea 是否存在账号 `TeaxBot`
-2. 若不存在则自动创建并绑定系统邮箱（如 `teaxbot@local`）
-3. 为 `TeaxBot` 生成专用访问令牌（最小权限）
-4. 将令牌安全保存到平台密钥管理（不写入配置仓库）
+1. 在 Gitea 手动创建（或指定已有）`TeaxBot` 账号
+2. 手动生成最小权限访问令牌
+3. 在平台配置中传入 `AGENT_BOT_TOKEN`（或统一使用 `AGENT_META_REPO_TOKEN`）
+4. 配置提交身份（`AGENT_BOT_USERNAME` / `AGENT_BOT_EMAIL`）
 
 `TeaxBot` 默认职责：
 
@@ -775,7 +795,7 @@ Repo Session 支持人工接管：
 - System Runtime 启动即存在
 - System Session 编排与子会话聚合
 - 跨仓库批量任务 API 与管理页
-- Runtime 配置与状态仓库自动创建与自动提交链路
+- Runtime 配置与状态仓库手动接入与自动提交链路
 - `/globals|/projects/{org}/{name}` -> `Dockerfile` -> image build 的闭环
 
 ### Phase 3（协作与治理）

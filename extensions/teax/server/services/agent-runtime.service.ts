@@ -11,6 +11,11 @@ const repoLocks = new Map<string, Promise<void>>();
 
 type RuntimeMode = "local" | "docker";
 
+/**
+ * Runtime 全局解析配置。
+ * - rootDir/repo/session 为宿主机目录
+ * - dockerWorkspaceRoot 为容器内工作根目录（默认 /runtime）
+ */
 interface RuntimeResolvedConfig {
   mode: RuntimeMode;
   rootDir: string;
@@ -33,11 +38,19 @@ interface RepoPathInfo {
   sessionPath: string;
 }
 
+/**
+ * 容器内路径映射信息。
+ * 每个会话 worktree 在容器内走 `containerSessionPath`，对应宿主机 `sessionPath`。
+ */
 interface RepoContainerPathInfo {
   containerRepoRootPath: string;
   containerSessionPath: string;
 }
 
+/**
+ * Docker Runtime 启动/复用结果。
+ * 该结构会写入 `agent_runtimes.metadata.docker`，用于后续排障与展示。
+ */
 interface DockerRuntimeEnsureResult {
   containerName: string;
   containerId: string;
@@ -53,6 +66,23 @@ interface RepositorySnapshot {
   full_name: string;
   clone_url: string;
   default_branch: string | null;
+}
+
+/**
+ * `agent_runtimes.metadata.docker` 关键字段结构。
+ * - meta_repo_container_path 固定为 `${AGENT_RUNTIME_ROOT}/.teax`
+ * - 用于追踪当前 runtime 的镜像与挂载状态
+ */
+interface AgentRuntimeDockerMetadata {
+  container_name: string;
+  container_id: string;
+  meta_repo_local_path: string;
+  meta_repo_container_path: string;
+  base_image_tag: string;
+  base_dockerfile_path: string;
+  image_tag: string;
+  dockerfile_path: string;
+  build_context: string;
 }
 
 /**
@@ -363,13 +393,17 @@ async function ensureDockerRuntimeContainer(params: {
   runtimeKey: string;
 }): Promise<DockerRuntimeEnsureResult> {
   const runtimeConfig = resolveRuntimeConfig();
+  const metaRepoLocalPath = join(runtimeConfig.rootDir, ".teax");
   const imageTag = `teax-agent-runtime:${toDockerSafeSegment(`${params.repository.full_name}-${params.repository.id.slice(0, 8)}`)}`;
   const containerName = params.runtimeKey;
   const containerReposRoot = posix.join(runtimeConfig.dockerWorkspaceRoot, "repos");
   const containerSessionsRoot = posix.join(runtimeConfig.dockerWorkspaceRoot, "sessions");
+  // 容器内元数据挂载点：${AGENT_RUNTIME_ROOT}/.teax
+  const containerMetaRepoRoot = posix.join(runtimeConfig.dockerWorkspaceRoot, ".teax");
 
   await mkdir(runtimeConfig.reposRootDir, { recursive: true });
   await mkdir(runtimeConfig.sessionsRootDir, { recursive: true });
+  await mkdir(metaRepoLocalPath, { recursive: true });
 
   const existing = await inspectDockerContainer(containerName);
   if (existing?.running) {
@@ -448,8 +482,14 @@ async function ensureDockerRuntimeContainer(params: {
     `${runtimeConfig.reposRootDir}:${containerReposRoot}`,
     "-v",
     `${runtimeConfig.sessionsRootDir}:${containerSessionsRoot}`,
+    "-v",
+    `${metaRepoLocalPath}:${containerMetaRepoRoot}`,
     "-w",
     runtimeConfig.dockerWorkspaceRoot,
+    "-e",
+    `AGENT_RUNTIME_ROOT=${runtimeConfig.dockerWorkspaceRoot}`,
+    "-e",
+    `AGENT_META_REPO_DIR=${containerMetaRepoRoot}`,
     "-e",
     `TEAX_REPOSITORY_ID=${params.repository.id}`,
     "-e",
@@ -527,17 +567,20 @@ export async function ensureRepoRuntime(params: {
         repository,
         runtimeKey,
       });
+      const dockerMetadata: AgentRuntimeDockerMetadata = {
+        container_name: dockerRuntime.containerName,
+        container_id: dockerRuntime.containerId,
+        meta_repo_local_path: join(runtimeConfig.rootDir, ".teax"),
+        meta_repo_container_path: posix.join(runtimeConfig.dockerWorkspaceRoot, ".teax"),
+        base_image_tag: dockerRuntime.baseImageTag,
+        base_dockerfile_path: dockerRuntime.baseDockerfilePath,
+        image_tag: dockerRuntime.imageTag,
+        dockerfile_path: dockerRuntime.dockerfilePath,
+        build_context: dockerRuntime.buildContext,
+      };
       metadata = {
         ...metadata,
-        docker: {
-          container_name: dockerRuntime.containerName,
-          container_id: dockerRuntime.containerId,
-          base_image_tag: dockerRuntime.baseImageTag,
-          base_dockerfile_path: dockerRuntime.baseDockerfilePath,
-          image_tag: dockerRuntime.imageTag,
-          dockerfile_path: dockerRuntime.dockerfilePath,
-          build_context: dockerRuntime.buildContext,
-        },
+        docker: dockerMetadata,
       };
     }
 
