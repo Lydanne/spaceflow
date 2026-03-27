@@ -155,6 +155,8 @@ const runtimeStopLoading = ref(false);
 const runtimeForceStopLoading = ref(false);
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let autoRefreshTick = 0;
+const SESSION_MESSAGES_PAGE_LIMIT = 100;
+const SESSION_EVENTS_PAGE_LIMIT = 100;
 
 const createForm = reactive({
   title: "",
@@ -301,10 +303,10 @@ async function loadSessionContext(sessionId: string) {
       $fetch<AgentSessionDetail>(`${sessionsApiBase}/${sessionId}`),
       $fetch<AgentSessionParticipant[]>(`${sessionsApiBase}/${sessionId}/participants`),
       $fetch<PaginatedResponse<AgentSessionMessage>>(`${sessionsApiBase}/${sessionId}/messages`, {
-        query: { page: 1, limit: 200 },
+        query: { page: 1, limit: SESSION_MESSAGES_PAGE_LIMIT },
       }),
       $fetch<PaginatedResponse<AgentSessionEvent>>(`${sessionsApiBase}/${sessionId}/events`, {
-        query: { page: 1, limit: 100 },
+        query: { page: 1, limit: SESSION_EVENTS_PAGE_LIMIT },
       }),
     ]);
 
@@ -330,10 +332,10 @@ async function refreshSessionRealtime(sessionId: string) {
       $fetch<AgentSessionDetail>(`${sessionsApiBase}/${sessionId}`),
       $fetch<AgentSessionParticipant[]>(`${sessionsApiBase}/${sessionId}/participants`),
       $fetch<PaginatedResponse<AgentSessionMessage>>(`${sessionsApiBase}/${sessionId}/messages`, {
-        query: { page: 1, limit: 200 },
+        query: { page: 1, limit: SESSION_MESSAGES_PAGE_LIMIT },
       }),
       $fetch<PaginatedResponse<AgentSessionEvent>>(`${sessionsApiBase}/${sessionId}/events`, {
-        query: { page: 1, limit: 100 },
+        query: { page: 1, limit: SESSION_EVENTS_PAGE_LIMIT },
       }),
     ]);
 
