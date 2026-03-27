@@ -1,7 +1,7 @@
 import { eq, desc } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { defineCardPage, requireBinding } from "~~/server/card-kit";
-import { getActiveAccount } from "~~/server/services/account.service";
+import type { User } from "~~/server/db/schema";
 
 export default defineCardPage({
   name: "approvals",
@@ -10,7 +10,7 @@ export default defineCardPage({
 
   async render(ctx) {
     const db = useDB();
-    const activeUser = await getActiveAccount(ctx.openId);
+    const activeUser = ctx.inject<User>(requireBinding);
 
     if (!activeUser) {
       return ctx

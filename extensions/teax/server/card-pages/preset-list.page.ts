@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { defineCardPage, guards, requireBinding, type EnhancedButtonConfig } from "~~/server/card-kit";
-import { getActiveAccountId } from "~~/server/utils/feishu-active-account";
+import type { User } from "~~/server/db/schema";
 
 function getPresetStatus(
   activeUserId: string,
@@ -36,8 +36,8 @@ export default defineCardPage({
     const repo = ctx.params.repo as string | undefined;
     const repoFullName = owner && repo ? `${owner}/${repo}` : undefined;
 
-    // 获取当前活跃账户 ID
-    const activeUserId = await getActiveAccountId(ctx.openId);
+    const activeUser = ctx.inject<User>(requireBinding);
+    const activeUserId = activeUser?.id;
     if (!activeUserId) {
       return ctx
         .card({ title: "🔒 未绑定账号", theme: "orange" })

@@ -1,13 +1,12 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { defineCardPage, navigate, asyncTask, toast, EnhancedCardBuilder, requireBinding } from "~~/server/card-kit";
-import { getActiveAccountId } from "~~/server/utils/feishu-active-account";
 import { resolvePresetByShareToken } from "~~/server/utils/resolve-preset";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { dispatchAndPoll, buildDispatchErrorCard, buildTriggerResultCard, fetchWorkflowFormData, renderWorkflowForm } from "~~/server/utils/workflow-trigger";
-import { getActiveAccount } from "~~/server/services/account.service";
 import { queryUserPermissionGroups, rowGrantsPermission } from "~~/server/utils/permission";
 import { recordAutoLockHistory, recordTriggerHistory } from "~~/server/services/preset-lock.service";
+import type { User } from "~~/server/db/schema";
 
 // --- Helper: permission check without H3Event ---
 async function checkUserPermission(userId: string, orgId: string, permission: string, repositoryId?: string): Promise<boolean> {
@@ -52,6 +51,9 @@ export default defineCardPage({
     card.text(`**仓库**: ${repo.full_name}\n**工作流**: ${preset.workflow_path}`, true);
     card.divider();
 
+    const activeUser = ctx.inject<User>(requireBinding);
+    const activeUserId = activeUser?.id;
+
     const lockedInputs = new Set<string>(preset.locked_inputs || []);
     renderWorkflowForm(card, formData, {
       formName: "preset_form",
@@ -60,7 +62,6 @@ export default defineCardPage({
     });
 
     // 锁定状态提示
-    const activeUserId = await getActiveAccountId(ctx.openId);
     if (preset.group_id && preset.locked_by) {
       card.divider();
       if (preset.locked_by === activeUserId) {
@@ -95,10 +96,11 @@ export default defineCardPage({
 
   async onAction(ctx) {
     const shareToken = ctx.params.shareToken as string;
+    const activeUser = ctx.inject<User>(requireBinding);
+    const activeUserId = activeUser?.id;
 
     // 处理解锁操作
     if (ctx.action === "unlock") {
-      const activeUserId = await getActiveAccountId(ctx.openId);
       if (!activeUserId) return navigate("preset-console", { shareToken });
 
       const db = useDB();
@@ -140,17 +142,15 @@ export default defineCardPage({
       finalBranch = formValue.branch;
     }
 
-    const openId = ctx.openId;
+    if (!activeUser) {
+      return navigate("preset-console", { shareToken });
+    }
 
     // 3. Return AsyncTaskResult
     return asyncTask(
       `**预设**: ${preset.name}\n**仓库**: ${repo.full_name}\n**分支**: ${finalBranch}\n\n⏳ 正在触发工作流，请稍候...`,
       async () => {
         const updateCard = ctx.update;
-
-        // Check user (binding already verified by beforeEnter)
-        const activeUser = await getActiveAccount(openId);
-        if (!activeUser) return;
 
         // Check permission
         const canTrigger = await checkUserPermission(activeUser.id, repo.organization_id, "actions:trigger", repo.id);
