@@ -88,7 +88,7 @@ interface PaginatedResponse<T> {
 interface RepoRuntimeSummary {
   repository_id: string;
   repository_full_name: string;
-  mode: "local" | "mock";
+  mode: "local" | "docker";
   root_dir: string;
   repo_root_path: string;
   sessions_root_dir: string;
@@ -636,7 +636,7 @@ async function pinMessage(messageId: string) {
               color="neutral"
               variant="soft"
             >
-              {{ runtimeSummary?.mode || "mock" }}
+              {{ runtimeSummary?.mode || "docker" }}
             </UBadge>
           </div>
 

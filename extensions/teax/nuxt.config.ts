@@ -24,11 +24,20 @@ export default defineNuxtConfig({
     giteaServiceToken: process.env.GITEA_SERVICE_TOKEN || "",
     tokenEncryptSecret: process.env.TOKEN_ENCRYPT_SECRET || "",
     // Agent Runtime（P1）配置
-    agentRuntimeMode: process.env.AGENT_RUNTIME_MODE || "mock",
+    agentRuntimeMode: process.env.AGENT_RUNTIME_MODE || "docker",
     agentRuntimeRoot: process.env.AGENT_RUNTIME_ROOT || ".teax-agent-runtime",
     agentRuntimeGitBin: process.env.AGENT_RUNTIME_GIT_BIN || "git",
+    agentRuntimeDockerBin: process.env.AGENT_RUNTIME_DOCKER_BIN || "docker",
+    agentRuntimeDockerBaseDockerfile:
+      process.env.AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE
+      || "docker/base/node24-vscode-browser.Dockerfile",
+    agentRuntimeDockerBaseBuildContext: process.env.AGENT_RUNTIME_DOCKER_BASE_BUILD_CONTEXT || ".",
+    agentRuntimeDockerBaseImage: process.env.AGENT_RUNTIME_DOCKER_BASE_IMAGE || "teax-agent-runtime:base-local",
+    agentRuntimeDockerBuildOnStart: process.env.AGENT_RUNTIME_DOCKER_BUILD_ON_START !== "false",
+    agentRuntimeDockerfile: process.env.AGENT_RUNTIME_DOCKERFILE || "",
+    agentRuntimeDockerBuildContext: process.env.AGENT_RUNTIME_DOCKER_BUILD_CONTEXT || "",
+    agentRuntimeDockerWorkspaceRoot: process.env.AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT || "/runtime",
     agentRuntimeKeepWorktreeOnStop: process.env.AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP === "true",
-    agentRuntimeAllowMockFallback: process.env.AGENT_RUNTIME_ALLOW_MOCK_FALLBACK !== "false",
     session: {
       password: process.env.NUXT_SESSION_PASSWORD || "",
     },

@@ -24,8 +24,8 @@ export const agentRuntimes = pgTable(
     repository_id: uuid("repository_id")
       .notNull()
       .references(() => repositories.id, { onDelete: "cascade" }),
-    // provider：local/mock/docker（MVP 先实现 local/mock）
-    provider: varchar("provider", { length: 32 }).notNull().default("local"),
+    // provider：local/docker
+    provider: varchar("provider", { length: 32 }).notNull().default("docker"),
     // 外部 runtime 标识（例如容器名、容器 ID）
     runtime_key: varchar("runtime_key", { length: 255 }),
     status: varchar("status", { length: 32 }).notNull().default("starting"),
