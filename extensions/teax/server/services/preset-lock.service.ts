@@ -15,6 +15,47 @@ export interface UnlockResult {
   success: boolean;
 }
 
+export interface TriggerLockRefreshPayload {
+  lockOwner: string;
+  lockedAt: Date;
+  autoUnlockAt: Date | null;
+  lockInfo: {
+    locked_by: string;
+    locked_at: string;
+    auto_unlock_at: string | null;
+  };
+}
+
+/**
+ * 计算“触发后刷新锁定时间”的字段
+ * - 保留已有锁定者；若无则使用当前触发人
+ * - 自动解锁时间从当前时刻按分钟数重算
+ */
+export function buildTriggerLockRefresh(
+  params: {
+    currentLockedBy: string | null;
+    actorId: string;
+    autoUnlockMinutes: number | null | undefined;
+  },
+): TriggerLockRefreshPayload {
+  const now = new Date();
+  const autoUnlockAt = params.autoUnlockMinutes
+    ? new Date(now.getTime() + params.autoUnlockMinutes * 60 * 1000)
+    : null;
+  const lockOwner = params.currentLockedBy || params.actorId;
+
+  return {
+    lockOwner,
+    lockedAt: now,
+    autoUnlockAt,
+    lockInfo: {
+      locked_by: lockOwner,
+      locked_at: now.toISOString(),
+      auto_unlock_at: autoUnlockAt?.toISOString() || null,
+    },
+  };
+}
+
 /**
  * 锁定预设
  */

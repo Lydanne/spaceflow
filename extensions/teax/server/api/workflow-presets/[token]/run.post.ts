@@ -4,7 +4,11 @@ import { requireAuth } from "~~/server/utils/auth";
 import { requirePermission } from "~~/server/utils/permission";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolvePresetByToken } from "~~/server/utils/resolve-preset";
-import { recordAutoLockHistory, recordTriggerHistory } from "~~/server/services/preset-lock.service";
+import {
+  buildTriggerLockRefresh,
+  recordAutoLockHistory,
+  recordTriggerHistory,
+} from "~~/server/services/preset-lock.service";
 
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event);
@@ -113,7 +117,7 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // 保存 runId 到数据库，如果是子预设则同时锁定
+  // 保存 runId 到数据库；子预设每次触发都重算自动解锁时间
   const db = useDB();
   let lockInfo: { locked_by: string; locked_at: string; auto_unlock_at: string | null } | null = null;
 
@@ -123,39 +127,29 @@ export default defineEventHandler(async (event) => {
       last_triggered_by: session.user.id,
     };
 
-    // 如果是子预设且未被锁定，自动锁定
-    if (preset.group_id && !preset.locked_by) {
-      // 获取 group 的自动解锁时间配置
+    // 子预设每次触发都刷新锁定时间和自动解锁时间
+    if (preset.group_id) {
       const [group] = await db
         .select({ auto_unlock_minutes: schema.workflowPresetGroups.auto_unlock_minutes })
         .from(schema.workflowPresetGroups)
         .where(eq(schema.workflowPresetGroups.id, preset.group_id))
         .limit(1);
-
-      const now = new Date();
-      const autoUnlockAt = group?.auto_unlock_minutes
-        ? new Date(now.getTime() + group.auto_unlock_minutes * 60 * 1000)
-        : null;
-
-      updateData.locked_by = session.user.id;
-      updateData.locked_at = now;
-      if (autoUnlockAt) {
-        updateData.auto_unlock_at = autoUnlockAt;
-      }
-
-      // 记录锁定信息用于返回
-      lockInfo = {
-        locked_by: session.user.id,
-        locked_at: now.toISOString(),
-        auto_unlock_at: autoUnlockAt?.toISOString() || null,
-      };
+      const lockRefresh = buildTriggerLockRefresh({
+        currentLockedBy: preset.locked_by,
+        actorId: session.user.id,
+        autoUnlockMinutes: group?.auto_unlock_minutes,
+      });
+      updateData.locked_by = lockRefresh.lockOwner;
+      updateData.locked_at = lockRefresh.lockedAt;
+      updateData.auto_unlock_at = lockRefresh.autoUnlockAt;
+      lockInfo = lockRefresh.lockInfo;
     }
 
     await db
       .update(schema.workflowPresets)
       .set(updateData)
       .where(eq(schema.workflowPresets.id, preset.id));
-    console.log("[run.post] Saved current_run_id:", newRunId, preset.group_id ? "(auto-locked)" : "");
+    console.log("[run.post] Saved current_run_id:", newRunId, preset.group_id ? "(lock refreshed)" : "");
 
     // 写入历史记录（仅子预设）
     if (preset.group_id) {

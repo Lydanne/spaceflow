@@ -22,6 +22,7 @@ import {
   rowGrantsPermission,
 } from "~~/server/utils/permission";
 import {
+  buildTriggerLockRefresh,
   recordAutoLockHistory,
   recordTriggerHistory,
 } from "~~/server/services/preset-lock.service";
@@ -315,8 +316,8 @@ export default defineCardPage({
             }
           }
 
-          // Auto-lock sub-presets
-          if (preset.group_id && !preset.locked_by) {
+          // 子预设每次触发都刷新锁定时间和自动解锁时间
+          if (preset.group_id) {
             const [group] = await db
               .select({
                 auto_unlock_minutes:
@@ -325,23 +326,15 @@ export default defineCardPage({
               .from(schema.workflowPresetGroups)
               .where(eq(schema.workflowPresetGroups.id, preset.group_id))
               .limit(1);
-
-            const now = new Date();
-            const autoUnlockAt = group?.auto_unlock_minutes
-              ? new Date(now.getTime() + group.auto_unlock_minutes * 60 * 1000)
-              : null;
-
-            updateData.locked_by = activeUser.id;
-            updateData.locked_at = now;
-            if (autoUnlockAt) {
-              updateData.auto_unlock_at = autoUnlockAt;
-            }
-
-            lockInfo = {
-              locked_by: activeUser.id,
-              locked_at: now.toISOString(),
-              auto_unlock_at: autoUnlockAt?.toISOString() || null,
-            };
+            const lockRefresh = buildTriggerLockRefresh({
+              currentLockedBy: preset.locked_by,
+              actorId: activeUser.id,
+              autoUnlockMinutes: group?.auto_unlock_minutes,
+            });
+            updateData.locked_by = lockRefresh.lockOwner;
+            updateData.locked_at = lockRefresh.lockedAt;
+            updateData.auto_unlock_at = lockRefresh.autoUnlockAt;
+            lockInfo = lockRefresh.lockInfo;
           }
 
           await db

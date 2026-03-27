@@ -2,6 +2,7 @@ import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireAuth } from "~~/server/utils/auth";
 import { useGiteaSdk } from "~~/server/utils/gitea";
+import { buildTriggerLockRefresh } from "~~/server/services/preset-lock.service";
 
 /**
  * 触发子预设的 CI
@@ -31,6 +32,7 @@ export default defineEventHandler(async (event) => {
       id: schema.workflowPresetGroups.id,
       workflow_path: schema.workflowPresetGroups.workflow_path,
       repository_id: schema.workflowPresetGroups.repository_id,
+      auto_unlock_minutes: schema.workflowPresetGroups.auto_unlock_minutes,
     })
     .from(schema.workflowPresetGroups)
     .where(eq(schema.workflowPresetGroups.share_token, token));
@@ -98,10 +100,19 @@ export default defineEventHandler(async (event) => {
 
     // 更新子预设状态（暂时不设置 current_run_id，因为 dispatch 不返回）
     await db.transaction(async (tx) => {
+      const lockRefresh = buildTriggerLockRefresh({
+        currentLockedBy: preset.locked_by,
+        actorId: session.user.id,
+        autoUnlockMinutes: group.auto_unlock_minutes,
+      });
+
       await tx
         .update(schema.workflowPresets)
         .set({
           last_triggered_by: session.user.id,
+          locked_by: lockRefresh.lockOwner,
+          locked_at: lockRefresh.lockedAt,
+          auto_unlock_at: lockRefresh.autoUnlockAt,
         })
         .where(eq(schema.workflowPresets.id, preset.id));
 
