@@ -32,20 +32,23 @@ NUXT_PUBLIC_APP_URL=http://localhost:3000
 ### 数据库配置
 
 ```env
-# PostgreSQL 连接字符串
-DATABASE_URL=postgresql://username:password@host:port/database
+# PostgreSQL 基础配置（推荐）
+POSTGRES_DB=teax
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+
+# 可选：覆盖自动拼接的连接串
+# DATABASE_URL=postgresql://username:password@host:port/database
 ```
 
-**连接字符串格式：**
-```
-postgresql://[用户名]:[密码]@[主机]:[端口]/[数据库名]?[参数]
-```
+**说明：**
+- 应用默认会根据 `POSTGRES_*` 自动拼接 `DATABASE_URL`
+- 若显式设置 `DATABASE_URL`，则优先使用该值
 
-**示例：**
+**可选连接串示例：**
 ```env
-# 本地开发
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teax
-
 # 生产环境（带 SSL）
 DATABASE_URL=postgresql://teax_user:strong_password@db.example.com:5432/teax_prod?sslmode=require
 
@@ -61,20 +64,21 @@ DATABASE_URL=postgresql://teax_user:password@localhost:5432/teax?pool_timeout=30
 ### Redis 配置
 
 ```env
-# Redis 连接字符串
-REDIS_URL=redis://host:port
+# Redis 基础配置（推荐）
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+
+# 可选：覆盖自动拼接的连接串
+# REDIS_URL=redis://host:port
 ```
 
-**连接字符串格式：**
-```
-redis://[:密码@]主机:端口[/数据库编号]
-```
+**说明：**
+- 应用默认会根据 `REDIS_*` 自动拼接 `REDIS_URL`
+- 若显式设置 `REDIS_URL`，则优先使用该值
 
-**示例：**
+**可选连接串示例：**
 ```env
-# 本地开发（无密码）
-REDIS_URL=redis://localhost:6379
-
 # 生产环境（带密码）
 REDIS_URL=redis://:strong_redis_password@redis.example.com:6379
 
@@ -471,10 +475,16 @@ NUXT_PUBLIC_APP_NAME=Teax Dev
 NUXT_PUBLIC_APP_URL=http://localhost:3000
 
 # 数据库
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teax_dev
+POSTGRES_DB=teax_dev
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
 
 # Redis
-REDIS_URL=redis://localhost:6379
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
 
 # Gitea
 GITEA_URL=http://localhost:3001
@@ -497,11 +507,21 @@ FEISHU_APP_SECRET=
 NUXT_PUBLIC_APP_NAME=Teax
 NUXT_PUBLIC_APP_URL=https://teax.example.com
 
-# 数据库（使用 SSL）
-DATABASE_URL=postgresql://teax_user:STRONG_PASSWORD@db.example.com:5432/teax_prod?sslmode=require
+# 数据库
+POSTGRES_DB=teax_prod
+POSTGRES_USER=teax_user
+POSTGRES_PASSWORD=STRONG_PASSWORD
+POSTGRES_HOST=db.example.com
+POSTGRES_PORT=5432
+# 可选：若需附加参数可直接覆盖
+# DATABASE_URL=postgresql://teax_user:STRONG_PASSWORD@db.example.com:5432/teax_prod?sslmode=require
 
 # Redis（使用密码）
-REDIS_URL=redis://:STRONG_REDIS_PASSWORD@redis.example.com:6379
+REDIS_HOST=redis.example.com
+REDIS_PORT=6379
+REDIS_PASSWORD=STRONG_REDIS_PASSWORD
+# 可选：也可以直接覆盖
+# REDIS_URL=redis://:STRONG_REDIS_PASSWORD@redis.example.com:6379
 
 # Gitea
 GITEA_URL=https://gitea.example.com

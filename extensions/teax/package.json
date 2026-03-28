@@ -6,6 +6,10 @@
   "scripts": {
     "build": "spaceflow build",
     "dev": "spaceflow dev",
+    "env:start": "bash scripts/dev-infra.sh start",
+    "env:status": "bash scripts/dev-infra.sh status",
+    "env:stop": "bash scripts/dev-infra.sh stop",
+    "env:down": "bash scripts/dev-infra.sh down",
     "nuxt:build": "nuxt build",
     "nuxt:dev": "nuxt dev",
     "preview": "nuxt preview",

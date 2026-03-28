@@ -1,4 +1,29 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+const resolveDatabaseUrl = () => {
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+  const user = process.env.POSTGRES_USER || "postgres";
+  const password = process.env.POSTGRES_PASSWORD || "postgres";
+  const host = process.env.POSTGRES_HOST || "localhost";
+  const port = process.env.POSTGRES_PORT || "5432";
+  const database = process.env.POSTGRES_DB || "teax";
+  return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
+};
+
+const resolveRedisUrl = () => {
+  if (process.env.REDIS_URL) {
+    return process.env.REDIS_URL;
+  }
+  const host = process.env.REDIS_HOST || "localhost";
+  const port = process.env.REDIS_PORT || "6379";
+  const password = process.env.REDIS_PASSWORD || "";
+  if (password) {
+    return `redis://:${encodeURIComponent(password)}@${host}:${port}`;
+  }
+  return `redis://${host}:${port}`;
+};
+
 export default defineNuxtConfig({
   modules: ["@nuxt/eslint", "@nuxt/ui", "nuxt-auth-utils", "@nuxtjs/mdc"],
 
@@ -9,10 +34,8 @@ export default defineNuxtConfig({
   css: ["~/assets/css/main.css"],
 
   runtimeConfig: {
-    databaseUrl:
-      process.env.DATABASE_URL
-      || "postgresql://postgres:postgres@localhost:5432/teax",
-    redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
+    databaseUrl: resolveDatabaseUrl(),
+    redisUrl: resolveRedisUrl(),
     giteaUrl: process.env.GITEA_URL || "",
     giteaClientId: process.env.GITEA_CLIENT_ID || "",
     giteaClientSecret: process.env.GITEA_CLIENT_SECRET || "",

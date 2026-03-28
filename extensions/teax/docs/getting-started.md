@@ -99,10 +99,16 @@ NUXT_PUBLIC_APP_NAME=Teax Dev
 NUXT_PUBLIC_APP_URL=http://localhost:3000
 
 # 数据库
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teax
+POSTGRES_DB=teax
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
 
 # Redis
-REDIS_URL=redis://localhost:6379
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
 
 # Gitea OAuth（需要先在 Gitea 中创建 OAuth 应用）
 GITEA_URL=http://localhost:3001
