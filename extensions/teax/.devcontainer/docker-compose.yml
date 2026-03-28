@@ -1,8 +1,12 @@
 services:
   app:
-    image: node:24-bookworm
+    build:
+      context: .
+      dockerfile: Dockerfile
     command: sleep infinity
     init: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/teax
       REDIS_URL: redis://redis:6379

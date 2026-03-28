@@ -7,7 +7,8 @@
   "service": "app",
   "workspaceFolder": "/workspace/extensions/teax",
   "mounts": [
-    "source=${localWorkspaceFolder}/../..,target=/workspace,type=bind,consistency=cached"
+    "source=${localWorkspaceFolder}/../..,target=/workspace,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.pnpm-store,target=/root/.pnpm-store,type=bind,consistency=cached"
   ],
   "shutdownAction": "stopCompose",
   "runServices": [
@@ -15,6 +16,10 @@
     "db",
     "redis"
   ],
+  "containerEnv": {
+    "PNPM_STORE_DIR": "/root/.pnpm-store",
+    "npm_config_store_dir": "/root/.pnpm-store"
+  },
   "forwardPorts": [
     3000,
     5432,
@@ -32,7 +37,7 @@
       "label": "Redis"
     }
   },
-  "postCreateCommand": "bash -lc 'set -e; cd /workspace; corepack pnpm install'",
+  "postCreateCommand": "bash -lc 'set -e; cd /workspace; corepack pnpm install --store-dir /root/.pnpm-store'",
   "postStartCommand": "bash -lc 'set -e; cd /workspace/extensions/teax; if [ -f .env.example ] && [ ! -f .env ]; then cp .env.example .env; fi; cd /workspace; corepack pnpm --filter @spaceflow/teax db:push'",
   "customizations": {
     "vscode": {
@@ -49,6 +54,5 @@
       ]
     }
   },
-  "remoteUser": "node",
-  "updateRemoteUserUID": true
+  "remoteUser": "root"
 }
