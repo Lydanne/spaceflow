@@ -16,7 +16,6 @@ const AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG = "teax-agent-runtime:base";
  */
 interface RuntimeResolvedConfig {
   rootDir: string;
-  reposRootDir: string;
   sessionsRootDir: string;
   dockerBin: string;
   dockerBaseDockerfilePath: string;
@@ -27,7 +26,6 @@ interface RuntimeResolvedConfig {
 }
 
 interface RepoPathInfo {
-  repoRootPath: string;
   sessionPath: string;
 }
 
@@ -36,7 +34,6 @@ interface RepoPathInfo {
  * 每个会话 worktree 在容器内走 `containerSessionPath`，对应宿主机 `sessionPath`。
  */
 interface RepoContainerPathInfo {
-  containerRepoRootPath: string;
   containerSessionPath: string;
 }
 
@@ -110,7 +107,6 @@ function resolveRuntimeConfig(): RuntimeResolvedConfig {
 
   return {
     rootDir,
-    reposRootDir: join(rootDir, "repos"),
     sessionsRootDir: join(rootDir, "sessions"),
     dockerBin: String(config.agentRuntimeDockerBin || "docker"),
     dockerBaseDockerfilePath,
@@ -119,13 +115,6 @@ function resolveRuntimeConfig(): RuntimeResolvedConfig {
     dockerWorkspaceRoot: String(config.agentRuntimeDockerWorkspaceRoot || "/runtime"),
     keepWorktreeOnStop: config.agentRuntimeKeepWorktreeOnStop === true,
   };
-}
-
-function toSafePathSegments(repoFullName: string): string[] {
-  return repoFullName
-    .split("/")
-    .map((item) => item.trim().replace(/[^a-zA-Z0-9._-]/g, "_"))
-    .filter(Boolean);
 }
 
 function buildWorkingBranch(sessionId: string, specified?: string): string {
@@ -517,22 +506,15 @@ async function ensureDockerGitCredentials(params: {
   });
 }
 
-function buildRepoPaths(repository: RepositorySnapshot, sessionId: string): RepoPathInfo {
+function buildRepoPaths(sessionId: string): RepoPathInfo {
   const config = resolveRuntimeConfig();
-  const repoSegments = toSafePathSegments(repository.full_name);
-  const repoRootPath = join(config.reposRootDir, ...repoSegments);
   const sessionPath = join(config.sessionsRootDir, sessionId);
-  return { repoRootPath, sessionPath };
+  return { sessionPath };
 }
 
-function buildRepoContainerPaths(
-  repository: RepositorySnapshot,
-  sessionId: string,
-): RepoContainerPathInfo {
+function buildRepoContainerPaths(sessionId: string): RepoContainerPathInfo {
   const config = resolveRuntimeConfig();
-  const repoSegments = toSafePathSegments(repository.full_name);
   return {
-    containerRepoRootPath: posix.join(config.dockerWorkspaceRoot, "repos", ...repoSegments),
     containerSessionPath: posix.join(config.dockerWorkspaceRoot, "sessions", sessionId),
   };
 }
@@ -721,7 +703,6 @@ async function ensureDockerRuntimeContainer(params: {
   const metaRepoLocalPath = join(runtimeConfig.rootDir, ".teax");
   const imageTag = `teax-agent-runtime:${toDockerSafeSegment(`${params.repository.full_name}-${params.repository.id.slice(0, 8)}`)}`;
   const containerName = params.runtimeKey;
-  const containerReposRoot = posix.join(runtimeConfig.dockerWorkspaceRoot, "repos");
   const containerSessionsRoot = posix.join(runtimeConfig.dockerWorkspaceRoot, "sessions");
   // 容器内元数据挂载点：${AGENT_RUNTIME_ROOT}/.teax
   const containerMetaRepoRoot = posix.join(runtimeConfig.dockerWorkspaceRoot, ".teax");
@@ -732,7 +713,6 @@ async function ensureDockerRuntimeContainer(params: {
     image_tag: imageTag,
   });
 
-  await mkdir(runtimeConfig.reposRootDir, { recursive: true });
   await mkdir(runtimeConfig.sessionsRootDir, { recursive: true });
   await mkdir(metaRepoLocalPath, { recursive: true });
   await mkdir(join(metaRepoLocalPath, "projects"), { recursive: true });
@@ -833,7 +813,6 @@ async function ensureDockerRuntimeContainer(params: {
   logRuntimeStep("runtime bootstrap step 4/4 run container", {
     container_name: containerName,
     image_tag: imageTag,
-    mount_repo_root: runtimeConfig.reposRootDir,
     mount_session_root: runtimeConfig.sessionsRootDir,
     mount_meta_repo: metaRepoLocalPath,
     workspace_root: runtimeConfig.dockerWorkspaceRoot,
@@ -849,8 +828,6 @@ async function ensureDockerRuntimeContainer(params: {
     "teax.agent-runtime=true",
     "--label",
     `teax.repository-id=${params.repository.id}`,
-    "-v",
-    `${runtimeConfig.reposRootDir}:${containerReposRoot}`,
     "-v",
     `${runtimeConfig.sessionsRootDir}:${containerSessionsRoot}`,
     "-v",
@@ -922,10 +899,8 @@ export async function ensureRepoRuntime(params: {
     repository_full_name: repository.full_name,
   });
 
-  await mkdir(runtimeConfig.reposRootDir, { recursive: true });
   await mkdir(runtimeConfig.sessionsRootDir, { recursive: true });
 
-  const paths = buildRepoPaths(repository, "placeholder-session-id");
   return withRepositoryLock(params.repositoryId, async () => {
     logRuntimeStep("ensure repo runtime lock acquired", {
       repository_id: params.repositoryId,
@@ -942,7 +917,7 @@ export async function ensureRepoRuntime(params: {
     let metadata: Record<string, unknown> = {
       ...(existing?.metadata as Record<string, unknown> || {}),
       root_dir: runtimeConfig.rootDir,
-      repo_root_path: paths.repoRootPath,
+      repo_root_path: "",
       sessions_root_dir: runtimeConfig.sessionsRootDir,
       mode: "docker",
       meta_repo: {
@@ -1035,110 +1010,57 @@ async function prepareWorktreeInDockerMode(params: {
   actorId: string;
 }) {
   const db = useDB();
-  const paths = buildRepoPaths(params.repository, params.sessionId);
-  const containerPaths = buildRepoContainerPaths(params.repository, params.sessionId);
-  const repoGitDirPath = join(paths.repoRootPath, ".git");
+  const paths = buildRepoPaths(params.sessionId);
+  const containerPaths = buildRepoContainerPaths(params.sessionId);
   const gitExecOptions: DockerExecOptions = {
     env: {
       GIT_TERMINAL_PROMPT: "0",
     },
   };
 
-  await mkdir(paths.repoRootPath, { recursive: true });
   await mkdir(resolveRuntimeConfig().sessionsRootDir, { recursive: true });
   await ensureDockerGitCredentials({
     runtimeKey: params.runtimeKey,
     cloneUrl: params.repository.clone_url,
   });
 
-  if (!await pathExists(repoGitDirPath)) {
-    await rm(paths.repoRootPath, { recursive: true, force: true });
-    await mkdir(paths.repoRootPath, { recursive: true });
-    await runDockerExec(params.runtimeKey, [
-      "git",
-      "clone",
-      params.repository.clone_url,
-      containerPaths.containerRepoRootPath,
-    ], gitExecOptions);
-  } else {
-    await runDockerExec(params.runtimeKey, [
-      "git",
-      "-C",
-      containerPaths.containerRepoRootPath,
-      "remote",
-      "set-url",
-      "origin",
-      params.repository.clone_url,
-    ], gitExecOptions);
+  if (await pathExists(paths.sessionPath)) {
+    await rm(paths.sessionPath, { recursive: true, force: true });
   }
 
   await runDockerExec(params.runtimeKey, [
     "git",
-    "-C",
-    containerPaths.containerRepoRootPath,
-    "fetch",
+    "clone",
+    "--branch",
+    params.baseBranch,
+    "--single-branch",
+    "--origin",
     "origin",
-    "--prune",
+    params.repository.clone_url,
+    containerPaths.containerSessionPath,
   ], gitExecOptions);
-
   await runDockerExec(params.runtimeKey, [
     "git",
     "-C",
-    containerPaths.containerRepoRootPath,
+    containerPaths.containerSessionPath,
+    "checkout",
+    "-B",
+    params.workingBranch,
+    `origin/${params.baseBranch}`,
+  ], gitExecOptions);
+  await runDockerExec(params.runtimeKey, [
+    "git",
+    "-C",
+    containerPaths.containerSessionPath,
     "reset",
     "--hard",
   ], gitExecOptions);
   await runDockerExec(params.runtimeKey, [
     "git",
     "-C",
-    containerPaths.containerRepoRootPath,
+    containerPaths.containerSessionPath,
     "clean",
     "-fd",
-  ], gitExecOptions);
-  await runDockerExec(params.runtimeKey, [
-    "git",
-    "-C",
-    containerPaths.containerRepoRootPath,
-    "checkout",
-    "--force",
-    "--detach",
-    `origin/${params.baseBranch}`,
-  ], gitExecOptions);
-
-  if (await pathExists(paths.sessionPath)) {
-    try {
-      await runDockerExec(params.runtimeKey, [
-        "git",
-        "-C",
-        containerPaths.containerRepoRootPath,
-        "worktree",
-        "remove",
-        "--force",
-        containerPaths.containerSessionPath,
-      ], gitExecOptions);
-    } catch {
-      // 忽略历史脏状态，后续直接强制清理目录
-    }
-    await rm(paths.sessionPath, { recursive: true, force: true });
-  }
-
-  await runDockerExec(params.runtimeKey, [
-    "git",
-    "-C",
-    containerPaths.containerRepoRootPath,
-    "worktree",
-    "add",
-    "-B",
-    params.workingBranch,
-    containerPaths.containerSessionPath,
-    `origin/${params.baseBranch}`,
-  ], gitExecOptions);
-  await runDockerExec(params.runtimeKey, [
-    "git",
-    "-C",
-    containerPaths.containerRepoRootPath,
-    "worktree",
-    "prune",
   ], gitExecOptions);
 
   const [headResult, branchResult] = await Promise.all([
@@ -1285,7 +1207,7 @@ export async function prepareRepoSessionWorktree(params: {
           runtime_id: runtimeResult.runtime.id,
           base_branch: baseBranch,
           working_branch: workingBranch,
-          worktree_path: buildRepoPaths(repository, params.sessionId).sessionPath,
+          worktree_path: buildRepoPaths(params.sessionId).sessionPath,
           status: "failed",
           last_error: message,
           row_creator: params.actorId,
@@ -1296,7 +1218,7 @@ export async function prepareRepoSessionWorktree(params: {
             runtime_id: runtimeResult.runtime.id,
             base_branch: baseBranch,
             working_branch: workingBranch,
-            worktree_path: buildRepoPaths(repository, params.sessionId).sessionPath,
+            worktree_path: buildRepoPaths(params.sessionId).sessionPath,
             status: "failed",
             last_error: message,
             updated_at: new Date(),
@@ -1327,7 +1249,6 @@ export async function cleanupSessionWorktree(params: {
 }) {
   const db = useDB();
   const runtimeConfig = resolveRuntimeConfig();
-  const repository = await getRepositoryById(params.repositoryId);
   const [worktree] = await db
     .select()
     .from(schema.agentSessionWorktrees)
@@ -1340,43 +1261,7 @@ export async function cleanupSessionWorktree(params: {
 
   return withRepositoryLock(params.repositoryId, async () => {
     const sessionPath = worktree.worktree_path;
-    const containerPaths = buildRepoContainerPaths(repository, params.sessionId);
     const shouldDeletePath = !runtimeConfig.keepWorktreeOnStop;
-    const [runtime] = worktree.runtime_id
-      ? await db
-          .select({
-            provider: schema.agentRuntimes.provider,
-            runtime_key: schema.agentRuntimes.runtime_key,
-          })
-          .from(schema.agentRuntimes)
-          .where(eq(schema.agentRuntimes.id, worktree.runtime_id))
-          .limit(1)
-      : [null];
-    const runtimeProvider = runtime?.provider || "docker";
-    const runtimeKey = runtime?.runtime_key || buildRepoRuntimeKey(params.repositoryId);
-
-    if (runtimeProvider === "docker" && shouldDeletePath) {
-      try {
-        await runDockerExec(runtimeKey, [
-          "git",
-          "-C",
-          containerPaths.containerRepoRootPath,
-          "worktree",
-          "remove",
-          "--force",
-          containerPaths.containerSessionPath,
-        ]);
-        await runDockerExec(runtimeKey, [
-          "git",
-          "-C",
-          containerPaths.containerRepoRootPath,
-          "worktree",
-          "prune",
-        ]);
-      } catch {
-        // 容器不可用时降级为目录清理，避免清理流程阻塞
-      }
-    }
 
     if (shouldDeletePath) {
       await rm(sessionPath, { recursive: true, force: true });
@@ -1444,7 +1329,6 @@ export async function getRepoRuntimeSummary(params: {
       ),
     );
 
-  const paths = buildRepoPaths(repository, "placeholder-session-id");
   let runtimeStatus = runtime?.status || "stopped";
 
   // docker 运行态以容器实时状态为准，避免 DB 状态陈旧导致前端误判。
@@ -1459,7 +1343,7 @@ export async function getRepoRuntimeSummary(params: {
     repository_full_name: repository.full_name,
     mode: "docker",
     root_dir: runtimeConfig.rootDir,
-    repo_root_path: paths.repoRootPath,
+    repo_root_path: "",
     sessions_root_dir: runtimeConfig.sessionsRootDir,
     runtime: runtime || null,
     runtime_status: runtimeStatus,
