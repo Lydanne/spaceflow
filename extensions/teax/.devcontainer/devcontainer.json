@@ -8,7 +8,8 @@
   "workspaceFolder": "/workspace/extensions/teax",
   "mounts": [
     "source=${localWorkspaceFolder}/../..,target=/workspace,type=bind,consistency=cached",
-    "source=${localEnv:HOME}/.pnpm-store,target=/root/.pnpm-store,type=bind,consistency=cached"
+    "source=${localEnv:HOME}/.pnpm-store,target=/root/.pnpm-store,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.ssh,target=/tmp/host-ssh,type=bind,readonly"
   ],
   "shutdownAction": "stopCompose",
   "runServices": [
@@ -38,7 +39,7 @@
     }
   },
   "postCreateCommand": "bash -lc 'set -e; cd /workspace; corepack pnpm install --store-dir /root/.pnpm-store'",
-  "postStartCommand": "bash -lc 'set -e; cd /workspace/extensions/teax; if [ -f .env.example ] && [ ! -f .env ]; then cp .env.example .env; fi; cd /workspace; corepack pnpm --filter @spaceflow/teax db:push'",
+  "postStartCommand": "bash -lc 'set -e; if [ -d /tmp/host-ssh ]; then mkdir -p /root/.ssh; chmod 700 /root/.ssh; cp -a /tmp/host-ssh/. /root/.ssh/; chown -R root:root /root/.ssh; find /root/.ssh -type d -print0 | xargs -0 chmod 700; find /root/.ssh -type f -print0 | xargs -0 chmod 600; fi; cd /workspace/extensions/teax; if [ -f .env.example ] && [ ! -f .env ]; then cp .env.example .env; fi; cd /workspace; corepack pnpm --filter @spaceflow/teax db:push'",
   "customizations": {
     "vscode": {
       "settings": {
