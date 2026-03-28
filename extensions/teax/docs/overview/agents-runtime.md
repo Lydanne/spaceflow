@@ -318,7 +318,7 @@ failed/stopped --retry--> preparing -> running
 
 1. `AGENT_RUNTIME_DOCKER_BIN` 是否可执行
 2. Docker daemon 是否正常运行、当前用户是否有权限访问 Docker
-3. `clone_url` 是否可访问（凭据/网络）
+3. `clone_url` 是否可访问（凭据/网络），私有仓库需确保已配置 `AGENT_BOT_TOKEN`（或 `GITEA_SERVICE_TOKEN`）
 4. `AGENT_RUNTIME_ROOT` 是否有读写权限
 
 请修复环境后重试。

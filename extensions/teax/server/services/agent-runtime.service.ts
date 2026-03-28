@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import { dirname, isAbsolute, join, posix, resolve } from "node:path";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
@@ -60,6 +60,16 @@ interface RepositorySnapshot {
   full_name: string;
   clone_url: string;
   default_branch: string | null;
+}
+
+interface DockerExecOptions {
+  env?: Record<string, string>;
+}
+
+interface RuntimeGitAuth {
+  username: string;
+  token: string;
+  tokenSource: "AGENT_META_REPO_TOKEN" | "AGENT_BOT_TOKEN" | "GITEA_SERVICE_TOKEN";
 }
 
 /**
@@ -334,8 +344,19 @@ async function runDocker(args: string[], cwd?: string, options?: { suppressError
   });
 }
 
-async function runDockerExec(containerName: string, command: string[]) {
-  return runDocker(["exec", containerName, ...command]);
+async function runDockerExec(
+  containerName: string,
+  command: string[],
+  options?: DockerExecOptions,
+) {
+  const args = ["exec"];
+  if (options?.env) {
+    for (const [key, value] of Object.entries(options.env)) {
+      args.push("-e", `${key}=${value}`);
+    }
+  }
+  args.push(containerName, ...command);
+  return runDocker(args);
 }
 
 async function withRepositoryLock<T>(repositoryId: string, fn: () => Promise<T>): Promise<T> {
@@ -374,6 +395,126 @@ async function getRepositoryById(repositoryId: string): Promise<RepositorySnapsh
     throw createError({ statusCode: 404, message: "Repository not found" });
   }
   return repository;
+}
+
+async function resolveRuntimeGitAuth(): Promise<RuntimeGitAuth | null> {
+  const metaRepoConfig = resolveAgentMetaRepoConfig();
+  if (metaRepoConfig.token) {
+    return {
+      username: metaRepoConfig.botUsername || "TeaxBot",
+      token: metaRepoConfig.token,
+      tokenSource: metaRepoConfig.tokenSource,
+    };
+  }
+
+  const runtimeConfig = useRuntimeConfig();
+  const serviceToken = String(runtimeConfig.giteaServiceToken || "").trim();
+  const giteaUrl = String(runtimeConfig.giteaUrl || "").trim().replace(/\/+$/, "");
+  if (!serviceToken || !giteaUrl) {
+    return null;
+  }
+
+  try {
+    const profile = await $fetch<{ login?: string }>(`${giteaUrl}/api/v1/user`, {
+      headers: {
+        Authorization: `token ${serviceToken}`,
+      },
+    });
+    const username = String(profile?.login || "").trim() || "oauth2";
+    return {
+      username,
+      token: serviceToken,
+      tokenSource: "GITEA_SERVICE_TOKEN",
+    };
+  } catch (error) {
+    logRuntimeStep("resolve git auth fallback username", {
+      message: (error as { message?: string })?.message || "unknown",
+    });
+    return {
+      username: "oauth2",
+      token: serviceToken,
+      tokenSource: "GITEA_SERVICE_TOKEN",
+    };
+  }
+}
+
+async function ensureDockerGitCredentials(params: {
+  runtimeKey: string;
+  cloneUrl: string;
+}) {
+  let parsedCloneUrl: URL | null = null;
+  try {
+    parsedCloneUrl = new URL(params.cloneUrl);
+  } catch {
+    return;
+  }
+  if (!/^https?:$/.test(parsedCloneUrl.protocol)) {
+    return;
+  }
+
+  const auth = await resolveRuntimeGitAuth();
+  if (!auth) {
+    return;
+  }
+
+  const runtimeConfig = resolveRuntimeConfig();
+  const hostMetaRepoPath = join(runtimeConfig.rootDir, ".teax");
+  const hostCredentialsPath = join(hostMetaRepoPath, "git-credentials");
+  const containerCredentialsPath = posix.join(runtimeConfig.dockerWorkspaceRoot, ".teax", "git-credentials");
+  await mkdir(hostMetaRepoPath, { recursive: true });
+
+  const credentialUrl = new URL(`${parsedCloneUrl.protocol}//${parsedCloneUrl.host}/`);
+  credentialUrl.username = auth.username;
+  credentialUrl.password = auth.token;
+  const credentialLine = credentialUrl.toString();
+
+  let existingLines: string[] = [];
+  try {
+    const current = await readFile(hostCredentialsPath, "utf8");
+    existingLines = current.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  } catch {
+    existingLines = [];
+  }
+
+  const filteredLines = existingLines.filter((line) => {
+    try {
+      return new URL(line).host !== parsedCloneUrl.host;
+    } catch {
+      return true;
+    }
+  });
+  filteredLines.push(credentialLine);
+  await writeFile(hostCredentialsPath, `${filteredLines.join("\n")}\n`, { mode: 0o600 });
+  await chmod(hostCredentialsPath, 0o600);
+
+  await runDockerExec(params.runtimeKey, [
+    "git",
+    "config",
+    "--global",
+    "credential.helper",
+    `store --file ${containerCredentialsPath}`,
+  ]);
+  await runDockerExec(params.runtimeKey, [
+    "git",
+    "config",
+    "--global",
+    "credential.useHttpPath",
+    "false",
+  ]);
+  await runDockerExec(params.runtimeKey, [
+    "git",
+    "config",
+    "--global",
+    "credential.username",
+    auth.username,
+  ]);
+
+  logRuntimeStep("runtime git credentials ready", {
+    runtime_key: params.runtimeKey,
+    clone_host: parsedCloneUrl.host,
+    token_source: auth.tokenSource,
+    username: auth.username,
+  });
 }
 
 function buildRepoPaths(repository: RepositorySnapshot, sessionId: string): RepoPathInfo {
@@ -594,6 +735,8 @@ async function ensureDockerRuntimeContainer(params: {
   await mkdir(runtimeConfig.reposRootDir, { recursive: true });
   await mkdir(runtimeConfig.sessionsRootDir, { recursive: true });
   await mkdir(metaRepoLocalPath, { recursive: true });
+  await mkdir(join(metaRepoLocalPath, "projects"), { recursive: true });
+  await mkdir(join(metaRepoLocalPath, "globals"), { recursive: true });
 
   const existing = await inspectDockerContainer(containerName);
   if (existing?.running) {
@@ -895,19 +1038,28 @@ async function prepareWorktreeInDockerMode(params: {
   const paths = buildRepoPaths(params.repository, params.sessionId);
   const containerPaths = buildRepoContainerPaths(params.repository, params.sessionId);
   const repoGitDirPath = join(paths.repoRootPath, ".git");
+  const gitExecOptions: DockerExecOptions = {
+    env: {
+      GIT_TERMINAL_PROMPT: "0",
+    },
+  };
 
   await mkdir(paths.repoRootPath, { recursive: true });
   await mkdir(resolveRuntimeConfig().sessionsRootDir, { recursive: true });
+  await ensureDockerGitCredentials({
+    runtimeKey: params.runtimeKey,
+    cloneUrl: params.repository.clone_url,
+  });
 
   if (!await pathExists(repoGitDirPath)) {
     await rm(paths.repoRootPath, { recursive: true, force: true });
+    await mkdir(paths.repoRootPath, { recursive: true });
     await runDockerExec(params.runtimeKey, [
       "git",
       "clone",
-      "--no-checkout",
       params.repository.clone_url,
       containerPaths.containerRepoRootPath,
-    ]);
+    ], gitExecOptions);
   } else {
     await runDockerExec(params.runtimeKey, [
       "git",
@@ -917,7 +1069,7 @@ async function prepareWorktreeInDockerMode(params: {
       "set-url",
       "origin",
       params.repository.clone_url,
-    ]);
+    ], gitExecOptions);
   }
 
   await runDockerExec(params.runtimeKey, [
@@ -927,7 +1079,31 @@ async function prepareWorktreeInDockerMode(params: {
     "fetch",
     "origin",
     "--prune",
-  ]);
+  ], gitExecOptions);
+
+  await runDockerExec(params.runtimeKey, [
+    "git",
+    "-C",
+    containerPaths.containerRepoRootPath,
+    "reset",
+    "--hard",
+  ], gitExecOptions);
+  await runDockerExec(params.runtimeKey, [
+    "git",
+    "-C",
+    containerPaths.containerRepoRootPath,
+    "clean",
+    "-fd",
+  ], gitExecOptions);
+  await runDockerExec(params.runtimeKey, [
+    "git",
+    "-C",
+    containerPaths.containerRepoRootPath,
+    "checkout",
+    "--force",
+    "--detach",
+    `origin/${params.baseBranch}`,
+  ], gitExecOptions);
 
   if (await pathExists(paths.sessionPath)) {
     try {
@@ -939,7 +1115,7 @@ async function prepareWorktreeInDockerMode(params: {
         "remove",
         "--force",
         containerPaths.containerSessionPath,
-      ]);
+      ], gitExecOptions);
     } catch {
       // 忽略历史脏状态，后续直接强制清理目录
     }
@@ -956,14 +1132,14 @@ async function prepareWorktreeInDockerMode(params: {
     params.workingBranch,
     containerPaths.containerSessionPath,
     `origin/${params.baseBranch}`,
-  ]);
+  ], gitExecOptions);
   await runDockerExec(params.runtimeKey, [
     "git",
     "-C",
     containerPaths.containerRepoRootPath,
     "worktree",
     "prune",
-  ]);
+  ], gitExecOptions);
 
   const [headResult, branchResult] = await Promise.all([
     runDockerExec(params.runtimeKey, [
@@ -972,7 +1148,7 @@ async function prepareWorktreeInDockerMode(params: {
       containerPaths.containerSessionPath,
       "rev-parse",
       "HEAD",
-    ]),
+    ], gitExecOptions),
     runDockerExec(params.runtimeKey, [
       "git",
       "-C",
@@ -980,7 +1156,7 @@ async function prepareWorktreeInDockerMode(params: {
       "rev-parse",
       "--abbrev-ref",
       "HEAD",
-    ]),
+    ], gitExecOptions),
   ]);
 
   const [upserted] = await db
