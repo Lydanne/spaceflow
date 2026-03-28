@@ -134,7 +134,24 @@ pnpm db:migrate
 pnpm db:push
 ```
 
-5. **启动开发服务器**
+5. **启动本地依赖环境**
+
+如果你用 VS Code 打开这个工作区，首次会看到“是否允许自动任务”的提示。允许后会自动执行 `infra: start`，拉起开发需要的 `PostgreSQL` 和 `Redis`。
+
+如果没有看到提示，也可以手动运行：
+
+```bash
+docker compose up -d db redis
+```
+
+或者在 VS Code 里执行以下任务：
+
+- `infra: start` - 启动 PostgreSQL 和 Redis
+- `infra: status` - 查看依赖环境状态
+- `infra: stop` - 停止 PostgreSQL 和 Redis
+- `infra: down` - 停止并移除 Compose 资源
+
+6. **启动开发服务器**
 
 ```bash
 pnpm dev

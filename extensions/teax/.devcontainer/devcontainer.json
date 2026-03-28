@@ -1,0 +1,54 @@
+{
+  "name": "teax-dev",
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.yml"
+  ],
+  "service": "app",
+  "workspaceFolder": "/workspace/extensions/teax",
+  "mounts": [
+    "source=${localWorkspaceFolder}/../..,target=/workspace,type=bind,consistency=cached"
+  ],
+  "shutdownAction": "stopCompose",
+  "runServices": [
+    "app",
+    "db",
+    "redis"
+  ],
+  "forwardPorts": [
+    3000,
+    5432,
+    6379
+  ],
+  "portsAttributes": {
+    "3000": {
+      "label": "Teax Dev Server",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL"
+    },
+    "6379": {
+      "label": "Redis"
+    }
+  },
+  "postCreateCommand": "bash -lc 'set -e; cd /workspace; corepack pnpm install'",
+  "postStartCommand": "bash -lc 'set -e; cd /workspace/extensions/teax; if [ -f .env.example ] && [ ! -f .env ]; then cp .env.example .env; fi; cd /workspace; corepack pnpm --filter @spaceflow/teax db:push'",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "typescript.tsdk": "node_modules/typescript/lib"
+      },
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "vue.volar",
+        "dbaeumer.vscode-eslint",
+        "ckolkman.vscode-postgres",
+        "cweijan.vscode-redis-client"
+      ]
+    }
+  },
+  "remoteUser": "node",
+  "updateRemoteUserUID": true
+}

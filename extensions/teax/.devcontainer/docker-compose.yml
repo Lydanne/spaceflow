@@ -1,0 +1,14 @@
+services:
+  app:
+    image: node:24-bookworm
+    command: sleep infinity
+    init: true
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/teax
+      REDIS_URL: redis://redis:6379
+      NUXT_PUBLIC_APP_URL: http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
