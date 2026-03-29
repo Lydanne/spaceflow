@@ -39,6 +39,7 @@ const runtimeSummaryPending = ref(false);
 const runtimeStartLoading = ref(false);
 const runtimeStopLoading = ref(false);
 const runtimeForceStopLoading = ref(false);
+const runtimeRestartLoading = ref(false);
 
 function formatDateTime(value?: string | null): string {
   if (!value) return "-";
@@ -101,6 +102,25 @@ async function stopRuntime(force: boolean) {
   } finally {
     runtimeStopLoading.value = false;
     runtimeForceStopLoading.value = false;
+  }
+}
+
+async function restartRuntime() {
+  runtimeRestartLoading.value = true;
+  try {
+    if (runtimeSummary.value?.runtime_status === "running") {
+      await $fetch<{ summary?: RepoRuntimeSummary }>(`${runtimeApiBase}/stop`, {
+        method: "POST",
+        body: { force: false },
+      });
+    }
+    runtimeSummary.value = await $fetch<RepoRuntimeSummary>(`${runtimeApiBase}/start`, { method: "POST" });
+    toast.add({ title: "Runtime 已重启", color: "success" });
+  } catch (error: unknown) {
+    const message = (error as { data?: { message?: string } })?.data?.message || "重启 Runtime 失败";
+    toast.add({ title: message, color: "error" });
+  } finally {
+    runtimeRestartLoading.value = false;
   }
 }
 
@@ -358,6 +378,15 @@ async function deleteProject() {
               @click="stopRuntime(false)"
             >
               停止
+            </UButton>
+            <UButton
+              icon="i-lucide-refresh-cw"
+              color="info"
+              variant="soft"
+              :loading="runtimeRestartLoading"
+              @click="restartRuntime"
+            >
+              重启
             </UButton>
             <UButton
               icon="i-lucide-octagon-x"
