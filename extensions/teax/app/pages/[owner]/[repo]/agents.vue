@@ -291,6 +291,14 @@ function messageModelRef(message: AgentSessionMessage): string | null {
     ? (message.metadata as Record<string, unknown>)
     : {};
 
+  const composeModelId = (providerRaw: unknown, modelRaw: unknown): string | null => {
+    const provider = String(providerRaw || "").trim();
+    const model = String(modelRaw || "").trim();
+    if (provider && model) return `${provider}/${model}`;
+    if (model) return model;
+    return null;
+  };
+
   const readCandidate = (value: unknown): string | null => {
     const parsed = String(value || "").trim();
     return parsed || null;
@@ -304,6 +312,21 @@ function messageModelRef(message: AgentSessionMessage): string | null {
   const info = metadata.info && typeof metadata.info === "object"
     ? (metadata.info as Record<string, unknown>)
     : {};
+
+  const modelObject = info.model && typeof info.model === "object"
+    ? (info.model as Record<string, unknown>)
+    : {};
+  const composedFromModelObject = composeModelId(
+    modelObject.providerID || modelObject.provider_id,
+    modelObject.modelID || modelObject.model_id || modelObject.id,
+  );
+  if (composedFromModelObject) return composedFromModelObject;
+
+  const composedFromTopLevel = composeModelId(
+    info.providerID || info.provider_id,
+    info.modelID || info.model_id,
+  );
+  if (composedFromTopLevel) return composedFromTopLevel;
 
   return readCandidate(info.model)
     || readCandidate(info.model_name)
