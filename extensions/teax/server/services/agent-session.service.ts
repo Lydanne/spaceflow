@@ -736,15 +736,15 @@ export async function createAgentSessionMessage(params: {
     || null;
   const modelRef = String(
     params.metadata.model
-      || params.metadata.model_name
-      || params.metadata.model_id
-      || "",
+    || params.metadata.model_name
+    || params.metadata.model_id
+    || "",
   ).trim() || null;
   const agentRef = String(
     params.metadata.agent
-      || params.metadata.agent_id
-      || params.metadata.agent_name
-      || "",
+    || params.metadata.agent_id
+    || params.metadata.agent_name
+    || "",
   ).trim() || null;
 
   try {

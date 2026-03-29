@@ -46,16 +46,17 @@ Docker Runtime（每仓库一个容器）
 `ensureRepoRuntime()` 的主要步骤：
 
 1. 读取仓库信息与 Runtime 配置
-2. 确保目录存在：
+2. 启动时先将 `{projectRoot}/defaults/.teax/` 中缺失文件补齐到 `${AGENT_RUNTIME_ROOT}/.teax/`（按文件补齐，不覆盖已有）
+3. 确保目录存在：
    - `${AGENT_RUNTIME_ROOT}/sessions`
    - `${AGENT_RUNTIME_ROOT}/.teax`
-3. 构建基础镜像（固定 tag：`teax-agent-runtime:base`）
-4. 使用全局 Dockerfile：`${AGENT_RUNTIME_ROOT}/.teax/globals/Dockerfile`（不存在时自动创建默认值）
-5. 容器启动时映射全局 opencode 目录：
+4. 构建基础镜像（固定 tag：`teax-agent-runtime:base`）
+5. 使用全局 Dockerfile：`${AGENT_RUNTIME_ROOT}/.teax/globals/Dockerfile`（不存在时自动创建默认值）
+6. 容器启动时映射全局 opencode 目录：
    - `${AGENT_RUNTIME_ROOT}/.teax/globals/opencode` -> `/root/.config/opencode`
    - `${AGENT_RUNTIME_ROOT}/.teax/globals/opencode` -> `/home/node/.config/opencode`
-6. 启动/复用容器（容器名：`teax-agent-repo-{repoId8}`）
-7. 写回 `agent_runtimes`（状态、metadata、docker 信息）
+7. 启动/复用容器（容器名：`teax-agent-repo-{repoId8}`）
+8. 写回 `agent_runtimes`（状态、metadata、docker 信息）
 
 ### 3.2 停止流程（`POST /agents/runtime/stop`）
 

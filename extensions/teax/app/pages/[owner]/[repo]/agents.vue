@@ -746,7 +746,7 @@ async function updateParticipantRole(userId: string, role: "collaborator" | "vie
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "更新成员角色失败"), color: "error" });
   } finally {
-    delete participantSavingState[userId];
+    participantSavingState[userId] = false;
   }
 }
 
@@ -763,7 +763,7 @@ async function updateParticipantCanChat(userId: string, canChat: boolean) {
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "更新发言权限失败"), color: "error" });
   } finally {
-    delete participantSavingState[userId];
+    participantSavingState[userId] = false;
   }
 }
 
@@ -979,16 +979,16 @@ async function submitPrompt() {
                   分支 {{ sessionDetail.working_branch || sessionDetail.base_branch }} · {{ formatDateTime(sessionDetail.updated_at) }}
                 </p>
               </div>
-            <UButton
-              icon="i-lucide-settings-2"
-              color="neutral"
-              variant="ghost"
-              size="xs"
-              @click="openSessionSettingsModal"
-            >
-              会话设置
-            </UButton>
-          </div>
+              <UButton
+                icon="i-lucide-settings-2"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                @click="openSessionSettingsModal"
+              >
+                会话设置
+              </UButton>
+            </div>
 
             <div
               ref="messageViewportRef"

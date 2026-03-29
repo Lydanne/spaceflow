@@ -1030,8 +1030,8 @@ function buildOpencodeStartCommandCandidates(endpoint: SessionOpencodeServerEndp
   const configured = runtimeConfig.opencodeStartCommand.trim();
   const interpolatedConfigured = configured
     ? configured
-      .replaceAll("{hostname}", endpoint.hostname)
-      .replaceAll("{port}", String(endpoint.port))
+        .replaceAll("{hostname}", endpoint.hostname)
+        .replaceAll("{port}", String(endpoint.port))
     : "";
 
   const commands = [
@@ -1228,9 +1228,9 @@ function resolveMessageTimestamp(info: Record<string, unknown>, key: "created" |
   const nestedTime = asRecord(info.time);
   return resolveIsoTimestamp(
     info[directKey]
-      ?? info[camelKey]
-      ?? nestedTime[key]
-      ?? nestedTime[key === "created" ? "created_at" : "updated_at"],
+    ?? info[camelKey]
+    ?? nestedTime[key]
+    ?? nestedTime[key === "created" ? "created_at" : "updated_at"],
     fallback,
   );
 }
@@ -1418,12 +1418,12 @@ async function callSessionOpencodeHttp(params: {
     : "";
   const bodyJson = bodyText
     ? (() => {
-      try {
-        return JSON.parse(bodyText) as unknown;
-      } catch {
-        return null;
-      }
-    })()
+        try {
+          return JSON.parse(bodyText) as unknown;
+        } catch {
+          return null;
+        }
+      })()
     : null;
 
   if (!Number.isInteger(statusCode)) {
@@ -1630,9 +1630,9 @@ function parseOpencodeModelOptions(payload: unknown): AgentSessionOpencodeModelO
   const providersRaw = Array.isArray(providersField)
     ? providersField
     : Object.entries(asRecord(providersField)).map(([providerId, value]) => ({
-      ...asRecord(value),
-      id: providerId,
-    }));
+        ...asRecord(value),
+        id: providerId,
+      }));
   const defaultsMap = asRecord(data.default);
   const options: AgentSessionOpencodeModelOption[] = [];
   const seen = new Set<string>();

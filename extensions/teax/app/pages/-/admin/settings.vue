@@ -656,7 +656,7 @@ onMounted(() => {
               v-model="globalsForm.opencodeConfig"
               :rows="10"
               class="w-full font-mono text-xs"
-              placeholder="{\"$schema\":\"https://opencode.ai/config.json\"}"
+              placeholder="例如：opencode 全局 JSON 配置"
             />
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
               对应目录：{{ globalsPaths?.opencodeDir || "-" }}，可放置 `agents/`、`skills/`、`mcp/`。

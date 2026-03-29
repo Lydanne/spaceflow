@@ -1,6 +1,7 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import { isAbsolute, join, posix, resolve } from "node:path";
+import { ensureRuntimeTeaxDefaultsSynced } from "~~/server/services/agent-runtime-defaults.service";
 
 export interface AgentRuntimeGlobalsPaths {
   rootDir: string;
@@ -78,6 +79,7 @@ export function resolveAgentRuntimeGlobalsPaths(): AgentRuntimeGlobalsPaths {
 }
 
 export async function ensureAgentRuntimeGlobalsDefaults(): Promise<AgentRuntimeGlobalsPaths> {
+  await ensureRuntimeTeaxDefaultsSynced();
   const paths = resolveAgentRuntimeGlobalsPaths();
   await mkdir(paths.globalsDir, { recursive: true });
   await mkdir(paths.opencodeDir, { recursive: true });
@@ -137,4 +139,3 @@ export async function updateAgentRuntimeGlobalsFiles(params: {
 
   return readAgentRuntimeGlobalsFiles();
 }
-

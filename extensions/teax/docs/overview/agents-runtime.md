@@ -53,6 +53,16 @@
 
 ## 3. Runtime 行为
 
+### 3.0 启动初始化（defaults 同步）
+
+系统启动时会执行一次 defaults 同步：
+
+- 源目录：`{projectRoot}/defaults/.teax/`
+- 目标目录：`${AGENT_RUNTIME_ROOT}/.teax/`
+- 同步策略：按文件补齐（目标缺失才复制，不覆盖已有文件）
+
+这保证了 Runtime 目录缺配置时可自动补全，同时保留本地已修改配置。
+
 ### 3.1 每仓库一个容器
 
 - 容器名：`teax-agent-repo-{repoId8}`
