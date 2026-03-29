@@ -256,19 +256,19 @@
 }
 ```
 
-#### agent_session_messages - 会话消息表
+#### agent_session_messages - 会话消息兼容索引表（逐步下线）
 
 ```typescript
 {
   id: uuid (PK),
   session_id: uuid (FK -> agent_sessions.id),
-  seq: integer,                     // 会话内单调递增
+  seq: integer,                     // 与 OpenCode 消息序号对齐
   actor_type: enum('user', 'agent', 'system', 'bot'),
   actor_id: string,
   message_type: enum('user_prompt', 'agent_reply', 'system_note', 'tool_summary'),
-  content: text,
-  metadata: jsonb,
-  pinned: boolean,
+  content: text,                    // 仅兼容字段，未来可迁移移除
+  metadata: jsonb,                  // 可记录 opencode_message_id/source
+  pinned: boolean,                  // 当前主要用途：置顶状态索引
   pinned_by: uuid (FK -> users.id, nullable),
   pinned_at: timestamp (nullable),
   created_at: timestamp,
@@ -276,6 +276,12 @@
   row_creator: string
 }
 ```
+
+说明：
+
+- 会话消息主时间线来源为 OpenCode Server（`/session/{id}/message`）
+- 本表不再作为会话聊天主存储，仅用于兼容能力（例如 pin 的本地状态）
+- 后续迁移目标是将 pin/注释等本地状态从该表拆分到更轻量的状态表
 
 #### agent_session_events - 会话事件表
 

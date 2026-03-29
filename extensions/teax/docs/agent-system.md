@@ -14,7 +14,6 @@
 不包含（尚未落地）：
 
 - System Agent / 跨仓库编排
-- Agent 自动回复（当前仅支持用户消息入库）
 - SSE 实时事件流（当前为分页查询）
 
 ## 2. 当前架构
@@ -26,7 +25,7 @@
    ↓
 Agent Session Service / Agent Runtime Service
    ↓
-PostgreSQL（session/runtime/worktree/message/event）
+PostgreSQL（session/runtime/worktree/event，消息主时间线由 OpenCode Server 提供）
    ↓
 Docker Runtime（每仓库一个容器）
    ↓
@@ -82,10 +81,9 @@ Docker Runtime（每仓库一个容器）
 
 1. 新建 `agent_sessions`（初始 `status=created`）
 2. 创建 owner 参与者
-3. 写入首条消息（`message_type=user_prompt`）
-4. 记录事件：`session_created`、`session_preparing`
-5. 调用 `prepareRepoSessionWorktree()`
-6. 成功后记录事件 `worktree_prepared`；失败则 `worktree_prepare_failed`
+3. 记录事件：`session_created`、`session_preparing`
+4. 调用 `prepareRepoSessionWorktree()`
+5. 成功后记录事件 `worktree_prepared`；失败则 `worktree_prepare_failed`
 
 ### 4.2 Worktree 准备
 
@@ -135,7 +133,15 @@ Docker Runtime（每仓库一个容器）
   2. `opencode serve`
   3. `opencode server`
 
-### 4.5 会话状态（当前写入路径）
+### 4.5 消息读写模型（OpenCode Server Source of Truth）
+
+- `POST /sessions/{sessionId}/prompt` / `POST /sessions/{sessionId}/messages`：将用户输入直接转发到 OpenCode Server
+- 首次对话时自动创建 OpenCode Session，并回写 `agent_sessions.opencode_session_id`
+- `GET /sessions/{sessionId}/messages` 优先从 OpenCode Server 拉取消息
+- `agent_session_messages` 仅保留兼容用途（例如 pinned 状态索引），不再作为主对话存储
+- 如果 OpenCode 调用失败，请求直接报错，并写入 `opencode_prompt_failed` 事件
+
+### 4.6 会话状态（当前写入路径）
 
 ```text
 created -> preparing -> running
@@ -197,7 +203,7 @@ Sessions：
 - `PATCH /sessions/{sessionId}/participants/{userId}`
 - `GET /sessions/{sessionId}/messages`
 - `POST /sessions/{sessionId}/messages`
-- `POST /sessions/{sessionId}/prompt`（兼容接口，内部仍入库为消息）
+- `POST /sessions/{sessionId}/prompt`（兼容接口，内部直接转发到 OpenCode Server）
 - `POST /sessions/{sessionId}/messages/{messageId}/pin`
 - `GET /sessions/{sessionId}/events`（分页查询，支持 `after_seq`）
 - `POST /sessions/{sessionId}/opencode/control`（会话级进程控制）

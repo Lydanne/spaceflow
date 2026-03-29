@@ -182,7 +182,11 @@ failed/stopped --retry--> created
 - `POST /sessions/{sessionId}/messages/{messageId}/pin`（`agent:write`）
 - `GET /sessions/{sessionId}/events`（`agent:read`，分页 + `after_seq`）
 
-说明：事件接口当前是普通分页查询，不是 SSE。
+说明：
+
+- 消息主数据源为 OpenCode Server，后端优先读取 OpenCode 消息接口
+- `prompt/messages` 写入会直接转发到 OpenCode Server，不再依赖本地消息表作为主存储
+- 事件接口当前是普通分页查询，不是 SSE
 
 ## 7. 前端字段对应
 

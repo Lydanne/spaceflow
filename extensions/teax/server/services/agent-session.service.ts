@@ -1,10 +1,12 @@
-import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
 import { schema, useDB } from "~~/server/db";
 import {
   cleanupSessionWorktree,
   controlAgentSessionOpencodeProcess,
   getSessionWorktreeBySessionId,
+  listAgentSessionOpencodeMessages,
   type AgentSessionOpencodeAction,
+  promptAgentSessionOpencode,
   prepareRepoSessionWorktree,
 } from "~~/server/services/agent-runtime.service";
 
@@ -244,16 +246,6 @@ export async function createAgentSession(params: {
       ],
     });
 
-  await db.insert(schema.agentSessionMessages).values({
-    session_id: created.id,
-    seq: 1,
-    actor_type: "user",
-    actor_id: params.creatorId,
-    message_type: "user_prompt",
-    content: params.prompt,
-    metadata: { initial: true },
-  });
-
   await appendSessionEvent({
     sessionId: created.id,
     type: "session_created",
@@ -407,6 +399,26 @@ export async function getAgentSessionDetail(params: {
     .from(schema.agentSessionMessages)
     .where(eq(schema.agentSessionMessages.session_id, session.id));
 
+  let messageCount = toNumber(messageCountRow?.count);
+  const opencodeSessionId = String(session.opencode_session_id || "").trim();
+  if (opencodeSessionId) {
+    try {
+      const opencodeMessages = await listAgentSessionOpencodeMessages({
+        repositoryId: params.repositoryId,
+        sessionId: session.id,
+        opencodeSessionId,
+        limit: 5000,
+      });
+      messageCount = opencodeMessages.length;
+    } catch (error) {
+      console.warn("[agent-session] get detail opencode message_count failed, fallback to db:", {
+        session_id: session.id,
+        opencode_session_id: opencodeSessionId,
+        message: (error as { message?: string })?.message || "unknown",
+      });
+    }
+  }
+
   const myParticipant = await getParticipant(session.id, params.actor.userId);
   const worktree = await getSessionWorktreeBySessionId({
     repositoryId: params.repositoryId,
@@ -429,7 +441,7 @@ export async function getAgentSessionDetail(params: {
   return {
     ...session,
     participant_count: toNumber(participantCountRow?.count),
-    message_count: toNumber(messageCountRow?.count),
+    message_count: messageCount,
     my_role: myParticipant?.role || (session.creator_id === params.actor.userId ? "owner" : null),
     my_can_chat: myParticipant?.can_chat ?? session.creator_id === params.actor.userId,
     runtime_status: runtime?.status || null,
@@ -583,6 +595,68 @@ export async function listAgentSessionMessages(params: {
   const session = await ensureSessionReadable(params.sessionId, params.repositoryId, params.actor);
   const offset = (params.page - 1) * params.limit;
 
+  const opencodeSessionId = String(session.opencode_session_id || "").trim();
+  if (opencodeSessionId) {
+    try {
+      const readLimit = Math.max(params.limit, params.page * params.limit);
+      const opencodeMessages = await listAgentSessionOpencodeMessages({
+        repositoryId: params.repositoryId,
+        sessionId: session.id,
+        opencodeSessionId,
+        limit: readLimit,
+      });
+
+      const dbMessageRows = await db
+        .select({
+          id: schema.agentSessionMessages.id,
+          seq: schema.agentSessionMessages.seq,
+          pinned: schema.agentSessionMessages.pinned,
+          pinned_by: schema.agentSessionMessages.pinned_by,
+          pinned_at: schema.agentSessionMessages.pinned_at,
+          created_at: schema.agentSessionMessages.created_at,
+          updated_at: schema.agentSessionMessages.updated_at,
+        })
+        .from(schema.agentSessionMessages)
+        .where(
+          and(
+            eq(schema.agentSessionMessages.session_id, session.id),
+            lte(schema.agentSessionMessages.seq, readLimit),
+          ),
+        );
+      const dbMessageBySeq = new Map(dbMessageRows.map((row) => [row.seq, row]));
+
+      const pageMessages = opencodeMessages.slice(offset, offset + params.limit).map((message) => ({
+        id: dbMessageBySeq.get(message.seq)?.id || `opencode:${message.id}`,
+        session_id: session.id,
+        seq: message.seq,
+        actor_type: message.actor_type,
+        actor_id: message.actor_id,
+        message_type: message.message_type,
+        content: message.content,
+        metadata: message.metadata,
+        pinned: dbMessageBySeq.get(message.seq)?.pinned ?? false,
+        pinned_by: dbMessageBySeq.get(message.seq)?.pinned_by ?? null,
+        pinned_at: dbMessageBySeq.get(message.seq)?.pinned_at ?? null,
+        created_at: dbMessageBySeq.get(message.seq)?.created_at ?? message.created_at,
+        updated_at: dbMessageBySeq.get(message.seq)?.updated_at ?? message.updated_at,
+      }));
+
+      return {
+        data: pageMessages,
+        total: opencodeMessages.length,
+        page: params.page,
+        limit: params.limit,
+        hasMore: offset + params.limit < opencodeMessages.length,
+      };
+    } catch (error) {
+      console.warn("[agent-session] list opencode messages failed, fallback to db:", {
+        session_id: session.id,
+        opencode_session_id: opencodeSessionId,
+        message: (error as { message?: string })?.message || "unknown",
+      });
+    }
+  }
+
   const messages = await db
     .select()
     .from(schema.agentSessionMessages)
@@ -616,71 +690,168 @@ export async function createAgentSessionMessage(params: {
 }) {
   const db = useDB();
   const session = await ensureSessionChatAllowed(params.sessionId, params.repositoryId, params.actor);
+  const existingOpencodeSessionId = String(session.opencode_session_id || "").trim();
+  let beforeMaxSeq = 0;
 
-  let created: typeof schema.agentSessionMessages.$inferSelect | undefined;
-
-  // 消息序号在会话内唯一；多人并发发言时冲突重试，提升协作稳定性。
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  if (existingOpencodeSessionId) {
     try {
-      created = await db.transaction(async (tx) => {
-        const [maxSeqRow] = await tx
-          .select({
-            maxSeq: sql<number>`COALESCE(MAX(${schema.agentSessionMessages.seq}), 0)`,
-          })
-          .from(schema.agentSessionMessages)
-          .where(eq(schema.agentSessionMessages.session_id, session.id));
-
-        const nextSeq = toNumber(maxSeqRow?.maxSeq) + 1;
-
-        const [inserted] = await tx
-          .insert(schema.agentSessionMessages)
-          .values({
-            session_id: session.id,
-            seq: nextSeq,
-            actor_type: "user",
-            actor_id: params.actor.userId,
-            message_type: "user_prompt",
-            content: params.content,
-            metadata: params.metadata,
-          })
-          .returning();
-
-        await tx
-          .update(schema.agentSessions)
-          .set({ updated_at: new Date() })
-          .where(eq(schema.agentSessions.id, session.id));
-
-        return inserted;
+      const beforeMessages = await listAgentSessionOpencodeMessages({
+        repositoryId: params.repositoryId,
+        sessionId: session.id,
+        opencodeSessionId: existingOpencodeSessionId,
+        limit: 5000,
       });
-
-      if (created) {
-        break;
-      }
+      beforeMaxSeq = beforeMessages.reduce((max, item) => Math.max(max, item.seq), 0);
     } catch (error) {
-      if (isUniqueViolation(error) && attempt < 2) {
-        continue;
-      }
-      throw error;
+      console.warn("[agent-session] read opencode messages before prompt failed:", {
+        session_id: session.id,
+        opencode_session_id: existingOpencodeSessionId,
+        message: (error as { message?: string })?.message || "unknown",
+      });
     }
   }
 
-  if (!created) {
-    throw createError({ statusCode: 500, message: "Failed to create session message" });
+  try {
+    const opencode = await promptAgentSessionOpencode({
+      repositoryId: params.repositoryId,
+      sessionId: session.id,
+      prompt: params.content,
+      opencodeSessionId: session.opencode_session_id,
+      sessionTitle: session.title,
+    });
+
+    if (opencode.opencode_session_id !== session.opencode_session_id) {
+      await db
+        .update(schema.agentSessions)
+        .set({
+          opencode_session_id: opencode.opencode_session_id,
+          updated_at: new Date(),
+        })
+        .where(eq(schema.agentSessions.id, session.id));
+    }
+
+    let userMessage:
+      | Awaited<ReturnType<typeof listAgentSessionOpencodeMessages>>[number]
+      | undefined;
+    let agentMessage:
+      | Awaited<ReturnType<typeof listAgentSessionOpencodeMessages>>[number]
+      | undefined;
+    try {
+      const afterMessages = await listAgentSessionOpencodeMessages({
+        repositoryId: params.repositoryId,
+        sessionId: session.id,
+        opencodeSessionId: opencode.opencode_session_id,
+        limit: 5000,
+      });
+
+      const baseSeq = opencode.opencode_session_id === existingOpencodeSessionId ? beforeMaxSeq : 0;
+      const deltaMessages = afterMessages.filter((item) => item.seq > baseSeq);
+      const latestUser = [...deltaMessages].reverse().find((item) => item.actor_type === "user")
+        || [...afterMessages].reverse().find((item) => item.actor_type === "user");
+      const latestAgent = [...deltaMessages].reverse().find((item) => item.actor_type === "agent")
+        || [...afterMessages].reverse().find((item) => item.actor_type === "agent");
+      userMessage = latestUser;
+      agentMessage = latestAgent;
+    } catch (error) {
+      console.warn("[agent-session] read opencode messages after prompt failed:", {
+        session_id: session.id,
+        opencode_session_id: opencode.opencode_session_id,
+        message: (error as { message?: string })?.message || "unknown",
+      });
+    }
+
+    const nowIso = new Date().toISOString();
+    const fallbackUserSeq = beforeMaxSeq + 1;
+    const fallbackUserId = `opencode:${opencode.opencode_session_id}:${fallbackUserSeq}`;
+    const responseMessage = userMessage
+      ? {
+        id: `opencode:${userMessage.id}`,
+        session_id: session.id,
+        seq: userMessage.seq,
+        actor_type: userMessage.actor_type,
+        actor_id: userMessage.actor_id,
+        message_type: userMessage.message_type,
+        content: userMessage.content,
+        metadata: userMessage.metadata,
+        pinned: false,
+        pinned_by: null,
+        pinned_at: null,
+        created_at: userMessage.created_at,
+        updated_at: userMessage.updated_at,
+      }
+      : {
+        id: fallbackUserId,
+        session_id: session.id,
+        seq: fallbackUserSeq,
+        actor_type: "user" as const,
+        actor_id: params.actor.userId,
+        message_type: "user_prompt" as const,
+        content: params.content,
+        metadata: {
+          ...params.metadata,
+          source: "opencode_server",
+          opencode_session_id: opencode.opencode_session_id,
+          server_hostname: opencode.server_hostname,
+          server_port: opencode.server_port,
+        },
+        pinned: false,
+        pinned_by: null,
+        pinned_at: null,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+
+    await appendSessionEvent({
+      sessionId: session.id,
+      type: "message_created",
+      actorType: "user",
+      actorId: params.actor.userId,
+      payload: {
+        message_id: responseMessage.id,
+        seq: responseMessage.seq,
+        message_type: responseMessage.message_type,
+      },
+    });
+
+    if (agentMessage) {
+      await appendSessionEvent({
+        sessionId: session.id,
+        type: "message_created",
+        actorType: "agent",
+        actorId: "opencode",
+        payload: {
+          message_id: `opencode:${agentMessage.id}`,
+          seq: agentMessage.seq,
+          message_type: agentMessage.message_type,
+        },
+      });
+    } else if (opencode.agent_reply.trim()) {
+      await appendSessionEvent({
+        sessionId: session.id,
+        type: "message_created",
+        actorType: "agent",
+        actorId: "opencode",
+        payload: {
+          message_id: null,
+          seq: null,
+          message_type: "agent_reply",
+        },
+      });
+    }
+
+    return responseMessage;
+  } catch (error) {
+    await appendSessionEvent({
+      sessionId: session.id,
+      type: "opencode_prompt_failed",
+      actorType: "system",
+      actorId: "opencode",
+      payload: {
+        error: (error as { message?: string })?.message || "opencode prompt failed",
+      },
+    });
+    throw error;
   }
-
-  await appendSessionEvent({
-    sessionId: session.id,
-    type: "message_created",
-    actorType: "user",
-    actorId: params.actor.userId,
-    payload: {
-      message_id: created.id,
-      seq: created.seq,
-      message_type: created.message_type,
-    },
-  });
-
-  return created;
 }
 
 export async function joinAgentSession(params: {
@@ -789,9 +960,14 @@ export async function pinAgentSessionMessage(params: {
     }
   }
 
-  const [message] = await db
+  let [message] = await db
     .select({
       id: schema.agentSessionMessages.id,
+      seq: schema.agentSessionMessages.seq,
+      actor_type: schema.agentSessionMessages.actor_type,
+      actor_id: schema.agentSessionMessages.actor_id,
+      message_type: schema.agentSessionMessages.message_type,
+      content: schema.agentSessionMessages.content,
       metadata: schema.agentSessionMessages.metadata,
     })
     .from(schema.agentSessionMessages)
@@ -802,6 +978,110 @@ export async function pinAgentSessionMessage(params: {
       ),
     )
     .limit(1);
+
+  if (!message) {
+    const opencodeSessionId = String(session.opencode_session_id || "").trim();
+    const opencodeMessageToken = params.messageId.startsWith("opencode:")
+      ? params.messageId.slice("opencode:".length).trim()
+      : "";
+    if (opencodeSessionId && opencodeMessageToken) {
+      try {
+        const opencodeMessages = await listAgentSessionOpencodeMessages({
+          repositoryId: params.repositoryId,
+          sessionId: session.id,
+          opencodeSessionId,
+          limit: 5000,
+        });
+        const matched = opencodeMessages.find((item) => item.id === opencodeMessageToken);
+        if (matched) {
+          const [existingBySeq] = await db
+            .select({
+              id: schema.agentSessionMessages.id,
+              seq: schema.agentSessionMessages.seq,
+              actor_type: schema.agentSessionMessages.actor_type,
+              actor_id: schema.agentSessionMessages.actor_id,
+              message_type: schema.agentSessionMessages.message_type,
+              content: schema.agentSessionMessages.content,
+              metadata: schema.agentSessionMessages.metadata,
+            })
+            .from(schema.agentSessionMessages)
+            .where(
+              and(
+                eq(schema.agentSessionMessages.session_id, session.id),
+                eq(schema.agentSessionMessages.seq, matched.seq),
+              ),
+            )
+            .limit(1);
+
+          if (existingBySeq) {
+            message = existingBySeq;
+          } else {
+            const [inserted] = await db
+              .insert(schema.agentSessionMessages)
+              .values({
+                session_id: session.id,
+                seq: matched.seq,
+                actor_type: matched.actor_type,
+                actor_id: matched.actor_id.slice(0, 64),
+                message_type: matched.message_type,
+                content: matched.content,
+                metadata: {
+                  ...matched.metadata,
+                  source: "opencode_server",
+                  opencode_message_id: matched.id,
+                },
+              })
+              .onConflictDoNothing({
+                target: [
+                  schema.agentSessionMessages.session_id,
+                  schema.agentSessionMessages.seq,
+                ],
+              })
+              .returning({
+                id: schema.agentSessionMessages.id,
+                seq: schema.agentSessionMessages.seq,
+                actor_type: schema.agentSessionMessages.actor_type,
+                actor_id: schema.agentSessionMessages.actor_id,
+                message_type: schema.agentSessionMessages.message_type,
+                content: schema.agentSessionMessages.content,
+                metadata: schema.agentSessionMessages.metadata,
+              });
+
+            if (inserted) {
+              message = inserted;
+            } else {
+              const [reloaded] = await db
+                .select({
+                  id: schema.agentSessionMessages.id,
+                  seq: schema.agentSessionMessages.seq,
+                  actor_type: schema.agentSessionMessages.actor_type,
+                  actor_id: schema.agentSessionMessages.actor_id,
+                  message_type: schema.agentSessionMessages.message_type,
+                  content: schema.agentSessionMessages.content,
+                  metadata: schema.agentSessionMessages.metadata,
+                })
+                .from(schema.agentSessionMessages)
+                .where(
+                  and(
+                    eq(schema.agentSessionMessages.session_id, session.id),
+                    eq(schema.agentSessionMessages.seq, matched.seq),
+                  ),
+                )
+                .limit(1);
+              message = reloaded;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("[agent-session] pin opencode message resolve failed:", {
+          session_id: session.id,
+          opencode_session_id: opencodeSessionId,
+          message_id: params.messageId,
+          message: (error as { message?: string })?.message || "unknown",
+        });
+      }
+    }
+  }
 
   if (!message) {
     throw createError({ statusCode: 404, message: "Session message not found" });
@@ -825,7 +1105,7 @@ export async function pinAgentSessionMessage(params: {
     })
     .where(
       and(
-        eq(schema.agentSessionMessages.id, params.messageId),
+        eq(schema.agentSessionMessages.id, message.id),
         eq(schema.agentSessionMessages.session_id, session.id),
       ),
     )
@@ -837,7 +1117,7 @@ export async function pinAgentSessionMessage(params: {
     actorType: "user",
     actorId: params.actor.userId,
     payload: {
-      message_id: params.messageId,
+      message_id: message.id,
     },
   });
 

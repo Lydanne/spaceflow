@@ -10,7 +10,11 @@ const repoLocks = new Map<string, Promise<void>>();
 const AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG = "teax-agent-runtime:base";
 const AGENT_RUNTIME_OPENCODE_PID_FILENAME = ".teax-opencode.pid";
 const AGENT_RUNTIME_OPENCODE_LOG_FILENAME = ".teax-opencode.log";
-const AGENT_RUNTIME_OPENCODE_FALLBACK_COMMANDS = ["opencode serve", "opencode server"];
+const AGENT_RUNTIME_OPENCODE_SERVER_HOSTNAME = "127.0.0.1";
+const AGENT_RUNTIME_OPENCODE_SERVER_PORT_BASE = 20000;
+const AGENT_RUNTIME_OPENCODE_SERVER_PORT_SPAN = 20000;
+const AGENT_RUNTIME_OPENCODE_HEALTH_RETRY_COUNT = 20;
+const AGENT_RUNTIME_OPENCODE_HEALTH_RETRY_INTERVAL_MS = 500;
 
 /**
  * Runtime 全局解析配置。
@@ -53,6 +57,19 @@ interface SessionOpencodeState {
   pid: number | null;
 }
 
+interface SessionOpencodeServerEndpoint {
+  hostname: string;
+  port: number;
+}
+
+interface SessionOpencodeResolvedContext {
+  runtimeKey: string;
+  paths: SessionOpencodePathInfo;
+  endpoint: SessionOpencodeServerEndpoint;
+  worktreeId: string;
+  worktreeMetadata: Record<string, unknown>;
+}
+
 /**
  * Docker Runtime 启动/复用结果。
  * 该结构会写入 `agent_runtimes.metadata.docker`，用于后续排障与展示。
@@ -92,12 +109,35 @@ export interface AgentSessionOpencodeControlResult {
   status: "running" | "stopped";
   pid: number | null;
   command: string | null;
+  server_hostname: string;
+  server_port: number;
+  server_base_url: string;
   runtime_key: string;
   session_id: string;
   session_path: string;
   container_session_path: string;
   pid_file: string;
   log_file: string;
+}
+
+export interface AgentSessionOpencodePromptResult {
+  opencode_session_id: string;
+  agent_reply: string;
+  server_hostname: string;
+  server_port: number;
+  server_base_url: string;
+}
+
+export interface AgentSessionOpencodeMessage {
+  id: string;
+  seq: number;
+  actor_type: "user" | "agent" | "system" | "bot";
+  actor_id: string;
+  message_type: "user_prompt" | "agent_reply" | "system_note" | "tool_summary";
+  content: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 /**
@@ -562,6 +602,71 @@ function buildSessionOpencodePaths(sessionId: string): SessionOpencodePathInfo {
   };
 }
 
+function sleep(ms: number) {
+  return new Promise((resolvePromise) => {
+    setTimeout(resolvePromise, ms);
+  });
+}
+
+function toPositivePort(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return null;
+  if (parsed <= 0 || parsed > 65535) return null;
+  return parsed;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+}
+
+function deriveOpencodeServerPortFromSessionId(sessionId: string): number {
+  const compact = sessionId.replace(/-/g, "");
+  const hex = compact.slice(0, 8);
+  const seed = Number.parseInt(hex, 16);
+  const normalized = Number.isFinite(seed) ? seed : 0;
+  return AGENT_RUNTIME_OPENCODE_SERVER_PORT_BASE + (normalized % AGENT_RUNTIME_OPENCODE_SERVER_PORT_SPAN);
+}
+
+function resolveSessionOpencodeServerEndpoint(params: {
+  sessionId: string;
+  worktreeMetadata: Record<string, unknown>;
+}): SessionOpencodeServerEndpoint {
+  const serverMetadata = asRecord(params.worktreeMetadata.opencode_server);
+  const hostname = String(serverMetadata.hostname || AGENT_RUNTIME_OPENCODE_SERVER_HOSTNAME).trim()
+    || AGENT_RUNTIME_OPENCODE_SERVER_HOSTNAME;
+  const port = toPositivePort(serverMetadata.port) || deriveOpencodeServerPortFromSessionId(params.sessionId);
+  return { hostname, port };
+}
+
+async function updateWorktreeOpencodeMetadata(params: {
+  worktreeId: string;
+  existingMetadata: Record<string, unknown>;
+  patch: Record<string, unknown>;
+}) {
+  const db = useDB();
+  const existingServer = asRecord(params.existingMetadata.opencode_server);
+  const patchServer = asRecord(params.patch.opencode_server);
+  const mergedMetadata = {
+    ...params.existingMetadata,
+    ...params.patch,
+    opencode_server: {
+      ...existingServer,
+      ...patchServer,
+    },
+  };
+
+  await db
+    .update(schema.agentSessionWorktrees)
+    .set({
+      metadata: mergedMetadata,
+      updated_at: new Date(),
+    })
+    .where(eq(schema.agentSessionWorktrees.id, params.worktreeId));
+}
+
 function parseCommandKvOutput(output: string): Record<string, string> {
   const parsed: Record<string, string> = {};
   const lines = output.split(/\r?\n/);
@@ -960,14 +1065,22 @@ async function stopAndRemoveDockerContainer(containerName: string) {
   return true;
 }
 
-function buildOpencodeStartCommandCandidates(): string[] {
+function buildOpencodeStartCommandCandidates(endpoint: SessionOpencodeServerEndpoint): string[] {
   const runtimeConfig = resolveRuntimeConfig();
+  const configured = runtimeConfig.opencodeStartCommand.trim();
+  const interpolatedConfigured = configured
+    ? configured
+      .replaceAll("{hostname}", endpoint.hostname)
+      .replaceAll("{port}", String(endpoint.port))
+    : "";
+
   const commands = [
-    runtimeConfig.opencodeStartCommand,
-    ...AGENT_RUNTIME_OPENCODE_FALLBACK_COMMANDS,
-  ]
-    .map((item) => item.trim())
-    .filter(Boolean);
+    interpolatedConfigured,
+    `opencode serve --hostname ${endpoint.hostname} --port ${endpoint.port}`,
+    `opencode serve --port ${endpoint.port}`,
+    `opencode server --hostname ${endpoint.hostname} --port ${endpoint.port}`,
+    `opencode server --port ${endpoint.port}`,
+  ].map((item) => item.trim()).filter(Boolean);
 
   const deduped = new Set<string>();
   for (const command of commands) {
@@ -1052,9 +1165,10 @@ async function stopSessionOpencodeInContainer(params: {
 async function startSessionOpencodeInContainer(params: {
   runtimeKey: string;
   sessionId: string;
+  endpoint: SessionOpencodeServerEndpoint;
 }): Promise<{ command: string | null }> {
   const paths = buildSessionOpencodePaths(params.sessionId);
-  const [command1, command2, command3] = buildOpencodeStartCommandCandidates();
+  const [command1, command2, command3] = buildOpencodeStartCommandCandidates(params.endpoint);
   const script = [
     "set -eu",
     `session_dir=${JSON.stringify(paths.containerSessionPath)}`,
@@ -1113,6 +1227,485 @@ async function startSessionOpencodeInContainer(params: {
   return {
     command: parsed.command || null,
   };
+}
+
+function extractOpencodeSessionId(payload: unknown): string | null {
+  const root = asRecord(payload);
+  const directId = String(root.id || "").trim();
+  if (directId) return directId;
+  const info = asRecord(root.info);
+  const infoId = String(info.id || "").trim();
+  if (infoId) return infoId;
+  return null;
+}
+
+function normalizeActorTypeFromOpencodeRole(roleRaw: unknown): "user" | "agent" | "system" | "bot" {
+  const role = String(roleRaw || "").trim().toLowerCase();
+  if (role === "user" || role === "human") return "user";
+  if (role === "assistant" || role === "agent" || role === "ai") return "agent";
+  if (role === "system") return "system";
+  return "bot";
+}
+
+function normalizeMessageTypeFromActorType(actorType: "user" | "agent" | "system" | "bot") {
+  if (actorType === "user") return "user_prompt" as const;
+  if (actorType === "agent") return "agent_reply" as const;
+  if (actorType === "system") return "system_note" as const;
+  return "tool_summary" as const;
+}
+
+function resolveIsoTimestamp(value: unknown, fallback: string): string {
+  const raw = String(value || "").trim();
+  if (!raw) return fallback;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return date.toISOString();
+}
+
+function resolveMessageTimestamp(info: Record<string, unknown>, key: "created" | "updated", fallback: string) {
+  const directKey = key === "created" ? "created_at" : "updated_at";
+  const camelKey = key === "created" ? "createdAt" : "updatedAt";
+  const nestedTime = asRecord(info.time);
+  return resolveIsoTimestamp(
+    info[directKey]
+      ?? info[camelKey]
+      ?? nestedTime[key]
+      ?? nestedTime[key === "created" ? "created_at" : "updated_at"],
+    fallback,
+  );
+}
+
+function extractOpencodeMessageContent(bundle: unknown): string {
+  const bundleRecord = asRecord(bundle);
+  return extractOpencodeReplyText({
+    parts: bundleRecord.parts,
+  });
+}
+
+function extractOpencodeReplyText(payload: unknown): string {
+  const root = asRecord(payload);
+  const parts = Array.isArray(root.parts) ? root.parts : [];
+  const segments: string[] = [];
+
+  const visit = (value: unknown) => {
+    if (!value) return;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) {
+        segments.push(trimmed);
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        visit(item);
+      }
+      return;
+    }
+    if (typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    if (typeof record.text === "string") {
+      visit(record.text);
+    }
+    if (typeof record.content === "string" || Array.isArray(record.content)) {
+      visit(record.content);
+    }
+    if (Array.isArray(record.parts)) {
+      visit(record.parts);
+    }
+  };
+
+  visit(parts);
+
+  if (segments.length === 0) {
+    return "";
+  }
+  return segments.join("\n\n").slice(0, 20000).trim();
+}
+
+async function resolveSessionOpencodeContext(params: {
+  repositoryId: string;
+  sessionId: string;
+}): Promise<SessionOpencodeResolvedContext> {
+  const db = useDB();
+  const [session] = await db
+    .select({
+      id: schema.agentSessions.id,
+      runtime_id: schema.agentSessions.runtime_id,
+    })
+    .from(schema.agentSessions)
+    .where(
+      and(
+        eq(schema.agentSessions.id, params.sessionId),
+        eq(schema.agentSessions.repository_id, params.repositoryId),
+      ),
+    )
+    .limit(1);
+
+  if (!session) {
+    throw createError({ statusCode: 404, message: "Agent session not found" });
+  }
+  if (!session.runtime_id) {
+    throw createError({
+      statusCode: 409,
+      message: "Session runtime is not ready yet",
+    });
+  }
+
+  const [runtime] = await db
+    .select({
+      id: schema.agentRuntimes.id,
+      provider: schema.agentRuntimes.provider,
+      runtime_key: schema.agentRuntimes.runtime_key,
+    })
+    .from(schema.agentRuntimes)
+    .where(eq(schema.agentRuntimes.id, session.runtime_id))
+    .limit(1);
+
+  if (!runtime) {
+    throw createError({ statusCode: 404, message: "Runtime not found for this session" });
+  }
+  if (runtime.provider !== "docker") {
+    throw createError({ statusCode: 400, message: "Only docker runtime supports opencode control" });
+  }
+
+  const runtimeKey = runtime.runtime_key || buildRepoRuntimeKey(params.repositoryId);
+  const inspected = await inspectDockerContainer(runtimeKey);
+  if (!inspected?.running) {
+    throw createError({
+      statusCode: 409,
+      message: "Runtime container is not running, please start runtime first",
+    });
+  }
+
+  const [worktree] = await db
+    .select({
+      id: schema.agentSessionWorktrees.id,
+      metadata: schema.agentSessionWorktrees.metadata,
+    })
+    .from(schema.agentSessionWorktrees)
+    .where(
+      and(
+        eq(schema.agentSessionWorktrees.repository_id, params.repositoryId),
+        eq(schema.agentSessionWorktrees.session_id, params.sessionId),
+      ),
+    )
+    .limit(1);
+
+  if (!worktree) {
+    throw createError({
+      statusCode: 409,
+      message: "Session workspace is not prepared",
+    });
+  }
+
+  const paths = buildSessionOpencodePaths(params.sessionId);
+  if (!await pathExists(paths.hostSessionPath)) {
+    throw createError({
+      statusCode: 409,
+      message: "Session directory is missing, please retry session to rebuild workspace first",
+    });
+  }
+
+  const worktreeMetadata = asRecord(worktree.metadata);
+  const endpoint = resolveSessionOpencodeServerEndpoint({
+    sessionId: params.sessionId,
+    worktreeMetadata,
+  });
+
+  return {
+    runtimeKey,
+    paths,
+    endpoint,
+    worktreeId: worktree.id,
+    worktreeMetadata,
+  };
+}
+
+async function callSessionOpencodeHttp(params: {
+  runtimeKey: string;
+  endpoint: SessionOpencodeServerEndpoint;
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  path: string;
+  body?: unknown;
+}) {
+  const normalizedPath = params.path.startsWith("/") ? params.path : `/${params.path}`;
+  const url = `http://${params.endpoint.hostname}:${params.endpoint.port}${normalizedPath}`;
+  const payload = params.body === undefined ? "" : JSON.stringify(params.body);
+  const payloadBase64 = Buffer.from(payload, "utf8").toString("base64");
+  const hasBody = params.body !== undefined;
+  const requestLine = hasBody
+    ? `status="$(curl -sS -o "$tmp" -w "%{http_code}" -X ${JSON.stringify(params.method)} -H "content-type: application/json" --data "$payload" "$url")"`
+    : `status="$(curl -sS -o "$tmp" -w "%{http_code}" -X ${JSON.stringify(params.method)} "$url")"`;
+  const script = [
+    "set -eu",
+    `url=${JSON.stringify(url)}`,
+    `payload_base64=${JSON.stringify(payloadBase64)}`,
+    "payload=\"$(printf '%s' \"$payload_base64\" | base64 -d)\"",
+    "tmp=\"$(mktemp)\"",
+    requestLine,
+    "body=\"$(cat \"$tmp\")\"",
+    "rm -f \"$tmp\"",
+    "echo \"status=$status\"",
+    "printf 'body_base64=%s\\n' \"$(printf '%s' \"$body\" | base64 | tr -d '\\n')\"",
+  ].join("\n");
+
+  const result = await runDockerExec(params.runtimeKey, ["sh", "-lc", script]);
+  const parsed = parseCommandKvOutput(result.stdout);
+  const statusCode = Number.parseInt(String(parsed.status || ""), 10);
+  const bodyText = parsed.body_base64
+    ? Buffer.from(parsed.body_base64, "base64").toString("utf8")
+    : "";
+  const bodyJson = bodyText
+    ? (() => {
+      try {
+        return JSON.parse(bodyText) as unknown;
+      } catch {
+        return null;
+      }
+    })()
+    : null;
+
+  if (!Number.isInteger(statusCode)) {
+    throw createError({
+      statusCode: 500,
+      message: "Invalid opencode HTTP response status",
+    });
+  }
+
+  return {
+    statusCode,
+    bodyText,
+    bodyJson,
+  };
+}
+
+async function ensureSessionOpencodeServerReady(params: {
+  runtimeKey: string;
+  sessionId: string;
+  endpoint: SessionOpencodeServerEndpoint;
+}) {
+  const initialState = await readSessionOpencodeState({
+    runtimeKey: params.runtimeKey,
+    sessionId: params.sessionId,
+  });
+
+  let command: string | null = null;
+  if (initialState.status !== "running") {
+    const started = await startSessionOpencodeInContainer({
+      runtimeKey: params.runtimeKey,
+      sessionId: params.sessionId,
+      endpoint: params.endpoint,
+    });
+    command = started.command;
+  }
+
+  for (let attempt = 0; attempt < AGENT_RUNTIME_OPENCODE_HEALTH_RETRY_COUNT; attempt += 1) {
+    try {
+      const health = await callSessionOpencodeHttp({
+        runtimeKey: params.runtimeKey,
+        endpoint: params.endpoint,
+        method: "GET",
+        path: "/global/health",
+      });
+      if (health.statusCode >= 200 && health.statusCode < 300) {
+        const state = await readSessionOpencodeState({
+          runtimeKey: params.runtimeKey,
+          sessionId: params.sessionId,
+        });
+        return {
+          state,
+          command,
+        };
+      }
+    } catch {
+      // server 可能还在启动中
+    }
+    await sleep(AGENT_RUNTIME_OPENCODE_HEALTH_RETRY_INTERVAL_MS);
+  }
+
+  throw createError({
+    statusCode: 500,
+    message: "Opencode server did not become ready in time",
+  });
+}
+
+async function createOpencodeServerSession(params: {
+  runtimeKey: string;
+  endpoint: SessionOpencodeServerEndpoint;
+  title: string;
+}) {
+  const response = await callSessionOpencodeHttp({
+    runtimeKey: params.runtimeKey,
+    endpoint: params.endpoint,
+    method: "POST",
+    path: "/session",
+    body: {
+      title: params.title,
+    },
+  });
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw createError({
+      statusCode: 500,
+      message: `Failed to create opencode session: ${response.bodyText || `HTTP ${response.statusCode}`}`,
+    });
+  }
+
+  const opencodeSessionId = extractOpencodeSessionId(response.bodyJson);
+  if (!opencodeSessionId) {
+    throw createError({
+      statusCode: 500,
+      message: "Opencode session response missing session id",
+    });
+  }
+  return opencodeSessionId;
+}
+
+async function sendPromptToOpencodeServerSession(params: {
+  runtimeKey: string;
+  endpoint: SessionOpencodeServerEndpoint;
+  opencodeSessionId: string;
+  prompt: string;
+}) {
+  const response = await callSessionOpencodeHttp({
+    runtimeKey: params.runtimeKey,
+    endpoint: params.endpoint,
+    method: "POST",
+    path: `/session/${encodeURIComponent(params.opencodeSessionId)}/message`,
+    body: {
+      parts: [{ type: "text", text: params.prompt }],
+    },
+  });
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw createError({
+      statusCode: 500,
+      message: `Failed to prompt opencode session: ${response.bodyText || `HTTP ${response.statusCode}`}`,
+    });
+  }
+
+  return extractOpencodeReplyText(response.bodyJson);
+}
+
+export async function promptAgentSessionOpencode(params: {
+  repositoryId: string;
+  sessionId: string;
+  prompt: string;
+  opencodeSessionId?: string | null;
+  sessionTitle?: string | null;
+}) {
+  const context = await resolveSessionOpencodeContext({
+    repositoryId: params.repositoryId,
+    sessionId: params.sessionId,
+  });
+
+  return withRepositoryLock(params.repositoryId, async () => {
+    const ready = await ensureSessionOpencodeServerReady({
+      runtimeKey: context.runtimeKey,
+      sessionId: params.sessionId,
+      endpoint: context.endpoint,
+    });
+
+    let opencodeSessionId = String(params.opencodeSessionId || "").trim();
+    if (!opencodeSessionId) {
+      opencodeSessionId = await createOpencodeServerSession({
+        runtimeKey: context.runtimeKey,
+        endpoint: context.endpoint,
+        title: (params.sessionTitle || "").trim() || `Teax Session ${params.sessionId.slice(0, 8)}`,
+      });
+    }
+
+    const agentReply = await sendPromptToOpencodeServerSession({
+      runtimeKey: context.runtimeKey,
+      endpoint: context.endpoint,
+      opencodeSessionId,
+      prompt: params.prompt,
+    });
+
+    await updateWorktreeOpencodeMetadata({
+      worktreeId: context.worktreeId,
+      existingMetadata: context.worktreeMetadata,
+      patch: {
+        opencode_server: {
+          hostname: context.endpoint.hostname,
+          port: context.endpoint.port,
+          status: ready.state.status,
+          pid: ready.state.pid,
+          command: ready.command || null,
+          last_prompt_at: new Date().toISOString(),
+        },
+      },
+    });
+
+    return {
+      opencode_session_id: opencodeSessionId,
+      agent_reply: agentReply,
+      server_hostname: context.endpoint.hostname,
+      server_port: context.endpoint.port,
+      server_base_url: `http://${context.endpoint.hostname}:${context.endpoint.port}`,
+    } satisfies AgentSessionOpencodePromptResult;
+  });
+}
+
+export async function listAgentSessionOpencodeMessages(params: {
+  repositoryId: string;
+  sessionId: string;
+  opencodeSessionId: string;
+  limit?: number;
+}) {
+  const opencodeSessionId = String(params.opencodeSessionId || "").trim();
+  if (!opencodeSessionId) {
+    return [] as AgentSessionOpencodeMessage[];
+  }
+
+  const context = await resolveSessionOpencodeContext({
+    repositoryId: params.repositoryId,
+    sessionId: params.sessionId,
+  });
+  const maxLimit = Math.max(1, Math.min(5000, toNumber(params.limit || 200)));
+  const response = await callSessionOpencodeHttp({
+    runtimeKey: context.runtimeKey,
+    endpoint: context.endpoint,
+    method: "GET",
+    path: `/session/${encodeURIComponent(opencodeSessionId)}/message?limit=${maxLimit}`,
+  });
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw createError({
+      statusCode: 500,
+      message: `Failed to list opencode messages: ${response.bodyText || `HTTP ${response.statusCode}`}`,
+    });
+  }
+
+  const rows = Array.isArray(response.bodyJson) ? response.bodyJson : [];
+  const nowIso = new Date().toISOString();
+  return rows.map((row, index) => {
+    const bundle = asRecord(row);
+    const info = asRecord(bundle.info);
+    const actorType = normalizeActorTypeFromOpencodeRole(
+      info.role ?? info.actor ?? info.actor_type,
+    );
+    const createdAt = resolveMessageTimestamp(info, "created", nowIso);
+    const updatedAt = resolveMessageTimestamp(info, "updated", createdAt);
+    const messageId = String(info.id || "").trim() || `opencode-${opencodeSessionId}-${index + 1}`;
+
+    return {
+      id: messageId,
+      seq: index + 1,
+      actor_type: actorType,
+      actor_id: String(info.actor_id || info.role || "opencode").trim() || "opencode",
+      message_type: normalizeMessageTypeFromActorType(actorType),
+      content: extractOpencodeMessageContent(bundle),
+      metadata: {
+        source: "opencode_server",
+        opencode_session_id: opencodeSessionId,
+        info,
+      },
+      created_at: createdAt,
+      updated_at: updatedAt,
+    } satisfies AgentSessionOpencodeMessage;
+  });
 }
 
 /**
@@ -1680,59 +2273,10 @@ export async function controlAgentSessionOpencodeProcess(params: {
   sessionId: string;
   action: AgentSessionOpencodeAction;
 }) {
-  const db = useDB();
-  const [session] = await db
-    .select({
-      id: schema.agentSessions.id,
-      runtime_id: schema.agentSessions.runtime_id,
-    })
-    .from(schema.agentSessions)
-    .where(
-      and(
-        eq(schema.agentSessions.id, params.sessionId),
-        eq(schema.agentSessions.repository_id, params.repositoryId),
-      ),
-    )
-    .limit(1);
-
-  if (!session) {
-    throw createError({ statusCode: 404, message: "Agent session not found" });
-  }
-
-  if (!session.runtime_id) {
-    throw createError({
-      statusCode: 409,
-      message: "Session runtime is not ready yet",
-    });
-  }
-
-  const [runtime] = await db
-    .select({
-      id: schema.agentRuntimes.id,
-      provider: schema.agentRuntimes.provider,
-      runtime_key: schema.agentRuntimes.runtime_key,
-    })
-    .from(schema.agentRuntimes)
-    .where(eq(schema.agentRuntimes.id, session.runtime_id))
-    .limit(1);
-
-  if (!runtime) {
-    throw createError({ statusCode: 404, message: "Runtime not found for this session" });
-  }
-  if (runtime.provider !== "docker") {
-    throw createError({ statusCode: 400, message: "Only docker runtime supports opencode control" });
-  }
-
-  const runtimeKey = runtime.runtime_key || buildRepoRuntimeKey(params.repositoryId);
-  const inspected = await inspectDockerContainer(runtimeKey);
-  if (!inspected?.running) {
-    throw createError({
-      statusCode: 409,
-      message: "Runtime container is not running, please start runtime first",
-    });
-  }
-
-  const paths = buildSessionOpencodePaths(params.sessionId);
+  const context = await resolveSessionOpencodeContext({
+    repositoryId: params.repositoryId,
+    sessionId: params.sessionId,
+  });
 
   let command: string | null = null;
 
@@ -1740,23 +2284,25 @@ export async function controlAgentSessionOpencodeProcess(params: {
     try {
       if (params.action === "start") {
         const started = await startSessionOpencodeInContainer({
-          runtimeKey,
+          runtimeKey: context.runtimeKey,
           sessionId: params.sessionId,
+          endpoint: context.endpoint,
         });
         command = started.command;
       } else if (params.action === "stop") {
         await stopSessionOpencodeInContainer({
-          runtimeKey,
+          runtimeKey: context.runtimeKey,
           sessionId: params.sessionId,
         });
       } else {
         await stopSessionOpencodeInContainer({
-          runtimeKey,
+          runtimeKey: context.runtimeKey,
           sessionId: params.sessionId,
         });
         const started = await startSessionOpencodeInContainer({
-          runtimeKey,
+          runtimeKey: context.runtimeKey,
           sessionId: params.sessionId,
+          endpoint: context.endpoint,
         });
         command = started.command;
       }
@@ -1769,8 +2315,24 @@ export async function controlAgentSessionOpencodeProcess(params: {
   });
 
   const state = await readSessionOpencodeState({
-    runtimeKey,
+    runtimeKey: context.runtimeKey,
     sessionId: params.sessionId,
+  });
+
+  await updateWorktreeOpencodeMetadata({
+    worktreeId: context.worktreeId,
+    existingMetadata: context.worktreeMetadata,
+    patch: {
+      opencode_server: {
+        hostname: context.endpoint.hostname,
+        port: context.endpoint.port,
+        status: state.status,
+        pid: state.pid,
+        command,
+        last_control_action: params.action,
+        last_control_at: new Date().toISOString(),
+      },
+    },
   });
 
   return {
@@ -1778,12 +2340,15 @@ export async function controlAgentSessionOpencodeProcess(params: {
     status: state.status,
     pid: state.pid,
     command,
-    runtime_key: runtimeKey,
+    server_hostname: context.endpoint.hostname,
+    server_port: context.endpoint.port,
+    server_base_url: `http://${context.endpoint.hostname}:${context.endpoint.port}`,
+    runtime_key: context.runtimeKey,
     session_id: params.sessionId,
-    session_path: paths.hostSessionPath,
-    container_session_path: paths.containerSessionPath,
-    pid_file: paths.containerPidFilePath,
-    log_file: paths.containerLogFilePath,
+    session_path: context.paths.hostSessionPath,
+    container_session_path: context.paths.containerSessionPath,
+    pid_file: context.paths.containerPidFilePath,
+    log_file: context.paths.containerLogFilePath,
   } satisfies AgentSessionOpencodeControlResult;
 }
 
