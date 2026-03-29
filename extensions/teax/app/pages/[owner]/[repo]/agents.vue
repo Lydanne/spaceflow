@@ -204,6 +204,46 @@ function messageBranchRef(message: AgentSessionMessage): string | null {
   return fallback.trim() || null;
 }
 
+function messageModelRef(message: AgentSessionMessage): string | null {
+  const metadata = message.metadata && typeof message.metadata === "object"
+    ? (message.metadata as Record<string, unknown>)
+    : {};
+
+  const readCandidate = (value: unknown): string | null => {
+    const parsed = String(value || "").trim();
+    return parsed || null;
+  };
+
+  const direct = readCandidate(metadata.model)
+    || readCandidate(metadata.model_name)
+    || readCandidate(metadata.model_id);
+  if (direct) return direct;
+
+  const info = metadata.info && typeof metadata.info === "object"
+    ? (metadata.info as Record<string, unknown>)
+    : {};
+
+  return readCandidate(info.model)
+    || readCandidate(info.model_name)
+    || readCandidate(info.model_id)
+    || readCandidate((info.options as Record<string, unknown> | undefined)?.model)
+    || null;
+}
+
+const composerBranchLabel = computed(() => {
+  return (sessionDetail.value?.working_branch || sessionDetail.value?.base_branch || "-").trim() || "-";
+});
+
+const composerModelLabel = computed(() => {
+  for (let i = messages.value.length - 1; i >= 0; i -= 1) {
+    const message = messages.value[i];
+    if (!message) continue;
+    const model = messageModelRef(message);
+    if (model) return model;
+  }
+  return "默认";
+});
+
 function isUserMessage(message: AgentSessionMessage): boolean {
   return message.actor_type === "user";
 }
@@ -695,26 +735,42 @@ async function submitPrompt() {
                 class="w-full"
                 :disabled="!canChatInSession"
               />
-              <div class="flex items-center justify-between">
-                <p
-                  v-if="!canChatInSession"
-                  class="text-xs text-amber-500"
-                >
-                  你当前没有发言权限，请在设置页调整权限
-                </p>
-                <div class="ml-auto flex items-center gap-2">
-                  <UButton
-                    icon="i-lucide-send"
-                    color="primary"
-                    size="sm"
-                    :loading="sendPromptLoading"
-                    :disabled="!canChatInSession || !promptDraft.trim()"
-                    @click="submitPrompt"
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <UBadge
+                    color="neutral"
+                    variant="soft"
+                    size="xs"
+                    class="truncate max-w-52"
                   >
-                    发送
-                  </UButton>
+                    【分支】{{ composerBranchLabel }}
+                  </UBadge>
+                  <UBadge
+                    color="neutral"
+                    variant="soft"
+                    size="xs"
+                    class="truncate max-w-56"
+                  >
+                    【模型】{{ composerModelLabel }}
+                  </UBadge>
                 </div>
+                <UButton
+                  icon="i-lucide-send"
+                  color="primary"
+                  size="sm"
+                  :loading="sendPromptLoading"
+                  :disabled="!canChatInSession || !promptDraft.trim()"
+                  @click="submitPrompt"
+                >
+                  发送
+                </UButton>
               </div>
+              <p
+                v-if="!canChatInSession"
+                class="text-xs text-amber-500"
+              >
+                你当前没有发言权限，请在设置页调整权限
+              </p>
             </div>
           </template>
         </UCard>
