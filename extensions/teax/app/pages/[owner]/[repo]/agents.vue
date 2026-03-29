@@ -88,6 +88,8 @@ const promptDraft = ref("");
 const showCreateModal = ref(false);
 const createLoading = ref(false);
 const sendPromptLoading = ref(false);
+const messageViewportRef = ref<HTMLElement | null>(null);
+const shouldStickToBottom = ref(true);
 
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 const SESSION_MESSAGES_PAGE_LIMIT = 100;
@@ -131,8 +133,10 @@ watch(
       sessionDetail.value = null;
       messages.value = [];
       sessionContextError.value = "";
+      shouldStickToBottom.value = true;
       return;
     }
+    shouldStickToBottom.value = true;
     await loadSessionContext(sessionId);
   },
   { immediate: true },
@@ -187,6 +191,22 @@ function messageActorLabel(message: AgentSessionMessage): string {
   return "Bot";
 }
 
+function onMessageViewportScroll() {
+  const el = messageViewportRef.value;
+  if (!el) return;
+  const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+  shouldStickToBottom.value = distanceToBottom < 120;
+}
+
+async function maybeScrollToBottom(force = false) {
+  await nextTick();
+  const el = messageViewportRef.value;
+  if (!el) return;
+  if (force || shouldStickToBottom.value) {
+    el.scrollTop = el.scrollHeight;
+  }
+}
+
 async function loadSessionContext(sessionId: string) {
   sessionContextPending.value = true;
   sessionContextError.value = "";
@@ -202,6 +222,7 @@ async function loadSessionContext(sessionId: string) {
 
     sessionDetail.value = detail;
     messages.value = messageResp.data;
+    await maybeScrollToBottom(true);
   } catch (error: unknown) {
     if (selectedSessionId.value !== sessionId) return;
     sessionContextError.value = getErrorMessage(error, "加载会话失败");
@@ -223,6 +244,7 @@ async function refreshSessionRealtime(sessionId: string) {
     if (selectedSessionId.value !== sessionId) return;
     sessionDetail.value = detail;
     messages.value = messageResp.data;
+    await maybeScrollToBottom(false);
   } catch {
     // 静默失败，避免打断用户输入
   }
@@ -311,6 +333,7 @@ async function submitPrompt() {
     });
     promptDraft.value = "";
     await Promise.all([refreshCurrentSession(), refreshSessionList()]);
+    await maybeScrollToBottom(true);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "发送消息失败"), color: "error" });
   } finally {
@@ -358,23 +381,21 @@ async function submitPrompt() {
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-      <div class="lg:col-span-4 xl:col-span-3">
-        <UCard>
-          <template #header>
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-semibold">
-                会话
-              </h3>
-              <UBadge
-                color="neutral"
-                variant="subtle"
-              >
-                {{ sessions.length }}
-              </UBadge>
-            </div>
-          </template>
+    <div class="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-4 lg:h-[calc(100vh-14rem)] lg:min-h-[640px]">
+      <aside class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950/40 flex flex-col lg:min-h-0">
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+          <h3 class="text-sm font-semibold">
+            会话
+          </h3>
+          <UBadge
+            color="neutral"
+            variant="subtle"
+          >
+            {{ sessions.length }}
+          </UBadge>
+        </div>
 
+        <div class="p-3 flex-1 lg:min-h-0 lg:overflow-y-auto space-y-2">
           <div
             v-if="sessionListPending && sessions.length === 0"
             class="py-10 text-center text-gray-400"
@@ -397,64 +418,68 @@ async function submitPrompt() {
             暂无会话
           </div>
 
-          <div
-            v-else
-            class="space-y-2"
+          <button
+            v-for="item in sessions"
+            :key="item.id"
+            type="button"
+            class="w-full text-left rounded-lg border p-3 transition-colors"
+            :class="[
+              selectedSessionId === item.id
+                ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-900/20'
+                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/40',
+            ]"
+            @click="selectedSessionId = item.id"
           >
-            <button
-              v-for="item in sessions"
-              :key="item.id"
-              type="button"
-              class="w-full text-left rounded-lg border p-3 transition-colors"
-              :class="[
-                selectedSessionId === item.id
-                  ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-900/20'
-                  : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/40',
-              ]"
-              @click="selectedSessionId = item.id"
-            >
-              <p class="font-medium text-sm truncate">
-                {{ sessionTitle(item) }}
-              </p>
-              <div class="mt-2 text-xs text-gray-500 flex items-center gap-2">
-                <span class="inline-flex items-center gap-1">
-                  <UIcon
-                    name="i-lucide-git-branch"
-                    class="w-3 h-3"
-                  />
-                  {{ item.working_branch || item.base_branch }}
-                </span>
-                <span class="text-gray-300">·</span>
-                <span>{{ formatDateTime(item.updated_at) }}</span>
-              </div>
-            </button>
-          </div>
-        </UCard>
-      </div>
+            <p class="font-medium text-sm truncate">
+              {{ sessionTitle(item) }}
+            </p>
+            <div class="mt-2 text-xs text-gray-500 flex items-center gap-2">
+              <span class="inline-flex items-center gap-1">
+                <UIcon
+                  name="i-lucide-git-branch"
+                  class="w-3 h-3"
+                />
+                {{ item.working_branch || item.base_branch }}
+              </span>
+              <span class="text-gray-300">·</span>
+              <span>{{ formatDateTime(item.updated_at) }}</span>
+            </div>
+          </button>
+        </div>
+      </aside>
 
-      <div class="lg:col-span-8 xl:col-span-9">
-        <UCard v-if="!selectedSessionId">
-          <div class="py-16 text-center text-gray-400">
+      <section class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950/40 flex flex-col lg:min-h-0">
+        <div
+          v-if="!selectedSessionId"
+          class="flex-1 flex items-center justify-center text-gray-400"
+        >
+          <div class="text-center">
             <UIcon
               name="i-lucide-message-square"
               class="w-10 h-10 mx-auto mb-2"
             />
             选择一个会话开始聊天
           </div>
-        </UCard>
+        </div>
 
-        <UCard v-else-if="sessionContextPending">
-          <div class="py-16 text-center text-gray-400">
+        <div
+          v-else-if="sessionContextPending"
+          class="flex-1 flex items-center justify-center text-gray-400"
+        >
+          <div class="text-center">
             <UIcon
               name="i-lucide-loader-2"
               class="w-5 h-5 animate-spin mx-auto mb-2"
             />
             正在加载聊天
           </div>
-        </UCard>
+        </div>
 
-        <UCard v-else-if="sessionContextError">
-          <div class="py-16 text-center text-red-500">
+        <div
+          v-else-if="sessionContextError"
+          class="flex-1 flex items-center justify-center text-red-500 px-6"
+        >
+          <div class="text-center">
             <UIcon
               name="i-lucide-alert-triangle"
               class="w-8 h-8 mx-auto mb-2"
@@ -470,35 +495,34 @@ async function submitPrompt() {
               重试
             </UButton>
           </div>
-        </UCard>
+        </div>
 
-        <UCard
-          v-else-if="sessionDetail"
-          class="h-full"
-        >
-          <template #header>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 class="text-base font-semibold">
-                  {{ sessionTitle(sessionDetail) }}
-                </h3>
-                <p class="text-xs text-gray-500 mt-1">
-                  分支 {{ sessionDetail.working_branch || sessionDetail.base_branch }} · {{ formatDateTime(sessionDetail.updated_at) }}
-                </p>
-              </div>
-              <UButton
-                icon="i-lucide-settings-2"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                :to="runtimeSettingsPath"
-              >
-                去设置页
-              </UButton>
+        <template v-else-if="sessionDetail">
+          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="text-base font-semibold">
+                {{ sessionTitle(sessionDetail) }}
+              </h3>
+              <p class="text-xs text-gray-500 mt-1">
+                分支 {{ sessionDetail.working_branch || sessionDetail.base_branch }} · {{ formatDateTime(sessionDetail.updated_at) }}
+              </p>
             </div>
-          </template>
+            <UButton
+              icon="i-lucide-settings-2"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              :to="runtimeSettingsPath"
+            >
+              去设置页
+            </UButton>
+          </div>
 
-          <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+          <div
+            ref="messageViewportRef"
+            class="flex-1 lg:min-h-0 overflow-y-auto px-4 py-4 space-y-3"
+            @scroll="onMessageViewportScroll"
+          >
             <div
               v-if="messages.length === 0"
               class="text-sm text-gray-400 py-4"
@@ -511,7 +535,7 @@ async function submitPrompt() {
               class="w-full"
             >
               <div
-                class="max-w-[85%] rounded-lg border p-3"
+                class="max-w-[86%] rounded-2xl border px-4 py-3"
                 :class="messageBubbleClass(msg)"
               >
                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
@@ -527,17 +551,17 @@ async function submitPrompt() {
                     {{ messageBranchRef(msg) }}
                   </UBadge>
                 </div>
-                <p class="text-sm whitespace-pre-wrap break-words">
+                <p class="text-sm whitespace-pre-wrap break-words leading-6">
                   {{ msg.content }}
                 </p>
               </div>
             </div>
           </div>
 
-          <div class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+          <div class="border-t border-gray-200 dark:border-gray-800 p-3 space-y-2">
             <UTextarea
               v-model="promptDraft"
-              :rows="4"
+              :rows="3"
               placeholder="输入消息..."
               class="w-full"
               :disabled="!canChatInSession"
@@ -562,8 +586,8 @@ async function submitPrompt() {
               </div>
             </div>
           </div>
-        </UCard>
-      </div>
+        </template>
+      </section>
     </div>
 
     <UModal v-model:open="showCreateModal">
