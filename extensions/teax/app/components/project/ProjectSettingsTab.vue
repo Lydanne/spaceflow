@@ -22,6 +22,7 @@ interface RepoRuntimeSummary {
   root_dir: string;
   repo_root_path: string;
   sessions_root_dir: string;
+  opencode_start_command: string | null;
   runtime: {
     id: string;
     status: string;
@@ -437,6 +438,9 @@ async function deleteProject() {
       </div>
       <p class="text-xs text-gray-500 mt-3">
         会话目录根路径：{{ runtimeSummary?.sessions_root_dir || "-" }}
+      </p>
+      <p class="text-xs text-gray-500 mt-1">
+        Opencode 默认启动命令：{{ runtimeSummary?.opencode_start_command || "自动回退（opencode serve/server）" }}
       </p>
     </UCard>
 

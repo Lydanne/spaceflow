@@ -2172,6 +2172,7 @@ export async function getRepoRuntimeSummary(params: {
     root_dir: runtimeConfig.rootDir,
     repo_root_path: "",
     sessions_root_dir: runtimeConfig.sessionsRootDir,
+    opencode_start_command: runtimeConfig.opencodeStartCommand || null,
     runtime: runtime || null,
     runtime_status: runtimeStatus,
     active_session_count: toNumber(activeSessionCountRow?.count),
