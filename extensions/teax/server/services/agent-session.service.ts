@@ -31,6 +31,29 @@ function toNumber(value: unknown): number {
   return Number(value ?? 0);
 }
 
+function resolveSessionBranchRef(session: {
+  base_branch?: string | null;
+  working_branch?: string | null;
+}) {
+  const branchRef = String(session.working_branch || session.base_branch || "").trim();
+  return branchRef || null;
+}
+
+function withBranchRefMetadata(
+  metadata: unknown,
+  branchRef: string | null,
+): Record<string, unknown> {
+  const metadataObject = (metadata && typeof metadata === "object")
+    ? { ...(metadata as Record<string, unknown>) }
+    : {};
+
+  if (branchRef) {
+    metadataObject.branch_ref = branchRef;
+  }
+
+  return metadataObject;
+}
+
 function isUniqueViolation(error: unknown): boolean {
   const err = error as { code?: string; cause?: { code?: string } };
   return err?.code === "23505" || err?.cause?.code === "23505";
@@ -594,6 +617,7 @@ export async function listAgentSessionMessages(params: {
   const db = useDB();
   const session = await ensureSessionReadable(params.sessionId, params.repositoryId, params.actor);
   const offset = (params.page - 1) * params.limit;
+  const branchRef = resolveSessionBranchRef(session);
 
   const opencodeSessionId = String(session.opencode_session_id || "").trim();
   if (opencodeSessionId) {
@@ -633,7 +657,7 @@ export async function listAgentSessionMessages(params: {
         actor_id: message.actor_id,
         message_type: message.message_type,
         content: message.content,
-        metadata: message.metadata,
+        metadata: withBranchRefMetadata(message.metadata, branchRef),
         pinned: dbMessageBySeq.get(message.seq)?.pinned ?? false,
         pinned_by: dbMessageBySeq.get(message.seq)?.pinned_by ?? null,
         pinned_at: dbMessageBySeq.get(message.seq)?.pinned_at ?? null,
@@ -673,7 +697,10 @@ export async function listAgentSessionMessages(params: {
   const total = toNumber(totalRow?.count);
 
   return {
-    data: messages,
+    data: messages.map((message) => ({
+      ...message,
+      metadata: withBranchRefMetadata(message.metadata, branchRef),
+    })),
     total,
     page: params.page,
     limit: params.limit,
@@ -690,6 +717,9 @@ export async function createAgentSessionMessage(params: {
 }) {
   const db = useDB();
   const session = await ensureSessionChatAllowed(params.sessionId, params.repositoryId, params.actor);
+  const branchRef = resolveSessionBranchRef(session)
+    || String(params.metadata.branch_ref || "").trim()
+    || null;
 
   try {
     const opencode = await promptAgentSessionOpencode({
@@ -721,6 +751,7 @@ export async function createAgentSessionMessage(params: {
       content: params.content,
       metadata: {
         ...params.metadata,
+        branch_ref: branchRef,
         source: "opencode_server",
         opencode_session_id: opencode.opencode_session_id,
         server_hostname: opencode.server_hostname,
@@ -744,6 +775,7 @@ export async function createAgentSessionMessage(params: {
         seq: null,
         message_type: responseMessage.message_type,
         source: "opencode_server",
+        branch_ref: branchRef,
       },
     });
 
@@ -758,6 +790,7 @@ export async function createAgentSessionMessage(params: {
           seq: null,
           message_type: "agent_reply",
           source: "opencode_server",
+          branch_ref: branchRef,
         },
       });
     }
@@ -952,6 +985,7 @@ export async function pinAgentSessionMessage(params: {
                   ...matched.metadata,
                   source: "opencode_server",
                   opencode_message_id: matched.id,
+                  branch_ref: resolveSessionBranchRef(session),
                 },
               })
               .onConflictDoNothing({

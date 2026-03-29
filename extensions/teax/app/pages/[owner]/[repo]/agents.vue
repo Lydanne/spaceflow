@@ -281,6 +281,16 @@ function containerSessionPath(sessionId: string): string {
   return `/runtime/sessions/${sessionId}`;
 }
 
+function messageBranchRef(message: AgentSessionMessage): string | null {
+  const metadata = message.metadata && typeof message.metadata === "object"
+    ? (message.metadata as Record<string, unknown>)
+    : {};
+  const fromMetadata = String(metadata.branch_ref || "").trim();
+  if (fromMetadata) return fromMetadata;
+  const fallback = sessionDetail.value?.working_branch || sessionDetail.value?.base_branch || "";
+  return fallback.trim() || null;
+}
+
 function sessionTitle(session: AgentSessionSummary | AgentSessionDetail): string {
   return session.title?.trim() || `会话 ${shortId(session.id)}`;
 }
@@ -1032,6 +1042,14 @@ async function updateParticipantPermission(item: AgentSessionParticipant) {
                     size="xs"
                   >
                     {{ msg.message_type }}
+                  </UBadge>
+                  <UBadge
+                    v-if="messageBranchRef(msg)"
+                    color="info"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    {{ messageBranchRef(msg) }}
                   </UBadge>
                   <span>#{{ msg.seq }}</span>
                   <span class="text-gray-300">·</span>
