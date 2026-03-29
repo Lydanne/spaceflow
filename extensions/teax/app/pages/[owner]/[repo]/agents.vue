@@ -389,8 +389,8 @@ async function submitPrompt() {
       </div>
     </div>
 
-    <div class="flex flex-col lg:flex-row gap-3">
-      <aside class="lg:w-72 xl:w-80 lg:shrink-0">
+    <div class="agents-layout gap-3">
+      <aside class="agents-sidebar min-w-0">
         <UCard :ui="{ body: 'p-0' }">
         <template #header>
           <div class="flex items-center justify-between gap-2">
@@ -406,7 +406,7 @@ async function submitPrompt() {
           </div>
         </template>
 
-        <div class="p-2 space-y-2 h-[16rem] lg:h-[calc(100dvh-20rem)] min-h-[14rem] overflow-y-auto">
+        <div class="p-2 space-y-2 h-[calc(100dvh-18rem)] min-h-[14rem] overflow-y-auto">
           <div
             v-if="sessionListPending && sessions.length === 0"
             class="py-10 text-center text-muted text-sm"
@@ -460,11 +460,11 @@ async function submitPrompt() {
         </UCard>
       </aside>
 
-      <section class="min-w-0 flex-1">
+      <section class="agents-chat min-w-0">
         <UCard :ui="{ body: 'p-0' }">
         <div
           v-if="!selectedSessionId"
-          class="h-[20rem] lg:h-[calc(100dvh-20rem)] min-h-[16rem] flex items-center justify-center text-muted"
+          class="h-[calc(100dvh-18rem)] min-h-[16rem] flex items-center justify-center text-muted"
         >
           <div class="text-center">
             <UIcon
@@ -477,7 +477,7 @@ async function submitPrompt() {
 
         <div
           v-else-if="sessionContextPending"
-          class="h-[20rem] lg:h-[calc(100dvh-20rem)] min-h-[16rem] flex items-center justify-center text-muted"
+          class="h-[calc(100dvh-18rem)] min-h-[16rem] flex items-center justify-center text-muted"
         >
           <div class="text-center">
             <UIcon
@@ -490,7 +490,7 @@ async function submitPrompt() {
 
         <div
           v-else-if="sessionContextError"
-          class="h-[20rem] lg:h-[calc(100dvh-20rem)] min-h-[16rem] flex items-center justify-center text-red-500 px-6"
+          class="h-[calc(100dvh-18rem)] min-h-[16rem] flex items-center justify-center text-red-500 px-6"
         >
           <div class="text-center">
             <UIcon
@@ -533,7 +533,7 @@ async function submitPrompt() {
 
           <div
             ref="messageViewportRef"
-            class="h-[18rem] lg:h-[calc(100dvh-24rem)] min-h-[14rem] overflow-y-auto px-3 py-3 space-y-2.5"
+            class="h-[calc(100dvh-22rem)] min-h-[14rem] overflow-y-auto px-3 py-3 space-y-2.5"
             @scroll="onMessageViewportScroll"
           >
             <div
@@ -651,3 +651,22 @@ async function submitPrompt() {
     </UModal>
   </div>
 </template>
+
+<style scoped>
+.agents-layout {
+  display: grid;
+  grid-template-columns: 18rem minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.agents-sidebar,
+.agents-chat {
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .agents-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+</style>
