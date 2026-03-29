@@ -174,14 +174,22 @@ function messageBranchRef(message: AgentSessionMessage): string | null {
   return fallback.trim() || null;
 }
 
+function isUserMessage(message: AgentSessionMessage): boolean {
+  return message.actor_type === "user";
+}
+
+function messageRowClass(message: AgentSessionMessage): string {
+  return isUserMessage(message) ? "flex justify-end" : "flex justify-start";
+}
+
 function messageBubbleClass(message: AgentSessionMessage): string {
   if (message.actor_type === "user") {
-    return "ml-auto bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800";
+    return "bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800";
   }
   if (message.actor_type === "agent") {
-    return "mr-auto bg-gray-50 dark:bg-gray-900/40 border-gray-200 dark:border-gray-700";
+    return "bg-gray-50 dark:bg-gray-900/40 border-gray-200 dark:border-gray-700";
   }
-  return "mr-auto bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800";
+  return "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800";
 }
 
 function messageActorLabel(message: AgentSessionMessage): string {
@@ -343,14 +351,14 @@ async function submitPrompt() {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="flex items-center justify-between">
+  <div class="flex flex-col gap-3">
+    <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 dark:border-gray-800 px-4 py-3 bg-white dark:bg-gray-950/40">
       <div>
-        <h2 class="text-lg font-semibold">
+        <h2 class="text-base font-semibold">
           Agents
         </h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          会话式聊天工作台。Runtime、权限和运维状态统一在设置页管理。
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          简洁聊天视图。复杂状态统一在设置页管理。
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -381,8 +389,8 @@ async function submitPrompt() {
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-4 lg:h-[calc(100vh-14rem)] lg:min-h-[640px]">
-      <aside class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950/40 flex flex-col lg:min-h-0">
+    <div class="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-3 lg:h-[calc(100dvh-13rem)] lg:min-h-[620px]">
+      <aside class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950/40 flex flex-col overflow-hidden lg:min-h-0">
         <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
           <h3 class="text-sm font-semibold">
             会话
@@ -395,7 +403,7 @@ async function submitPrompt() {
           </UBadge>
         </div>
 
-        <div class="p-3 flex-1 lg:min-h-0 lg:overflow-y-auto space-y-2">
+        <div class="p-2.5 flex-1 lg:min-h-0 lg:overflow-y-auto space-y-2">
           <div
             v-if="sessionListPending && sessions.length === 0"
             class="py-10 text-center text-gray-400"
@@ -422,7 +430,7 @@ async function submitPrompt() {
             v-for="item in sessions"
             :key="item.id"
             type="button"
-            class="w-full text-left rounded-lg border p-3 transition-colors"
+            class="w-full text-left rounded-lg border px-3 py-2.5 transition-colors"
             :class="[
               selectedSessionId === item.id
                 ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-900/20'
@@ -448,7 +456,7 @@ async function submitPrompt() {
         </div>
       </aside>
 
-      <section class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950/40 flex flex-col lg:min-h-0">
+      <section class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950/40 flex flex-col overflow-hidden lg:min-h-0">
         <div
           v-if="!selectedSessionId"
           class="flex-1 flex items-center justify-center text-gray-400"
@@ -498,7 +506,7 @@ async function submitPrompt() {
         </div>
 
         <template v-else-if="sessionDetail">
-          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-center justify-between gap-2">
+          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-center justify-between gap-2 bg-gray-50/60 dark:bg-gray-900/20">
             <div>
               <h3 class="text-base font-semibold">
                 {{ sessionTitle(sessionDetail) }}
@@ -533,9 +541,10 @@ async function submitPrompt() {
               v-for="msg in messages"
               :key="msg.id"
               class="w-full"
+              :class="messageRowClass(msg)"
             >
               <div
-                class="max-w-[86%] rounded-2xl border px-4 py-3"
+                class="max-w-[86%] rounded-2xl border px-4 py-3 shadow-sm"
                 :class="messageBubbleClass(msg)"
               >
                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
@@ -558,7 +567,7 @@ async function submitPrompt() {
             </div>
           </div>
 
-          <div class="border-t border-gray-200 dark:border-gray-800 p-3 space-y-2">
+          <div class="border-t border-gray-200 dark:border-gray-800 p-3 bg-white/80 dark:bg-gray-950/60 space-y-2">
             <UTextarea
               v-model="promptDraft"
               :rows="3"
@@ -573,7 +582,7 @@ async function submitPrompt() {
               >
                 你当前没有发言权限，请在设置页调整权限
               </p>
-              <div class="ml-auto">
+              <div class="ml-auto flex items-center gap-2">
                 <UButton
                   icon="i-lucide-send"
                   color="primary"
