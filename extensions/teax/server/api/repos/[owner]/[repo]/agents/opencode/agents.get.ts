@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { parse as parseYaml } from "yaml";
 import { schema, useDB } from "~~/server/db";
+import { ensureAgentRuntimeGlobalsDefaults } from "~~/server/services/agent-runtime-globals.service";
 import { type GiteaRepoContent, type GiteaService, useGiteaSdk } from "~~/server/utils/gitea";
 import { requirePermission } from "~~/server/utils/permission";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
@@ -79,25 +80,9 @@ async function listProjectOpencodeAgents(params: {
   return options;
 }
 
-function resolveGlobalAgentsDir(): string {
-  const explicit = String(process.env.OPENCODE_AGENTS_DIR || "").trim();
-  if (explicit) return explicit;
-
-  const xdgConfigHome = String(process.env.XDG_CONFIG_HOME || "").trim();
-  if (xdgConfigHome) {
-    return join(xdgConfigHome, "opencode", "agents");
-  }
-
-  const home = String(process.env.HOME || "").trim();
-  if (home) {
-    return join(home, ".config", "opencode", "agents");
-  }
-
-  return join(process.cwd(), ".config", "opencode", "agents");
-}
-
 async function listGlobalOpencodeAgents(): Promise<{ dir: string; options: OpencodeAgentOption[] }> {
-  const dir = resolveGlobalAgentsDir();
+  const globals = await ensureAgentRuntimeGlobalsDefaults();
+  const dir = globals.opencodeAgentsDir;
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
   const files = entries
     .filter((entry) => entry.isFile() && /\.md$/i.test(entry.name))
@@ -151,7 +136,7 @@ export default defineEventHandler(async (event) => {
       ref: branch,
       gitea,
     }).catch(() => []),
-    listGlobalOpencodeAgents().catch(() => ({ dir: resolveGlobalAgentsDir(), options: [] })),
+    listGlobalOpencodeAgents().catch(() => ({ dir: "", options: [] })),
   ]);
 
   // 项目级优先；同名 agent 仅展示一个。

@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, posix, resolve } from "node:path";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { schema, useDB } from "~~/server/db";
 import { resolveAgentMetaRepoConfig } from "~~/server/services/agent-meta-config.service";
+import { ensureAgentRuntimeGlobalsDefaults } from "~~/server/services/agent-runtime-globals.service";
 
 const repoLocks = new Map<string, Promise<void>>();
 const AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG = "teax-agent-runtime:base";
@@ -82,7 +83,9 @@ interface DockerRuntimeEnsureResult {
   baseDockerfilePath: string;
   dockerfilePath: string;
   buildContext: string;
-  dockerfileSource: "projects" | "globals" | "generated";
+  dockerfileSource: "globals";
+  globalOpencodeDirPath: string;
+  containerGlobalOpencodeDirPath: string;
 }
 
 interface RepositorySnapshot {
@@ -163,7 +166,9 @@ interface AgentRuntimeDockerMetadata {
   image_tag: string;
   dockerfile_path: string;
   build_context: string;
-  dockerfile_source: "projects" | "globals" | "generated";
+  dockerfile_source: "globals";
+  global_opencode_dir_path: string;
+  container_global_opencode_dir_path: string;
 }
 
 /**
@@ -744,27 +749,6 @@ async function inspectDockerContainer(containerName: string) {
   }
 }
 
-function rewriteDockerfileToUseBaseImage(content: string) {
-  const lines = content.split(/\r?\n/);
-  let replaced = false;
-  const rewritten = lines.map((line) => {
-    if (replaced) {
-      return line;
-    }
-    const fromMatch = line.match(/^\s*FROM\s+\S+(\s+AS\s+\S+)?\s*$/i);
-    if (!fromMatch) {
-      return line;
-    }
-    replaced = true;
-    const stageAlias = fromMatch[1] || "";
-    return `FROM ${AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG}${stageAlias}`;
-  });
-
-  return replaced
-    ? rewritten.join("\n")
-    : `FROM ${AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG}\n${rewritten.join("\n")}`;
-}
-
 async function ensureDockerBaseBuildSpec() {
   const runtimeConfig = resolveRuntimeConfig();
   if (runtimeConfig.dockerBaseDockerfilePath) {
@@ -833,57 +817,17 @@ async function ensureDockerBaseBuildSpec() {
   };
 }
 
-async function ensureRepoDockerfileAndContext(params: {
-  repository: RepositorySnapshot;
-}) {
-  const runtimeConfig = resolveRuntimeConfig();
-  const generatedContext = join(runtimeConfig.rootDir, "docker-build", params.repository.id);
-  const generatedDockerfile = join(generatedContext, "Dockerfile.repo");
-  await mkdir(generatedContext, { recursive: true });
-
-  const repoSegments = params.repository.full_name.split("/").map((item) => item.trim()).filter(Boolean);
-  const dockerfileCandidates: Array<{ source: "projects" | "globals"; path: string }> = [
-    {
-      source: "projects",
-      path: join(runtimeConfig.rootDir, ".teax", "projects", ...repoSegments, "Dockerfile"),
-    },
-    {
-      source: "globals",
-      path: join(runtimeConfig.rootDir, ".teax", "globals", "Dockerfile"),
-    },
-  ];
-
-  for (const candidate of dockerfileCandidates) {
-    if (!await pathExists(candidate.path)) {
-      continue;
-    }
-    const rawDockerfile = await readFile(candidate.path, "utf8");
-    const rewrittenDockerfile = rewriteDockerfileToUseBaseImage(rawDockerfile);
-    await writeFile(generatedDockerfile, rewrittenDockerfile);
-    return {
-      dockerfilePath: generatedDockerfile,
-      sourceDockerfilePath: candidate.path,
-      buildContext: resolve(dirname(candidate.path)),
-      dockerfileSource: candidate.source,
-      generated: true,
-    };
-  }
-
-  await writeFile(
-    generatedDockerfile,
-    [
-      `FROM ${AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG}`,
-      "WORKDIR /runtime",
-      "CMD [\"sleep\", \"infinity\"]",
-      "",
-    ].join("\n"),
-  );
+async function ensureRepoDockerfileAndContext() {
+  const globals = await ensureAgentRuntimeGlobalsDefaults();
   return {
-    dockerfilePath: generatedDockerfile,
-    sourceDockerfilePath: generatedDockerfile,
-    buildContext: generatedContext,
-    dockerfileSource: "generated" as const,
-    generated: true,
+    dockerfilePath: globals.globalsDockerfilePath,
+    sourceDockerfilePath: globals.globalsDockerfilePath,
+    buildContext: globals.globalsDir,
+    dockerfileSource: "globals" as const,
+    generated: false,
+    globalOpencodeDirPath: globals.opencodeDir,
+    containerGlobalOpencodeDirPath: globals.containerRootConfigDir,
+    containerNodeGlobalOpencodeDirPath: globals.containerNodeConfigDir,
   };
 }
 
@@ -892,12 +836,13 @@ async function ensureDockerRuntimeContainer(params: {
   runtimeKey: string;
 }): Promise<DockerRuntimeEnsureResult> {
   const runtimeConfig = resolveRuntimeConfig();
-  const metaRepoLocalPath = join(runtimeConfig.rootDir, ".teax");
+  const globals = await ensureAgentRuntimeGlobalsDefaults();
+  const metaRepoLocalPath = globals.teaxDir;
   const imageTag = `teax-agent-runtime:${toDockerSafeSegment(`${params.repository.full_name}-${params.repository.id.slice(0, 8)}`)}`;
   const containerName = params.runtimeKey;
   const containerSessionsRoot = posix.join(runtimeConfig.dockerWorkspaceRoot, "sessions");
   // 容器内元数据挂载点：${AGENT_RUNTIME_ROOT}/.teax
-  const containerMetaRepoRoot = posix.join(runtimeConfig.dockerWorkspaceRoot, ".teax");
+  const containerMetaRepoRoot = globals.containerTeaxDir;
   logRuntimeStep("runtime bootstrap begin", {
     repository_id: params.repository.id,
     repository_full_name: params.repository.full_name,
@@ -907,8 +852,6 @@ async function ensureDockerRuntimeContainer(params: {
 
   await mkdir(runtimeConfig.sessionsRootDir, { recursive: true });
   await mkdir(metaRepoLocalPath, { recursive: true });
-  await mkdir(join(metaRepoLocalPath, "projects"), { recursive: true });
-  await mkdir(join(metaRepoLocalPath, "globals"), { recursive: true });
 
   const existing = await inspectDockerContainer(containerName);
   if (existing?.running) {
@@ -917,9 +860,7 @@ async function ensureDockerRuntimeContainer(params: {
       container_id: existing.containerId,
       image_tag: existing.imageTag || imageTag,
     });
-    const repoBuildSpec = await ensureRepoDockerfileAndContext({
-      repository: params.repository,
-    });
+    const repoBuildSpec = await ensureRepoDockerfileAndContext();
     return {
       containerName,
       containerId: existing.containerId,
@@ -929,6 +870,8 @@ async function ensureDockerRuntimeContainer(params: {
       dockerfilePath: repoBuildSpec.sourceDockerfilePath,
       buildContext: repoBuildSpec.buildContext,
       dockerfileSource: repoBuildSpec.dockerfileSource,
+      globalOpencodeDirPath: repoBuildSpec.globalOpencodeDirPath,
+      containerGlobalOpencodeDirPath: repoBuildSpec.containerGlobalOpencodeDirPath,
     };
   }
 
@@ -936,9 +879,7 @@ async function ensureDockerRuntimeContainer(params: {
     logRuntimeStep("runtime bootstrap start existing stopped container", {
       container_name: containerName,
     });
-    const repoBuildSpec = await ensureRepoDockerfileAndContext({
-      repository: params.repository,
-    });
+    const repoBuildSpec = await ensureRepoDockerfileAndContext();
     await runDocker(["start", containerName]);
     const started = await inspectDockerContainer(containerName);
     if (!started?.running) {
@@ -953,13 +894,13 @@ async function ensureDockerRuntimeContainer(params: {
       dockerfilePath: repoBuildSpec.sourceDockerfilePath,
       buildContext: repoBuildSpec.buildContext,
       dockerfileSource: repoBuildSpec.dockerfileSource,
+      globalOpencodeDirPath: repoBuildSpec.globalOpencodeDirPath,
+      containerGlobalOpencodeDirPath: repoBuildSpec.containerGlobalOpencodeDirPath,
     };
   }
 
   const baseBuildSpec = await ensureDockerBaseBuildSpec();
-  const repoBuildSpec = await ensureRepoDockerfileAndContext({
-    repository: params.repository,
-  });
+  const repoBuildSpec = await ensureRepoDockerfileAndContext();
 
   if (runtimeConfig.dockerBuildOnStart || !existing) {
     // 第一步：先构建基础镜像。
@@ -1007,6 +948,7 @@ async function ensureDockerRuntimeContainer(params: {
     image_tag: imageTag,
     mount_session_root: runtimeConfig.sessionsRootDir,
     mount_meta_repo: metaRepoLocalPath,
+    mount_global_opencode: repoBuildSpec.globalOpencodeDirPath,
     workspace_root: runtimeConfig.dockerWorkspaceRoot,
   });
   await runDocker([
@@ -1024,12 +966,20 @@ async function ensureDockerRuntimeContainer(params: {
     `${runtimeConfig.sessionsRootDir}:${containerSessionsRoot}`,
     "-v",
     `${metaRepoLocalPath}:${containerMetaRepoRoot}`,
+    "-v",
+    `${repoBuildSpec.globalOpencodeDirPath}:${repoBuildSpec.containerGlobalOpencodeDirPath}`,
+    "-v",
+    `${repoBuildSpec.globalOpencodeDirPath}:${repoBuildSpec.containerNodeGlobalOpencodeDirPath}`,
     "-w",
     runtimeConfig.dockerWorkspaceRoot,
     "-e",
     `AGENT_RUNTIME_ROOT=${runtimeConfig.dockerWorkspaceRoot}`,
     "-e",
     `AGENT_META_REPO_DIR=${containerMetaRepoRoot}`,
+    "-e",
+    "XDG_CONFIG_HOME=/root/.config",
+    "-e",
+    `OPENCODE_CONFIG_DIR=${repoBuildSpec.containerGlobalOpencodeDirPath}`,
     "-e",
     `TEAX_REPOSITORY_ID=${params.repository.id}`,
     "-e",
@@ -1058,6 +1008,8 @@ async function ensureDockerRuntimeContainer(params: {
     dockerfilePath: repoBuildSpec.sourceDockerfilePath,
     buildContext: repoBuildSpec.buildContext,
     dockerfileSource: repoBuildSpec.dockerfileSource,
+    globalOpencodeDirPath: repoBuildSpec.globalOpencodeDirPath,
+    containerGlobalOpencodeDirPath: repoBuildSpec.containerGlobalOpencodeDirPath,
   };
 }
 
@@ -1922,6 +1874,8 @@ export async function ensureRepoRuntime(params: {
       dockerfile_path: dockerRuntime.dockerfilePath,
       build_context: dockerRuntime.buildContext,
       dockerfile_source: dockerRuntime.dockerfileSource,
+      global_opencode_dir_path: dockerRuntime.globalOpencodeDirPath,
+      container_global_opencode_dir_path: dockerRuntime.containerGlobalOpencodeDirPath,
     };
     metadata = {
       ...metadata,
@@ -2274,6 +2228,7 @@ export async function getRepoRuntimeSummary(params: {
 }) {
   const db = useDB();
   const runtimeConfig = resolveRuntimeConfig();
+  const globals = await ensureAgentRuntimeGlobalsDefaults();
   const repository = await getRepositoryById(params.repositoryId);
   const [runtime] = await db
     .select()
@@ -2321,6 +2276,10 @@ export async function getRepoRuntimeSummary(params: {
     root_dir: runtimeConfig.rootDir,
     repo_root_path: "",
     sessions_root_dir: runtimeConfig.sessionsRootDir,
+    globals_dir: globals.globalsDir,
+    globals_dockerfile_path: globals.globalsDockerfilePath,
+    globals_opencode_dir: globals.opencodeDir,
+    container_globals_opencode_dir: globals.containerRootConfigDir,
     opencode_start_command: runtimeConfig.opencodeStartCommand || null,
     runtime: runtime || null,
     runtime_status: runtimeStatus,

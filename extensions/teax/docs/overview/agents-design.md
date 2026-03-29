@@ -40,6 +40,7 @@ Agents 以“会话（Session）+ 对话（Chat）”为中心，不再把 Runti
 - 容器启动/停止/重启
 - Runtime 健康状态与统计
 - Opencode 默认启动参数（如 `AGENT_RUNTIME_OPENCODE_START_COMMAND`）
+- Runtime Globals 配置（`globals/Dockerfile`、`globals/opencode/opencode.json`）
 
 ### 2.3 会话设置（Session Settings）
 

@@ -63,16 +63,13 @@
 启动 Runtime（`POST /runtime/start`）时：
 
 1. 构建基础镜像 `teax-agent-runtime:base`
-2. 选择 repo Dockerfile：
-   - `${AGENT_RUNTIME_ROOT}/.teax/projects/{owner}/{repo}/Dockerfile`
-   - `${AGENT_RUNTIME_ROOT}/.teax/globals/Dockerfile`
-   - 系统生成最小 Dockerfile
-3. 将首个 `FROM` 改写为 `FROM teax-agent-runtime:base`
+2. 使用全局 Dockerfile：`${AGENT_RUNTIME_ROOT}/.teax/globals/Dockerfile`
+3. 若文件不存在，系统会自动创建默认 Dockerfile
 4. 构建 repo image 并启动容器
 
 当 `AGENT_RUNTIME_DOCKER_BUILD_ON_START=false` 且容器已存在（停止态）时，优先直接 `docker start`。
 
-补充：`.teax` 仅作为本地配置来源参与构建，不进入会话分支提交流程。
+补充：`.teax` 仅作为本地配置来源参与构建，不进入会话分支提交流程。`projects` 目录当前不参与 Runtime 构建选择。
 
 ### 3.3 挂载
 
@@ -80,6 +77,8 @@
 
 - `${AGENT_RUNTIME_ROOT}/sessions` -> `/runtime/sessions`
 - `${AGENT_RUNTIME_ROOT}/.teax` -> `/runtime/.teax`
+- `${AGENT_RUNTIME_ROOT}/.teax/globals/opencode` -> `/root/.config/opencode`
+- `${AGENT_RUNTIME_ROOT}/.teax/globals/opencode` -> `/home/node/.config/opencode`
 
 ## 4. Session 与目录生命周期
 
@@ -153,6 +152,11 @@ failed/stopped --retry--> created
 - `POST /runtime/start`（`agent:start`）
 - `POST /runtime/stop`（`agent:stop`，body: `{ force?: boolean }`）
 - `GET /opencode/agents`（`agent:create`，扫描项目/全局 Agent 候选）
+
+系统设置（管理员）新增：
+
+- `GET /api/admin/agent-runtime/globals`（读取 globals Dockerfile 与 opencode.json）
+- `PATCH /api/admin/agent-runtime/globals`（更新 globals Dockerfile 与 opencode.json）
 
 建议入口：这些 Runtime 级操作统一放在 `/:owner/:repo/settings` 的 Agents Runtime 设置区。
 

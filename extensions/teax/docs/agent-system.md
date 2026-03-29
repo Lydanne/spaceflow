@@ -50,11 +50,10 @@ Docker Runtime（每仓库一个容器）
    - `${AGENT_RUNTIME_ROOT}/sessions`
    - `${AGENT_RUNTIME_ROOT}/.teax`
 3. 构建基础镜像（固定 tag：`teax-agent-runtime:base`）
-4. 选择 repo Dockerfile 来源（优先级）：
-   - `${AGENT_RUNTIME_ROOT}/.teax/projects/{owner}/{repo}/Dockerfile`
-   - `${AGENT_RUNTIME_ROOT}/.teax/globals/Dockerfile`
-   - 生成最小 Dockerfile
-5. 将 repo Dockerfile 的首个 `FROM` 强制改写为 `FROM teax-agent-runtime:base`
+4. 使用全局 Dockerfile：`${AGENT_RUNTIME_ROOT}/.teax/globals/Dockerfile`（不存在时自动创建默认值）
+5. 容器启动时映射全局 opencode 目录：
+   - `${AGENT_RUNTIME_ROOT}/.teax/globals/opencode` -> `/root/.config/opencode`
+   - `${AGENT_RUNTIME_ROOT}/.teax/globals/opencode` -> `/home/node/.config/opencode`
 6. 启动/复用容器（容器名：`teax-agent-repo-{repoId8}`）
 7. 写回 `agent_runtimes`（状态、metadata、docker 信息）
 
