@@ -10,11 +10,11 @@
 
 - 每个仓库有且仅有一个 OpenCode Runtime 容器
 - 每个 Runtime 容器仅运行一个 OpenCode 服务实例
-- 每个会话都通过 `git worktree` 创建独立任务目录
+- 每个会话都在 `sessions/{sessionId}` 目录中独立执行（基于 `git clone/checkout`）
 - 会话默认公开（`public`），可创建用户私有会话（`private`）
 - 会话支持人工接管（Web IDE / VSCode Remote）
 - 系统启动后默认拉起一个系统级 Agent，用于跨仓库任务
-- Runtime 基础镜像内置 Node.js 24、vscode-server、无头浏览器等基础工具链
+- Runtime 基础镜像内置 Node.js 24、OpenCode CLI、无头浏览器等基础工具链
 - 支持后续动态扩展工具链，并生成新 Dockerfile 覆盖当前 Runtime 镜像
 - Runtime 配置与状态由 Gitea 元数据仓库托管，资源手动接入并自动提交
 - OpenCode 配置、MCP、skills、rules 采用双层主模型：全局层 + 资源层（项目/仓库）
@@ -34,7 +34,7 @@
 
 - 绑定一个仓库
 - 在该仓库 Runtime 内执行
-- 每个会话独立 worktree
+- 每个会话独立目录
 
 ### 2.2 System Agent（系统级）
 
@@ -60,7 +60,7 @@
 Agent Control Plane
     ├── Session API（创建/停止/事件流/权限）
     ├── Runtime Manager（system + repo runtime 生命周期）
-    ├── Worktree Manager（分支与目录隔离）
+    ├── Session Workspace Manager（分支与目录隔离）
     ├── Orchestrator（系统级跨仓库编排）
     └── Audit & Policy（审计、配额、策略）
             │

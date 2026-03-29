@@ -1,15 +1,15 @@
 # Agents Runtime 使用与配置指南（P1）
 
-> 适用版本：Phase 1（Repo Runtime + Repo Session + Worktree 生命周期）
+> 适用版本：Phase 1（Repo Runtime + Repo Session + Session 目录生命周期）
 
 ## 1. 目标与范围
 
 本文档用于说明当前已落地的 Agents P1 能力如何配置和使用，覆盖：
 
 - 仓库级 Runtime 生命周期（查询 / 启动 / 停止）
-- 会话创建后自动准备 worktree（`created -> preparing -> running`）
-- 会话停止时回收 worktree、会话重试时重建 worktree
-- 会话详情中的 runtime/worktree 状态展示
+- 会话创建后自动准备 session 工作目录（`created -> preparing -> running`）
+- 会话停止时回收 session 目录、会话重试时重建 session 目录
+- 会话详情中的 runtime/worktree 状态展示（字段名沿用 worktree）
 
 不包含（Phase 2+）：
 
@@ -31,7 +31,7 @@
 | `AGENT_RUNTIME_DOCKER_BASE_BUILD_CONTEXT` | `.` | 基础镜像 build context |
 | `AGENT_RUNTIME_DOCKER_BUILD_ON_START` | `true` | 启动仓库 runtime 时是否自动 `docker build` |
 | `AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT` | `/runtime` | 容器内挂载工作根目录 |
-| `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP` | `false` | 停止会话时是否保留 worktree 目录 |
+| `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP` | `false` | 停止会话时是否保留 session 目录（兼容历史命名） |
 
 #### 参数详解
 
@@ -42,7 +42,7 @@
 - 生效范围：全局
 - 行为说明：
   - 作为 runtime 根目录，会生成：
-    - `sessions/`（会话 worktree 目录）
+    - `sessions/`（会话工作目录）
     - `docker-build/`（构建中间产物与生成 Dockerfile）
   - 若配置为相对路径，会按服务进程当前工作目录解析为绝对路径
 - 推荐：
@@ -136,7 +136,7 @@
 - 默认值：`false`
 - 生效范围：`docker` 模式
 - 行为说明：
-  - `false`：停止会话时清理 worktree 目录，并将记录标记为 `removed`
+  - `false`：停止会话时清理 session 目录，并将记录标记为 `removed`
   - `true`：停止会话时保留目录，便于排查/复盘
 - 推荐：
   - 生产默认 `false`
@@ -169,7 +169,7 @@ pnpm dev
   1. 先基于 `AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE` 构建固定基础镜像 `teax-agent-runtime:base`
   2. 再使用 `.teax` 仓库中的 Dockerfile 构建 repo image（首个 `FROM` 会改写为 `FROM teax-agent-runtime:base`）
   3. 最后基于 repo image 启动 runtime 容器
-- 会话 worktree 通过 `docker exec git ...` 在容器中执行
+- 会话目录通过 `docker exec git clone/checkout ...` 在容器中执行
 - 宿主机仅需具备 Docker，sessions 目录与元数据目录会挂载进容器
 - 停止 runtime 时会停止并移除该仓库容器
 
@@ -196,7 +196,7 @@ pnpm dev
 .teax-agent-runtime/
 ├── .teax/                        # 元数据仓库本地目录（固定标准目录）
 └── sessions/
-    └── {sessionId}/             # 会话 worktree 目录
+    └── {sessionId}/             # 会话工作目录
 ```
 
 ## 5. 权限要求
@@ -224,7 +224,7 @@ Runtime 与 Session 相关接口权限如下：
 - `runtime_status`：`running/stopped/...`
 - `mode`：`docker`
 - `active_session_count`
-- `active_worktree_count`
+- `active_worktree_count`（兼容字段名，表示活跃会话目录数）
 
 ### 6.2 启动 Runtime
 
@@ -243,10 +243,10 @@ Runtime 与 Session 相关接口权限如下：
 
 行为：
 
-- `force=false`：若存在活跃 worktree，返回 `409`
-- `force=true`：先清理活跃 worktree，再停止 runtime
+- `force=false`：若存在活跃会话目录，返回 `409`
+- `force=true`：先清理活跃会话目录，再停止 runtime
 
-### 6.4 创建会话（自动准备 worktree）
+### 6.4 创建会话（自动准备 session 目录）
 
 - `POST /sessions`
 
@@ -254,28 +254,28 @@ Runtime 与 Session 相关接口权限如下：
 
 1. 创建会话与首条消息
 2. 写入 `session_preparing` 事件
-3. 自动准备 worktree
+3. 自动准备 session 目录
 4. 会话进入 `running`
 5. 写入 `worktree_prepared` 或 `worktree_prepare_failed`
 
-### 6.5 停止会话（自动清理 worktree）
+### 6.5 停止会话（自动清理 session 目录）
 
 - `POST /sessions/{sessionId}/stop`
 
 行为：
 
 - 会话标记为 `stopped`
-- 执行 worktree 清理
+- 执行 session 目录清理
 - 记录 `session_stopped` 事件（含是否移除 worktree）
 
-### 6.6 重试会话（重建 worktree）
+### 6.6 重试会话（重建 session 目录）
 
 - `POST /sessions/{sessionId}/retry`
 
 行为：
 
 - 仅允许 `failed/stopped` 会话
-- 先尝试清理旧 worktree
+- 先尝试清理旧 session 目录
 - 再次执行 prepare，恢复到 `running`
 
 ## 7. 会话状态流转
@@ -295,7 +295,7 @@ failed/stopped --retry--> preparing -> running
 
 仓库页面 `/:owner/:repo/agents` 已支持：
 
-- Runtime 面板：状态、模式、活跃会话/worktree 计数、启动/停止操作
+- Runtime 面板：状态、模式、活跃会话/目录计数、启动/停止操作
 - 会话列表与详情：展示 `runtime_status/worktree_status/worktree_path/worktree_error`
 - 自动刷新：消息与事件流周期刷新，Runtime 摘要定时刷新
 
@@ -303,7 +303,7 @@ failed/stopped --retry--> preparing -> running
 
 ### 9.1 停止 runtime 返回 409
 
-原因：存在活跃 worktree。
+原因：存在活跃会话目录。
 
 处理：调用 `POST /runtime/stop` 并传 `{"force": true}`。
 
@@ -330,7 +330,7 @@ failed/stopped --retry--> preparing -> running
 - 建议将 `AGENT_RUNTIME_ROOT` 指向持久化磁盘
 - 结合系统监控采集以下指标：
   - runtime 状态变化
-  - worktree 准备失败率
+  - 会话目录准备失败率
   - 强制停止次数
 
 ## 11. 变更清单（P1）

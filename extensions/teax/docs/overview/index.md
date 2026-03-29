@@ -16,7 +16,7 @@
 - `agents-design.md`
   - 仓库级/系统级 Agents 设计、元数据仓库、权限与治理
 - `agents-runtime.md`
-  - 当前 P1 已落地运行手册（Docker Runtime + worktree 生命周期）
+  - 当前 P1 已落地运行手册（Docker Runtime + Session 目录生命周期）
 
 ## 关联文档（位于 `docs/` 根目录）
 
