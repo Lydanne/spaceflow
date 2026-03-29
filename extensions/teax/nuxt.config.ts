@@ -65,6 +65,7 @@ export default defineNuxtConfig({
     agentRuntimeDockerBuildOnStart: process.env.AGENT_RUNTIME_DOCKER_BUILD_ON_START !== "false",
     agentRuntimeDockerWorkspaceRoot: process.env.AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT || "/runtime",
     agentRuntimeKeepWorktreeOnStop: process.env.AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP === "true",
+    agentRuntimeOpencodeStartCommand: process.env.AGENT_RUNTIME_OPENCODE_START_COMMAND || "",
     session: {
       password: process.env.NUXT_SESSION_PASSWORD || "",
     },

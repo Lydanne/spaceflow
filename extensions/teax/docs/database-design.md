@@ -170,52 +170,124 @@
 
 ### Agent 系统
 
-#### agent_sessions - Agent 会话表
+#### agent_runtimes - 仓库 Runtime 表
 
 ```typescript
 {
   id: uuid (PK),
+  scope: string (default: 'repo'),
   repository_id: uuid (FK -> repositories.id),
-  status: enum('running', 'completed', 'stopped', 'failed'),
-  prompt: text,
-  system_prompt: text,
-  model: string,
-  provider_id: string,
-  steps: integer (default: 0),
-  tokens_used: integer (default: 0),
-  cost: decimal (default: 0),
-  pr_url: string (nullable),
-  error_message: text (nullable),
-  started_at: timestamp,
-  completed_at: timestamp (nullable),
+  provider: string (default: 'docker'),
+  runtime_key: string (nullable),   // 例如容器名
+  status: string,                   // starting/running/stopped/failed
+  last_heartbeat_at: timestamp (nullable),
+  last_error: text (nullable),
+  metadata: jsonb,
   created_at: timestamp,
   updated_at: timestamp,
   row_creator: string
 }
 ```
 
-#### session_logs - Agent 日志表
+#### agent_sessions - Agent 会话表
+
+```typescript
+{
+  id: uuid (PK),
+  runtime_id: uuid (nullable),
+  scope: string (default: 'repo'),
+  parent_session_id: uuid (nullable),
+  title: string (nullable),
+  prompt: text (nullable),
+  base_branch: string (default: 'main'),
+  working_branch: string (nullable),
+  session_path: text (nullable),
+  visibility: enum('public', 'private'),
+  creator_id: uuid (FK -> users.id),
+  status: string,                   // created/preparing/running/failed/stopped/completed
+  opencode_session_id: string (nullable),
+  auto_commit: boolean,
+  auto_pr: boolean,
+  pr_url: text (nullable),
+  started_at: timestamp (nullable),
+  finished_at: timestamp (nullable),
+  created_at: timestamp,
+  updated_at: timestamp,
+  row_creator: string
+}
+```
+
+#### agent_session_worktrees - 会话目录生命周期表
 
 ```typescript
 {
   id: uuid (PK),
   session_id: uuid (FK -> agent_sessions.id),
-  type: enum('stdout', 'stderr', 'tool', 'reasoning', 'system'),
-  content: text,
-  timestamp: timestamp,
-  created_at: timestamp
+  repository_id: uuid (FK -> repositories.id),
+  runtime_id: uuid (FK -> agent_runtimes.id, nullable),
+  base_branch: string,
+  working_branch: string,
+  worktree_path: text,
+  status: string,                   // preparing/active/failed/removed
+  prepared_at: timestamp (nullable),
+  removed_at: timestamp (nullable),
+  last_error: text (nullable),
+  metadata: jsonb,
+  created_at: timestamp,
+  updated_at: timestamp,
+  row_creator: string
 }
 ```
 
-#### agent_secrets - Agent 密钥表
+#### agent_session_participants - 会话参与者表
 
 ```typescript
 {
   id: uuid (PK),
-  repository_id: uuid (FK -> repositories.id),
-  provider_id: string,
-  encrypted_api_key: string (AES-256-GCM 加密),
-  iv: string (初始化向量),
+  session_id: uuid (FK -> agent_sessions.id),
+  user_id: uuid (FK -> users.id),
+  role: enum('owner', 'collaborator', 'viewer'),
+  can_chat: boolean,
+  invited_by: uuid (FK -> users.id, nullable),
+  joined_at: timestamp,
+  created_at: timestamp,
+  updated_at: timestamp,
+  row_creator: string
+}
+```
+
+#### agent_session_messages - 会话消息表
+
+```typescript
+{
+  id: uuid (PK),
+  session_id: uuid (FK -> agent_sessions.id),
+  seq: integer,                     // 会话内单调递增
+  actor_type: enum('user', 'agent', 'system', 'bot'),
+  actor_id: string,
+  message_type: enum('user_prompt', 'agent_reply', 'system_note', 'tool_summary'),
+  content: text,
+  metadata: jsonb,
+  pinned: boolean,
+  pinned_by: uuid (FK -> users.id, nullable),
+  pinned_at: timestamp (nullable),
+  created_at: timestamp,
+  updated_at: timestamp,
+  row_creator: string
+}
+```
+
+#### agent_session_events - 会话事件表
+
+```typescript
+{
+  id: uuid (PK),
+  session_id: uuid (FK -> agent_sessions.id),
+  seq: integer,                     // 会话内单调递增
+  type: string,                     // 例如 session_created/message_created/worktree_prepared
+  payload: jsonb,
+  actor_type: enum('user', 'agent', 'system', 'bot'),
+  actor_id: string,
   created_at: timestamp,
   updated_at: timestamp,
   row_creator: string
@@ -322,12 +394,37 @@ CREATE INDEX idx_workspaces_repository_id ON workspaces(repository_id);
 CREATE INDEX idx_workspaces_creator_id ON workspaces(creator_id);
 CREATE INDEX idx_workspaces_name ON workspaces(name);
 
+-- agent_runtimes 表
+CREATE UNIQUE INDEX agent_runtimes_repository_unique ON agent_runtimes(repository_id);
+CREATE INDEX idx_agent_runtimes_status ON agent_runtimes(status);
+
 -- agent_sessions 表
 CREATE INDEX idx_agent_sessions_repository_id ON agent_sessions(repository_id);
+CREATE INDEX idx_agent_sessions_runtime_id ON agent_sessions(runtime_id);
+CREATE INDEX idx_agent_sessions_creator_id ON agent_sessions(creator_id);
 CREATE INDEX idx_agent_sessions_status ON agent_sessions(status);
+CREATE INDEX idx_agent_sessions_visibility ON agent_sessions(visibility);
 
--- session_logs 表
-CREATE INDEX idx_session_logs_session_id ON session_logs(session_id);
+-- agent_session_worktrees 表
+CREATE UNIQUE INDEX agent_session_worktrees_session_unique ON agent_session_worktrees(session_id);
+CREATE INDEX idx_agent_session_worktrees_repository_id ON agent_session_worktrees(repository_id);
+CREATE INDEX idx_agent_session_worktrees_runtime_id ON agent_session_worktrees(runtime_id);
+CREATE INDEX idx_agent_session_worktrees_status ON agent_session_worktrees(status);
+
+-- agent_session_participants 表
+CREATE UNIQUE INDEX agent_session_participants_session_user ON agent_session_participants(session_id, user_id);
+CREATE INDEX idx_agent_session_participants_session_id ON agent_session_participants(session_id);
+CREATE INDEX idx_agent_session_participants_user_id ON agent_session_participants(user_id);
+
+-- agent_session_messages 表
+CREATE UNIQUE INDEX agent_session_messages_session_seq ON agent_session_messages(session_id, seq);
+CREATE INDEX idx_agent_session_messages_session_id ON agent_session_messages(session_id);
+CREATE INDEX idx_agent_session_messages_actor ON agent_session_messages(actor_type, actor_id);
+
+-- agent_session_events 表
+CREATE UNIQUE INDEX agent_session_events_session_seq ON agent_session_events(session_id, seq);
+CREATE INDEX idx_agent_session_events_session_id ON agent_session_events(session_id);
+CREATE INDEX idx_agent_session_events_type ON agent_session_events(type);
 
 -- approval_requests 表
 CREATE INDEX idx_approval_requests_repository_id ON approval_requests(repository_id);
@@ -346,7 +443,9 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 users
   ├─ team_members (user_id)
   ├─ workspaces (creator_id)
-  ├─ agent_sessions (row_creator)
+  ├─ agent_sessions (creator_id)
+  ├─ agent_session_participants (user_id)
+  ├─ agent_session_messages (pinned_by)
   ├─ approval_requests (requester_id, approved_by)
   └─ audit_logs (user_id)
 
@@ -365,13 +464,21 @@ permission_groups
 
 repositories
   ├─ workspaces (repository_id)
+  ├─ agent_runtimes (repository_id)
   ├─ agent_sessions (repository_id)
-  ├─ agent_secrets (repository_id)
+  ├─ agent_session_worktrees (repository_id)
   ├─ workflow_presets (repository_id)
   └─ approval_requests (repository_id)
 
+agent_runtimes
+  ├─ agent_sessions (runtime_id)
+  └─ agent_session_worktrees (runtime_id)
+
 agent_sessions
-  └─ session_logs (session_id)
+  ├─ agent_session_worktrees (session_id)
+  ├─ agent_session_participants (session_id)
+  ├─ agent_session_messages (session_id)
+  └─ agent_session_events (session_id)
 ```
 
 ## 数据迁移

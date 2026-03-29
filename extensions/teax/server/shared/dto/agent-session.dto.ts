@@ -97,6 +97,15 @@ export const listAgentSessionEventsQuerySchema = z.object({
 export type ListAgentSessionEventsQuery = z.infer<typeof listAgentSessionEventsQuerySchema>;
 
 /**
+ * 会话级 Opencode 进程控制。
+ */
+export const controlAgentSessionOpencodeBodySchema = z.object({
+  action: z.enum(["start", "stop", "restart"]),
+});
+
+export type ControlAgentSessionOpencodeBody = z.infer<typeof controlAgentSessionOpencodeBodySchema>;
+
+/**
  * 停止仓库 runtime 请求体。
  * force=true 时会先清理活跃 worktree 再停止 runtime。
  */

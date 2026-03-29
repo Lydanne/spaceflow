@@ -1,216 +1,227 @@
-# OpenCode 集成文档
+# Agents 当前实现文档
 
-> 工作区的 AI 辅助编辑功能 - 基于 @opencode-ai/sdk
+> 更新时间：2026-03-29（基于当前仓库代码）
 
-## 概述
+## 1. 文档范围
 
-OpenCode 是工作区的 **AI 辅助编辑功能**，作为 Web VSCode 的补充编辑方式。每个工作区容器内同时运行 Web VSCode 和 OpenCode 服务，用户可以选择：
+本文描述 **已经在代码中实现** 的 Agents 能力，覆盖：
 
-- **手动编辑**：通过 Web VSCode 直接编辑代码
-- **AI 辅助编辑**：通过 OpenCode 让 AI Agent 自动编辑代码
+- 仓库级 Runtime（Docker）生命周期
+- 会话（Session）创建、重试、停止、删除
+- 会话协作（参与者、可见性、消息、事件）
+- Worktree（会话目录）准备与清理
 
-## Agent Session 概念
+不包含（尚未落地）：
 
-每个 OpenCode 运行实例对应一个 Session，由 **`@opencode-ai/sdk`** 驱动执行。Session 包含运行状态、步骤追踪、token 消耗和实时日志流。
+- System Agent / 跨仓库编排
+- Agent 自动回复（当前仅支持用户消息入库）
+- SSE 实时事件流（当前为分页查询）
 
-### Session 状态
-
-- **运行中**：open-code 正在处理 prompt，执行工具调用
-- **已完成**：open-code session 正常结束，产物（PR 等）已创建
-- **已停止**：手动停止，open-code server 已关闭
-- **失败**：LLM 调用错误、工具执行异常或超时
-
-## 整体执行流程
+## 2. 当前架构
 
 ```text
-触发（手动 / Webhook / 飞书）
-         │
-         ▼
-  AgentService.startSession()
-         │
-         ├─ 1. 克隆/更新项目仓库到隔离工作区
-         ├─ 2. 从 agent_secrets 读取 API Key（AES-256-GCM 解密）
-         ├─ 3. createOpencode({ port, config: buildOpenCodeConfig(llmConfig) })
-         ├─ 4. client.auth.set({ type: "api", key: decryptedApiKey })
-         ├─ 5. client.session.create({ title: "teax-{sessionId}" })
-         ├─ 6. client.session.prompt({ noReply:true, parts:[systemPrompt] })
-         ├─ 7. client.session.prompt({ model, parts:[userPrompt] })  ← 流式消费
-         │        │
-         │        ├─ text        → session_logs(stdout)  + WebSocket push
-         │        ├─ tool_use    → session_logs(tool)    + WebSocket push
-         │        ├─ reasoning   → session_logs(reasoning)
-         │        ├─ step_start  → session_logs(system) + 更新 AgentSession.steps
-         │        └─ step_finish → 累加 tokens_used / cost
-         │
-         ├─ 8. [可选] git add . && git commit && Gitea API 创建 PR
-         │        └─ 写入 AgentSession.pr_url
-         └─ 9. 清理：client.session.delete + cleanup opencode server + 删除工作区
+用户 / 前端
+   ↓
+/api/repos/{owner}/{repo}/agents/*
+   ↓
+Agent Session Service / Agent Runtime Service
+   ↓
+PostgreSQL（session/runtime/worktree/message/event）
+   ↓
+Docker Runtime（每仓库一个容器）
+   ↓
+会话目录（${AGENT_RUNTIME_ROOT}/sessions/{sessionId}）
 ```
 
-## open-code 配置构建
+关键约束：
 
-对应 `OpenCodeAdapter.buildOpenCodeConfig()`，Teax 动态生成 open-code 配置：
+- 每个仓库最多一个 runtime 记录（`agent_runtimes.repository_id` 唯一）
+- Runtime provider 当前固定为 `docker`
+- 每个会话一个独立 worktree 目录
+- worktree 实际通过 `git clone + checkout -B` 准备，不使用 git worktree 子命令
 
-```typescript
-function buildOpenCodeConfig(llmConfig: AgentLlmConfig): Record<string, any> {
-  const { providerID, model, baseUrl } = llmConfig;
-  return {
-    model: `${providerID}/${model}`,
-    provider: {
-      [providerID]: {
-        npm: "@ai-sdk/openai-compatible",
-        name: providerID,
-        options: baseUrl ? { baseURL: baseUrl } : undefined,
-        models: {
-          [model]: {
-            tool_call: true,
-            context: 128000,
-            output: 16000,
-          },
-        },
-      },
-    },
-  };
-}
-```
+## 3. Runtime 实现
 
-## 支持的 LLM 供应商
+### 3.1 启动流程（`POST /agents/runtime/start`）
 
-| 供应商 | providerID | baseUrl |
-| ------ | ---------- | ------- |
-| OpenAI | `openai` | 默认（无需配置） |
-| Azure OpenAI | `azure-openai` | `https://{resource}.openai.azure.com/` |
-| 私有 vLLM | `custom-vllm` | `http://内网:8000/v1` |
-| 火山引擎方舟 | `volc-ark` | `https://ark.cn-beijing.volces.com/api/v3` |
-| Anthropic（兼容层） | `anthropic-compat` | `https://api.anthropic.com/v1` |
+`ensureRepoRuntime()` 的主要步骤：
 
-## 日志流映射
+1. 读取仓库信息与 Runtime 配置
+2. 确保目录存在：
+   - `${AGENT_RUNTIME_ROOT}/sessions`
+   - `${AGENT_RUNTIME_ROOT}/.teax`
+3. 构建基础镜像（固定 tag：`teax-agent-runtime:base`）
+4. 选择 repo Dockerfile 来源（优先级）：
+   - `${AGENT_RUNTIME_ROOT}/.teax/projects/{owner}/{repo}/Dockerfile`
+   - `${AGENT_RUNTIME_ROOT}/.teax/globals/Dockerfile`
+   - 生成最小 Dockerfile
+5. 将 repo Dockerfile 的首个 `FROM` 强制改写为 `FROM teax-agent-runtime:base`
+6. 启动/复用容器（容器名：`teax-agent-repo-{repoId8}`）
+7. 写回 `agent_runtimes`（状态、metadata、docker 信息）
 
-open-code 流式事件 → `session_logs` 类型映射：
+### 3.2 停止流程（`POST /agents/runtime/stop`）
 
-| open-code 事件 | session_logs.type | content 说明 |
-| ------------- | ----------------- | ------------ |
-| `text` | `stdout` | Agent 输出的文本 |
-| `tool_use` | `tool` | JSON：`{ tool, input, output, status }` |
-| `reasoning` | `reasoning` | 思维链（前端可折叠展示） |
-| `step_start` | `system` | `"[Step N] 开始"` |
-| `step_finish` | `system` | `"[Step N] 完成，tokens: xxx, cost: $xxx"` |
-| `error` | `stderr` | 错误信息 |
+- `force=false`：若存在活跃 worktree，返回 `409`
+- `force=true`：先清理活跃 worktree，并将活跃会话状态改为 `stopped`
+- docker 容器会被停止并移除
 
-## 工具执行隔离
+### 3.3 Runtime 摘要（`GET /agents/runtime`）
 
-open-code 的 `bash` 工具具有执行 shell 命令的能力，必须在隔离容器中运行：
+返回字段包含：
+
+- `runtime_status`：优先按 docker 实时 `inspect` 推断
+- `active_session_count`
+- `active_worktree_count`
+- `root_dir` / `sessions_root_dir` / `mode`
+
+## 4. Session 与 Worktree 实现
+
+### 4.1 创建会话（`POST /agents/sessions`）
+
+`createAgentSession()` 流程：
+
+1. 新建 `agent_sessions`（初始 `status=created`）
+2. 创建 owner 参与者
+3. 写入首条消息（`message_type=user_prompt`）
+4. 记录事件：`session_created`、`session_preparing`
+5. 调用 `prepareRepoSessionWorktree()`
+6. 成功后记录事件 `worktree_prepared`；失败则 `worktree_prepare_failed`
+
+### 4.2 Worktree 准备
+
+`prepareRepoSessionWorktree()` 会：
+
+- 自动确保 runtime 可用
+- 将会话状态更新为 `preparing`
+- 在容器内执行：
+  - `git clone --branch {baseBranch}`
+  - `git checkout -B {workingBranch} origin/{baseBranch}`
+  - `git reset --hard` + `git clean -fd`
+- 成功后：
+  - `agent_session_worktrees.status=active`
+  - `agent_sessions.status=running`
+- 失败后：
+  - `agent_session_worktrees.status=failed`
+  - `agent_sessions.status=failed`
+
+### 4.3 停止 / 重试 / 删除
+
+- 停止：`POST /sessions/{sessionId}/stop`
+  - 会话状态改为 `stopped`
+  - 尝试清理目录，记录 `session_stopped`
+- 重试：`POST /sessions/{sessionId}/retry`
+  - 仅 `failed/stopped` 可重试
+  - 会话重置到 `created` 后重新 prepare
+- 删除：`DELETE /sessions/{sessionId}`
+  - 先尝试清理目录，再删会话记录
+
+### 4.4 会话级 Opencode 进程控制
+
+已实现会话目录内的 Opencode 进程控制接口：
+
+- `POST /sessions/{sessionId}/opencode/control`
+- body: `{ action: "start" | "stop" | "restart" }`
+
+行为要点：
+
+- 仅 owner/管理员可控制（除 API 权限外，service 层二次校验）
+- 依赖 Runtime 容器处于运行状态
+- 依赖会话目录存在
+- PID 文件与日志文件固定写在会话目录：
+  - `.teax-opencode.pid`
+  - `.teax-opencode.log`
+- 启动命令优先级：
+  1. `AGENT_RUNTIME_OPENCODE_START_COMMAND`
+  2. `opencode serve`
+  3. `opencode server`
+
+### 4.5 会话状态（当前写入路径）
 
 ```text
-AgentService (宿主)
-  └─ docker run (隔离容器)
-       ├─ 镜像：teax/agent-runner（内置 Node.js + opencode-ai/sdk）
-       ├─ 挂载：项目工作区目录（读写）
-       ├─ 网络：仅允许出站到 LLM API + Gitea（其余拒绝）
-       ├─ 用户：非 root（uid=1000）
-       └─ 资源：CPU/内存按 Agent.resources 配置限制
+created -> preparing -> running
+             |           |
+             v           v
+           failed      stopped
+
+failed/stopped --retry--> created -> preparing -> running
 ```
 
-AgentService 通过 Docker SDK（`dockerode`）管理容器生命周期，容器内通过 stdio 与宿主通信传递 open-code 结果。
+说明：`completed` 字段在模型中保留，但当前服务层没有自动进入 `completed` 的执行逻辑。
 
-## OpenCode API（用于 CI/CD）
+## 5. 协作与权限
 
-Teax 提供 OpenCode API 供 Gitea Actions 调用。API 内部通过 **OpenCode 客户端**（`@opencode-ai/sdk`）连接到 CI 工作区容器内运行的 **OpenCode 服务端**。
+### 5.1 可见性
 
-### 架构说明
+- `public`：仓库内有权限用户可见
+- `private`：仅 owner、管理员、受邀参与者可见
 
-```text
-Gitea Actions
-    ↓ HTTP Request
-Teax API (/api/repos/{owner}/{repo}/opencode/sessions)
-    ↓ OpenCode Client SDK
-CI 工作区容器
-    ├── OpenCode 服务端（监听端口 3100）
-    ├── 项目代码仓库
-    └── 开发工具链
-```
+### 5.2 参与者规则
 
-### API 端点
+- owner 不能 `leave`
+- public 会话中，首次发言可自动加入参与者
+- `viewer` 无法 pin 消息、无法发言
 
-```typescript
-// 创建 OpenCode Session
-POST /api/repos/{owner}/{repo}/opencode/sessions
-Body: {
-  prompt: string;           // AI 任务描述
-  systemPrompt?: string;    // 系统提示词
-  model?: string;           // LLM 模型（默认使用项目配置）
-  branch?: string;          // 工作分支（默认 main）
-}
-Response: {
-  sessionId: string;
-  status: 'running';
-  workspaceId: string;      // CI 工作区 ID
-}
+### 5.3 API 权限映射
 
-// 获取 Session 状态
-GET /api/repos/{owner}/{repo}/opencode/sessions/{sessionId}
-Response: {
-  sessionId: string;
-  status: 'running' | 'completed' | 'failed';
-  steps: number;
-  tokensUsed: number;
-  cost: number;
-  prUrl?: string;           // 创建的 PR 链接
-  errorMessage?: string;
-}
+- `agent:read`：会话/消息/事件/参与者读取、runtime 摘要
+- `agent:create`：创建会话
+- `agent:chat`：发消息、join/leave
+- `agent:write`：stop/retry/delete/pin/opencode control
+- `agent:manage`：改可见性、管理参与者
+- `agent:start`：启动 runtime
+- `agent:stop`：停止 runtime
 
-// 获取 Session 日志（SSE 流式）
-GET /api/repos/{owner}/{repo}/opencode/sessions/{sessionId}/logs
-Response: Server-Sent Events
-  event: log
-  data: { type: 'stdout' | 'tool' | 'reasoning', content: string }
+## 6. API（当前实现）
 
-// 停止 Session
-POST /api/repos/{owner}/{repo}/opencode/sessions/{sessionId}/stop
-```
+基线路径：`/api/repos/{owner}/{repo}/agents`
 
-### Gitea Actions 使用示例
+Runtime：
 
-```yaml
-name: AI Code Review
-on:
-  pull_request:
-    types: [opened, synchronize]
+- `GET /runtime`
+- `POST /runtime/start`
+- `POST /runtime/stop`（body: `{ force?: boolean }`）
 
-jobs:
-  ai-review:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger OpenCode Review
-        run: |
-          curl -X POST \
-            -H "Authorization: token ${{ secrets.TEAX_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "prompt": "Review this PR and suggest improvements",
-              "branch": "${{ github.head_ref }}"
-            }' \
-            https://teax.example.com/api/repos/${{ github.repository }}/opencode/sessions
-```
+Sessions：
 
-### 权限控制
+- `GET /sessions`
+- `POST /sessions`
+- `GET /sessions/{sessionId}`
+- `DELETE /sessions/{sessionId}`
+- `POST /sessions/{sessionId}/stop`
+- `POST /sessions/{sessionId}/retry`
+- `PATCH /sessions/{sessionId}/visibility`
+- `POST /sessions/{sessionId}/join`
+- `POST /sessions/{sessionId}/leave`
+- `GET /sessions/{sessionId}/participants`
+- `POST /sessions/{sessionId}/participants`
+- `PATCH /sessions/{sessionId}/participants/{userId}`
+- `GET /sessions/{sessionId}/messages`
+- `POST /sessions/{sessionId}/messages`
+- `POST /sessions/{sessionId}/prompt`（兼容接口，内部仍入库为消息）
+- `POST /sessions/{sessionId}/messages/{messageId}/pin`
+- `GET /sessions/{sessionId}/events`（分页查询，支持 `after_seq`）
+- `POST /sessions/{sessionId}/opencode/control`（会话级进程控制）
 
-- **认证**：需要 Gitea Personal Access Token 或 Teax API Token
-- **授权**：调用者需要对仓库有写权限
-- **限流**：每个项目每小时最多 10 个并发 Session
+## 7. 关键环境变量
 
-## 安全考虑
+| 变量名 | 说明 |
+| --- | --- |
+| `AGENT_RUNTIME_ROOT` | runtime 根目录（代码默认 `.teax-agent-runtime`） |
+| `AGENT_RUNTIME_DOCKER_BIN` | docker 可执行文件 |
+| `AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE` | 基础镜像 Dockerfile |
+| `AGENT_RUNTIME_DOCKER_BASE_BUILD_CONTEXT` | 基础镜像构建上下文 |
+| `AGENT_RUNTIME_DOCKER_BUILD_ON_START` | 启动 runtime 是否强制重建镜像 |
+| `AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT` | 容器内挂载根目录（默认 `/runtime`） |
+| `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP` | 停止会话是否保留目录 |
+| `AGENT_RUNTIME_OPENCODE_START_COMMAND` | 自定义 Opencode 启动命令（为空则走回退命令） |
+| `AGENT_META_REPO_URL` | 元数据仓库地址（当前仅用于读取配置来源与凭据） |
+| `AGENT_META_REPO_TOKEN` / `AGENT_BOT_TOKEN` | git 凭据来源（前者优先） |
 
-| 风险点 | 防护措施 |
-| ------ | -------- |
-| **任意代码执行** | 容器隔离，限制网络访问 |
-| **资源耗尽** | CPU/内存限制，超时机制 |
-| **敏感信息泄露** | API Key 加密存储（AES-256-GCM） |
-| **恶意工具调用** | 工具白名单，参数校验 |
-| **容器逃逸** | 非 root 用户运行，只读文件系统（除工作区） |
+## 8. 相关代码
 
-## 相关文档
-
-- [架构概览](./overview/index.md) - 系统整体架构
-- [工作区](./workspace.md) - 容器化开发环境
-- [数据库设计](./database-design.md) - Agent 相关表结构
+- `server/services/agent-runtime.service.ts`
+- `server/services/agent-session.service.ts`
+- `server/shared/dto/agent-session.dto.ts`
+- `server/db/schema/agent-runtime.ts`
+- `server/db/schema/agent-session.ts`
+- `server/api/repos/[owner]/[repo]/agents/**`

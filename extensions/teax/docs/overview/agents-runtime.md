@@ -1,348 +1,229 @@
-# Agents Runtime 使用与配置指南（P1）
+# Agents Runtime 使用与配置指南
 
-> 适用版本：Phase 1（Repo Runtime + Repo Session + Session 目录生命周期）
+> 更新时间：2026-03-29（与当前代码实现对齐）
 
-## 1. 目标与范围
+## 1. 适用范围
 
-本文档用于说明当前已落地的 Agents P1 能力如何配置和使用，覆盖：
+本文覆盖当前已实现的仓库级 Agents Runtime：
 
-- 仓库级 Runtime 生命周期（查询 / 启动 / 停止）
-- 会话创建后自动准备 session 工作目录（`created -> preparing -> running`）
-- 会话停止时回收 session 目录、会话重试时重建 session 目录
-- 会话详情中的 runtime/worktree 状态展示（字段名沿用 worktree）
+- Runtime 查询 / 启动 / 停止
+- Session 创建后自动准备会话目录
+- Session 停止 / 重试 / 删除时的目录清理逻辑
+- `/:owner/:repo/agents` 页面对应的数据字段
 
-不包含（Phase 2+）：
+不包含：
 
-- System Runtime 与跨仓库编排
-- `/globals` / `/projects/{org}/{name}` 配置仓库自动提交闭环
-- VSCode Remote 临时凭据交换
+- System Runtime
+- 跨仓库编排
+- Agent 自动回复执行链路
 
-## 2. 快速开始
+## 2. 环境变量
 
-### 2.1 环境变量配置
+### 2.1 Runtime 相关
 
-在 `.env` 中增加以下配置（默认值见 `.env.example`）：
-
-| 变量名 | 默认值 | 说明 |
+| 变量名 | 说明 | 代码默认值 |
 | --- | --- | --- |
-| `AGENT_RUNTIME_ROOT` | `.teax-agent-runtime` | Runtime 根目录 |
-| `AGENT_RUNTIME_DOCKER_BIN` | `docker` | Docker 可执行文件路径 |
-| `AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE` | `docker/base/node24-vscode-browser.Dockerfile` | 基础镜像 Dockerfile |
-| `AGENT_RUNTIME_DOCKER_BASE_BUILD_CONTEXT` | `.` | 基础镜像 build context |
-| `AGENT_RUNTIME_DOCKER_BUILD_ON_START` | `true` | 启动仓库 runtime 时是否自动 `docker build` |
-| `AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT` | `/runtime` | 容器内挂载工作根目录 |
-| `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP` | `false` | 停止会话时是否保留 session 目录（兼容历史命名） |
+| `AGENT_RUNTIME_ROOT` | Runtime 根目录 | `.teax-agent-runtime` |
+| `AGENT_RUNTIME_DOCKER_BIN` | Docker 命令路径 | `docker` |
+| `AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE` | 基础镜像 Dockerfile | `docker/base/node24-vscode-browser.Dockerfile` |
+| `AGENT_RUNTIME_DOCKER_BASE_BUILD_CONTEXT` | 基础镜像 build context | `.` |
+| `AGENT_RUNTIME_DOCKER_BUILD_ON_START` | 启动 Runtime 时是否重建镜像 | `true` |
+| `AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT` | 容器内工作根目录 | `/runtime` |
+| `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP` | 停止会话时是否保留目录 | `false` |
+| `AGENT_RUNTIME_OPENCODE_START_COMMAND` | Opencode 启动命令（可选） | `""` |
 
-#### 参数详解
+说明：仓库 `.env.example` 当前给出的 `AGENT_RUNTIME_ROOT` 示例是 `./.runtime`。若你使用该示例值，实际生效将是 `./.runtime`，否则走代码默认值 `.teax-agent-runtime`。
 
-##### `AGENT_RUNTIME_ROOT`
+`AGENT_RUNTIME_OPENCODE_START_COMMAND` 为空时，系统会按顺序回退尝试 `opencode serve`、`opencode server`。
 
-- 类型：`string`（路径）
-- 默认值：`.teax-agent-runtime`
-- 生效范围：全局
-- 行为说明：
-  - 作为 runtime 根目录，会生成：
-    - `sessions/`（会话工作目录）
-    - `docker-build/`（构建中间产物与生成 Dockerfile）
-  - 若配置为相对路径，会按服务进程当前工作目录解析为绝对路径
-- 推荐：
-  - 生产使用持久化磁盘绝对路径，例如 `/data/teax-agent-runtime`
+### 2.2 元数据仓库与凭据
 
-##### `AGENT_RUNTIME_DOCKER_BIN`
+| 变量名 | 说明 |
+| --- | --- |
+| `AGENT_META_REPO_URL` | 元数据仓库地址 |
+| `AGENT_META_REPO_BRANCH` | 元数据仓库分支（默认 `main`） |
+| `AGENT_META_REPO_TOKEN` | 元数据仓库 token（优先） |
+| `AGENT_BOT_TOKEN` | 回退 token（当 `AGENT_META_REPO_TOKEN` 未配置） |
+| `AGENT_BOT_USERNAME` / `AGENT_BOT_EMAIL` | git 凭据用户名和邮箱 |
 
-- 类型：`string`
-- 默认值：`docker`
-- 生效范围：`docker` 模式
-- 行为说明：
-  - 指定 Docker CLI 可执行文件
-  - runtime 会调用 `docker build/run/start/stop/rm/exec/inspect`
-- 推荐：
-  - 默认 `docker`；特殊环境可填绝对路径
+Token 优先级：`AGENT_META_REPO_TOKEN > AGENT_BOT_TOKEN > GITEA_SERVICE_TOKEN(回退)`。
 
-##### `AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE`
+## 3. Runtime 行为
 
-- 类型：`string`（路径）
-- 默认值：`docker/base/node24-vscode-browser.Dockerfile`
-- 生效范围：`docker` 模式
-- 行为说明：
-  - 用于“第一段构建”的基础镜像 Dockerfile
-  - 支持相对路径（按进程 cwd 解析）或绝对路径
-  - 若为空，系统会在 `${AGENT_RUNTIME_ROOT}/docker-build/base/Dockerfile.base` 生成一个默认基础 Dockerfile
-- 推荐：
-  - 显式指定项目内基线 Dockerfile，便于团队统一
+### 3.1 每仓库一个容器
 
-##### `AGENT_RUNTIME_DOCKER_BASE_BUILD_CONTEXT`
+- 容器名：`teax-agent-repo-{repoId8}`
+- 数据库唯一键：`agent_runtimes.repository_id`
 
-- 类型：`string`（路径）
-- 默认值：`.`
-- 生效范围：`docker` 模式
-- 行为说明：
-  - 基础镜像构建时的 build context
-  - 支持相对路径或绝对路径
-- 推荐：
-  - 若基础 Dockerfile 会 `COPY` 项目文件，通常保持 `.` 即可
+### 3.2 启动时构建与来源规则
 
-##### 固定基础镜像命名（无环境变量）
+启动 Runtime（`POST /runtime/start`）时：
 
-- 基础镜像 tag 固定为：`teax-agent-runtime:base`
-- 不再支持：
-  - `AGENT_RUNTIME_DOCKER_BASE_IMAGE`
-  - `TEAX_BASE_IMAGE`（repo Dockerfile build arg）
-- 行为说明：
-  - “第一段构建”始终将 `AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE` 构建到 `teax-agent-runtime:base`
-  - “第二段构建”中，repo Dockerfile 首个 `FROM` 会被改写为 `FROM teax-agent-runtime:base`
+1. 构建基础镜像 `teax-agent-runtime:base`
+2. 选择 repo Dockerfile：
+   - `${AGENT_RUNTIME_ROOT}/.teax/projects/{owner}/{repo}/Dockerfile`
+   - `${AGENT_RUNTIME_ROOT}/.teax/globals/Dockerfile`
+   - 系统生成最小 Dockerfile
+3. 将首个 `FROM` 改写为 `FROM teax-agent-runtime:base`
+4. 构建 repo image 并启动容器
 
-##### `AGENT_RUNTIME_DOCKER_BUILD_ON_START`
+当 `AGENT_RUNTIME_DOCKER_BUILD_ON_START=false` 且容器已存在（停止态）时，优先直接 `docker start`。
 
-- 类型：`boolean`（环境变量字符串，`"false"` 以外都视为 true）
-- 默认值：`true`
-- 生效范围：`docker` 模式
-- 行为说明：
-  - `true`：启动 runtime 时执行两段构建并以新镜像重建容器
-  - `false`：
-    - 若容器已存在且处于停止状态，只执行 `docker start`
-    - 若容器不存在，仍会执行构建后再 `run`（因为需要首次镜像）
-- 推荐：
-  - 开发阶段：`true`
-  - 追求启动速度且镜像已预热：`false`
+### 3.3 挂载
 
-##### 仓库 Dockerfile 来源（固定来自 `.teax`）
+默认挂载关系：
 
-- 不再支持通过环境变量指定 `AGENT_RUNTIME_DOCKERFILE` / `AGENT_RUNTIME_DOCKER_BUILD_CONTEXT`
-- Runtime 启动时会按以下顺序在元数据仓库目录中查找：
-  1. `${AGENT_RUNTIME_ROOT}/.teax/projects/{owner}/{repo}/Dockerfile`
-  2. `${AGENT_RUNTIME_ROOT}/.teax/globals/Dockerfile`
-  3. 若都不存在，使用系统生成的最小 Dockerfile（仅 `FROM teax-agent-runtime:base` + `WORKDIR`）
-- 命中来源后，build context 固定为该 Dockerfile 所在目录
-- 系统会将首个 `FROM` 改写为 `FROM teax-agent-runtime:base`，确保仓库运行镜像总是基于本地固定基础镜像
+- `${AGENT_RUNTIME_ROOT}/sessions` -> `/runtime/sessions`
+- `${AGENT_RUNTIME_ROOT}/.teax` -> `/runtime/.teax`
 
-##### `AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT`
+## 4. Session 与目录生命周期
 
-- 类型：`string`（容器内路径）
-- 默认值：`/runtime`
-- 生效范围：`docker` 模式
-- 行为说明：
-  - 容器内工作根目录
-  - 宿主机会挂载：
-    - `${AGENT_RUNTIME_ROOT}/sessions -> ${WORKSPACE_ROOT}/sessions`
-    - `${AGENT_RUNTIME_ROOT}/.teax -> ${WORKSPACE_ROOT}/.teax`
-  - 会话目录在该目录树下执行 `git clone/checkout`
-- 推荐：
-  - 保持默认 `/runtime`，避免与系统目录冲突
+### 4.1 创建会话
 
-##### `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP`
+`POST /sessions` 触发后：
 
-- 类型：`boolean`（环境变量字符串，仅 `"true"` 为 true）
-- 默认值：`false`
-- 生效范围：`docker` 模式
-- 行为说明：
-  - `false`：停止会话时清理 session 目录，并将记录标记为 `removed`
-  - `true`：停止会话时保留目录，便于排查/复盘
-- 推荐：
-  - 生产默认 `false`
-  - 需要定位问题时临时改为 `true`
-
-建议：默认使用 `docker`。
-
-### 2.2 数据库落库
-
-P1 新增了以下表结构：
-
-- `agent_runtimes`
-- `agent_session_worktrees`
-- `agent_sessions.runtime_id`
-
-请按你们当前 DB 发布流程执行 schema 同步（例如 `drizzle-kit push`）。
-
-### 2.3 启动服务
-
-```bash
-pnpm dev
-```
-
-## 3. 运行模式说明
-
-### 3.1 docker 模式
-
-- 默认模式
-- 启动 runtime 时会按“两段构建”拉起仓库容器（每仓库一个容器）：
-  1. 先基于 `AGENT_RUNTIME_DOCKER_BASE_DOCKERFILE` 构建固定基础镜像 `teax-agent-runtime:base`
-  2. 再使用 `.teax` 仓库中的 Dockerfile 构建 repo image（首个 `FROM` 会改写为 `FROM teax-agent-runtime:base`）
-  3. 最后基于 repo image 启动 runtime 容器
-- 会话目录通过 `docker exec git clone/checkout ...` 在容器中执行
-- 宿主机仅需具备 Docker，sessions 目录与元数据目录会挂载进容器
-- 停止 runtime 时会停止并移除该仓库容器
-
-容器内挂载关系（默认值）：
-
-- `${AGENT_RUNTIME_ROOT}/sessions`
-- `${AGENT_RUNTIME_ROOT}/.teax`（元数据仓库挂载点）
-
-内置基础 Dockerfile 目录：
-
-- `docker/base/node24-core.Dockerfile`
-- `docker/base/node24-vscode.Dockerfile`
-- `docker/base/node24-vscode-browser.Dockerfile`
-
-说明：
-
-- 上述基础镜像都内置 `OpenCode CLI`（`opencode`，通过 `npm i -g opencode-ai@latest` 安装）
-
-## 4. 目录结构
-
-以 `AGENT_RUNTIME_ROOT=.teax-agent-runtime` 为例：
-
-```text
-.teax-agent-runtime/
-├── .teax/                        # 元数据仓库本地目录（固定标准目录）
-└── sessions/
-    └── {sessionId}/             # 会话工作目录
-```
-
-## 5. 权限要求
-
-Runtime 与 Session 相关接口权限如下：
-
-- `agent:read`：查看会话、事件、runtime 摘要
-- `agent:create`：创建会话
-- `agent:chat`：会话内对话
-- `agent:write`：停止 / 重试 / 置顶等写操作
-- `agent:manage`：可见性与参与者管理
-- `agent:start`：启动 runtime
-- `agent:stop`：停止 runtime
-
-## 6. API 用法
-
-基线路径：`/api/repos/{owner}/{repo}/agents`
-
-### 6.1 Runtime 摘要
-
-- `GET /runtime`
-
-返回要点：
-
-- `runtime_status`：`running/stopped/...`
-- `mode`：`docker`
-- `active_session_count`
-- `active_worktree_count`（兼容字段名，表示活跃会话目录数）
-
-### 6.2 启动 Runtime
-
-- `POST /runtime/start`
-
-行为：
-
-- 确保仓库存在 runtime 记录
-- 更新状态为 `running`
-- 回传最新 runtime 摘要
-
-### 6.3 停止 Runtime
-
-- `POST /runtime/stop`
-- Body：`{ "force": boolean }`
-
-行为：
-
-- `force=false`：若存在活跃会话目录，返回 `409`
-- `force=true`：先清理活跃会话目录，再停止 runtime
-
-### 6.4 创建会话（自动准备 session 目录）
-
-- `POST /sessions`
-
-行为：
-
-1. 创建会话与首条消息
+1. 创建 `agent_sessions`（`status=created`）
 2. 写入 `session_preparing` 事件
-3. 自动准备 session 目录
-4. 会话进入 `running`
-5. 写入 `worktree_prepared` 或 `worktree_prepare_failed`
+3. 自动准备会话目录
+4. 成功后 `status=running`，失败则 `status=failed`
 
-### 6.5 停止会话（自动清理 session 目录）
+### 4.2 目录准备细节
 
-- `POST /sessions/{sessionId}/stop`
+会话目录为 `${AGENT_RUNTIME_ROOT}/sessions/{sessionId}`，准备流程：
 
-行为：
+- `git clone --branch {baseBranch}`
+- `git checkout -B {workingBranch} origin/{baseBranch}`
+- `git reset --hard` + `git clean -fd`
 
-- 会话标记为 `stopped`
-- 执行 session 目录清理
-- 记录 `session_stopped` 事件（含是否移除 worktree）
+对应 worktree 表状态：
 
-### 6.6 重试会话（重建 session 目录）
+- 成功：`active`
+- 失败：`failed`
 
-- `POST /sessions/{sessionId}/retry`
+### 4.3 停止/重试/删除
 
-行为：
+- 停止：`POST /sessions/{sessionId}/stop`
+  - 会话设为 `stopped`
+  - 尝试清理目录
+- 重试：`POST /sessions/{sessionId}/retry`
+  - 仅允许 `failed/stopped`
+  - 先清理后重建目录
+- 删除：`DELETE /sessions/{sessionId}`
+  - 先清理目录，再删除会话
 
-- 仅允许 `failed/stopped` 会话
-- 先尝试清理旧 session 目录
-- 再次执行 prepare，恢复到 `running`
+`AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP=true` 时，停止不会删目录，worktree 记录保持 `active`。
 
-## 7. 会话状态流转
+### 4.4 Opencode 控制目录
 
-P1 实际状态机：
+- Session 级 Opencode 控制接口统一在容器目录 `/runtime/sessions/{sessionId}` 执行（实际前缀由 `AGENT_RUNTIME_DOCKER_WORKSPACE_ROOT` 决定）。
+- 运行标记文件：
+  - PID：`/runtime/sessions/{sessionId}/.teax-opencode.pid`
+  - 日志：`/runtime/sessions/{sessionId}/.teax-opencode.log`
+
+## 5. 状态流转
+
+### 5.1 Session
 
 ```text
 created -> preparing -> running
              |           |
              v           v
-           failed     stopped/completed
+           failed      stopped
 
-failed/stopped --retry--> preparing -> running
+failed/stopped --retry--> created
 ```
 
-## 8. 前端使用说明
+### 5.2 Runtime
 
-仓库页面 `/:owner/:repo/agents` 已支持：
+- DB 状态会写 `running/stopped/...`
+- Runtime 摘要中的 `runtime_status` 对 docker 模式会按 `docker inspect` 实时判定，优先于 DB 陈旧状态
 
-- Runtime 面板：状态、模式、活跃会话/目录计数、启动/停止操作
-- 会话列表与详情：展示 `runtime_status/worktree_status/worktree_path/worktree_error`
-- 自动刷新：消息与事件流周期刷新，Runtime 摘要定时刷新
+## 6. API（当前实现）
 
-## 9. 常见问题
+基线路径：`/api/repos/{owner}/{repo}/agents`
 
-### 9.1 停止 runtime 返回 409
+### 6.1 Runtime
 
-原因：存在活跃会话目录。
+- `GET /runtime`（`agent:read`）
+- `POST /runtime/start`（`agent:start`）
+- `POST /runtime/stop`（`agent:stop`，body: `{ force?: boolean }`）
 
-处理：调用 `POST /runtime/stop` 并传 `{"force": true}`。
+### 6.2 Sessions
 
-### 9.2 docker 模式下会话创建失败
+- `GET /sessions`（`agent:read`）
+- `POST /sessions`（`agent:create`）
+- `GET /sessions/{sessionId}`（`agent:read`）
+- `DELETE /sessions/{sessionId}`（`agent:write`）
+- `POST /sessions/{sessionId}/stop`（`agent:write`）
+- `POST /sessions/{sessionId}/retry`（`agent:write`）
+- `PATCH /sessions/{sessionId}/visibility`（`agent:manage`）
+- `POST /sessions/{sessionId}/opencode/control`（`agent:write`，body: `{ action: "start" | "stop" | "restart" }`）
+
+### 6.3 协作
+
+- `POST /sessions/{sessionId}/join`（`agent:chat`）
+- `POST /sessions/{sessionId}/leave`（`agent:chat`）
+- `GET /sessions/{sessionId}/participants`（`agent:read`）
+- `POST /sessions/{sessionId}/participants`（`agent:manage`）
+- `PATCH /sessions/{sessionId}/participants/{userId}`（`agent:manage`）
+
+### 6.4 消息与事件
+
+- `GET /sessions/{sessionId}/messages`（`agent:read`，分页）
+- `POST /sessions/{sessionId}/messages`（`agent:chat`）
+- `POST /sessions/{sessionId}/prompt`（`agent:chat`，兼容接口）
+- `POST /sessions/{sessionId}/messages/{messageId}/pin`（`agent:write`）
+- `GET /sessions/{sessionId}/events`（`agent:read`，分页 + `after_seq`）
+
+说明：事件接口当前是普通分页查询，不是 SSE。
+
+## 7. 前端字段对应
+
+`GET /sessions/{sessionId}` 已返回用于页面展示的 runtime/worktree 衍生字段：
+
+- `runtime_status`
+- `runtime_provider`
+- `runtime_last_heartbeat_at`
+- `runtime_key`
+- `worktree_status`
+- `worktree_path`
+- `worktree_last_error`
+
+## 8. 常见问题
+
+### 8.1 停止 Runtime 返回 409
+
+原因：存在活跃 worktree。
+
+处理：调用 `POST /runtime/stop` 并传 `{ "force": true }`。
+
+### 8.2 创建会话失败
 
 优先检查：
 
-1. `AGENT_RUNTIME_DOCKER_BIN` 是否可执行
-2. Docker daemon 是否正常运行、当前用户是否有权限访问 Docker
-3. `clone_url` 是否可访问（凭据/网络），私有仓库需确保已配置 `AGENT_BOT_TOKEN`（或 `GITEA_SERVICE_TOKEN`）
-4. `AGENT_RUNTIME_ROOT` 是否有读写权限
+1. Docker 可执行文件与 daemon 权限
+2. 仓库 clone URL 的访问凭据
+3. `AGENT_RUNTIME_ROOT` 目录读写权限
+4. `.teax` 配置目录是否可读
 
-请修复环境后重试。
+### 8.3 停止会话后目录仍在
 
-### 9.3 停止会话后目录未删除
+检查 `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP` 是否为 `true`。
 
-检查：
+### 8.4 Opencode 启动失败
 
-- `AGENT_RUNTIME_KEEP_WORKTREE_ON_STOP=true` 时会保留目录，这是预期行为。
+优先检查：
 
-## 10. 生产建议
+1. Runtime 容器是否处于 `running`
+2. 该 Session 目录是否存在（`/runtime/sessions/{sessionId}`）
+3. 容器内 `opencode` 命令是否可执行
+4. 是否需要设置 `AGENT_RUNTIME_OPENCODE_START_COMMAND`
 
-- 生产建议使用 `docker`
-- 建议将 `AGENT_RUNTIME_ROOT` 指向持久化磁盘
-- 结合系统监控采集以下指标：
-  - runtime 状态变化
-  - 会话目录准备失败率
-  - 强制停止次数
+## 9. 关键代码
 
-## 11. 变更清单（P1）
-
-关键文件：
-
-- `server/db/schema/agent-runtime.ts`
 - `server/services/agent-runtime.service.ts`
 - `server/services/agent-session.service.ts`
+- `server/shared/dto/agent-session.dto.ts`
 - `server/api/repos/[owner]/[repo]/agents/runtime/*`
+- `server/api/repos/[owner]/[repo]/agents/sessions/*`
 - `app/pages/[owner]/[repo]/agents.vue`
-
----
-
-如需继续扩展到 Phase 2（System Runtime、跨仓库编排、配置仓库自动提交），建议直接在本文档基础上新增“Phase 2 运维手册”章节。

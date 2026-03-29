@@ -2,7 +2,9 @@ import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
 import { schema, useDB } from "~~/server/db";
 import {
   cleanupSessionWorktree,
+  controlAgentSessionOpencodeProcess,
   getSessionWorktreeBySessionId,
+  type AgentSessionOpencodeAction,
   prepareRepoSessionWorktree,
 } from "~~/server/services/agent-runtime.service";
 
@@ -950,6 +952,43 @@ export async function stopAgentSession(params: {
   });
 
   return updated;
+}
+
+export async function controlAgentSessionOpencode(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+  action: AgentSessionOpencodeAction;
+}) {
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    throw createError({ statusCode: 403, message: "Only session owner can control opencode" });
+  }
+
+  const controlled = await controlAgentSessionOpencodeProcess({
+    repositoryId: params.repositoryId,
+    sessionId: session.id,
+    action: params.action,
+  });
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "opencode_controlled",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      action: params.action,
+      status: controlled.status,
+      pid: controlled.pid,
+      command: controlled.command,
+      log_file: controlled.log_file,
+      session_path: controlled.session_path,
+      container_session_path: controlled.container_session_path,
+    },
+  });
+
+  return controlled;
 }
 
 export async function retryAgentSession(params: {

@@ -104,6 +104,19 @@ interface RepoRuntimeSummary {
   active_worktree_count: number;
 }
 
+interface SessionOpencodeControlResult {
+  action: "start" | "stop" | "restart";
+  status: "running" | "stopped";
+  pid: number | null;
+  command: string | null;
+  runtime_key: string;
+  session_id: string;
+  session_path: string;
+  container_session_path: string;
+  pid_file: string;
+  log_file: string;
+}
+
 const props = defineProps<{
   owner: string;
   repo: string;
@@ -153,6 +166,9 @@ const pinningMessageId = ref<string | null>(null);
 const runtimeStartLoading = ref(false);
 const runtimeStopLoading = ref(false);
 const runtimeForceStopLoading = ref(false);
+const opencodeStartLoading = ref(false);
+const opencodeStopLoading = ref(false);
+const opencodeRestartLoading = ref(false);
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 let autoRefreshTick = 0;
 const SESSION_MESSAGES_PAGE_LIMIT = 100;
@@ -215,7 +231,10 @@ watch(
     }
 
     if (!selectedSessionId.value || !list.some((item) => item.id === selectedSessionId.value)) {
-      selectedSessionId.value = list[0].id;
+      const firstSession = list[0];
+      if (firstSession) {
+        selectedSessionId.value = firstSession.id;
+      }
     }
   },
   { immediate: true },
@@ -474,6 +493,46 @@ async function stopRuntime(force: boolean) {
   }
 }
 
+function setOpencodeLoading(action: "start" | "stop" | "restart", value: boolean) {
+  if (action === "start") opencodeStartLoading.value = value;
+  if (action === "stop") opencodeStopLoading.value = value;
+  if (action === "restart") opencodeRestartLoading.value = value;
+}
+
+function opencodeActionLabel(action: "start" | "stop" | "restart"): string {
+  if (action === "start") return "启动";
+  if (action === "stop") return "停止";
+  return "重启";
+}
+
+async function controlSessionOpencode(action: "start" | "stop" | "restart") {
+  if (!selectedSessionId.value) return;
+
+  setOpencodeLoading(action, true);
+  try {
+    const result = await $fetch<SessionOpencodeControlResult>(`${sessionsApiBase}/${selectedSessionId.value}/opencode/control`, {
+      method: "POST",
+      body: {
+        action,
+      },
+    });
+
+    const statusText = result.status === "running"
+      ? `运行中${result.pid ? `（PID ${result.pid}）` : ""}`
+      : "已停止";
+    toast.add({
+      title: `Opencode 已${opencodeActionLabel(action)}`,
+      description: `${statusText} · 目录 ${result.container_session_path}`,
+      color: "success",
+    });
+    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
+  } catch (error: unknown) {
+    toast.add({ title: getErrorMessage(error, `Opencode ${opencodeActionLabel(action)}失败`), color: "error" });
+  } finally {
+    setOpencodeLoading(action, false);
+  }
+}
+
 async function submitPrompt() {
   if (!selectedSessionId.value || !promptDraft.value.trim()) return;
 
@@ -626,7 +685,7 @@ async function pinMessage(messageId: string) {
           color="neutral"
           variant="ghost"
           :loading="sessionListPending"
-          @click="refreshSessionList"
+          @click="() => refreshSessionList()"
         >
           刷新
         </UButton>
@@ -667,7 +726,7 @@ async function pinMessage(messageId: string) {
               variant="ghost"
               icon="i-lucide-refresh-cw"
               :loading="runtimeSummaryPending"
-              @click="refreshRuntimeSummary"
+              @click="() => refreshRuntimeSummary()"
             >
               刷新
             </UButton>
@@ -1019,6 +1078,42 @@ async function pinMessage(messageId: string) {
                   @click="retrySession"
                 >
                   重试
+                </UButton>
+
+                <UButton
+                  v-if="canManageSession"
+                  icon="i-lucide-play"
+                  color="primary"
+                  variant="soft"
+                  :loading="opencodeStartLoading"
+                  :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
+                  @click="controlSessionOpencode('start')"
+                >
+                  启动 Opencode
+                </UButton>
+
+                <UButton
+                  v-if="canManageSession"
+                  icon="i-lucide-square"
+                  color="warning"
+                  variant="soft"
+                  :loading="opencodeStopLoading"
+                  :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
+                  @click="controlSessionOpencode('stop')"
+                >
+                  停止 Opencode
+                </UButton>
+
+                <UButton
+                  v-if="canManageSession"
+                  icon="i-lucide-refresh-cw"
+                  color="info"
+                  variant="ghost"
+                  :loading="opencodeRestartLoading"
+                  :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
+                  @click="controlSessionOpencode('restart')"
+                >
+                  重启 Opencode
                 </UButton>
 
                 <UButton

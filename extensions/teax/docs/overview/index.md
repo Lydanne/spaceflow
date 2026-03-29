@@ -14,7 +14,7 @@
 - `architecture.md`
   - 平台定位、用户体系、功能模块、技术栈
 - `agents-design.md`
-  - 仓库级/系统级 Agents 设计、元数据仓库、权限与治理
+  - 当前 Agents 已实现模型（Runtime/Session/协作/权限）
 - `agents-runtime.md`
   - 当前 P1 已落地运行手册（Docker Runtime + Session 目录生命周期）
 
@@ -23,7 +23,7 @@
 - [API 规范](../api-specification.md)
 - [权限系统](../permission-system.md)
 - [CI/CD 集成](../cicd-integration.md)
-- [OpenCode 集成细节](../agent-system.md)
+- [Agents 当前实现文档](../agent-system.md)
 - [数据库设计](../database-design.md)
 - [部署配置](../deployment.md)
 - [飞书集成](../feishu-integration.md)

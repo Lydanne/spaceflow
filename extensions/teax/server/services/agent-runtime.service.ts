@@ -8,6 +8,9 @@ import { resolveAgentMetaRepoConfig } from "~~/server/services/agent-meta-config
 
 const repoLocks = new Map<string, Promise<void>>();
 const AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG = "teax-agent-runtime:base";
+const AGENT_RUNTIME_OPENCODE_PID_FILENAME = ".teax-opencode.pid";
+const AGENT_RUNTIME_OPENCODE_LOG_FILENAME = ".teax-opencode.log";
+const AGENT_RUNTIME_OPENCODE_FALLBACK_COMMANDS = ["opencode serve", "opencode server"];
 
 /**
  * Runtime 全局解析配置。
@@ -23,6 +26,7 @@ interface RuntimeResolvedConfig {
   dockerBuildOnStart: boolean;
   dockerWorkspaceRoot: string;
   keepWorktreeOnStop: boolean;
+  opencodeStartCommand: string;
 }
 
 interface RepoPathInfo {
@@ -35,6 +39,18 @@ interface RepoPathInfo {
  */
 interface RepoContainerPathInfo {
   containerSessionPath: string;
+}
+
+interface SessionOpencodePathInfo {
+  hostSessionPath: string;
+  containerSessionPath: string;
+  containerPidFilePath: string;
+  containerLogFilePath: string;
+}
+
+interface SessionOpencodeState {
+  status: "running" | "stopped";
+  pid: number | null;
 }
 
 /**
@@ -66,7 +82,22 @@ interface DockerExecOptions {
 interface RuntimeGitAuth {
   username: string;
   token: string;
-  tokenSource: "AGENT_META_REPO_TOKEN" | "AGENT_BOT_TOKEN" | "GITEA_SERVICE_TOKEN";
+  tokenSource: "AGENT_META_REPO_TOKEN" | "AGENT_BOT_TOKEN" | "GITEA_SERVICE_TOKEN" | "none";
+}
+
+export type AgentSessionOpencodeAction = "start" | "stop" | "restart";
+
+export interface AgentSessionOpencodeControlResult {
+  action: AgentSessionOpencodeAction;
+  status: "running" | "stopped";
+  pid: number | null;
+  command: string | null;
+  runtime_key: string;
+  session_id: string;
+  session_path: string;
+  container_session_path: string;
+  pid_file: string;
+  log_file: string;
 }
 
 /**
@@ -114,6 +145,7 @@ function resolveRuntimeConfig(): RuntimeResolvedConfig {
     dockerBuildOnStart: config.agentRuntimeDockerBuildOnStart !== false,
     dockerWorkspaceRoot: String(config.agentRuntimeDockerWorkspaceRoot || "/runtime"),
     keepWorktreeOnStop: config.agentRuntimeKeepWorktreeOnStop === true,
+    opencodeStartCommand: String(config.agentRuntimeOpencodeStartCommand || "").trim(),
   };
 }
 
@@ -519,6 +551,53 @@ function buildRepoContainerPaths(sessionId: string): RepoContainerPathInfo {
   };
 }
 
+function buildSessionOpencodePaths(sessionId: string): SessionOpencodePathInfo {
+  const repoPaths = buildRepoPaths(sessionId);
+  const containerPaths = buildRepoContainerPaths(sessionId);
+  return {
+    hostSessionPath: repoPaths.sessionPath,
+    containerSessionPath: containerPaths.containerSessionPath,
+    containerPidFilePath: posix.join(containerPaths.containerSessionPath, AGENT_RUNTIME_OPENCODE_PID_FILENAME),
+    containerLogFilePath: posix.join(containerPaths.containerSessionPath, AGENT_RUNTIME_OPENCODE_LOG_FILENAME),
+  };
+}
+
+function parseCommandKvOutput(output: string): Record<string, string> {
+  const parsed: Record<string, string> = {};
+  const lines = output.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex <= 0) continue;
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed.slice(separatorIndex + 1).trim();
+    if (!key) continue;
+    parsed[key] = value;
+  }
+  return parsed;
+}
+
+function toNullablePid(value: string | undefined): number | null {
+  const parsed = Number(value || "");
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+function summarizeDockerExecError(error: unknown): string {
+  const stdout = String((error as { stdout?: string })?.stdout || "").trim();
+  const stderr = String((error as { stderr?: string })?.stderr || "").trim();
+  const combined = [stderr, stdout].filter(Boolean).join("\n");
+  if (!combined) {
+    return (error as { message?: string })?.message || "unknown error";
+  }
+  const lines = combined
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines.slice(-8).join(" | ");
+}
+
 async function inspectDockerContainer(containerName: string) {
   try {
     const result = await runDocker([
@@ -879,6 +958,161 @@ async function stopAndRemoveDockerContainer(containerName: string) {
   }
   await runDocker(["rm", containerName]);
   return true;
+}
+
+function buildOpencodeStartCommandCandidates(): string[] {
+  const runtimeConfig = resolveRuntimeConfig();
+  const commands = [
+    runtimeConfig.opencodeStartCommand,
+    ...AGENT_RUNTIME_OPENCODE_FALLBACK_COMMANDS,
+  ]
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const deduped = new Set<string>();
+  for (const command of commands) {
+    deduped.add(command);
+  }
+  return Array.from(deduped);
+}
+
+async function readSessionOpencodeState(params: {
+  runtimeKey: string;
+  sessionId: string;
+}): Promise<SessionOpencodeState> {
+  const paths = buildSessionOpencodePaths(params.sessionId);
+  const script = [
+    "set -eu",
+    `session_dir=${JSON.stringify(paths.containerSessionPath)}`,
+    `pid_file=${JSON.stringify(paths.containerPidFilePath)}`,
+    "if [ ! -d \"$session_dir\" ]; then",
+    "  echo \"status=stopped\"",
+    "  exit 0",
+    "fi",
+    "if [ -f \"$pid_file\" ]; then",
+    "  pid=\"$(cat \"$pid_file\" 2>/dev/null || true)\"",
+    "  case \"$pid\" in",
+    "    ''|*[!0-9]*) pid=\"\" ;;",
+    "  esac",
+    "  if [ -n \"$pid\" ] && kill -0 \"$pid\" 2>/dev/null; then",
+    "    echo \"status=running\"",
+    "    echo \"pid=$pid\"",
+    "    exit 0",
+    "  fi",
+    "  rm -f \"$pid_file\"",
+    "fi",
+    "echo \"status=stopped\"",
+  ].join("\n");
+
+  const result = await runDockerExec(params.runtimeKey, ["sh", "-lc", script]);
+  const parsed = parseCommandKvOutput(result.stdout);
+  return {
+    status: parsed.status === "running" ? "running" : "stopped",
+    pid: toNullablePid(parsed.pid),
+  };
+}
+
+async function stopSessionOpencodeInContainer(params: {
+  runtimeKey: string;
+  sessionId: string;
+}) {
+  const paths = buildSessionOpencodePaths(params.sessionId);
+  const script = [
+    "set -eu",
+    `session_dir=${JSON.stringify(paths.containerSessionPath)}`,
+    `pid_file=${JSON.stringify(paths.containerPidFilePath)}`,
+    "if [ ! -d \"$session_dir\" ]; then",
+    "  echo \"status=stopped\"",
+    "  exit 0",
+    "fi",
+    "if [ -f \"$pid_file\" ]; then",
+    "  pid=\"$(cat \"$pid_file\" 2>/dev/null || true)\"",
+    "  case \"$pid\" in",
+    "    ''|*[!0-9]*) pid=\"\" ;;",
+    "  esac",
+    "  if [ -n \"$pid\" ] && kill -0 \"$pid\" 2>/dev/null; then",
+    "    kill \"$pid\" 2>/dev/null || true",
+    "    i=0",
+    "    while [ \"$i\" -lt 10 ] && kill -0 \"$pid\" 2>/dev/null; do",
+    "      sleep 1",
+    "      i=$((i + 1))",
+    "    done",
+    "    if kill -0 \"$pid\" 2>/dev/null; then",
+    "      kill -9 \"$pid\" 2>/dev/null || true",
+    "    fi",
+    "  fi",
+    "  rm -f \"$pid_file\"",
+    "fi",
+    "echo \"status=stopped\"",
+  ].join("\n");
+
+  await runDockerExec(params.runtimeKey, ["sh", "-lc", script]);
+}
+
+async function startSessionOpencodeInContainer(params: {
+  runtimeKey: string;
+  sessionId: string;
+}): Promise<{ command: string | null }> {
+  const paths = buildSessionOpencodePaths(params.sessionId);
+  const [command1, command2, command3] = buildOpencodeStartCommandCandidates();
+  const script = [
+    "set -eu",
+    `session_dir=${JSON.stringify(paths.containerSessionPath)}`,
+    `pid_file=${JSON.stringify(paths.containerPidFilePath)}`,
+    `log_file=${JSON.stringify(paths.containerLogFilePath)}`,
+    `cmd1=${JSON.stringify(command1 || "")}`,
+    `cmd2=${JSON.stringify(command2 || "")}`,
+    `cmd3=${JSON.stringify(command3 || "")}`,
+    "if [ ! -d \"$session_dir\" ]; then",
+    "  echo \"session directory does not exist: $session_dir\"",
+    "  exit 1",
+    "fi",
+    "if [ -f \"$pid_file\" ]; then",
+    "  pid=\"$(cat \"$pid_file\" 2>/dev/null || true)\"",
+    "  case \"$pid\" in",
+    "    ''|*[!0-9]*) pid=\"\" ;;",
+    "  esac",
+    "  if [ -n \"$pid\" ] && kill -0 \"$pid\" 2>/dev/null; then",
+    "    echo \"status=running\"",
+    "    echo \"pid=$pid\"",
+    "    echo \"command=\"",
+    "    exit 0",
+    "  fi",
+    "  rm -f \"$pid_file\"",
+    "fi",
+    "touch \"$log_file\"",
+    "cd \"$session_dir\"",
+    "start_one() {",
+    "  candidate=\"$1\"",
+    "  if [ -z \"$candidate\" ]; then",
+    "    return 1",
+    "  fi",
+    "  nohup sh -lc \"$candidate\" >> \"$log_file\" 2>&1 &",
+    "  pid=$!",
+    "  echo \"$pid\" > \"$pid_file\"",
+    "  sleep 1",
+    "  if kill -0 \"$pid\" 2>/dev/null; then",
+    "    echo \"status=running\"",
+    "    echo \"pid=$pid\"",
+    "    echo \"command=$candidate\"",
+    "    return 0",
+    "  fi",
+    "  wait \"$pid\" 2>/dev/null || true",
+    "  rm -f \"$pid_file\"",
+    "  return 1",
+    "}",
+    "start_one \"$cmd1\" || start_one \"$cmd2\" || start_one \"$cmd3\" || {",
+    "  echo \"failed to start opencode\"",
+    "  tail -n 40 \"$log_file\" || true",
+    "  exit 1",
+    "}",
+  ].join("\n");
+
+  const result = await runDockerExec(params.runtimeKey, ["sh", "-lc", script]);
+  const parsed = parseCommandKvOutput(result.stdout);
+  return {
+    command: parsed.command || null,
+  };
 }
 
 /**
@@ -1439,6 +1673,118 @@ export async function stopRepoRuntime(params: {
     stopped: true,
     active_worktree_count: activeWorktrees.length,
   };
+}
+
+export async function controlAgentSessionOpencodeProcess(params: {
+  repositoryId: string;
+  sessionId: string;
+  action: AgentSessionOpencodeAction;
+}) {
+  const db = useDB();
+  const [session] = await db
+    .select({
+      id: schema.agentSessions.id,
+      runtime_id: schema.agentSessions.runtime_id,
+    })
+    .from(schema.agentSessions)
+    .where(
+      and(
+        eq(schema.agentSessions.id, params.sessionId),
+        eq(schema.agentSessions.repository_id, params.repositoryId),
+      ),
+    )
+    .limit(1);
+
+  if (!session) {
+    throw createError({ statusCode: 404, message: "Agent session not found" });
+  }
+
+  if (!session.runtime_id) {
+    throw createError({
+      statusCode: 409,
+      message: "Session runtime is not ready yet",
+    });
+  }
+
+  const [runtime] = await db
+    .select({
+      id: schema.agentRuntimes.id,
+      provider: schema.agentRuntimes.provider,
+      runtime_key: schema.agentRuntimes.runtime_key,
+    })
+    .from(schema.agentRuntimes)
+    .where(eq(schema.agentRuntimes.id, session.runtime_id))
+    .limit(1);
+
+  if (!runtime) {
+    throw createError({ statusCode: 404, message: "Runtime not found for this session" });
+  }
+  if (runtime.provider !== "docker") {
+    throw createError({ statusCode: 400, message: "Only docker runtime supports opencode control" });
+  }
+
+  const runtimeKey = runtime.runtime_key || buildRepoRuntimeKey(params.repositoryId);
+  const inspected = await inspectDockerContainer(runtimeKey);
+  if (!inspected?.running) {
+    throw createError({
+      statusCode: 409,
+      message: "Runtime container is not running, please start runtime first",
+    });
+  }
+
+  const paths = buildSessionOpencodePaths(params.sessionId);
+
+  let command: string | null = null;
+
+  await withRepositoryLock(params.repositoryId, async () => {
+    try {
+      if (params.action === "start") {
+        const started = await startSessionOpencodeInContainer({
+          runtimeKey,
+          sessionId: params.sessionId,
+        });
+        command = started.command;
+      } else if (params.action === "stop") {
+        await stopSessionOpencodeInContainer({
+          runtimeKey,
+          sessionId: params.sessionId,
+        });
+      } else {
+        await stopSessionOpencodeInContainer({
+          runtimeKey,
+          sessionId: params.sessionId,
+        });
+        const started = await startSessionOpencodeInContainer({
+          runtimeKey,
+          sessionId: params.sessionId,
+        });
+        command = started.command;
+      }
+    } catch (error) {
+      throw createError({
+        statusCode: 500,
+        message: `Failed to ${params.action} opencode: ${summarizeDockerExecError(error)}`,
+      });
+    }
+  });
+
+  const state = await readSessionOpencodeState({
+    runtimeKey,
+    sessionId: params.sessionId,
+  });
+
+  return {
+    action: params.action,
+    status: state.status,
+    pid: state.pid,
+    command,
+    runtime_key: runtimeKey,
+    session_id: params.sessionId,
+    session_path: paths.hostSessionPath,
+    container_session_path: paths.containerSessionPath,
+    pid_file: paths.containerPidFilePath,
+    log_file: paths.containerLogFilePath,
+  } satisfies AgentSessionOpencodeControlResult;
 }
 
 export async function getSessionWorktreeBySessionId(params: {
