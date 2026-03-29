@@ -140,6 +140,14 @@ export interface AgentSessionOpencodeMessage {
   updated_at: string;
 }
 
+export interface AgentSessionOpencodeModelOption {
+  id: string;
+  label: string;
+  provider_id: string | null;
+  provider_name: string | null;
+  is_default: boolean;
+}
+
 /**
  * `agent_runtimes.metadata.docker` 关键字段结构。
  * - meta_repo_container_path 固定为 `${AGENT_RUNTIME_ROOT}/.teax`
@@ -1567,15 +1575,22 @@ async function sendPromptToOpencodeServerSession(params: {
   endpoint: SessionOpencodeServerEndpoint;
   opencodeSessionId: string;
   prompt: string;
+  model?: string | null;
 }) {
+  const model = String(params.model || "").trim();
+  const requestBody: Record<string, unknown> = {
+    parts: [{ type: "text", text: params.prompt }],
+  };
+  if (model) {
+    requestBody.model = model;
+  }
+
   const response = await callSessionOpencodeHttp({
     runtimeKey: params.runtimeKey,
     endpoint: params.endpoint,
     method: "POST",
     path: `/session/${encodeURIComponent(params.opencodeSessionId)}/message`,
-    body: {
-      parts: [{ type: "text", text: params.prompt }],
-    },
+    body: requestBody,
   });
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -1594,6 +1609,7 @@ export async function promptAgentSessionOpencode(params: {
   prompt: string;
   opencodeSessionId?: string | null;
   sessionTitle?: string | null;
+  model?: string | null;
 }) {
   const context = await resolveSessionOpencodeContext({
     repositoryId: params.repositoryId,
@@ -1621,6 +1637,7 @@ export async function promptAgentSessionOpencode(params: {
       endpoint: context.endpoint,
       opencodeSessionId,
       prompt: params.prompt,
+      model: params.model,
     });
 
     await updateWorktreeOpencodeMetadata({
@@ -1646,6 +1663,100 @@ export async function promptAgentSessionOpencode(params: {
       server_base_url: `http://${context.endpoint.hostname}:${context.endpoint.port}`,
     } satisfies AgentSessionOpencodePromptResult;
   });
+}
+
+function parseOpencodeModelOptions(payload: unknown): AgentSessionOpencodeModelOption[] {
+  const data = asRecord(payload);
+  const providersRaw = Array.isArray(data.providers) ? data.providers : [];
+  const defaultsMap = asRecord(data.default);
+  const options: AgentSessionOpencodeModelOption[] = [];
+  const seen = new Set<string>();
+
+  for (const providerItem of providersRaw) {
+    const providerRecord = asRecord(providerItem);
+    const providerId = String(
+      providerRecord.id
+      || providerRecord.providerID
+      || providerRecord.provider_id
+      || providerRecord.name
+      || "",
+    ).trim();
+    if (!providerId) continue;
+
+    const providerName = String(providerRecord.name || providerId).trim() || providerId;
+    const providerDefaultModel = String(defaultsMap[providerId] || "").trim();
+    const modelsRaw = Array.isArray(providerRecord.models) ? providerRecord.models : [];
+
+    for (const modelItem of modelsRaw) {
+      const modelRecord = asRecord(modelItem);
+      const fallbackModel = typeof modelItem === "string" ? modelItem : "";
+      const modelId = String(
+        modelRecord.id
+        || modelRecord.modelID
+        || modelRecord.model_id
+        || modelRecord.key
+        || modelRecord.name
+        || fallbackModel,
+      ).trim();
+      if (!modelId) continue;
+
+      const optionId = modelId.includes("/") ? modelId : `${providerId}/${modelId}`;
+      if (seen.has(optionId)) continue;
+      seen.add(optionId);
+
+      const modelName = String(modelRecord.name || modelId).trim() || modelId;
+      options.push({
+        id: optionId,
+        label: `${providerName} / ${modelName}`,
+        provider_id: providerId,
+        provider_name: providerName,
+        is_default: providerDefaultModel === modelId || providerDefaultModel === optionId,
+      });
+    }
+  }
+
+  return options.sort((a, b) => {
+    if (a.is_default && !b.is_default) return -1;
+    if (!a.is_default && b.is_default) return 1;
+    return a.label.localeCompare(b.label);
+  });
+}
+
+export async function listAgentSessionOpencodeModels(params: {
+  repositoryId: string;
+  sessionId: string;
+}) {
+  const context = await resolveSessionOpencodeContext({
+    repositoryId: params.repositoryId,
+    sessionId: params.sessionId,
+  });
+
+  const ready = await ensureSessionOpencodeServerReady({
+    runtimeKey: context.runtimeKey,
+    sessionId: params.sessionId,
+    endpoint: context.endpoint,
+  });
+
+  const response = await callSessionOpencodeHttp({
+    runtimeKey: context.runtimeKey,
+    endpoint: context.endpoint,
+    method: "GET",
+    path: "/config/providers",
+  });
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw createError({
+      statusCode: 500,
+      message: `Failed to list opencode models: ${response.bodyText || `HTTP ${response.statusCode}`}`,
+    });
+  }
+
+  return {
+    data: parseOpencodeModelOptions(response.bodyJson),
+    server_hostname: context.endpoint.hostname,
+    server_port: context.endpoint.port,
+    server_status: ready.state.status,
+  };
 }
 
 export async function listAgentSessionOpencodeMessages(params: {

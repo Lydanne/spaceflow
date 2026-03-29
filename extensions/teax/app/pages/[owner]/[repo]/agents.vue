@@ -72,6 +72,30 @@ interface PaginatedResponse<T> {
   hasMore: boolean;
 }
 
+interface RepoBranch {
+  name: string;
+}
+
+interface RepoBranchesResponse {
+  data: RepoBranch[];
+  default_branch: string | null;
+}
+
+interface SessionOpencodeModelOption {
+  id: string;
+  label: string;
+  provider_id: string | null;
+  provider_name: string | null;
+  is_default: boolean;
+}
+
+interface SessionOpencodeModelsResponse {
+  data: SessionOpencodeModelOption[];
+  server_hostname: string;
+  server_port: number;
+  server_status: "running" | "stopped";
+}
+
 const props = defineProps<{
   owner: string;
   repo: string;
@@ -87,6 +111,9 @@ const { data: sessionListResp, pending: sessionListPending, refresh: refreshSess
 >(sessionsApiBase, {
   query: { page: 1, limit: 50 },
 });
+const { data: branchesResp } = await useFetch<RepoBranchesResponse>(
+  `/api/repos/${props.owner}/${props.repo}/branches`,
+);
 
 const sessions = computed(() => sessionListResp.value?.data ?? []);
 const selectedSessionId = ref<string | null>(null);
@@ -103,11 +130,15 @@ const createLoading = ref(false);
 const sendPromptLoading = ref(false);
 const sessionSettingsPending = ref(false);
 const sessionVisibilitySaving = ref(false);
+const sessionModelsPending = ref(false);
 const messageViewportRef = ref<HTMLElement | null>(null);
 const shouldStickToBottom = ref(true);
 const sessionParticipants = ref<AgentSessionParticipant[]>([]);
+const sessionModels = ref<SessionOpencodeModelOption[]>([]);
 const sessionVisibilityDraft = ref<"public" | "private">("public");
 const participantSavingState = reactive<Record<string, boolean>>({});
+const selectedComposerBranch = ref("");
+const selectedComposerModel = ref("");
 
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 const SESSION_MESSAGES_PAGE_LIMIT = 100;
@@ -126,6 +157,43 @@ const participantRoleOptions = [
   { label: "协作者", value: "collaborator" },
   { label: "只读", value: "viewer" },
 ];
+
+const composerBranchOptions = computed(() => {
+  const values = new Set<string>();
+  const ordered: string[] = [];
+  const push = (raw: string | null | undefined) => {
+    const value = String(raw || "").trim();
+    if (!value || values.has(value)) return;
+    values.add(value);
+    ordered.push(value);
+  };
+
+  const branchRows = branchesResp.value?.data || [];
+  for (const row of branchRows) {
+    push(row.name);
+  }
+  push(sessionDetail.value?.working_branch);
+  push(sessionDetail.value?.base_branch);
+
+  return ordered.map((value) => ({ label: value, value }));
+});
+
+const composerModelOptions = computed(() => {
+  const fallback = selectedComposerModel.value
+    || sessionModels.value.find((item) => item.is_default)?.id
+    || "default";
+  const options = sessionModels.value.map((item) => ({
+    label: item.label,
+    value: item.id,
+  }));
+  if (!options.some((item) => item.value === fallback)) {
+    options.unshift({
+      label: fallback === "default" ? "默认模型" : fallback,
+      value: fallback,
+    });
+  }
+  return options;
+});
 
 const canManageSession = computed(() => {
   if (!sessionDetail.value) return false;
@@ -159,6 +227,9 @@ watch(
   async (sessionId) => {
     showSessionSettingsModal.value = false;
     sessionParticipants.value = [];
+    sessionModels.value = [];
+    selectedComposerModel.value = "";
+    selectedComposerBranch.value = "";
     if (!sessionId) {
       sessionDetail.value = null;
       messages.value = [];
@@ -170,6 +241,17 @@ watch(
     await loadSessionContext(sessionId);
   },
   { immediate: true },
+);
+
+watch(
+  sessionDetail,
+  (detail) => {
+    if (!detail) return;
+    const branch = (detail.working_branch || detail.base_branch || "").trim();
+    if (branch) {
+      selectedComposerBranch.value = branch;
+    }
+  },
 );
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -230,19 +312,15 @@ function messageModelRef(message: AgentSessionMessage): string | null {
     || null;
 }
 
-const composerBranchLabel = computed(() => {
-  return (sessionDetail.value?.working_branch || sessionDetail.value?.base_branch || "-").trim() || "-";
-});
-
-const composerModelLabel = computed(() => {
+function resolveLatestModelRef(): string | null {
   for (let i = messages.value.length - 1; i >= 0; i -= 1) {
     const message = messages.value[i];
     if (!message) continue;
     const model = messageModelRef(message);
     if (model) return model;
   }
-  return "默认";
-});
+  return null;
+}
 
 function isUserMessage(message: AgentSessionMessage): boolean {
   return message.actor_type === "user";
@@ -306,6 +384,12 @@ async function loadSessionContext(sessionId: string) {
 
     sessionDetail.value = detail;
     messages.value = messageResp.data;
+    await loadSessionModels(sessionId);
+    if (!selectedComposerModel.value) {
+      selectedComposerModel.value = resolveLatestModelRef()
+        || sessionModels.value.find((item) => item.is_default)?.id
+        || "default";
+    }
     await maybeScrollToBottom(true);
   } catch (error: unknown) {
     if (selectedSessionId.value !== sessionId) return;
@@ -328,9 +412,30 @@ async function refreshSessionRealtime(sessionId: string) {
     if (selectedSessionId.value !== sessionId) return;
     sessionDetail.value = detail;
     messages.value = messageResp.data;
+    if (!selectedComposerModel.value) {
+      selectedComposerModel.value = resolveLatestModelRef()
+        || sessionModels.value.find((item) => item.is_default)?.id
+        || "default";
+    }
     await maybeScrollToBottom(false);
   } catch {
     // 静默失败，避免打断用户输入
+  }
+}
+
+async function loadSessionModels(sessionId: string) {
+  sessionModelsPending.value = true;
+  try {
+    const response = await $fetch<SessionOpencodeModelsResponse>(`${sessionsApiBase}/${sessionId}/opencode/models`);
+    if (selectedSessionId.value !== sessionId) return;
+    sessionModels.value = response.data || [];
+  } catch {
+    if (selectedSessionId.value !== sessionId) return;
+    sessionModels.value = [];
+  } finally {
+    if (selectedSessionId.value === sessionId) {
+      sessionModelsPending.value = false;
+    }
   }
 }
 
@@ -479,13 +584,19 @@ async function submitPrompt() {
 
   sendPromptLoading.value = true;
   try {
-    const branchRef = sessionDetail.value?.working_branch || sessionDetail.value?.base_branch || null;
+    const branchRef = selectedComposerBranch.value.trim()
+      || sessionDetail.value?.working_branch
+      || sessionDetail.value?.base_branch
+      || null;
+    const rawModel = selectedComposerModel.value.trim();
+    const selectedModel = rawModel && rawModel !== "default" ? rawModel : null;
     await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/prompt`, {
       method: "POST",
       body: {
         prompt: promptDraft.value.trim(),
         metadata: {
           branch_ref: branchRef,
+          model: selectedModel,
           session_id: selectedSessionId.value,
         },
       },
@@ -736,23 +847,30 @@ async function submitPrompt() {
                 :disabled="!canChatInSession"
               />
               <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-1.5 min-w-0">
-                  <UBadge
-                    color="neutral"
-                    variant="soft"
-                    size="xs"
-                    class="truncate max-w-52"
-                  >
-                    【分支】{{ composerBranchLabel }}
-                  </UBadge>
-                  <UBadge
-                    color="neutral"
-                    variant="soft"
-                    size="xs"
-                    class="truncate max-w-56"
-                  >
-                    【模型】{{ composerModelLabel }}
-                  </UBadge>
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class="inline-flex items-center gap-1 shrink min-w-0">
+                    <span class="text-xs text-muted shrink-0">【分支】</span>
+                    <USelect
+                      v-model="selectedComposerBranch"
+                      :items="composerBranchOptions"
+                      value-key="value"
+                      size="sm"
+                      class="w-44 min-w-0"
+                      :disabled="composerBranchOptions.length === 0"
+                    />
+                  </div>
+                  <div class="inline-flex items-center gap-1 shrink min-w-0">
+                    <span class="text-xs text-muted shrink-0">【模型】</span>
+                    <USelect
+                      v-model="selectedComposerModel"
+                      :items="composerModelOptions"
+                      value-key="value"
+                      size="sm"
+                      class="w-56 min-w-0"
+                      :loading="sessionModelsPending"
+                      :disabled="sessionModelsPending || composerModelOptions.length === 0"
+                    />
+                  </div>
                 </div>
                 <UButton
                   icon="i-lucide-send"

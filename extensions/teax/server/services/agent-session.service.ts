@@ -4,6 +4,7 @@ import {
   cleanupSessionWorktree,
   controlAgentSessionOpencodeProcess,
   getSessionWorktreeBySessionId,
+  listAgentSessionOpencodeModels,
   listAgentSessionOpencodeMessages,
   type AgentSessionOpencodeAction,
   promptAgentSessionOpencode,
@@ -708,6 +709,19 @@ export async function listAgentSessionMessages(params: {
   };
 }
 
+export async function listAgentSessionModels(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const session = await ensureSessionReadable(params.sessionId, params.repositoryId, params.actor);
+
+  return listAgentSessionOpencodeModels({
+    repositoryId: params.repositoryId,
+    sessionId: session.id,
+  });
+}
+
 export async function createAgentSessionMessage(params: {
   repositoryId: string;
   sessionId: string;
@@ -717,9 +731,15 @@ export async function createAgentSessionMessage(params: {
 }) {
   const db = useDB();
   const session = await ensureSessionChatAllowed(params.sessionId, params.repositoryId, params.actor);
-  const branchRef = resolveSessionBranchRef(session)
-    || String(params.metadata.branch_ref || "").trim()
+  const branchRef = String(params.metadata.branch_ref || "").trim()
+    || resolveSessionBranchRef(session)
     || null;
+  const modelRef = String(
+    params.metadata.model
+      || params.metadata.model_name
+      || params.metadata.model_id
+      || "",
+  ).trim() || null;
 
   try {
     const opencode = await promptAgentSessionOpencode({
@@ -728,6 +748,7 @@ export async function createAgentSessionMessage(params: {
       prompt: params.content,
       opencodeSessionId: session.opencode_session_id,
       sessionTitle: session.title,
+      model: modelRef,
     });
 
     if (opencode.opencode_session_id !== session.opencode_session_id) {
@@ -752,6 +773,7 @@ export async function createAgentSessionMessage(params: {
       metadata: {
         ...params.metadata,
         branch_ref: branchRef,
+        model: modelRef,
         source: "opencode_server",
         opencode_session_id: opencode.opencode_session_id,
         server_hostname: opencode.server_hostname,
