@@ -184,12 +184,12 @@ function messageRowClass(message: AgentSessionMessage): string {
 
 function messageBubbleClass(message: AgentSessionMessage): string {
   if (message.actor_type === "user") {
-    return "bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800";
+    return "bg-primary-500/10 border-primary-500/30";
   }
   if (message.actor_type === "agent") {
-    return "bg-gray-50 dark:bg-gray-900/40 border-gray-200 dark:border-gray-700";
+    return "bg-gray-500/10 border-gray-500/20";
   }
-  return "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800";
+  return "bg-amber-500/10 border-amber-500/30";
 }
 
 function messageActorLabel(message: AgentSessionMessage): string {
@@ -351,14 +351,14 @@ async function submitPrompt() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-3">
-    <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 dark:border-gray-800 px-4 py-3 bg-white dark:bg-gray-950/40">
+  <div class="flex flex-col gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-2">
       <div>
-        <h2 class="text-base font-semibold">
+        <h2 class="text-base font-semibold tracking-tight">
           Agents
         </h2>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-          简洁聊天视图。复杂状态统一在设置页管理。
+        <p class="text-xs text-muted mt-1">
+          会话 + 聊天。运行状态和控制统一在设置页。
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -389,24 +389,29 @@ async function submitPrompt() {
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-3 lg:h-[calc(100dvh-13rem)] lg:min-h-[620px]">
-      <aside class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950/40 flex flex-col overflow-hidden lg:min-h-0">
-        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-          <h3 class="text-sm font-semibold">
-            会话
-          </h3>
-          <UBadge
-            color="neutral"
-            variant="subtle"
-          >
-            {{ sessions.length }}
-          </UBadge>
-        </div>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <UCard
+        class="lg:col-span-4 xl:col-span-3"
+        :ui="{ body: 'p-0' }"
+      >
+        <template #header>
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-sm font-semibold">
+              会话
+            </h3>
+            <UBadge
+              color="neutral"
+              variant="subtle"
+            >
+              {{ sessions.length }}
+            </UBadge>
+          </div>
+        </template>
 
-        <div class="p-2.5 flex-1 lg:min-h-0 lg:overflow-y-auto space-y-2">
+        <div class="p-2 space-y-2 max-h-[32rem] overflow-y-auto">
           <div
             v-if="sessionListPending && sessions.length === 0"
-            class="py-10 text-center text-gray-400"
+            class="py-10 text-center text-muted text-sm"
           >
             <UIcon
               name="i-lucide-loader-2"
@@ -417,11 +422,11 @@ async function submitPrompt() {
 
           <div
             v-else-if="sessions.length === 0"
-            class="py-10 text-center text-gray-400"
+            class="py-10 text-center text-muted text-sm"
           >
             <UIcon
               name="i-lucide-message-square-plus"
-              class="w-9 h-9 mx-auto mb-2"
+              class="w-8 h-8 mx-auto mb-2"
             />
             暂无会话
           </div>
@@ -433,15 +438,15 @@ async function submitPrompt() {
             class="w-full text-left rounded-lg border px-3 py-2.5 transition-colors"
             :class="[
               selectedSessionId === item.id
-                ? 'border-primary-500 bg-primary-50/70 dark:bg-primary-900/20'
-                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/40',
+                ? 'border-primary-500 bg-primary-500/10'
+                : 'border-default hover:bg-gray-500/10',
             ]"
             @click="selectedSessionId = item.id"
           >
             <p class="font-medium text-sm truncate">
               {{ sessionTitle(item) }}
             </p>
-            <div class="mt-2 text-xs text-gray-500 flex items-center gap-2">
+            <div class="mt-2 text-xs text-muted flex items-center gap-2">
               <span class="inline-flex items-center gap-1">
                 <UIcon
                   name="i-lucide-git-branch"
@@ -449,17 +454,20 @@ async function submitPrompt() {
                 />
                 {{ item.working_branch || item.base_branch }}
               </span>
-              <span class="text-gray-300">·</span>
+              <span>·</span>
               <span>{{ formatDateTime(item.updated_at) }}</span>
             </div>
           </button>
         </div>
-      </aside>
+      </UCard>
 
-      <section class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950/40 flex flex-col overflow-hidden lg:min-h-0">
+      <UCard
+        class="lg:col-span-8 xl:col-span-9"
+        :ui="{ body: 'p-0' }"
+      >
         <div
           v-if="!selectedSessionId"
-          class="flex-1 flex items-center justify-center text-gray-400"
+          class="h-[32rem] flex items-center justify-center text-muted"
         >
           <div class="text-center">
             <UIcon
@@ -472,7 +480,7 @@ async function submitPrompt() {
 
         <div
           v-else-if="sessionContextPending"
-          class="flex-1 flex items-center justify-center text-gray-400"
+          class="h-[32rem] flex items-center justify-center text-muted"
         >
           <div class="text-center">
             <UIcon
@@ -485,7 +493,7 @@ async function submitPrompt() {
 
         <div
           v-else-if="sessionContextError"
-          class="flex-1 flex items-center justify-center text-red-500 px-6"
+          class="h-[32rem] flex items-center justify-center text-red-500 px-6"
         >
           <div class="text-center">
             <UIcon
@@ -506,12 +514,12 @@ async function submitPrompt() {
         </div>
 
         <template v-else-if="sessionDetail">
-          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex flex-wrap items-center justify-between gap-2 bg-gray-50/60 dark:bg-gray-900/20">
+          <div class="px-4 py-3 border-b border-default flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 class="text-base font-semibold">
                 {{ sessionTitle(sessionDetail) }}
               </h3>
-              <p class="text-xs text-gray-500 mt-1">
+              <p class="text-xs text-muted mt-1">
                 分支 {{ sessionDetail.working_branch || sessionDetail.base_branch }} · {{ formatDateTime(sessionDetail.updated_at) }}
               </p>
             </div>
@@ -528,12 +536,12 @@ async function submitPrompt() {
 
           <div
             ref="messageViewportRef"
-            class="flex-1 lg:min-h-0 overflow-y-auto px-4 py-4 space-y-3"
+            class="h-[32rem] overflow-y-auto px-4 py-4 space-y-3"
             @scroll="onMessageViewportScroll"
           >
             <div
               v-if="messages.length === 0"
-              class="text-sm text-gray-400 py-4"
+              class="text-sm text-muted py-4"
             >
               还没有消息，发第一条开始对话
             </div>
@@ -544,12 +552,12 @@ async function submitPrompt() {
               :class="messageRowClass(msg)"
             >
               <div
-                class="max-w-[86%] rounded-2xl border px-4 py-3 shadow-sm"
+                class="max-w-[86%] rounded-2xl border px-4 py-3"
                 :class="messageBubbleClass(msg)"
               >
-                <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
+                <div class="flex flex-wrap items-center gap-2 text-xs text-muted mb-2">
                   <span>{{ messageActorLabel(msg) }}</span>
-                  <span class="text-gray-300">·</span>
+                  <span>·</span>
                   <span>{{ formatDateTime(msg.created_at) }}</span>
                   <UBadge
                     v-if="messageBranchRef(msg)"
@@ -567,7 +575,7 @@ async function submitPrompt() {
             </div>
           </div>
 
-          <div class="border-t border-gray-200 dark:border-gray-800 p-3 bg-white/80 dark:bg-gray-950/60 space-y-2">
+          <div class="border-t border-default p-3 space-y-2">
             <UTextarea
               v-model="promptDraft"
               :rows="3"
@@ -596,7 +604,7 @@ async function submitPrompt() {
             </div>
           </div>
         </template>
-      </section>
+      </UCard>
     </div>
 
     <UModal v-model:open="showCreateModal">
