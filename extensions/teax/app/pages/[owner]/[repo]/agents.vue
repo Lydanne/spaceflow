@@ -140,6 +140,7 @@ const retryLoading = ref(false);
 const deleteLoading = ref(false);
 const visibilityLoading = ref(false);
 const pinningMessageId = ref<string | null>(null);
+const participantUpdatingUserId = ref<string | null>(null);
 const opencodeStartLoading = ref(false);
 const opencodeStopLoading = ref(false);
 const opencodeRestartLoading = ref(false);
@@ -161,6 +162,11 @@ const visibilityDraft = ref<"public" | "private">("public");
 const visibilityOptions = [
   { label: "公开", value: "public" },
   { label: "私有", value: "private" },
+];
+
+const participantRoleOptions = [
+  { label: "协作者", value: "collaborator" },
+  { label: "只读者", value: "viewer" },
 ];
 
 const createVisibilityOptions = [
@@ -598,6 +604,28 @@ async function pinMessage(messageId: string) {
     toast.add({ title: getErrorMessage(error, "置顶消息失败"), color: "error" });
   } finally {
     pinningMessageId.value = null;
+  }
+}
+
+async function updateParticipantPermission(item: AgentSessionParticipant) {
+  if (!selectedSessionId.value) return;
+  if (item.role === "owner") return;
+
+  participantUpdatingUserId.value = item.user_id;
+  try {
+    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/participants/${item.user_id}`, {
+      method: "PATCH",
+      body: {
+        role: item.role,
+        can_chat: item.can_chat,
+      },
+    });
+    toast.add({ title: "参与者权限已更新", color: "success" });
+    await refreshCurrentSession();
+  } catch (error: unknown) {
+    toast.add({ title: getErrorMessage(error, "更新参与者权限失败"), color: "error" });
+  } finally {
+    participantUpdatingUserId.value = null;
   }
 }
 </script>
@@ -1197,6 +1225,65 @@ async function pinMessage(messageId: string) {
               >
                 更新可见性
               </UButton>
+            </div>
+          </div>
+
+          <div class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-3">
+            <p class="text-sm font-medium">
+              参与者权限
+            </p>
+            <div class="space-y-2">
+              <div
+                v-for="item in participants"
+                :key="item.id"
+                class="rounded border border-gray-200 dark:border-gray-700 p-2"
+              >
+                <div class="flex flex-wrap items-center gap-2 justify-between">
+                  <div class="min-w-0">
+                    <p class="text-sm truncate">
+                      {{ item.gitea_username || shortId(item.user_id) }}
+                    </p>
+                    <p class="text-xs text-gray-500">
+                      {{ item.role === "owner" ? "Owner" : "可编辑权限" }}
+                    </p>
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-2">
+                    <template v-if="item.role === 'owner'">
+                      <UBadge
+                        color="neutral"
+                        variant="soft"
+                        size="xs"
+                      >
+                        owner
+                      </UBadge>
+                    </template>
+                    <template v-else>
+                      <USelect
+                        v-model="item.role"
+                        :items="participantRoleOptions"
+                        value-key="value"
+                        size="sm"
+                        class="w-24"
+                      />
+                      <div class="inline-flex items-center gap-1 text-xs text-gray-500">
+                        <span>可发言</span>
+                        <USwitch v-model="item.can_chat" />
+                      </div>
+                      <UButton
+                        icon="i-lucide-save"
+                        color="neutral"
+                        variant="soft"
+                        size="xs"
+                        :loading="participantUpdatingUserId === item.user_id"
+                        @click="updateParticipantPermission(item)"
+                      >
+                        保存
+                      </UButton>
+                    </template>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
