@@ -395,217 +395,217 @@ async function submitPrompt() {
     <div class="agents-layout gap-2">
       <aside class="agents-sidebar min-w-0">
         <UCard :ui="{ header: 'px-2.5 py-1.5', body: 'p-0' }">
-        <template #header>
-          <div class="flex items-center justify-between gap-2">
-            <h3 class="text-xs font-semibold tracking-wide">
-              会话
-            </h3>
-            <UBadge
-              color="neutral"
-              variant="subtle"
-              size="xs"
-            >
-              {{ sessions.length }}
-            </UBadge>
-          </div>
-        </template>
-
-        <div class="p-1.5 space-y-1 h-[calc(100dvh-19rem)] min-h-[12rem] overflow-y-auto">
-          <div
-            v-if="sessionListPending && sessions.length === 0"
-            class="py-6 text-center text-muted text-sm"
-          >
-            <UIcon
-              name="i-lucide-loader-2"
-              class="w-5 h-5 animate-spin mx-auto mb-2"
-            />
-            正在加载会话
-          </div>
-
-          <div
-            v-else-if="sessions.length === 0"
-            class="py-6 text-center text-muted text-sm"
-          >
-            <UIcon
-              name="i-lucide-message-square-plus"
-              class="w-8 h-8 mx-auto mb-2"
-            />
-            暂无会话
-          </div>
-
-          <button
-            v-for="item in sessions"
-            :key="item.id"
-            type="button"
-            class="w-full text-left rounded-md border px-1.5 py-1.5 transition-colors"
-            :class="[
-              selectedSessionId === item.id
-                ? 'border-primary-500 bg-primary-500/10'
-                : 'border-default hover:bg-gray-500/10',
-            ]"
-            @click="selectedSessionId = item.id"
-          >
-            <p class="font-medium text-xs truncate leading-5">
-              {{ sessionTitle(item) }}
-            </p>
-            <div class="mt-0.5 text-[10px] text-muted flex items-center gap-1">
-              <span class="inline-flex items-center gap-1">
-                <UIcon
-                  name="i-lucide-git-branch"
-                  class="w-2.5 h-2.5"
-                />
-                {{ item.working_branch || item.base_branch }}
-              </span>
-              <span class="opacity-60">·</span>
-              <span class="truncate">{{ formatDateTime(item.updated_at) }}</span>
+          <template #header>
+            <div class="flex items-center justify-between gap-2">
+              <h3 class="text-xs font-semibold tracking-wide">
+                会话
+              </h3>
+              <UBadge
+                color="neutral"
+                variant="subtle"
+                size="xs"
+              >
+                {{ sessions.length }}
+              </UBadge>
             </div>
-          </button>
-        </div>
+          </template>
+
+          <div class="space-y-1 h-[calc(100dvh-19rem)] min-h-[12rem] overflow-y-auto">
+            <div
+              v-if="sessionListPending && sessions.length === 0"
+              class="py-2 text-center text-muted text-sm"
+            >
+              <UIcon
+                name="i-lucide-loader-2"
+                class="w-5 h-5 animate-spin mx-auto mb-2"
+              />
+              正在加载会话
+            </div>
+
+            <div
+              v-else-if="sessions.length === 0"
+              class="py-6 text-center text-muted text-sm"
+            >
+              <UIcon
+                name="i-lucide-message-square-plus"
+                class="w-8 h-8 mx-auto mb-2"
+              />
+              暂无会话
+            </div>
+
+            <button
+              v-for="item in sessions"
+              :key="item.id"
+              type="button"
+              class="w-full text-left rounded-md border px-1.5 py-1.5 transition-colors"
+              :class="[
+                selectedSessionId === item.id
+                  ? 'border-primary-500 bg-primary-500/10'
+                  : 'border-default hover:bg-gray-500/10',
+              ]"
+              @click="selectedSessionId = item.id"
+            >
+              <p class="font-medium text-xs truncate leading-5">
+                {{ sessionTitle(item) }}
+              </p>
+              <div class="mt-0.5 text-[10px] text-muted flex items-center gap-1">
+                <span class="inline-flex items-center gap-1">
+                  <UIcon
+                    name="i-lucide-git-branch"
+                    class="w-2.5 h-2.5"
+                  />
+                  {{ item.working_branch || item.base_branch }}
+                </span>
+                <span class="opacity-60">·</span>
+                <span class="truncate">{{ formatDateTime(item.updated_at) }}</span>
+              </div>
+            </button>
+          </div>
         </UCard>
       </aside>
 
       <section class="agents-chat min-w-0">
         <UCard :ui="{ body: 'p-0' }">
-        <div
-          v-if="!selectedSessionId"
-          class="h-[calc(100dvh-19rem)] min-h-[14rem] flex items-center justify-center text-muted"
-        >
-          <div class="text-center">
-            <UIcon
-              name="i-lucide-message-square"
-              class="w-10 h-10 mx-auto mb-2"
-            />
-            选择一个会话开始聊天
-          </div>
-        </div>
-
-        <div
-          v-else-if="sessionContextPending"
-          class="h-[calc(100dvh-19rem)] min-h-[14rem] flex items-center justify-center text-muted"
-        >
-          <div class="text-center">
-            <UIcon
-              name="i-lucide-loader-2"
-              class="w-5 h-5 animate-spin mx-auto mb-2"
-            />
-            正在加载聊天
-          </div>
-        </div>
-
-        <div
-          v-else-if="sessionContextError"
-          class="h-[calc(100dvh-19rem)] min-h-[14rem] flex items-center justify-center text-red-500 px-6"
-        >
-          <div class="text-center">
-            <UIcon
-              name="i-lucide-alert-triangle"
-              class="w-8 h-8 mx-auto mb-2"
-            />
-            <p>{{ sessionContextError }}</p>
-            <UButton
-              class="mt-3"
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-refresh-cw"
-              @click="refreshCurrentSession"
-            >
-              重试
-            </UButton>
-          </div>
-        </div>
-
-        <template v-else-if="sessionDetail">
-          <div class="px-2.5 py-1.5 border-b border-default flex flex-wrap items-center justify-between gap-1.5">
-            <div>
-              <h3 class="text-[13px] font-semibold leading-5">
-                {{ sessionTitle(sessionDetail) }}
-              </h3>
-              <p class="text-[11px] text-muted mt-0.5">
-                分支 {{ sessionDetail.working_branch || sessionDetail.base_branch }} · {{ formatDateTime(sessionDetail.updated_at) }}
-              </p>
+          <div
+            v-if="!selectedSessionId"
+            class="h-[calc(100dvh-19rem)] min-h-[14rem] flex items-center justify-center text-muted"
+          >
+            <div class="text-center">
+              <UIcon
+                name="i-lucide-message-square"
+                class="w-10 h-10 mx-auto mb-2"
+              />
+              选择一个会话开始聊天
             </div>
-            <UButton
-              icon="i-lucide-settings-2"
-              color="neutral"
-              variant="ghost"
-              size="xs"
-              :to="runtimeSettingsPath"
-            >
-              设置
-            </UButton>
           </div>
 
           <div
-            ref="messageViewportRef"
-            class="h-[calc(100dvh-22rem)] min-h-[12rem] overflow-y-auto px-2.5 py-2.5 space-y-2"
-            @scroll="onMessageViewportScroll"
+            v-else-if="sessionContextPending"
+            class="h-[calc(100dvh-19rem)] min-h-[14rem] flex items-center justify-center text-muted"
           >
-            <div
-              v-if="messages.length === 0"
-              class="text-sm text-muted py-4"
-            >
-              还没有消息，发第一条开始对话
-            </div>
-            <div
-              v-for="msg in messages"
-              :key="msg.id"
-              class="w-full"
-              :class="messageRowClass(msg)"
-            >
-              <div
-                class="max-w-[78%] rounded-lg border px-2.5 py-2"
-                :class="messageBubbleClass(msg)"
-              >
-                <div class="flex flex-wrap items-center gap-1 text-[11px] text-muted mb-1">
-                  <span>{{ messageActorLabel(msg) }}</span>
-                  <span>·</span>
-                  <span>{{ formatDateTime(msg.created_at) }}</span>
-                  <UBadge
-                    v-if="messageBranchRef(msg)"
-                    color="info"
-                    variant="subtle"
-                    size="xs"
-                  >
-                    {{ messageBranchRef(msg) }}
-                  </UBadge>
-                </div>
-                <p class="text-[13px] whitespace-pre-wrap break-words leading-5">
-                  {{ msg.content }}
-                </p>
-              </div>
+            <div class="text-center">
+              <UIcon
+                name="i-lucide-loader-2"
+                class="w-5 h-5 animate-spin mx-auto mb-2"
+              />
+              正在加载聊天
             </div>
           </div>
 
-          <div class="border-t border-default p-2 space-y-1.5">
-            <UTextarea
-              v-model="promptDraft"
-              :rows="2"
-              placeholder="输入消息..."
-              class="w-full"
-              :disabled="!canChatInSession"
-            />
-            <div class="flex items-center justify-between">
-              <p
-                v-if="!canChatInSession"
-                class="text-xs text-amber-500"
+          <div
+            v-else-if="sessionContextError"
+            class="h-[calc(100dvh-19rem)] min-h-[14rem] flex items-center justify-center text-red-500 px-6"
+          >
+            <div class="text-center">
+              <UIcon
+                name="i-lucide-alert-triangle"
+                class="w-8 h-8 mx-auto mb-2"
+              />
+              <p>{{ sessionContextError }}</p>
+              <UButton
+                class="mt-3"
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-refresh-cw"
+                @click="refreshCurrentSession"
               >
-                你当前没有发言权限，请在设置页调整权限
-              </p>
-              <div class="ml-auto flex items-center gap-2">
-                <UButton
-                  icon="i-lucide-send"
-                  color="primary"
-                  size="sm"
-                  :loading="sendPromptLoading"
-                  :disabled="!canChatInSession || !promptDraft.trim()"
-                  @click="submitPrompt"
-                >
-                  发送
-                </UButton>
-              </div>
+                重试
+              </UButton>
             </div>
           </div>
-        </template>
+
+          <template v-else-if="sessionDetail">
+            <div class="px-2.5 py-1.5 border-b border-default flex flex-wrap items-center justify-between gap-1.5">
+              <div>
+                <h3 class="text-[13px] font-semibold leading-5">
+                  {{ sessionTitle(sessionDetail) }}
+                </h3>
+                <p class="text-[11px] text-muted mt-0.5">
+                  分支 {{ sessionDetail.working_branch || sessionDetail.base_branch }} · {{ formatDateTime(sessionDetail.updated_at) }}
+                </p>
+              </div>
+              <UButton
+                icon="i-lucide-settings-2"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                :to="runtimeSettingsPath"
+              >
+                设置
+              </UButton>
+            </div>
+
+            <div
+              ref="messageViewportRef"
+              class="h-[calc(100dvh-22rem)] min-h-[12rem] overflow-y-auto px-2.5 py-2.5 space-y-2"
+              @scroll="onMessageViewportScroll"
+            >
+              <div
+                v-if="messages.length === 0"
+                class="text-sm text-muted py-4"
+              >
+                还没有消息，发第一条开始对话
+              </div>
+              <div
+                v-for="msg in messages"
+                :key="msg.id"
+                class="w-full"
+                :class="messageRowClass(msg)"
+              >
+                <div
+                  class="max-w-[78%] rounded-lg border px-2.5 py-2"
+                  :class="messageBubbleClass(msg)"
+                >
+                  <div class="flex flex-wrap items-center gap-1 text-[11px] text-muted mb-1">
+                    <span>{{ messageActorLabel(msg) }}</span>
+                    <span>·</span>
+                    <span>{{ formatDateTime(msg.created_at) }}</span>
+                    <UBadge
+                      v-if="messageBranchRef(msg)"
+                      color="info"
+                      variant="subtle"
+                      size="xs"
+                    >
+                      {{ messageBranchRef(msg) }}
+                    </UBadge>
+                  </div>
+                  <p class="text-[13px] whitespace-pre-wrap break-words leading-5">
+                    {{ msg.content }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-t border-default p-2 space-y-1.5">
+              <UTextarea
+                v-model="promptDraft"
+                :rows="2"
+                placeholder="输入消息..."
+                class="w-full"
+                :disabled="!canChatInSession"
+              />
+              <div class="flex items-center justify-between">
+                <p
+                  v-if="!canChatInSession"
+                  class="text-xs text-amber-500"
+                >
+                  你当前没有发言权限，请在设置页调整权限
+                </p>
+                <div class="ml-auto flex items-center gap-2">
+                  <UButton
+                    icon="i-lucide-send"
+                    color="primary"
+                    size="sm"
+                    :loading="sendPromptLoading"
+                    :disabled="!canChatInSession || !promptDraft.trim()"
+                    @click="submitPrompt"
+                  >
+                    发送
+                  </UButton>
+                </div>
+              </div>
+            </div>
+          </template>
         </UCard>
       </section>
     </div>
