@@ -9,7 +9,7 @@
 - Runtime 查询 / 启动 / 停止
 - Session 创建后自动准备会话目录
 - Session 停止 / 重试 / 删除时的目录清理逻辑
-- `/:owner/:repo/agents` 页面对应的数据字段
+- 会话级 Opencode 进程控制与上下文目录约束
 
 不包含：
 
@@ -36,17 +36,20 @@
 
 `AGENT_RUNTIME_OPENCODE_START_COMMAND` 为空时，系统会按顺序回退尝试 `opencode serve`、`opencode server`。
 
-### 2.2 元数据仓库与凭据
+### 2.2 本地配置目录与 Git 凭据
 
 | 变量名 | 说明 |
 | --- | --- |
-| `AGENT_META_REPO_URL` | 元数据仓库地址 |
-| `AGENT_META_REPO_BRANCH` | 元数据仓库分支（默认 `main`） |
-| `AGENT_META_REPO_TOKEN` | 元数据仓库 token（优先） |
+| `AGENT_META_REPO_URL` | 兼容字段：本地配置来源标识（不再要求 push） |
+| `AGENT_META_REPO_BRANCH` | 兼容字段：配置分支标识（不再要求 push） |
+| `AGENT_META_REPO_TOKEN` | Git 访问 token（优先） |
 | `AGENT_BOT_TOKEN` | 回退 token（当 `AGENT_META_REPO_TOKEN` 未配置） |
 | `AGENT_BOT_USERNAME` / `AGENT_BOT_EMAIL` | git 凭据用户名和邮箱 |
 
-Token 优先级：`AGENT_META_REPO_TOKEN > AGENT_BOT_TOKEN > GITEA_SERVICE_TOKEN(回退)`。
+说明：
+
+- `.teax/` 在当前规范中是本地运行时目录，不再要求 push 到远程仓库。
+- Token 优先级：`AGENT_META_REPO_TOKEN > AGENT_BOT_TOKEN > GITEA_SERVICE_TOKEN(回退)`。
 
 ## 3. Runtime 行为
 
@@ -68,6 +71,8 @@ Token 优先级：`AGENT_META_REPO_TOKEN > AGENT_BOT_TOKEN > GITEA_SERVICE_TOKEN
 4. 构建 repo image 并启动容器
 
 当 `AGENT_RUNTIME_DOCKER_BUILD_ON_START=false` 且容器已存在（停止态）时，优先直接 `docker start`。
+
+补充：`.teax` 仅作为本地配置来源参与构建，不进入会话分支提交流程。
 
 ### 3.3 挂载
 
@@ -148,6 +153,8 @@ failed/stopped --retry--> created
 - `POST /runtime/start`（`agent:start`）
 - `POST /runtime/stop`（`agent:stop`，body: `{ force?: boolean }`）
 
+建议入口：这些 Runtime 级操作统一放在 `/:owner/:repo/settings` 的 Agents Runtime 设置区。
+
 ### 6.2 Sessions
 
 - `GET /sessions`（`agent:read`）
@@ -188,6 +195,11 @@ failed/stopped --retry--> created
 - `worktree_status`
 - `worktree_path`
 - `worktree_last_error`
+
+UI 规范补充：
+
+- `/:owner/:repo/agents` 只承载“左会话 + 右聊天”主流程。
+- 会话设置中展示分支绑定与上下文目录（`/runtime/sessions/{sessionId}`）。
 
 ## 8. 常见问题
 

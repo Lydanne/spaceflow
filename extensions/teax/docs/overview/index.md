@@ -14,9 +14,9 @@
 - `architecture.md`
   - 平台定位、用户体系、功能模块、技术栈
 - `agents-design.md`
-  - 当前 Agents 已实现模型（Runtime/Session/协作/权限）
+  - 会话中心版规范（左会话右聊天、分支绑定、设置分层、`.teax` 本地化）
 - `agents-runtime.md`
-  - 当前 P1 已落地运行手册（Docker Runtime + Session 目录生命周期）
+  - Runtime 运维手册（Docker Runtime + Session 目录生命周期 + Opencode 控制）
 
 ## 关联文档（位于 `docs/` 根目录）
 

@@ -125,13 +125,15 @@ Agents 当前已落地的是仓库级执行模型（System Agent 仍在规划）
 
 - **仓库级 Agent（Repo Agent）**：每个仓库一个 Runtime 容器，按会话创建独立目录执行任务
 - **系统级 Agent（System Agent）**：跨仓库编排能力，当前未落地
+- **核心服务**：容器内以 `opencode` 为核心会话服务
 - **会话协作**：会话默认公开，支持多人在同一会话持续对话
-- **远程开发**：会话目录可通过 VSCode 远程连接接管编辑
+- **分支绑定**：会话与工作分支绑定，对话语义与分支保持一致
+- **页面 IA**：`Agents` 主页面为“左侧会话 + 右侧聊天”，Runtime 统计与启停收敛到 `Settings`
 
 Runtime 采用 Docker 双阶段构建（基础镜像 -> 仓库镜像），容器内固定挂载：
 
 - `${AGENT_RUNTIME_ROOT}/sessions`
-- `${AGENT_RUNTIME_ROOT}/.teax`（元数据仓库挂载点）
+- `${AGENT_RUNTIME_ROOT}/.teax`（本地运行时配置目录，不要求 push）
 
 详见：[Agents 系统设计](./agents-design.md)、[Agents Runtime 手册](./agents-runtime.md)、[Agents 当前实现文档](../agent-system.md)
 
