@@ -17,7 +17,6 @@ interface AgentSessionDetail extends AgentSessionSummary {
   scope: string;
   parent_session_id: string | null;
   prompt: string | null;
-  session_path: string | null;
   opencode_session_id: string | null;
   auto_commit: boolean;
   auto_pr: boolean;
@@ -37,18 +36,6 @@ interface AgentSessionDetail extends AgentSessionSummary {
   worktree_last_error: string | null;
 }
 
-interface AgentSessionParticipant {
-  id: string;
-  session_id: string;
-  user_id: string;
-  role: "owner" | "collaborator" | "viewer";
-  can_chat: boolean;
-  invited_by: string | null;
-  joined_at: string;
-  gitea_username: string | null;
-  avatar_url: string | null;
-}
-
 interface AgentSessionMessage {
   id: string;
   session_id: string;
@@ -65,37 +52,12 @@ interface AgentSessionMessage {
   updated_at: string;
 }
 
-interface AgentSessionEvent {
-  id: string;
-  session_id: string;
-  seq: number;
-  type: string;
-  payload: Record<string, unknown> | null;
-  actor_type: "user" | "agent" | "system" | "bot";
-  actor_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
 interface PaginatedResponse<T> {
   data: T[];
   total: number;
   page: number;
   limit: number;
   hasMore: boolean;
-}
-
-interface SessionOpencodeControlResult {
-  action: "start" | "stop" | "restart";
-  status: "running" | "stopped";
-  pid: number | null;
-  command: string | null;
-  runtime_key: string;
-  session_id: string;
-  session_path: string;
-  container_session_path: string;
-  pid_file: string;
-  log_file: string;
 }
 
 const props = defineProps<{
@@ -111,71 +73,29 @@ const runtimeSettingsPath = `/${props.owner}/${props.repo}/settings`;
 const { data: sessionListResp, pending: sessionListPending, refresh: refreshSessionList } = await useFetch<
   PaginatedResponse<AgentSessionSummary>
 >(sessionsApiBase, {
-  query: {
-    page: 1,
-    limit: 50,
-  },
+  query: { page: 1, limit: 50 },
 });
 
 const sessions = computed(() => sessionListResp.value?.data ?? []);
 const selectedSessionId = ref<string | null>(null);
-
 const sessionDetail = ref<AgentSessionDetail | null>(null);
-const participants = ref<AgentSessionParticipant[]>([]);
 const messages = ref<AgentSessionMessage[]>([]);
-const events = ref<AgentSessionEvent[]>([]);
 
 const sessionContextPending = ref(false);
 const sessionContextError = ref("");
-const eventStreamPending = ref(false);
-const eventStreamError = ref("");
 const promptDraft = ref("");
 
 const showCreateModal = ref(false);
-const showEventStreamModal = ref(false);
-const showSessionSettingsModal = ref(false);
 const createLoading = ref(false);
 const sendPromptLoading = ref(false);
-const joinLoading = ref(false);
-const leaveLoading = ref(false);
-const stopLoading = ref(false);
-const retryLoading = ref(false);
-const deleteLoading = ref(false);
-const visibilityLoading = ref(false);
-const pinningMessageId = ref<string | null>(null);
-const participantUpdatingUserId = ref<string | null>(null);
-const opencodeStartLoading = ref(false);
-const opencodeStopLoading = ref(false);
-const opencodeRestartLoading = ref(false);
+
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 const SESSION_MESSAGES_PAGE_LIMIT = 100;
-const SESSION_EVENTS_PAGE_LIMIT = 100;
 
 const createForm = reactive({
   title: "",
   prompt: "",
-  visibility: "public" as "public" | "private",
-  base_branch: "main",
-  working_branch: "",
-  auto_commit: false,
-  auto_pr: false,
 });
-
-const visibilityDraft = ref<"public" | "private">("public");
-const visibilityOptions = [
-  { label: "公开", value: "public" },
-  { label: "私有", value: "private" },
-];
-
-const participantRoleOptions = [
-  { label: "协作者", value: "collaborator" },
-  { label: "只读者", value: "viewer" },
-];
-
-const createVisibilityOptions = [
-  { label: "公开会话", value: "public" },
-  { label: "私有会话", value: "private" },
-];
 
 const canManageSession = computed(() => {
   if (!sessionDetail.value) return false;
@@ -188,22 +108,6 @@ const canChatInSession = computed(() => {
   return sessionDetail.value.my_can_chat;
 });
 
-const canJoinSession = computed(() => {
-  if (!sessionDetail.value) return false;
-  return sessionDetail.value.my_role === null;
-});
-
-const canLeaveSession = computed(() => {
-  if (!sessionDetail.value) return false;
-  return sessionDetail.value.my_role !== null && sessionDetail.value.my_role !== "owner";
-});
-
-const canPinMessage = computed(() => {
-  if (!sessionDetail.value) return false;
-  if (canManageSession.value) return true;
-  return sessionDetail.value.my_role === "owner" || sessionDetail.value.my_role === "collaborator";
-});
-
 watch(
   sessions,
   (list) => {
@@ -214,19 +118,7 @@ watch(
 
     if (!selectedSessionId.value || !list.some((item) => item.id === selectedSessionId.value)) {
       const firstSession = list[0];
-      if (firstSession) {
-        selectedSessionId.value = firstSession.id;
-      }
-    }
-  },
-  { immediate: true },
-);
-
-watch(
-  () => sessionDetail.value?.visibility,
-  (value) => {
-    if (value === "public" || value === "private") {
-      visibilityDraft.value = value;
+      if (firstSession) selectedSessionId.value = firstSession.id;
     }
   },
   { immediate: true },
@@ -235,28 +127,15 @@ watch(
 watch(
   selectedSessionId,
   async (sessionId) => {
-    showEventStreamModal.value = false;
-    showSessionSettingsModal.value = false;
     if (!sessionId) {
       sessionDetail.value = null;
-      participants.value = [];
       messages.value = [];
-      events.value = [];
       sessionContextError.value = "";
-      eventStreamError.value = "";
       return;
     }
     await loadSessionContext(sessionId);
   },
   { immediate: true },
-);
-
-watch(
-  showEventStreamModal,
-  async (open) => {
-    if (!open || !selectedSessionId.value) return;
-    await loadSessionEvents(selectedSessionId.value);
-  },
 );
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -277,8 +156,8 @@ function shortId(value: string): string {
   return value.slice(0, 8);
 }
 
-function containerSessionPath(sessionId: string): string {
-  return `/runtime/sessions/${sessionId}`;
+function sessionTitle(session: AgentSessionSummary | AgentSessionDetail): string {
+  return session.title?.trim() || `会话 ${shortId(session.id)}`;
 }
 
 function messageBranchRef(message: AgentSessionMessage): string | null {
@@ -291,43 +170,29 @@ function messageBranchRef(message: AgentSessionMessage): string | null {
   return fallback.trim() || null;
 }
 
-function sessionTitle(session: AgentSessionSummary | AgentSessionDetail): string {
-  return session.title?.trim() || `会话 ${shortId(session.id)}`;
+function messageBubbleClass(message: AgentSessionMessage): string {
+  if (message.actor_type === "user") {
+    return "ml-auto bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800";
+  }
+  if (message.actor_type === "agent") {
+    return "mr-auto bg-gray-50 dark:bg-gray-900/40 border-gray-200 dark:border-gray-700";
+  }
+  return "mr-auto bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800";
 }
 
-function statusBadgeColor(status: string): "info" | "success" | "warning" | "error" | "neutral" {
-  if (status === "created") return "info";
-  if (status === "running") return "warning";
-  if (status === "completed") return "success";
-  if (status === "failed") return "error";
-  if (status === "stopped") return "neutral";
-  return "neutral";
-}
-
-function actorTypeColor(type: string): "info" | "success" | "warning" | "error" | "neutral" {
-  if (type === "user") return "info";
-  if (type === "agent") return "success";
-  if (type === "system") return "warning";
-  if (type === "bot") return "neutral";
-  return "neutral";
-}
-
-function runtimeStatusColor(status: string): "info" | "success" | "warning" | "error" | "neutral" {
-  if (status === "running") return "success";
-  if (status === "starting") return "warning";
-  if (status === "stopped") return "neutral";
-  if (status === "failed") return "error";
-  return "neutral";
+function messageActorLabel(message: AgentSessionMessage): string {
+  if (message.actor_type === "user") return "你";
+  if (message.actor_type === "agent") return "Agent";
+  if (message.actor_type === "system") return "System";
+  return "Bot";
 }
 
 async function loadSessionContext(sessionId: string) {
   sessionContextPending.value = true;
   sessionContextError.value = "";
-
   try {
-    const [detail, participantList, messageResp] = await Promise.all([
+    const [detail, messageResp] = await Promise.all([
       $fetch<AgentSessionDetail>(`${sessionsApiBase}/${sessionId}`),
-      $fetch<AgentSessionParticipant[]>(`${sessionsApiBase}/${sessionId}/participants`),
       $fetch<PaginatedResponse<AgentSessionMessage>>(`${sessionsApiBase}/${sessionId}/messages`, {
         query: { page: 1, limit: SESSION_MESSAGES_PAGE_LIMIT },
       }),
@@ -336,11 +201,10 @@ async function loadSessionContext(sessionId: string) {
     if (selectedSessionId.value !== sessionId) return;
 
     sessionDetail.value = detail;
-    participants.value = participantList;
     messages.value = messageResp.data;
   } catch (error: unknown) {
     if (selectedSessionId.value !== sessionId) return;
-    sessionContextError.value = getErrorMessage(error, "加载会话详情失败");
+    sessionContextError.value = getErrorMessage(error, "加载会话失败");
   } finally {
     if (selectedSessionId.value === sessionId) {
       sessionContextPending.value = false;
@@ -350,51 +214,26 @@ async function loadSessionContext(sessionId: string) {
 
 async function refreshSessionRealtime(sessionId: string) {
   try {
-    const [detail, participantList, messageResp] = await Promise.all([
+    const [detail, messageResp] = await Promise.all([
       $fetch<AgentSessionDetail>(`${sessionsApiBase}/${sessionId}`),
-      $fetch<AgentSessionParticipant[]>(`${sessionsApiBase}/${sessionId}/participants`),
       $fetch<PaginatedResponse<AgentSessionMessage>>(`${sessionsApiBase}/${sessionId}/messages`, {
         query: { page: 1, limit: SESSION_MESSAGES_PAGE_LIMIT },
       }),
     ]);
-
     if (selectedSessionId.value !== sessionId) return;
-
     sessionDetail.value = detail;
-    participants.value = participantList;
     messages.value = messageResp.data;
   } catch {
-    // 自动刷新失败时不打断用户操作，也不覆盖当前页面状态
-  }
-}
-
-async function loadSessionEvents(sessionId: string) {
-  eventStreamPending.value = true;
-  eventStreamError.value = "";
-  try {
-    const eventResp = await $fetch<PaginatedResponse<AgentSessionEvent>>(`${sessionsApiBase}/${sessionId}/events`, {
-      query: { page: 1, limit: SESSION_EVENTS_PAGE_LIMIT },
-    });
-    if (selectedSessionId.value !== sessionId) return;
-    events.value = eventResp.data;
-  } catch (error: unknown) {
-    if (selectedSessionId.value !== sessionId) return;
-    eventStreamError.value = getErrorMessage(error, "加载事件流失败");
-  } finally {
-    if (selectedSessionId.value === sessionId) {
-      eventStreamPending.value = false;
-    }
+    // 静默失败，避免打断用户输入
   }
 }
 
 function startAutoRefresh() {
   if (autoRefreshTimer) return;
-
   autoRefreshTimer = setInterval(() => {
     const sessionId = selectedSessionId.value;
     if (!sessionId) return;
     if (sessionContextPending.value || sendPromptLoading.value || createLoading.value) return;
-
     void refreshSessionRealtime(sessionId);
   }, 6000);
 }
@@ -420,11 +259,6 @@ function openCreateModal() {
 function resetCreateForm() {
   createForm.title = "";
   createForm.prompt = "";
-  createForm.visibility = "public";
-  createForm.base_branch = "main";
-  createForm.working_branch = "";
-  createForm.auto_commit = false;
-  createForm.auto_pr = false;
 }
 
 async function createSession() {
@@ -440,18 +274,10 @@ async function createSession() {
       body: {
         title: createForm.title.trim() || undefined,
         prompt: createForm.prompt.trim(),
-        visibility: createForm.visibility,
-        base_branch: createForm.base_branch.trim() || "main",
-        working_branch: createForm.working_branch.trim() || undefined,
-        auto_commit: createForm.auto_commit,
-        auto_pr: createForm.auto_pr,
       },
     });
-
     showCreateModal.value = false;
     resetCreateForm();
-    toast.add({ title: "会话创建成功", color: "success" });
-
     await refreshSessionList();
     selectedSessionId.value = created.id;
     await loadSessionContext(created.id);
@@ -465,46 +291,6 @@ async function createSession() {
 async function refreshCurrentSession() {
   if (!selectedSessionId.value) return;
   await loadSessionContext(selectedSessionId.value);
-}
-
-function setOpencodeLoading(action: "start" | "stop" | "restart", value: boolean) {
-  if (action === "start") opencodeStartLoading.value = value;
-  if (action === "stop") opencodeStopLoading.value = value;
-  if (action === "restart") opencodeRestartLoading.value = value;
-}
-
-function opencodeActionLabel(action: "start" | "stop" | "restart"): string {
-  if (action === "start") return "启动";
-  if (action === "stop") return "停止";
-  return "重启";
-}
-
-async function controlSessionOpencode(action: "start" | "stop" | "restart") {
-  if (!selectedSessionId.value) return;
-
-  setOpencodeLoading(action, true);
-  try {
-    const result = await $fetch<SessionOpencodeControlResult>(`${sessionsApiBase}/${selectedSessionId.value}/opencode/control`, {
-      method: "POST",
-      body: {
-        action,
-      },
-    });
-
-    const statusText = result.status === "running"
-      ? `运行中${result.pid ? `（PID ${result.pid}）` : ""}`
-      : "已停止";
-    toast.add({
-      title: `Opencode 已${opencodeActionLabel(action)}`,
-      description: `${statusText} · 目录 ${result.container_session_path}`,
-      color: "success",
-    });
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
-  } catch (error: unknown) {
-    toast.add({ title: getErrorMessage(error, `Opencode ${opencodeActionLabel(action)}失败`), color: "error" });
-  } finally {
-    setOpencodeLoading(action, false);
-  }
 }
 
 async function submitPrompt() {
@@ -523,7 +309,6 @@ async function submitPrompt() {
         },
       },
     });
-
     promptDraft.value = "";
     await Promise.all([refreshCurrentSession(), refreshSessionList()]);
   } catch (error: unknown) {
@@ -532,152 +317,17 @@ async function submitPrompt() {
     sendPromptLoading.value = false;
   }
 }
-
-async function joinSession() {
-  if (!selectedSessionId.value) return;
-
-  joinLoading.value = true;
-  try {
-    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/join`, { method: "POST" });
-    toast.add({ title: "已加入会话", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
-  } catch (error: unknown) {
-    toast.add({ title: getErrorMessage(error, "加入会话失败"), color: "error" });
-  } finally {
-    joinLoading.value = false;
-  }
-}
-
-async function leaveSession() {
-  if (!selectedSessionId.value) return;
-
-  leaveLoading.value = true;
-  try {
-    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/leave`, { method: "POST" });
-    toast.add({ title: "已退出会话", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
-  } catch (error: unknown) {
-    toast.add({ title: getErrorMessage(error, "退出会话失败"), color: "error" });
-  } finally {
-    leaveLoading.value = false;
-  }
-}
-
-async function stopSession() {
-  if (!selectedSessionId.value) return;
-
-  stopLoading.value = true;
-  try {
-    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/stop`, { method: "POST" });
-    toast.add({ title: "会话已停止", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
-  } catch (error: unknown) {
-    toast.add({ title: getErrorMessage(error, "停止会话失败"), color: "error" });
-  } finally {
-    stopLoading.value = false;
-  }
-}
-
-async function retrySession() {
-  if (!selectedSessionId.value) return;
-
-  retryLoading.value = true;
-  try {
-    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/retry`, { method: "POST" });
-    toast.add({ title: "会话已重试", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
-  } catch (error: unknown) {
-    toast.add({ title: getErrorMessage(error, "重试会话失败"), color: "error" });
-  } finally {
-    retryLoading.value = false;
-  }
-}
-
-async function deleteSession() {
-  if (!selectedSessionId.value) return;
-  if (!confirm("确认删除该会话吗？删除后无法恢复。")) return;
-
-  deleteLoading.value = true;
-  try {
-    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}`, { method: "DELETE" });
-    toast.add({ title: "会话已删除", color: "success" });
-    selectedSessionId.value = null;
-    await refreshSessionList();
-  } catch (error: unknown) {
-    toast.add({ title: getErrorMessage(error, "删除会话失败"), color: "error" });
-  } finally {
-    deleteLoading.value = false;
-  }
-}
-
-async function updateVisibility() {
-  if (!selectedSessionId.value) return;
-
-  visibilityLoading.value = true;
-  try {
-    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/visibility`, {
-      method: "PATCH",
-      body: {
-        visibility: visibilityDraft.value,
-      },
-    });
-    toast.add({ title: "会话可见性已更新", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
-  } catch (error: unknown) {
-    toast.add({ title: getErrorMessage(error, "更新可见性失败"), color: "error" });
-  } finally {
-    visibilityLoading.value = false;
-  }
-}
-
-async function pinMessage(messageId: string) {
-  if (!selectedSessionId.value) return;
-
-  pinningMessageId.value = messageId;
-  try {
-    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/messages/${messageId}/pin`, {
-      method: "POST",
-    });
-    await refreshCurrentSession();
-  } catch (error: unknown) {
-    toast.add({ title: getErrorMessage(error, "置顶消息失败"), color: "error" });
-  } finally {
-    pinningMessageId.value = null;
-  }
-}
-
-async function updateParticipantPermission(item: AgentSessionParticipant) {
-  if (!selectedSessionId.value) return;
-  if (item.role === "owner") return;
-
-  participantUpdatingUserId.value = item.user_id;
-  try {
-    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/participants/${item.user_id}`, {
-      method: "PATCH",
-      body: {
-        role: item.role,
-        can_chat: item.can_chat,
-      },
-    });
-    toast.add({ title: "参与者权限已更新", color: "success" });
-    await refreshCurrentSession();
-  } catch (error: unknown) {
-    toast.add({ title: getErrorMessage(error, "更新参与者权限失败"), color: "error" });
-  } finally {
-    participantUpdatingUserId.value = null;
-  }
-}
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-4">
     <div class="flex items-center justify-between">
       <div>
         <h2 class="text-lg font-semibold">
           Agents
         </h2>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          会话协作主工作台：左侧会话，右侧聊天。Runtime 运维入口已收敛到仓库设置页。
+          会话式聊天工作台。Runtime、权限和运维状态统一在设置页管理。
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -687,7 +337,7 @@ async function updateParticipantPermission(item: AgentSessionParticipant) {
           variant="ghost"
           :to="runtimeSettingsPath"
         >
-          Runtime 设置
+          设置
         </UButton>
         <UButton
           icon="i-lucide-refresh-cw"
@@ -703,18 +353,18 @@ async function updateParticipantPermission(item: AgentSessionParticipant) {
           color="primary"
           @click="openCreateModal"
         >
-          创建会话
+          新会话
         </UButton>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
-      <div class="xl:col-span-4">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div class="lg:col-span-4 xl:col-span-3">
         <UCard>
           <template #header>
             <div class="flex items-center justify-between">
               <h3 class="text-sm font-semibold">
-                会话列表
+                会话
               </h3>
               <UBadge
                 color="neutral"
@@ -741,13 +391,10 @@ async function updateParticipantPermission(item: AgentSessionParticipant) {
             class="py-10 text-center text-gray-400"
           >
             <UIcon
-              name="i-lucide-container"
-              class="w-10 h-10 mx-auto mb-2"
+              name="i-lucide-message-square-plus"
+              class="w-9 h-9 mx-auto mb-2"
             />
-            <p>暂无会话</p>
-            <p class="text-xs mt-1">
-              先创建一个 Agent 会话开始协作
-            </p>
+            暂无会话
           </div>
 
           <div
@@ -766,26 +413,10 @@ async function updateParticipantPermission(item: AgentSessionParticipant) {
               ]"
               @click="selectedSessionId = item.id"
             >
-              <div class="flex items-start justify-between gap-2">
-                <p class="font-medium text-sm truncate">
-                  {{ sessionTitle(item) }}
-                </p>
-                <UBadge
-                  :color="statusBadgeColor(item.status)"
-                  variant="subtle"
-                  size="xs"
-                >
-                  {{ item.status }}
-                </UBadge>
-              </div>
-              <div class="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                <UBadge
-                  :color="item.visibility === 'public' ? 'success' : 'warning'"
-                  variant="soft"
-                  size="xs"
-                >
-                  {{ item.visibility === "public" ? "公开" : "私有" }}
-                </UBadge>
+              <p class="font-medium text-sm truncate">
+                {{ sessionTitle(item) }}
+              </p>
+              <div class="mt-2 text-xs text-gray-500 flex items-center gap-2">
                 <span class="inline-flex items-center gap-1">
                   <UIcon
                     name="i-lucide-git-branch"
@@ -801,29 +432,29 @@ async function updateParticipantPermission(item: AgentSessionParticipant) {
         </UCard>
       </div>
 
-      <div class="xl:col-span-8 space-y-4">
+      <div class="lg:col-span-8 xl:col-span-9">
         <UCard v-if="!selectedSessionId">
-          <div class="py-12 text-center text-gray-400">
+          <div class="py-16 text-center text-gray-400">
             <UIcon
               name="i-lucide-message-square"
               class="w-10 h-10 mx-auto mb-2"
             />
-            请选择一个会话查看详情
+            选择一个会话开始聊天
           </div>
         </UCard>
 
         <UCard v-else-if="sessionContextPending">
-          <div class="py-12 text-center text-gray-400">
+          <div class="py-16 text-center text-gray-400">
             <UIcon
               name="i-lucide-loader-2"
               class="w-5 h-5 animate-spin mx-auto mb-2"
             />
-            正在加载会话详情
+            正在加载聊天
           </div>
         </UCard>
 
         <UCard v-else-if="sessionContextError">
-          <div class="py-12 text-center text-red-500">
+          <div class="py-16 text-center text-red-500">
             <UIcon
               name="i-lucide-alert-triangle"
               class="w-8 h-8 mx-auto mb-2"
@@ -841,208 +472,52 @@ async function updateParticipantPermission(item: AgentSessionParticipant) {
           </div>
         </UCard>
 
-        <template v-else-if="sessionDetail">
-          <UCard>
-            <template #header>
-              <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 class="text-base font-semibold">
-                    {{ sessionTitle(sessionDetail) }}
-                  </h3>
-                  <div class="text-xs text-gray-500 mt-1 flex flex-wrap items-center gap-2">
-                    <span>Session: {{ sessionDetail.id }}</span>
-                    <span class="text-gray-300">·</span>
-                    <span>基线分支 {{ sessionDetail.base_branch }}</span>
-                    <span
-                      v-if="sessionDetail.working_branch"
-                      class="text-gray-300"
-                    >·</span>
-                    <span v-if="sessionDetail.working_branch">工作分支 {{ sessionDetail.working_branch }}</span>
-                  </div>
-                </div>
-
-                <div class="flex items-center gap-2 flex-wrap justify-end">
-                  <UBadge
-                    :color="statusBadgeColor(sessionDetail.status)"
-                    variant="subtle"
-                  >
-                    {{ sessionDetail.status }}
-                  </UBadge>
-                  <UBadge
-                    :color="sessionDetail.visibility === 'public' ? 'success' : 'warning'"
-                    variant="subtle"
-                  >
-                    {{ sessionDetail.visibility === "public" ? "公开" : "私有" }}
-                  </UBadge>
-                  <UBadge
-                    color="neutral"
-                    variant="soft"
-                  >
-                    我的角色: {{ sessionDetail.my_role || "未加入" }}
-                  </UBadge>
-                  <UBadge
-                    v-if="sessionDetail.runtime_status"
-                    :color="runtimeStatusColor(sessionDetail.runtime_status)"
-                    variant="soft"
-                  >
-                    Runtime: {{ sessionDetail.runtime_status }}
-                  </UBadge>
-                  <UBadge
-                    v-if="sessionDetail.worktree_status"
-                    color="neutral"
-                    variant="soft"
-                  >
-                    Worktree: {{ sessionDetail.worktree_status }}
-                  </UBadge>
-                </div>
-              </div>
-            </template>
-
-            <div class="space-y-4">
-              <p
-                v-if="sessionDetail.prompt"
-                class="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap"
-              >
-                {{ sessionDetail.prompt }}
-              </p>
-
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
-                  <p class="text-gray-500 mb-1">
-                    参与者
-                  </p>
-                  <p class="font-medium text-sm">
-                    {{ sessionDetail.participant_count }} 人
-                  </p>
-                </div>
-                <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
-                  <p class="text-gray-500 mb-1">
-                    消息数
-                  </p>
-                  <p class="font-medium text-sm">
-                    {{ sessionDetail.message_count }} 条
-                  </p>
-                </div>
-                <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
-                  <p class="text-gray-500 mb-1">
-                    更新时间
-                  </p>
-                  <p class="font-medium text-sm">
-                    {{ formatDateTime(sessionDetail.updated_at) }}
-                  </p>
-                </div>
-              </div>
-
-              <div
-                v-if="sessionDetail.id || sessionDetail.worktree_path || sessionDetail.worktree_last_error"
-                class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-1 text-xs"
-              >
-                <p class="text-gray-500">
-                  会话上下文（容器内）：{{ containerSessionPath(sessionDetail.id) }}
-                </p>
-                <p
-                  v-if="sessionDetail.worktree_path"
-                  class="text-gray-500"
-                >
-                  会话上下文（宿主机）：{{ sessionDetail.worktree_path }}
-                </p>
-                <p
-                  v-if="sessionDetail.worktree_last_error"
-                  class="text-red-500"
-                >
-                  Worktree 错误：{{ sessionDetail.worktree_last_error }}
-                </p>
-              </div>
-
-              <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <UButton
-                  v-if="canManageSession"
-                  icon="i-lucide-sliders-horizontal"
-                  color="neutral"
-                  variant="soft"
-                  @click="showSessionSettingsModal = true"
-                >
-                  会话设置
-                </UButton>
-
-                <UButton
-                  v-if="canJoinSession"
-                  icon="i-lucide-log-in"
-                  color="primary"
-                  :loading="joinLoading"
-                  @click="joinSession"
-                >
-                  加入会话
-                </UButton>
-
-                <UButton
-                  v-if="canLeaveSession"
-                  icon="i-lucide-log-out"
-                  color="neutral"
-                  variant="ghost"
-                  :loading="leaveLoading"
-                  @click="leaveSession"
-                >
-                  退出会话
-                </UButton>
-              </div>
-            </div>
-          </UCard>
-
-          <UCard>
-            <template #header>
-              <div class="flex items-center justify-between">
-                <h3 class="text-sm font-semibold">
-                  对话消息
+        <UCard
+          v-else-if="sessionDetail"
+          class="h-full"
+        >
+          <template #header>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 class="text-base font-semibold">
+                  {{ sessionTitle(sessionDetail) }}
                 </h3>
-                <div class="flex items-center gap-2">
-                  <UBadge
-                    color="neutral"
-                    variant="subtle"
-                  >
-                    {{ messages.length }}
-                  </UBadge>
-                  <UButton
-                    icon="i-lucide-list-collapse"
-                    color="neutral"
-                    variant="ghost"
-                    size="xs"
-                    @click="showEventStreamModal = true"
-                  >
-                    事件流（{{ events.length }}）
-                  </UButton>
-                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                  分支 {{ sessionDetail.working_branch || sessionDetail.base_branch }} · {{ formatDateTime(sessionDetail.updated_at) }}
+                </p>
               </div>
-            </template>
-
-            <div class="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-              <div
-                v-if="messages.length === 0"
-                class="text-sm text-gray-400 py-4"
+              <UButton
+                icon="i-lucide-settings-2"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :to="runtimeSettingsPath"
               >
-                还没有消息，先发起第一条任务描述
-              </div>
+                去设置页
+              </UButton>
+            </div>
+          </template>
 
+          <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            <div
+              v-if="messages.length === 0"
+              class="text-sm text-gray-400 py-4"
+            >
+              还没有消息，发第一条开始对话
+            </div>
+            <div
+              v-for="msg in messages"
+              :key="msg.id"
+              class="w-full"
+            >
               <div
-                v-for="msg in messages"
-                :key="msg.id"
-                class="rounded-lg border border-gray-200 dark:border-gray-700 p-3"
+                class="max-w-[85%] rounded-lg border p-3"
+                :class="messageBubbleClass(msg)"
               >
                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
-                  <UBadge
-                    :color="actorTypeColor(msg.actor_type)"
-                    variant="soft"
-                    size="xs"
-                  >
-                    {{ msg.actor_type }}
-                  </UBadge>
-                  <UBadge
-                    color="neutral"
-                    variant="subtle"
-                    size="xs"
-                  >
-                    {{ msg.message_type }}
-                  </UBadge>
+                  <span>{{ messageActorLabel(msg) }}</span>
+                  <span class="text-gray-300">·</span>
+                  <span>{{ formatDateTime(msg.created_at) }}</span>
                   <UBadge
                     v-if="messageBranchRef(msg)"
                     color="info"
@@ -1051,435 +526,69 @@ async function updateParticipantPermission(item: AgentSessionParticipant) {
                   >
                     {{ messageBranchRef(msg) }}
                   </UBadge>
-                  <span>#{{ msg.seq }}</span>
-                  <span class="text-gray-300">·</span>
-                  <span>{{ formatDateTime(msg.created_at) }}</span>
-                  <UBadge
-                    v-if="msg.pinned"
-                    color="warning"
-                    variant="subtle"
-                    size="xs"
-                  >
-                    已置顶
-                  </UBadge>
-                  <div class="ml-auto">
-                    <UButton
-                      v-if="!msg.pinned && canPinMessage"
-                      icon="i-lucide-pin"
-                      color="neutral"
-                      variant="ghost"
-                      size="xs"
-                      :loading="pinningMessageId === msg.id"
-                      @click="pinMessage(msg.id)"
-                    >
-                      置顶
-                    </UButton>
-                  </div>
                 </div>
                 <p class="text-sm whitespace-pre-wrap break-words">
                   {{ msg.content }}
                 </p>
               </div>
             </div>
+          </div>
 
-            <div class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
-              <UTextarea
-                v-model="promptDraft"
-                :rows="4"
-                placeholder="输入你的任务描述或追问..."
-                class="w-full"
-                :disabled="!canChatInSession"
-              />
-              <div class="flex items-center justify-between">
-                <p
-                  v-if="!canChatInSession"
-                  class="text-xs text-amber-500"
+          <div class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+            <UTextarea
+              v-model="promptDraft"
+              :rows="4"
+              placeholder="输入消息..."
+              class="w-full"
+              :disabled="!canChatInSession"
+            />
+            <div class="flex items-center justify-between">
+              <p
+                v-if="!canChatInSession"
+                class="text-xs text-amber-500"
+              >
+                你当前没有发言权限，请在设置页调整权限
+              </p>
+              <div class="ml-auto">
+                <UButton
+                  icon="i-lucide-send"
+                  color="primary"
+                  :loading="sendPromptLoading"
+                  :disabled="!canChatInSession || !promptDraft.trim()"
+                  @click="submitPrompt"
                 >
-                  你当前没有发言权限，请先加入会话或联系会话所有者
-                </p>
-                <div class="ml-auto">
-                  <UButton
-                    icon="i-lucide-send"
-                    color="primary"
-                    :loading="sendPromptLoading"
-                    :disabled="!canChatInSession || !promptDraft.trim()"
-                    @click="submitPrompt"
-                  >
-                    发送
-                  </UButton>
-                </div>
+                  发送
+                </UButton>
               </div>
             </div>
-          </UCard>
-
-        </template>
+          </div>
+        </UCard>
       </div>
     </div>
-
-    <UModal v-model:open="showEventStreamModal">
-      <template #content>
-        <div class="p-6 space-y-4">
-          <div class="flex items-center justify-between gap-3">
-            <h3 class="text-lg font-semibold">
-              会话事件流
-            </h3>
-            <div class="flex items-center gap-2">
-              <UBadge
-                color="neutral"
-                variant="subtle"
-              >
-                {{ events.length }}
-              </UBadge>
-              <UButton
-                icon="i-lucide-refresh-cw"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                :loading="eventStreamPending"
-                :disabled="!selectedSessionId"
-                @click="selectedSessionId && loadSessionEvents(selectedSessionId)"
-              >
-                刷新
-              </UButton>
-            </div>
-          </div>
-          <div class="space-y-2 max-h-[520px] overflow-y-auto pr-1">
-            <div
-              v-if="eventStreamPending"
-              class="text-sm text-gray-400 py-6 text-center"
-            >
-              <UIcon
-                name="i-lucide-loader-2"
-                class="w-4 h-4 animate-spin mx-auto mb-2"
-              />
-              正在加载事件流
-            </div>
-            <div
-              v-else-if="eventStreamError"
-              class="text-sm text-red-500 py-2"
-            >
-              {{ eventStreamError }}
-            </div>
-            <div
-              v-else-if="events.length === 0"
-              class="text-sm text-gray-400 py-2"
-            >
-              暂无事件
-            </div>
-            <div
-              v-for="eventItem in events"
-              :key="eventItem.id"
-              class="rounded border border-gray-200 dark:border-gray-700 p-2"
-            >
-              <div class="flex items-center gap-2 text-xs text-gray-500">
-                <span>#{{ eventItem.seq }}</span>
-                <UBadge
-                  :color="actorTypeColor(eventItem.actor_type)"
-                  variant="soft"
-                  size="xs"
-                >
-                  {{ eventItem.actor_type }}
-                </UBadge>
-                <span>{{ eventItem.type }}</span>
-              </div>
-              <p class="text-xs text-gray-400 mt-1">
-                {{ formatDateTime(eventItem.created_at) }} · {{ shortId(eventItem.actor_id) }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </template>
-    </UModal>
-
-    <UModal v-model:open="showSessionSettingsModal">
-      <template #content>
-        <div
-          v-if="sessionDetail"
-          class="p-6 space-y-5"
-        >
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <h3 class="text-lg font-semibold">
-                会话设置
-              </h3>
-              <p class="text-xs text-gray-500 mt-1">
-                Session {{ sessionDetail.id }}
-              </p>
-            </div>
-            <UButton
-              icon="i-lucide-x"
-              color="neutral"
-              variant="ghost"
-              @click="showSessionSettingsModal = false"
-            />
-          </div>
-
-          <div class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-1 text-xs">
-            <p class="text-gray-500">
-              基线分支：{{ sessionDetail.base_branch }}
-            </p>
-            <p class="text-gray-500">
-              工作分支：{{ sessionDetail.working_branch || sessionDetail.base_branch }}
-            </p>
-            <p class="text-gray-500">
-              会话上下文（容器内）：{{ containerSessionPath(sessionDetail.id) }}
-            </p>
-            <p
-              v-if="sessionDetail.worktree_path"
-              class="text-gray-500"
-            >
-              会话上下文（宿主机）：{{ sessionDetail.worktree_path }}
-            </p>
-            <p
-              v-if="sessionDetail.worktree_last_error"
-              class="text-red-500"
-            >
-              Worktree 错误：{{ sessionDetail.worktree_last_error }}
-            </p>
-          </div>
-
-          <div class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-3">
-            <p class="text-sm font-medium">
-              可见性
-            </p>
-            <div class="flex items-center gap-2">
-              <USelect
-                v-model="visibilityDraft"
-                :items="visibilityOptions"
-                value-key="value"
-                size="sm"
-                class="w-28"
-              />
-              <UButton
-                color="neutral"
-                variant="soft"
-                size="sm"
-                :loading="visibilityLoading"
-                @click="updateVisibility"
-              >
-                更新可见性
-              </UButton>
-            </div>
-          </div>
-
-          <div class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-3">
-            <p class="text-sm font-medium">
-              参与者权限
-            </p>
-            <div class="space-y-2">
-              <div
-                v-for="item in participants"
-                :key="item.id"
-                class="rounded border border-gray-200 dark:border-gray-700 p-2"
-              >
-                <div class="flex flex-wrap items-center gap-2 justify-between">
-                  <div class="min-w-0">
-                    <p class="text-sm truncate">
-                      {{ item.gitea_username || shortId(item.user_id) }}
-                    </p>
-                    <p class="text-xs text-gray-500">
-                      {{ item.role === "owner" ? "Owner" : "可编辑权限" }}
-                    </p>
-                  </div>
-
-                  <div class="flex flex-wrap items-center gap-2">
-                    <template v-if="item.role === 'owner'">
-                      <UBadge
-                        color="neutral"
-                        variant="soft"
-                        size="xs"
-                      >
-                        owner
-                      </UBadge>
-                    </template>
-                    <template v-else>
-                      <USelect
-                        v-model="item.role"
-                        :items="participantRoleOptions"
-                        value-key="value"
-                        size="sm"
-                        class="w-24"
-                      />
-                      <div class="inline-flex items-center gap-1 text-xs text-gray-500">
-                        <span>可发言</span>
-                        <USwitch v-model="item.can_chat" />
-                      </div>
-                      <UButton
-                        icon="i-lucide-save"
-                        color="neutral"
-                        variant="soft"
-                        size="xs"
-                        :loading="participantUpdatingUserId === item.user_id"
-                        @click="updateParticipantPermission(item)"
-                      >
-                        保存
-                      </UButton>
-                    </template>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-3">
-            <p class="text-sm font-medium">
-              Opencode 控制
-            </p>
-            <div class="flex flex-wrap items-center gap-2">
-              <UButton
-                icon="i-lucide-play"
-                color="primary"
-                variant="soft"
-                :loading="opencodeStartLoading"
-                :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
-                @click="controlSessionOpencode('start')"
-              >
-                启动
-              </UButton>
-              <UButton
-                icon="i-lucide-square"
-                color="warning"
-                variant="soft"
-                :loading="opencodeStopLoading"
-                :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
-                @click="controlSessionOpencode('stop')"
-              >
-                停止
-              </UButton>
-              <UButton
-                icon="i-lucide-refresh-cw"
-                color="info"
-                variant="ghost"
-                :loading="opencodeRestartLoading"
-                :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
-                @click="controlSessionOpencode('restart')"
-              >
-                重启
-              </UButton>
-            </div>
-          </div>
-
-          <div class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-3">
-            <p class="text-sm font-medium">
-              生命周期
-            </p>
-            <div class="flex flex-wrap items-center gap-2">
-              <UButton
-                v-if="sessionDetail.status !== 'stopped' && sessionDetail.status !== 'completed' && sessionDetail.status !== 'failed'"
-                icon="i-lucide-square"
-                color="warning"
-                variant="soft"
-                :loading="stopLoading"
-                @click="stopSession"
-              >
-                停止会话
-              </UButton>
-              <UButton
-                v-if="sessionDetail.status === 'failed' || sessionDetail.status === 'stopped'"
-                icon="i-lucide-rotate-cw"
-                color="info"
-                variant="soft"
-                :loading="retryLoading"
-                @click="retrySession"
-              >
-                重试会话
-              </UButton>
-              <UButton
-                icon="i-lucide-trash-2"
-                color="error"
-                variant="soft"
-                :loading="deleteLoading"
-                @click="deleteSession"
-              >
-                删除会话
-              </UButton>
-            </div>
-          </div>
-        </div>
-      </template>
-    </UModal>
 
     <UModal v-model:open="showCreateModal">
       <template #content>
         <div class="p-6 space-y-4">
           <h3 class="text-lg font-semibold">
-            创建 Agent 会话
+            新建会话
           </h3>
-
           <div>
             <label class="block text-sm font-medium mb-1">标题（可选）</label>
             <UInput
               v-model="createForm.title"
-              placeholder="例如：修复支付回调幂等问题"
+              placeholder="例如：修复支付回调"
               class="w-full"
             />
           </div>
-
           <div>
-            <label class="block text-sm font-medium mb-1">任务描述 *</label>
+            <label class="block text-sm font-medium mb-1">首条消息 *</label>
             <UTextarea
               v-model="createForm.prompt"
               :rows="4"
-              placeholder="描述本次要让 Agent 完成的任务"
+              placeholder="描述你希望 Agent 完成的任务"
               class="w-full"
             />
           </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium mb-1">可见性</label>
-              <USelect
-                v-model="createForm.visibility"
-                :items="createVisibilityOptions"
-                value-key="value"
-                class="w-full"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1">基线分支</label>
-              <UInput
-                v-model="createForm.base_branch"
-                placeholder="main"
-                class="w-full"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-1">工作分支（可选）</label>
-            <UInput
-              v-model="createForm.working_branch"
-              placeholder="feature/agent-task-001"
-              class="w-full"
-            />
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div class="flex items-center justify-between rounded border border-gray-200 dark:border-gray-700 p-3">
-              <div>
-                <p class="text-sm font-medium">
-                  自动提交
-                </p>
-                <p class="text-xs text-gray-500 mt-0.5">
-                  完成后自动提交代码
-                </p>
-              </div>
-              <USwitch v-model="createForm.auto_commit" />
-            </div>
-
-            <div class="flex items-center justify-between rounded border border-gray-200 dark:border-gray-700 p-3">
-              <div>
-                <p class="text-sm font-medium">
-                  自动 PR
-                </p>
-                <p class="text-xs text-gray-500 mt-0.5">
-                  完成后自动创建 PR
-                </p>
-              </div>
-              <USwitch v-model="createForm.auto_pr" />
-            </div>
-          </div>
-
           <div class="flex justify-end gap-2 pt-2">
             <UButton
               color="neutral"
