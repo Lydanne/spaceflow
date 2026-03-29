@@ -1667,7 +1667,13 @@ export async function promptAgentSessionOpencode(params: {
 
 function parseOpencodeModelOptions(payload: unknown): AgentSessionOpencodeModelOption[] {
   const data = asRecord(payload);
-  const providersRaw = Array.isArray(data.providers) ? data.providers : [];
+  const providersField = data.providers;
+  const providersRaw = Array.isArray(providersField)
+    ? providersField
+    : Object.entries(asRecord(providersField)).map(([providerId, value]) => ({
+      ...asRecord(value),
+      id: providerId,
+    }));
   const defaultsMap = asRecord(data.default);
   const options: AgentSessionOpencodeModelOption[] = [];
   const seen = new Set<string>();
@@ -1683,19 +1689,22 @@ function parseOpencodeModelOptions(payload: unknown): AgentSessionOpencodeModelO
     ).trim();
     if (!providerId) continue;
 
-    const providerName = String(providerRecord.name || providerId).trim() || providerId;
+    const providerName = String(providerRecord.name || providerRecord.label || providerId).trim() || providerId;
     const providerDefaultModel = String(defaultsMap[providerId] || "").trim();
-    const modelsRaw = Array.isArray(providerRecord.models) ? providerRecord.models : [];
+    const modelsField = providerRecord.models;
+    const modelRows = Array.isArray(modelsField)
+      ? modelsField.map((item) => ({ key: "", item }))
+      : Object.entries(asRecord(modelsField)).map(([key, item]) => ({ key, item }));
 
-    for (const modelItem of modelsRaw) {
-      const modelRecord = asRecord(modelItem);
-      const fallbackModel = typeof modelItem === "string" ? modelItem : "";
+    for (const modelRow of modelRows) {
+      const modelRecord = asRecord(modelRow.item);
+      const fallbackModel = typeof modelRow.item === "string" ? modelRow.item : "";
       const modelId = String(
         modelRecord.id
         || modelRecord.modelID
         || modelRecord.model_id
         || modelRecord.key
-        || modelRecord.name
+        || modelRow.key
         || fallbackModel,
       ).trim();
       if (!modelId) continue;
@@ -1704,13 +1713,35 @@ function parseOpencodeModelOptions(payload: unknown): AgentSessionOpencodeModelO
       if (seen.has(optionId)) continue;
       seen.add(optionId);
 
-      const modelName = String(modelRecord.name || modelId).trim() || modelId;
+      const modelName = String(
+        modelRecord.name
+        || modelRecord.label
+        || modelRecord.display_name
+        || modelId,
+      ).trim() || modelId;
       options.push({
         id: optionId,
         label: `${providerName} / ${modelName}`,
         provider_id: providerId,
         provider_name: providerName,
         is_default: providerDefaultModel === modelId || providerDefaultModel === optionId,
+      });
+    }
+  }
+
+  if (options.length === 0) {
+    for (const [providerId, defaultModelRaw] of Object.entries(defaultsMap)) {
+      const defaultModel = String(defaultModelRaw || "").trim();
+      if (!defaultModel) continue;
+      const optionId = defaultModel.includes("/") ? defaultModel : `${providerId}/${defaultModel}`;
+      if (seen.has(optionId)) continue;
+      seen.add(optionId);
+      options.push({
+        id: optionId,
+        label: optionId,
+        provider_id: providerId,
+        provider_name: providerId,
+        is_default: true,
       });
     }
   }
