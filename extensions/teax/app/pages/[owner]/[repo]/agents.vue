@@ -127,6 +127,8 @@ const events = ref<AgentSessionEvent[]>([]);
 
 const sessionContextPending = ref(false);
 const sessionContextError = ref("");
+const eventStreamPending = ref(false);
+const eventStreamError = ref("");
 const promptDraft = ref("");
 
 const showCreateModal = ref(false);
@@ -241,11 +243,20 @@ watch(
       messages.value = [];
       events.value = [];
       sessionContextError.value = "";
+      eventStreamError.value = "";
       return;
     }
     await loadSessionContext(sessionId);
   },
   { immediate: true },
+);
+
+watch(
+  showEventStreamModal,
+  async (open) => {
+    if (!open || !selectedSessionId.value) return;
+    await loadSessionEvents(selectedSessionId.value);
+  },
 );
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -304,14 +315,11 @@ async function loadSessionContext(sessionId: string) {
   sessionContextError.value = "";
 
   try {
-    const [detail, participantList, messageResp, eventResp] = await Promise.all([
+    const [detail, participantList, messageResp] = await Promise.all([
       $fetch<AgentSessionDetail>(`${sessionsApiBase}/${sessionId}`),
       $fetch<AgentSessionParticipant[]>(`${sessionsApiBase}/${sessionId}/participants`),
       $fetch<PaginatedResponse<AgentSessionMessage>>(`${sessionsApiBase}/${sessionId}/messages`, {
         query: { page: 1, limit: SESSION_MESSAGES_PAGE_LIMIT },
-      }),
-      $fetch<PaginatedResponse<AgentSessionEvent>>(`${sessionsApiBase}/${sessionId}/events`, {
-        query: { page: 1, limit: SESSION_EVENTS_PAGE_LIMIT },
       }),
     ]);
 
@@ -320,7 +328,6 @@ async function loadSessionContext(sessionId: string) {
     sessionDetail.value = detail;
     participants.value = participantList;
     messages.value = messageResp.data;
-    events.value = eventResp.data;
   } catch (error: unknown) {
     if (selectedSessionId.value !== sessionId) return;
     sessionContextError.value = getErrorMessage(error, "加载会话详情失败");
@@ -333,14 +340,11 @@ async function loadSessionContext(sessionId: string) {
 
 async function refreshSessionRealtime(sessionId: string) {
   try {
-    const [detail, participantList, messageResp, eventResp] = await Promise.all([
+    const [detail, participantList, messageResp] = await Promise.all([
       $fetch<AgentSessionDetail>(`${sessionsApiBase}/${sessionId}`),
       $fetch<AgentSessionParticipant[]>(`${sessionsApiBase}/${sessionId}/participants`),
       $fetch<PaginatedResponse<AgentSessionMessage>>(`${sessionsApiBase}/${sessionId}/messages`, {
         query: { page: 1, limit: SESSION_MESSAGES_PAGE_LIMIT },
-      }),
-      $fetch<PaginatedResponse<AgentSessionEvent>>(`${sessionsApiBase}/${sessionId}/events`, {
-        query: { page: 1, limit: SESSION_EVENTS_PAGE_LIMIT },
       }),
     ]);
 
@@ -349,9 +353,27 @@ async function refreshSessionRealtime(sessionId: string) {
     sessionDetail.value = detail;
     participants.value = participantList;
     messages.value = messageResp.data;
-    events.value = eventResp.data;
   } catch {
     // 自动刷新失败时不打断用户操作，也不覆盖当前页面状态
+  }
+}
+
+async function loadSessionEvents(sessionId: string) {
+  eventStreamPending.value = true;
+  eventStreamError.value = "";
+  try {
+    const eventResp = await $fetch<PaginatedResponse<AgentSessionEvent>>(`${sessionsApiBase}/${sessionId}/events`, {
+      query: { page: 1, limit: SESSION_EVENTS_PAGE_LIMIT },
+    });
+    if (selectedSessionId.value !== sessionId) return;
+    events.value = eventResp.data;
+  } catch (error: unknown) {
+    if (selectedSessionId.value !== sessionId) return;
+    eventStreamError.value = getErrorMessage(error, "加载事件流失败");
+  } finally {
+    if (selectedSessionId.value === sessionId) {
+      eventStreamPending.value = false;
+    }
   }
 }
 
@@ -1078,16 +1100,45 @@ async function updateParticipantPermission(item: AgentSessionParticipant) {
             <h3 class="text-lg font-semibold">
               会话事件流
             </h3>
-            <UBadge
-              color="neutral"
-              variant="subtle"
-            >
-              {{ events.length }}
-            </UBadge>
+            <div class="flex items-center gap-2">
+              <UBadge
+                color="neutral"
+                variant="subtle"
+              >
+                {{ events.length }}
+              </UBadge>
+              <UButton
+                icon="i-lucide-refresh-cw"
+                color="neutral"
+                variant="ghost"
+                size="xs"
+                :loading="eventStreamPending"
+                :disabled="!selectedSessionId"
+                @click="selectedSessionId && loadSessionEvents(selectedSessionId)"
+              >
+                刷新
+              </UButton>
+            </div>
           </div>
           <div class="space-y-2 max-h-[520px] overflow-y-auto pr-1">
             <div
-              v-if="events.length === 0"
+              v-if="eventStreamPending"
+              class="text-sm text-gray-400 py-6 text-center"
+            >
+              <UIcon
+                name="i-lucide-loader-2"
+                class="w-4 h-4 animate-spin mx-auto mb-2"
+              />
+              正在加载事件流
+            </div>
+            <div
+              v-else-if="eventStreamError"
+              class="text-sm text-red-500 py-2"
+            >
+              {{ eventStreamError }}
+            </div>
+            <div
+              v-else-if="events.length === 0"
               class="text-sm text-gray-400 py-2"
             >
               暂无事件
