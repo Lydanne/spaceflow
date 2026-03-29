@@ -130,6 +130,7 @@ const sessionContextError = ref("");
 const promptDraft = ref("");
 
 const showCreateModal = ref(false);
+const showEventStreamModal = ref(false);
 const showSessionSettingsModal = ref(false);
 const createLoading = ref(false);
 const sendPromptLoading = ref(false);
@@ -232,6 +233,7 @@ watch(
 watch(
   selectedSessionId,
   async (sessionId) => {
+    showEventStreamModal.value = false;
     showSessionSettingsModal.value = false;
     if (!sessionId) {
       sessionDetail.value = null;
@@ -956,12 +958,23 @@ async function updateParticipantPermission(item: AgentSessionParticipant) {
                 <h3 class="text-sm font-semibold">
                   对话消息
                 </h3>
-                <UBadge
-                  color="neutral"
-                  variant="subtle"
-                >
-                  {{ messages.length }}
-                </UBadge>
+                <div class="flex items-center gap-2">
+                  <UBadge
+                    color="neutral"
+                    variant="subtle"
+                  >
+                    {{ messages.length }}
+                  </UBadge>
+                  <UButton
+                    icon="i-lucide-list-collapse"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    @click="showEventStreamModal = true"
+                  >
+                    事件流（{{ events.length }}）
+                  </UButton>
+                </div>
               </div>
             </template>
 
@@ -1054,108 +1067,55 @@ async function updateParticipantPermission(item: AgentSessionParticipant) {
             </div>
           </UCard>
 
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <UCard>
-              <template #header>
-                <div class="flex items-center justify-between">
-                  <h3 class="text-sm font-semibold">
-                    参与者
-                  </h3>
-                  <UBadge
-                    color="neutral"
-                    variant="subtle"
-                  >
-                    {{ participants.length }}
-                  </UBadge>
-                </div>
-              </template>
-
-              <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
-                <div
-                  v-if="participants.length === 0"
-                  class="text-sm text-gray-400 py-2"
-                >
-                  暂无参与者
-                </div>
-                <div
-                  v-for="item in participants"
-                  :key="item.id"
-                  class="flex items-center justify-between rounded border border-gray-200 dark:border-gray-700 p-2"
-                >
-                  <div class="flex items-center gap-2 min-w-0">
-                    <UAvatar
-                      :src="item.avatar_url || undefined"
-                      :alt="item.gitea_username || item.user_id"
-                      size="xs"
-                    />
-                    <div class="min-w-0">
-                      <p class="text-sm truncate">
-                        {{ item.gitea_username || shortId(item.user_id) }}
-                      </p>
-                      <p class="text-xs text-gray-500">
-                        {{ item.can_chat ? "可发言" : "只读" }}
-                      </p>
-                    </div>
-                  </div>
-                  <UBadge
-                    color="neutral"
-                    variant="soft"
-                    size="xs"
-                  >
-                    {{ item.role }}
-                  </UBadge>
-                </div>
-              </div>
-            </UCard>
-
-            <UCard>
-              <template #header>
-                <div class="flex items-center justify-between">
-                  <h3 class="text-sm font-semibold">
-                    事件流
-                  </h3>
-                  <UBadge
-                    color="neutral"
-                    variant="subtle"
-                  >
-                    {{ events.length }}
-                  </UBadge>
-                </div>
-              </template>
-
-              <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
-                <div
-                  v-if="events.length === 0"
-                  class="text-sm text-gray-400 py-2"
-                >
-                  暂无事件
-                </div>
-                <div
-                  v-for="eventItem in events"
-                  :key="eventItem.id"
-                  class="rounded border border-gray-200 dark:border-gray-700 p-2"
-                >
-                  <div class="flex items-center gap-2 text-xs text-gray-500">
-                    <span>#{{ eventItem.seq }}</span>
-                    <UBadge
-                      :color="actorTypeColor(eventItem.actor_type)"
-                      variant="soft"
-                      size="xs"
-                    >
-                      {{ eventItem.actor_type }}
-                    </UBadge>
-                    <span>{{ eventItem.type }}</span>
-                  </div>
-                  <p class="text-xs text-gray-400 mt-1">
-                    {{ formatDateTime(eventItem.created_at) }} · {{ shortId(eventItem.actor_id) }}
-                  </p>
-                </div>
-              </div>
-            </UCard>
-          </div>
         </template>
       </div>
     </div>
+
+    <UModal v-model:open="showEventStreamModal">
+      <template #content>
+        <div class="p-6 space-y-4">
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="text-lg font-semibold">
+              会话事件流
+            </h3>
+            <UBadge
+              color="neutral"
+              variant="subtle"
+            >
+              {{ events.length }}
+            </UBadge>
+          </div>
+          <div class="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+            <div
+              v-if="events.length === 0"
+              class="text-sm text-gray-400 py-2"
+            >
+              暂无事件
+            </div>
+            <div
+              v-for="eventItem in events"
+              :key="eventItem.id"
+              class="rounded border border-gray-200 dark:border-gray-700 p-2"
+            >
+              <div class="flex items-center gap-2 text-xs text-gray-500">
+                <span>#{{ eventItem.seq }}</span>
+                <UBadge
+                  :color="actorTypeColor(eventItem.actor_type)"
+                  variant="soft"
+                  size="xs"
+                >
+                  {{ eventItem.actor_type }}
+                </UBadge>
+                <span>{{ eventItem.type }}</span>
+              </div>
+              <p class="text-xs text-gray-400 mt-1">
+                {{ formatDateTime(eventItem.created_at) }} · {{ shortId(eventItem.actor_id) }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </template>
+    </UModal>
 
     <UModal v-model:open="showSessionSettingsModal">
       <template #content>
