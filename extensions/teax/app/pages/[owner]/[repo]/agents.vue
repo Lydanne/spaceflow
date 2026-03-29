@@ -85,25 +85,6 @@ interface PaginatedResponse<T> {
   hasMore: boolean;
 }
 
-interface RepoRuntimeSummary {
-  repository_id: string;
-  repository_full_name: string;
-  mode: "docker";
-  root_dir: string;
-  repo_root_path: string;
-  sessions_root_dir: string;
-  runtime: {
-    id: string;
-    status: string;
-    provider: string;
-    runtime_key: string | null;
-    last_heartbeat_at: string | null;
-  } | null;
-  runtime_status: string;
-  active_session_count: number;
-  active_worktree_count: number;
-}
-
 interface SessionOpencodeControlResult {
   action: "start" | "stop" | "restart";
   status: "running" | "stopped";
@@ -125,7 +106,7 @@ const props = defineProps<{
 const toast = useToast();
 const { user } = useUserSession();
 const sessionsApiBase = `/api/repos/${props.owner}/${props.repo}/agents/sessions`;
-const runtimeApiBase = `/api/repos/${props.owner}/${props.repo}/agents/runtime`;
+const runtimeSettingsPath = `/${props.owner}/${props.repo}/settings`;
 
 const { data: sessionListResp, pending: sessionListPending, refresh: refreshSessionList } = await useFetch<
   PaginatedResponse<AgentSessionSummary>
@@ -136,12 +117,7 @@ const { data: sessionListResp, pending: sessionListPending, refresh: refreshSess
   },
 });
 
-const { data: runtimeSummaryResp, pending: runtimeSummaryPending, refresh: refreshRuntimeSummary } = await useFetch<
-  RepoRuntimeSummary
->(runtimeApiBase);
-
 const sessions = computed(() => sessionListResp.value?.data ?? []);
-const runtimeSummary = computed(() => runtimeSummaryResp.value || null);
 const selectedSessionId = ref<string | null>(null);
 
 const sessionDetail = ref<AgentSessionDetail | null>(null);
@@ -163,14 +139,10 @@ const retryLoading = ref(false);
 const deleteLoading = ref(false);
 const visibilityLoading = ref(false);
 const pinningMessageId = ref<string | null>(null);
-const runtimeStartLoading = ref(false);
-const runtimeStopLoading = ref(false);
-const runtimeForceStopLoading = ref(false);
 const opencodeStartLoading = ref(false);
 const opencodeStopLoading = ref(false);
 const opencodeRestartLoading = ref(false);
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
-let autoRefreshTick = 0;
 const SESSION_MESSAGES_PAGE_LIMIT = 100;
 const SESSION_EVENTS_PAGE_LIMIT = 100;
 
@@ -284,6 +256,10 @@ function shortId(value: string): string {
   return value.slice(0, 8);
 }
 
+function containerSessionPath(sessionId: string): string {
+  return `/runtime/sessions/${sessionId}`;
+}
+
 function sessionTitle(session: AgentSessionSummary | AgentSessionDetail): string {
   return session.title?.trim() || `会话 ${shortId(session.id)}`;
 }
@@ -374,14 +350,10 @@ function startAutoRefresh() {
 
   autoRefreshTimer = setInterval(() => {
     const sessionId = selectedSessionId.value;
-    autoRefreshTick += 1;
     if (!sessionId) return;
     if (sessionContextPending.value || sendPromptLoading.value || createLoading.value) return;
 
     void refreshSessionRealtime(sessionId);
-    if (autoRefreshTick % 3 === 0) {
-      void refreshRuntimeSummary();
-    }
   }, 6000);
 }
 
@@ -438,7 +410,7 @@ async function createSession() {
     resetCreateForm();
     toast.add({ title: "会话创建成功", color: "success" });
 
-    await Promise.all([refreshSessionList(), refreshRuntimeSummary()]);
+    await refreshSessionList();
     selectedSessionId.value = created.id;
     await loadSessionContext(created.id);
   } catch (error: unknown) {
@@ -451,46 +423,6 @@ async function createSession() {
 async function refreshCurrentSession() {
   if (!selectedSessionId.value) return;
   await loadSessionContext(selectedSessionId.value);
-}
-
-async function startRuntime() {
-  runtimeStartLoading.value = true;
-  toast.add({ title: "正在启动 Runtime，首次构建可能需要几分钟", color: "info" });
-  try {
-    await $fetch(`${runtimeApiBase}/start`, {
-      method: "POST",
-    });
-    toast.add({ title: "Runtime 已启动", color: "success" });
-    await refreshRuntimeSummary();
-  } catch (error: unknown) {
-    toast.add({ title: getErrorMessage(error, "启动 Runtime 失败"), color: "error" });
-  } finally {
-    runtimeStartLoading.value = false;
-  }
-}
-
-async function stopRuntime(force: boolean) {
-  if (force) {
-    runtimeForceStopLoading.value = true;
-  } else {
-    runtimeStopLoading.value = true;
-  }
-
-  try {
-    await $fetch(`${runtimeApiBase}/stop`, {
-      method: "POST",
-      body: {
-        force,
-      },
-    });
-    toast.add({ title: force ? "Runtime 已强制停止" : "Runtime 已停止", color: "success" });
-    await Promise.all([refreshRuntimeSummary(), refreshSessionList(), refreshCurrentSession()]);
-  } catch (error: unknown) {
-    toast.add({ title: getErrorMessage(error, "停止 Runtime 失败"), color: "error" });
-  } finally {
-    runtimeStopLoading.value = false;
-    runtimeForceStopLoading.value = false;
-  }
 }
 
 function setOpencodeLoading(action: "start" | "stop" | "restart", value: boolean) {
@@ -525,7 +457,7 @@ async function controlSessionOpencode(action: "start" | "stop" | "restart") {
       description: `${statusText} · 目录 ${result.container_session_path}`,
       color: "success",
     });
-    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, `Opencode ${opencodeActionLabel(action)}失败`), color: "error" });
   } finally {
@@ -546,7 +478,7 @@ async function submitPrompt() {
     });
 
     promptDraft.value = "";
-    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "发送消息失败"), color: "error" });
   } finally {
@@ -561,7 +493,7 @@ async function joinSession() {
   try {
     await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/join`, { method: "POST" });
     toast.add({ title: "已加入会话", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "加入会话失败"), color: "error" });
   } finally {
@@ -576,7 +508,7 @@ async function leaveSession() {
   try {
     await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/leave`, { method: "POST" });
     toast.add({ title: "已退出会话", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "退出会话失败"), color: "error" });
   } finally {
@@ -591,7 +523,7 @@ async function stopSession() {
   try {
     await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/stop`, { method: "POST" });
     toast.add({ title: "会话已停止", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "停止会话失败"), color: "error" });
   } finally {
@@ -606,7 +538,7 @@ async function retrySession() {
   try {
     await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/retry`, { method: "POST" });
     toast.add({ title: "会话已重试", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "重试会话失败"), color: "error" });
   } finally {
@@ -623,7 +555,7 @@ async function deleteSession() {
     await $fetch(`${sessionsApiBase}/${selectedSessionId.value}`, { method: "DELETE" });
     toast.add({ title: "会话已删除", color: "success" });
     selectedSessionId.value = null;
-    await Promise.all([refreshSessionList(), refreshRuntimeSummary()]);
+    await refreshSessionList();
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "删除会话失败"), color: "error" });
   } finally {
@@ -643,7 +575,7 @@ async function updateVisibility() {
       },
     });
     toast.add({ title: "会话可见性已更新", color: "success" });
-    await Promise.all([refreshCurrentSession(), refreshSessionList(), refreshRuntimeSummary()]);
+    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
   } catch (error: unknown) {
     toast.add({ title: getErrorMessage(error, "更新可见性失败"), color: "error" });
   } finally {
@@ -676,10 +608,18 @@ async function pinMessage(messageId: string) {
           Agents
         </h2>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          管理仓库级 Agent 会话，支持多人协作对话、事件追踪与任务执行
+          会话协作主工作台：左侧会话，右侧聊天。Runtime 运维入口已收敛到仓库设置页。
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <UButton
+          icon="i-lucide-settings"
+          color="neutral"
+          variant="ghost"
+          :to="runtimeSettingsPath"
+        >
+          Runtime 设置
+        </UButton>
         <UButton
           icon="i-lucide-refresh-cw"
           color="neutral"
@@ -698,106 +638,6 @@ async function pinMessage(messageId: string) {
         </UButton>
       </div>
     </div>
-
-    <UCard>
-      <template #header>
-        <div class="flex items-center justify-between gap-3">
-          <div class="flex items-center gap-2">
-            <h3 class="text-sm font-semibold">
-              Repo Runtime
-            </h3>
-            <UBadge
-              :color="runtimeStatusColor(runtimeSummary?.runtime_status || 'stopped')"
-              variant="subtle"
-            >
-              {{ runtimeSummary?.runtime_status || "stopped" }}
-            </UBadge>
-            <UBadge
-              color="neutral"
-              variant="soft"
-            >
-              {{ runtimeSummary?.mode || "docker" }}
-            </UBadge>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              icon="i-lucide-refresh-cw"
-              :loading="runtimeSummaryPending"
-              @click="() => refreshRuntimeSummary()"
-            >
-              刷新
-            </UButton>
-            <UButton
-              icon="i-lucide-play"
-              color="primary"
-              :loading="runtimeStartLoading"
-              :disabled="runtimeStartLoading"
-              @click="startRuntime"
-            >
-              启动
-            </UButton>
-            <UButton
-              icon="i-lucide-square"
-              color="warning"
-              variant="soft"
-              :loading="runtimeStopLoading"
-              :disabled="runtimeSummary?.runtime_status !== 'running'"
-              @click="stopRuntime(false)"
-            >
-              停止
-            </UButton>
-            <UButton
-              icon="i-lucide-octagon-x"
-              color="error"
-              variant="ghost"
-              :loading="runtimeForceStopLoading"
-              :disabled="runtimeSummary?.runtime_status !== 'running'"
-              @click="stopRuntime(true)"
-            >
-              强制停止
-            </UButton>
-          </div>
-        </div>
-      </template>
-
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
-          <p class="text-gray-500 mb-1">
-            活跃会话
-          </p>
-          <p class="font-medium text-sm">
-            {{ runtimeSummary?.active_session_count ?? 0 }}
-          </p>
-        </div>
-        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
-          <p class="text-gray-500 mb-1">
-            活跃 Worktree
-          </p>
-          <p class="font-medium text-sm">
-            {{ runtimeSummary?.active_worktree_count ?? 0 }}
-          </p>
-        </div>
-        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
-          <p class="text-gray-500 mb-1">
-            Runtime Key
-          </p>
-          <p class="font-medium text-sm truncate">
-            {{ runtimeSummary?.runtime?.runtime_key || "-" }}
-          </p>
-        </div>
-        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
-          <p class="text-gray-500 mb-1">
-            心跳
-          </p>
-          <p class="font-medium text-sm truncate">
-            {{ formatDateTime(runtimeSummary?.runtime?.last_heartbeat_at || null) }}
-          </p>
-        </div>
-      </div>
-    </UCard>
 
     <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
       <div class="xl:col-span-4">
@@ -877,7 +717,13 @@ async function pinMessage(messageId: string) {
                 >
                   {{ item.visibility === "public" ? "公开" : "私有" }}
                 </UBadge>
-                <span>{{ item.base_branch }}</span>
+                <span class="inline-flex items-center gap-1">
+                  <UIcon
+                    name="i-lucide-git-branch"
+                    class="w-3 h-3"
+                  />
+                  {{ item.working_branch || item.base_branch }}
+                </span>
                 <span class="text-gray-300">·</span>
                 <span>{{ formatDateTime(item.updated_at) }}</span>
               </div>
@@ -935,7 +781,7 @@ async function pinMessage(messageId: string) {
                     {{ sessionTitle(sessionDetail) }}
                   </h3>
                   <div class="text-xs text-gray-500 mt-1 flex flex-wrap items-center gap-2">
-                    <span>ID: {{ shortId(sessionDetail.id) }}</span>
+                    <span>Session: {{ sessionDetail.id }}</span>
                     <span class="text-gray-300">·</span>
                     <span>基线分支 {{ sessionDetail.base_branch }}</span>
                     <span
@@ -1019,14 +865,17 @@ async function pinMessage(messageId: string) {
               </div>
 
               <div
-                v-if="sessionDetail.worktree_path || sessionDetail.worktree_last_error"
+                v-if="sessionDetail.id || sessionDetail.worktree_path || sessionDetail.worktree_last_error"
                 class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-1 text-xs"
               >
+                <p class="text-gray-500">
+                  会话上下文（容器内）：{{ containerSessionPath(sessionDetail.id) }}
+                </p>
                 <p
                   v-if="sessionDetail.worktree_path"
                   class="text-gray-500"
                 >
-                  Worktree 路径：{{ sessionDetail.worktree_path }}
+                  会话上下文（宿主机）：{{ sessionDetail.worktree_path }}
                 </p>
                 <p
                   v-if="sessionDetail.worktree_last_error"

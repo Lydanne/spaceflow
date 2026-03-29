@@ -13,6 +13,100 @@ const props = defineProps<{
 }>();
 
 const toast = useToast();
+const runtimeApiBase = `/api/repos/${props.owner}/${props.repo}/agents/runtime`;
+
+interface RepoRuntimeSummary {
+  repository_id: string;
+  repository_full_name: string;
+  mode: "docker";
+  root_dir: string;
+  repo_root_path: string;
+  sessions_root_dir: string;
+  runtime: {
+    id: string;
+    status: string;
+    provider: string;
+    runtime_key: string | null;
+    last_heartbeat_at: string | null;
+  } | null;
+  runtime_status: string;
+  active_session_count: number;
+  active_worktree_count: number;
+}
+
+const runtimeSummary = ref<RepoRuntimeSummary | null>(null);
+const runtimeSummaryPending = ref(false);
+const runtimeStartLoading = ref(false);
+const runtimeStopLoading = ref(false);
+const runtimeForceStopLoading = ref(false);
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function runtimeStatusColor(status: string): "info" | "success" | "warning" | "error" | "neutral" {
+  if (status === "running") return "success";
+  if (status === "starting") return "warning";
+  if (status === "stopped") return "neutral";
+  if (status === "failed") return "error";
+  return "neutral";
+}
+
+async function refreshRuntimeSummary() {
+  runtimeSummaryPending.value = true;
+  try {
+    runtimeSummary.value = await $fetch<RepoRuntimeSummary>(runtimeApiBase);
+  } catch (error: unknown) {
+    const message = (error as { data?: { message?: string } })?.data?.message || "加载 Runtime 状态失败";
+    toast.add({ title: message, color: "error" });
+  } finally {
+    runtimeSummaryPending.value = false;
+  }
+}
+
+async function startRuntime() {
+  runtimeStartLoading.value = true;
+  toast.add({ title: "正在启动 Runtime，首次构建可能需要几分钟", color: "info" });
+  try {
+    runtimeSummary.value = await $fetch<RepoRuntimeSummary>(`${runtimeApiBase}/start`, { method: "POST" });
+    toast.add({ title: "Runtime 已启动", color: "success" });
+  } catch (error: unknown) {
+    const message = (error as { data?: { message?: string } })?.data?.message || "启动 Runtime 失败";
+    toast.add({ title: message, color: "error" });
+  } finally {
+    runtimeStartLoading.value = false;
+  }
+}
+
+async function stopRuntime(force: boolean) {
+  if (force) {
+    runtimeForceStopLoading.value = true;
+  } else {
+    runtimeStopLoading.value = true;
+  }
+
+  try {
+    const result = await $fetch<{ summary?: RepoRuntimeSummary }>(`${runtimeApiBase}/stop`, {
+      method: "POST",
+      body: { force },
+    });
+    runtimeSummary.value = result.summary || null;
+    toast.add({ title: force ? "Runtime 已强制停止" : "Runtime 已停止", color: "success" });
+  } catch (error: unknown) {
+    const message = (error as { data?: { message?: string } })?.data?.message || "停止 Runtime 失败";
+    toast.add({ title: message, color: "error" });
+  } finally {
+    runtimeStopLoading.value = false;
+    runtimeForceStopLoading.value = false;
+  }
+}
+
+onMounted(() => {
+  void refreshRuntimeSummary();
+});
 
 // ─── 事件类型常量 ──────────────────────────────────────
 const NOTIFY_EVENTS = [
@@ -213,6 +307,108 @@ async function deleteProject() {
           </p>
         </div>
       </div>
+    </UCard>
+
+    <!-- Agents Runtime -->
+    <UCard>
+      <template #header>
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <h3 class="font-semibold">
+              Agents Runtime
+            </h3>
+            <UBadge
+              :color="runtimeStatusColor(runtimeSummary?.runtime_status || 'stopped')"
+              variant="subtle"
+            >
+              {{ runtimeSummary?.runtime_status || "stopped" }}
+            </UBadge>
+            <UBadge
+              color="neutral"
+              variant="soft"
+            >
+              {{ runtimeSummary?.mode || "docker" }}
+            </UBadge>
+          </div>
+          <div class="flex items-center gap-2">
+            <UButton
+              icon="i-lucide-refresh-cw"
+              color="neutral"
+              variant="ghost"
+              :loading="runtimeSummaryPending"
+              @click="refreshRuntimeSummary"
+            >
+              刷新
+            </UButton>
+            <UButton
+              icon="i-lucide-play"
+              color="primary"
+              :loading="runtimeStartLoading"
+              :disabled="runtimeStartLoading"
+              @click="startRuntime"
+            >
+              启动
+            </UButton>
+            <UButton
+              icon="i-lucide-square"
+              color="warning"
+              variant="soft"
+              :loading="runtimeStopLoading"
+              :disabled="runtimeSummary?.runtime_status !== 'running'"
+              @click="stopRuntime(false)"
+            >
+              停止
+            </UButton>
+            <UButton
+              icon="i-lucide-octagon-x"
+              color="error"
+              variant="ghost"
+              :loading="runtimeForceStopLoading"
+              :disabled="runtimeSummary?.runtime_status !== 'running'"
+              @click="stopRuntime(true)"
+            >
+              强制停止
+            </UButton>
+          </div>
+        </div>
+      </template>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
+          <p class="text-gray-500 mb-1">
+            活跃会话
+          </p>
+          <p class="font-medium text-sm">
+            {{ runtimeSummary?.active_session_count ?? 0 }}
+          </p>
+        </div>
+        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
+          <p class="text-gray-500 mb-1">
+            活跃目录
+          </p>
+          <p class="font-medium text-sm">
+            {{ runtimeSummary?.active_worktree_count ?? 0 }}
+          </p>
+        </div>
+        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
+          <p class="text-gray-500 mb-1">
+            Runtime Key
+          </p>
+          <p class="font-medium text-sm truncate">
+            {{ runtimeSummary?.runtime?.runtime_key || "-" }}
+          </p>
+        </div>
+        <div class="rounded border border-gray-200 dark:border-gray-700 p-3">
+          <p class="text-gray-500 mb-1">
+            最近心跳
+          </p>
+          <p class="font-medium text-sm truncate">
+            {{ formatDateTime(runtimeSummary?.runtime?.last_heartbeat_at || null) }}
+          </p>
+        </div>
+      </div>
+      <p class="text-xs text-gray-500 mt-3">
+        会话目录根路径：{{ runtimeSummary?.sessions_root_dir || "-" }}
+      </p>
     </UCard>
 
     <!-- 飞书集成 -->
