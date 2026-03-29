@@ -22,7 +22,7 @@ Agents 以“会话（Session）+ 对话（Chat）”为中心，不再把 Runti
 - 左侧：会话列表（标题、状态、可见性、分支标识、最近更新时间）
 - 右侧：聊天面板（消息流、输入框、事件流入口）
 - 页面只保留会话协作动作：
-  - 创建会话
+  - 创建会话（可选分支、模型、Agent）
   - 切换会话
   - 发送消息
   - 会话参与者协作（join/leave）
@@ -49,6 +49,15 @@ Agents 以“会话（Session）+ 对话（Chat）”为中心，不再把 Runti
 - 会话上下文路径（容器内/宿主机）
 - Opencode 会话级控制（start/stop/restart）
 - 可见性与参与者权限
+
+### 2.4 新建会话的 Agent 选择来源
+
+新建会话弹窗中的 Agent 列表通过以下来源聚合：
+
+- 项目级：仓库分支下 `.opencode/agents/*.md`
+- 全局：`~/.config/opencode/agents/*.md`
+
+同名 Agent 按“项目级优先”去重；Agent 可不选，保持自动选择。
 
 ## 3. 会话上下文模型
 

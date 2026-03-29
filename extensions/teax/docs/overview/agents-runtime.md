@@ -152,6 +152,7 @@ failed/stopped --retry--> created
 - `GET /runtime`（`agent:read`）
 - `POST /runtime/start`（`agent:start`）
 - `POST /runtime/stop`（`agent:stop`，body: `{ force?: boolean }`）
+- `GET /opencode/agents`（`agent:create`，扫描项目/全局 Agent 候选）
 
 建议入口：这些 Runtime 级操作统一放在 `/:owner/:repo/settings` 的 Agents Runtime 设置区。
 
@@ -186,6 +187,7 @@ failed/stopped --retry--> created
 
 - 消息主数据源为 OpenCode Server，后端优先读取 OpenCode 消息接口
 - `prompt/messages` 写入会直接转发到 OpenCode Server，不再依赖本地消息表作为主存储
+- `/session/:id/message` 请求体中的 `model`、`agent` 均支持透传（与 OpenCode Server 文档对齐）
 - 事件接口当前是普通分页查询，不是 SSE
 
 ## 7. 前端字段对应

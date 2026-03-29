@@ -179,6 +179,20 @@ export interface GiteaAccessToken {
   scopes: string[];
 }
 
+export interface GiteaRepoContent {
+  type: "file" | "dir" | "symlink" | "submodule";
+  size: number;
+  name: string;
+  path: string;
+  sha: string;
+  url: string;
+  html_url: string;
+  git_url: string | null;
+  download_url: string | null;
+  content?: string;
+  encoding?: string;
+}
+
 export class GiteaService {
   private baseUrl: string;
   private accessToken: string;
@@ -458,6 +472,22 @@ export class GiteaService {
         return Buffer.from(result.content, "base64").toString("utf-8");
       }
       return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getRepoContents(
+    owner: string,
+    repo: string,
+    filepath: string,
+    ref?: string,
+  ): Promise<GiteaRepoContent[] | GiteaRepoContent | null> {
+    try {
+      const query = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+      return (await this.fetch(`/repos/${owner}/${repo}/contents/${filepath}${query}`)) as
+        | GiteaRepoContent[]
+        | GiteaRepoContent;
     } catch {
       return null;
     }

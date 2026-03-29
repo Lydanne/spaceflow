@@ -740,6 +740,12 @@ export async function createAgentSessionMessage(params: {
       || params.metadata.model_id
       || "",
   ).trim() || null;
+  const agentRef = String(
+    params.metadata.agent
+      || params.metadata.agent_id
+      || params.metadata.agent_name
+      || "",
+  ).trim() || null;
 
   try {
     const opencode = await promptAgentSessionOpencode({
@@ -749,6 +755,7 @@ export async function createAgentSessionMessage(params: {
       opencodeSessionId: session.opencode_session_id,
       sessionTitle: session.title,
       model: modelRef,
+      agent: agentRef,
     });
 
     if (opencode.opencode_session_id !== session.opencode_session_id) {
@@ -774,6 +781,7 @@ export async function createAgentSessionMessage(params: {
         ...params.metadata,
         branch_ref: branchRef,
         model: modelRef,
+        agent: agentRef,
         source: "opencode_server",
         opencode_session_id: opencode.opencode_session_id,
         server_hostname: opencode.server_hostname,

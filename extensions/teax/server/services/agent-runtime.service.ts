@@ -1576,13 +1576,18 @@ async function sendPromptToOpencodeServerSession(params: {
   opencodeSessionId: string;
   prompt: string;
   model?: string | null;
+  agent?: string | null;
 }) {
   const model = String(params.model || "").trim();
+  const agent = String(params.agent || "").trim();
   const requestBody: Record<string, unknown> = {
     parts: [{ type: "text", text: params.prompt }],
   };
   if (model) {
     requestBody.model = model;
+  }
+  if (agent) {
+    requestBody.agent = agent;
   }
 
   const response = await callSessionOpencodeHttp({
@@ -1610,6 +1615,7 @@ export async function promptAgentSessionOpencode(params: {
   opencodeSessionId?: string | null;
   sessionTitle?: string | null;
   model?: string | null;
+  agent?: string | null;
 }) {
   const context = await resolveSessionOpencodeContext({
     repositoryId: params.repositoryId,
@@ -1638,6 +1644,7 @@ export async function promptAgentSessionOpencode(params: {
       opencodeSessionId,
       prompt: params.prompt,
       model: params.model,
+      agent: params.agent,
     });
 
     await updateWorktreeOpencodeMetadata({

@@ -96,6 +96,22 @@ interface SessionOpencodeModelsResponse {
   server_status: "running" | "stopped";
 }
 
+interface OpencodeAgentOption {
+  id: string;
+  label: string;
+  description: string | null;
+  source: "project" | "global";
+  source_label: string;
+}
+
+interface OpencodeAgentsResponse {
+  data: OpencodeAgentOption[];
+  project_branch: string;
+  project_count: number;
+  global_count: number;
+  global_agents_dir: string;
+}
+
 const props = defineProps<{
   owner: string;
   repo: string;
@@ -128,6 +144,7 @@ const showCreateModal = ref(false);
 const showSessionSettingsModal = ref(false);
 const createLoading = ref(false);
 const sendPromptLoading = ref(false);
+const createAgentOptionsPending = ref(false);
 const sessionSettingsPending = ref(false);
 const sessionVisibilitySaving = ref(false);
 const sessionModelsPending = ref(false);
@@ -135,17 +152,22 @@ const messageViewportRef = ref<HTMLElement | null>(null);
 const shouldStickToBottom = ref(true);
 const sessionParticipants = ref<AgentSessionParticipant[]>([]);
 const sessionModels = ref<SessionOpencodeModelOption[]>([]);
+const createAgentOptions = ref<OpencodeAgentOption[]>([]);
 const sessionVisibilityDraft = ref<"public" | "private">("public");
 const participantSavingState = reactive<Record<string, boolean>>({});
 const selectedComposerBranch = ref("");
 const selectedComposerModel = ref("");
 
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
+let createAgentLoadToken = 0;
 const SESSION_MESSAGES_PAGE_LIMIT = 100;
 
 const createForm = reactive({
   title: "",
   prompt: "",
+  baseBranch: "",
+  model: "default",
+  agent: "",
 });
 
 const sessionVisibilityOptions = [
@@ -195,6 +217,49 @@ const composerModelOptions = computed(() => {
   return options;
 });
 
+const createBranchOptions = computed(() => {
+  const branchRows = branchesResp.value?.data || [];
+  const options = branchRows.map((row) => ({ label: row.name, value: row.name }));
+  if (options.length > 0) return options;
+  const fallback = String(branchesResp.value?.default_branch || "main").trim() || "main";
+  return [{ label: fallback, value: fallback }];
+});
+
+const createModelOptions = computed(() => {
+  const options = [...composerModelOptions.value];
+  const current = String(createForm.model || "").trim();
+  if (current && !options.some((item) => item.value === current)) {
+    options.unshift({
+      label: current === "default" ? "默认模型" : current,
+      value: current,
+    });
+  }
+  if (options.length === 0) {
+    options.push({ label: "默认模型", value: "default" });
+  }
+  return options;
+});
+
+const createAgentSelectOptions = computed(() => {
+  const options = [{
+    label: "自动（不指定）",
+    value: "",
+  }];
+  for (const agent of createAgentOptions.value) {
+    options.push({
+      label: `${agent.label} · ${agent.source_label}`,
+      value: agent.id,
+    });
+  }
+  return options;
+});
+
+const selectedCreateAgent = computed(() => {
+  const id = String(createForm.agent || "").trim();
+  if (!id) return null;
+  return createAgentOptions.value.find((item) => item.id === id) || null;
+});
+
 const canManageSession = computed(() => {
   if (!sessionDetail.value) return false;
   return sessionDetail.value.my_role === "owner" || user.value?.is_admin === true;
@@ -205,6 +270,25 @@ const canChatInSession = computed(() => {
   if (canManageSession.value) return true;
   return sessionDetail.value.my_can_chat;
 });
+
+function resolveDefaultCreateBranch(): string {
+  return String(
+    createBranchOptions.value[0]?.value
+    || branchesResp.value?.default_branch
+    || sessionDetail.value?.base_branch
+    || "main",
+  ).trim() || "main";
+}
+
+function resolveDefaultCreateModel(): string {
+  const fromSession = String(
+    selectedComposerModel.value
+    || resolveLatestModelRef()
+    || sessionModels.value.find((item) => item.is_default)?.id
+    || "default",
+  ).trim();
+  return fromSession || "default";
+}
 
 watch(
   sessions,
@@ -251,6 +335,39 @@ watch(
     if (branch) {
       selectedComposerBranch.value = branch;
     }
+  },
+);
+
+watch(
+  branchesResp,
+  () => {
+    if (!String(createForm.baseBranch || "").trim()) {
+      createForm.baseBranch = resolveDefaultCreateBranch();
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  showCreateModal,
+  (open) => {
+    if (!open) return;
+    if (!String(createForm.baseBranch || "").trim()) {
+      createForm.baseBranch = resolveDefaultCreateBranch();
+    }
+    if (!String(createForm.model || "").trim()) {
+      createForm.model = resolveDefaultCreateModel();
+    }
+    void loadCreateAgentOptions();
+  },
+);
+
+watch(
+  () => createForm.baseBranch,
+  (branch, previous) => {
+    if (!showCreateModal.value) return;
+    if (branch === previous) return;
+    void loadCreateAgentOptions();
   },
 );
 
@@ -487,12 +604,40 @@ onBeforeUnmount(() => {
 });
 
 function openCreateModal() {
+  resetCreateForm();
   showCreateModal.value = true;
 }
 
 function resetCreateForm() {
   createForm.title = "";
   createForm.prompt = "";
+  createForm.baseBranch = resolveDefaultCreateBranch();
+  createForm.model = resolveDefaultCreateModel();
+  createForm.agent = "";
+}
+
+async function loadCreateAgentOptions() {
+  const branch = String(createForm.baseBranch || "").trim() || resolveDefaultCreateBranch();
+  const requestToken = ++createAgentLoadToken;
+  createAgentOptionsPending.value = true;
+  try {
+    const response = await $fetch<OpencodeAgentsResponse>(`/api/repos/${props.owner}/${props.repo}/agents/opencode/agents`, {
+      query: { branch },
+    });
+    if (requestToken !== createAgentLoadToken) return;
+    createAgentOptions.value = response.data || [];
+    if (createForm.agent && !createAgentOptions.value.some((item) => item.id === createForm.agent)) {
+      createForm.agent = "";
+    }
+  } catch {
+    if (requestToken !== createAgentLoadToken) return;
+    createAgentOptions.value = [];
+    createForm.agent = "";
+  } finally {
+    if (requestToken === createAgentLoadToken) {
+      createAgentOptionsPending.value = false;
+    }
+  }
 }
 
 async function createSession() {
@@ -503,13 +648,38 @@ async function createSession() {
 
   createLoading.value = true;
   try {
+    const prompt = createForm.prompt.trim();
+    const baseBranch = String(createForm.baseBranch || "").trim() || resolveDefaultCreateBranch();
+    const rawModel = String(createForm.model || "").trim();
+    const selectedModel = rawModel && rawModel !== "default" ? rawModel : null;
+    const selectedAgent = String(createForm.agent || "").trim() || null;
     const created = await $fetch<AgentSessionSummary>(sessionsApiBase, {
       method: "POST",
       body: {
         title: createForm.title.trim() || undefined,
-        prompt: createForm.prompt.trim(),
+        prompt,
+        base_branch: baseBranch,
       },
     });
+
+    try {
+      await $fetch(`${sessionsApiBase}/${created.id}/prompt`, {
+        method: "POST",
+        body: {
+          prompt,
+          metadata: {
+            branch_ref: baseBranch,
+            model: selectedModel,
+            agent: selectedAgent,
+            session_id: created.id,
+            source: "create_session",
+          },
+        },
+      });
+    } catch (error: unknown) {
+      toast.add({ title: getErrorMessage(error, "会话已创建，但首条消息发送失败"), color: "warning" });
+    }
+
     showCreateModal.value = false;
     resetCreateForm();
     await refreshSessionList();
@@ -1059,6 +1229,52 @@ async function submitPrompt() {
           <h3 class="text-lg font-semibold">
             新建会话
           </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium mb-1">分支 *</label>
+              <USelect
+                v-model="createForm.baseBranch"
+                :items="createBranchOptions"
+                value-key="value"
+                class="w-full"
+                size="sm"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">模型</label>
+              <USelect
+                v-model="createForm.model"
+                :items="createModelOptions"
+                value-key="value"
+                class="w-full"
+                size="sm"
+              />
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <label class="block text-sm font-medium">Agent（可选）</label>
+              <UIcon
+                v-if="createAgentOptionsPending"
+                name="i-lucide-loader-2"
+                class="w-4 h-4 animate-spin text-muted"
+              />
+            </div>
+            <USelect
+              v-model="createForm.agent"
+              :items="createAgentSelectOptions"
+              value-key="value"
+              class="w-full"
+              size="sm"
+              :loading="createAgentOptionsPending"
+            />
+            <p
+              v-if="selectedCreateAgent?.description"
+              class="text-xs text-muted mt-1"
+            >
+              {{ selectedCreateAgent.description }}
+            </p>
+          </div>
           <div>
             <label class="block text-sm font-medium mb-1">标题（可选）</label>
             <UInput
