@@ -130,6 +130,7 @@ const sessionContextError = ref("");
 const promptDraft = ref("");
 
 const showCreateModal = ref(false);
+const showSessionSettingsModal = ref(false);
 const createLoading = ref(false);
 const sendPromptLoading = ref(false);
 const joinLoading = ref(false);
@@ -225,6 +226,7 @@ watch(
 watch(
   selectedSessionId,
   async (sessionId) => {
+    showSessionSettingsModal.value = false;
     if (!sessionId) {
       sessionDetail.value = null;
       participants.value = [];
@@ -887,6 +889,16 @@ async function pinMessage(messageId: string) {
 
               <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                 <UButton
+                  v-if="canManageSession"
+                  icon="i-lucide-sliders-horizontal"
+                  color="neutral"
+                  variant="soft"
+                  @click="showSessionSettingsModal = true"
+                >
+                  会话设置
+                </UButton>
+
+                <UButton
                   v-if="canJoinSession"
                   icon="i-lucide-log-in"
                   color="primary"
@@ -906,97 +918,6 @@ async function pinMessage(messageId: string) {
                 >
                   退出会话
                 </UButton>
-
-                <UButton
-                  v-if="canManageSession && sessionDetail.status !== 'stopped' && sessionDetail.status !== 'completed' && sessionDetail.status !== 'failed'"
-                  icon="i-lucide-square"
-                  color="warning"
-                  variant="soft"
-                  :loading="stopLoading"
-                  @click="stopSession"
-                >
-                  停止
-                </UButton>
-
-                <UButton
-                  v-if="canManageSession && (sessionDetail.status === 'failed' || sessionDetail.status === 'stopped')"
-                  icon="i-lucide-rotate-cw"
-                  color="info"
-                  variant="soft"
-                  :loading="retryLoading"
-                  @click="retrySession"
-                >
-                  重试
-                </UButton>
-
-                <UButton
-                  v-if="canManageSession"
-                  icon="i-lucide-play"
-                  color="primary"
-                  variant="soft"
-                  :loading="opencodeStartLoading"
-                  :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
-                  @click="controlSessionOpencode('start')"
-                >
-                  启动 Opencode
-                </UButton>
-
-                <UButton
-                  v-if="canManageSession"
-                  icon="i-lucide-square"
-                  color="warning"
-                  variant="soft"
-                  :loading="opencodeStopLoading"
-                  :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
-                  @click="controlSessionOpencode('stop')"
-                >
-                  停止 Opencode
-                </UButton>
-
-                <UButton
-                  v-if="canManageSession"
-                  icon="i-lucide-refresh-cw"
-                  color="info"
-                  variant="ghost"
-                  :loading="opencodeRestartLoading"
-                  :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
-                  @click="controlSessionOpencode('restart')"
-                >
-                  重启 Opencode
-                </UButton>
-
-                <UButton
-                  v-if="canManageSession"
-                  icon="i-lucide-trash-2"
-                  color="error"
-                  variant="soft"
-                  :loading="deleteLoading"
-                  @click="deleteSession"
-                >
-                  删除会话
-                </UButton>
-
-                <div
-                  v-if="canManageSession"
-                  class="flex items-center gap-2 ml-auto"
-                >
-                  <USelect
-                    v-model="visibilityDraft"
-                    :items="visibilityOptions"
-                    value-key="value"
-                    size="sm"
-                    class="w-28"
-                  />
-                  <UButton
-                    color="neutral"
-                    variant="soft"
-                    size="sm"
-                    :loading="visibilityLoading"
-                    @click="updateVisibility"
-                  >
-                    更新可见性
-                  </UButton>
-                </div>
               </div>
             </div>
           </UCard>
@@ -1207,6 +1128,155 @@ async function pinMessage(messageId: string) {
         </template>
       </div>
     </div>
+
+    <UModal v-model:open="showSessionSettingsModal">
+      <template #content>
+        <div
+          v-if="sessionDetail"
+          class="p-6 space-y-5"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="text-lg font-semibold">
+                会话设置
+              </h3>
+              <p class="text-xs text-gray-500 mt-1">
+                Session {{ sessionDetail.id }}
+              </p>
+            </div>
+            <UButton
+              icon="i-lucide-x"
+              color="neutral"
+              variant="ghost"
+              @click="showSessionSettingsModal = false"
+            />
+          </div>
+
+          <div class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-1 text-xs">
+            <p class="text-gray-500">
+              基线分支：{{ sessionDetail.base_branch }}
+            </p>
+            <p class="text-gray-500">
+              工作分支：{{ sessionDetail.working_branch || sessionDetail.base_branch }}
+            </p>
+            <p class="text-gray-500">
+              会话上下文（容器内）：{{ containerSessionPath(sessionDetail.id) }}
+            </p>
+            <p
+              v-if="sessionDetail.worktree_path"
+              class="text-gray-500"
+            >
+              会话上下文（宿主机）：{{ sessionDetail.worktree_path }}
+            </p>
+            <p
+              v-if="sessionDetail.worktree_last_error"
+              class="text-red-500"
+            >
+              Worktree 错误：{{ sessionDetail.worktree_last_error }}
+            </p>
+          </div>
+
+          <div class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-3">
+            <p class="text-sm font-medium">
+              可见性
+            </p>
+            <div class="flex items-center gap-2">
+              <USelect
+                v-model="visibilityDraft"
+                :items="visibilityOptions"
+                value-key="value"
+                size="sm"
+                class="w-28"
+              />
+              <UButton
+                color="neutral"
+                variant="soft"
+                size="sm"
+                :loading="visibilityLoading"
+                @click="updateVisibility"
+              >
+                更新可见性
+              </UButton>
+            </div>
+          </div>
+
+          <div class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-3">
+            <p class="text-sm font-medium">
+              Opencode 控制
+            </p>
+            <div class="flex flex-wrap items-center gap-2">
+              <UButton
+                icon="i-lucide-play"
+                color="primary"
+                variant="soft"
+                :loading="opencodeStartLoading"
+                :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
+                @click="controlSessionOpencode('start')"
+              >
+                启动
+              </UButton>
+              <UButton
+                icon="i-lucide-square"
+                color="warning"
+                variant="soft"
+                :loading="opencodeStopLoading"
+                :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
+                @click="controlSessionOpencode('stop')"
+              >
+                停止
+              </UButton>
+              <UButton
+                icon="i-lucide-refresh-cw"
+                color="info"
+                variant="ghost"
+                :loading="opencodeRestartLoading"
+                :disabled="sessionDetail.runtime_status !== 'running' || !sessionDetail.worktree_path"
+                @click="controlSessionOpencode('restart')"
+              >
+                重启
+              </UButton>
+            </div>
+          </div>
+
+          <div class="rounded border border-gray-200 dark:border-gray-700 p-3 space-y-3">
+            <p class="text-sm font-medium">
+              生命周期
+            </p>
+            <div class="flex flex-wrap items-center gap-2">
+              <UButton
+                v-if="sessionDetail.status !== 'stopped' && sessionDetail.status !== 'completed' && sessionDetail.status !== 'failed'"
+                icon="i-lucide-square"
+                color="warning"
+                variant="soft"
+                :loading="stopLoading"
+                @click="stopSession"
+              >
+                停止会话
+              </UButton>
+              <UButton
+                v-if="sessionDetail.status === 'failed' || sessionDetail.status === 'stopped'"
+                icon="i-lucide-rotate-cw"
+                color="info"
+                variant="soft"
+                :loading="retryLoading"
+                @click="retrySession"
+              >
+                重试会话
+              </UButton>
+              <UButton
+                icon="i-lucide-trash-2"
+                color="error"
+                variant="soft"
+                :loading="deleteLoading"
+                @click="deleteSession"
+              >
+                删除会话
+              </UButton>
+            </div>
+          </div>
+        </div>
+      </template>
+    </UModal>
 
     <UModal v-model:open="showCreateModal">
       <template #content>
