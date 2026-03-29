@@ -394,22 +394,23 @@ async function submitPrompt() {
 
     <div class="agents-layout gap-2">
       <aside class="agents-sidebar min-w-0">
-        <UCard :ui="{ header: 'px-3 py-2', body: 'p-0' }">
+        <UCard :ui="{ header: 'px-2.5 py-1.5', body: 'p-0' }">
         <template #header>
           <div class="flex items-center justify-between gap-2">
-            <h3 class="text-sm font-semibold">
+            <h3 class="text-xs font-semibold tracking-wide">
               会话
             </h3>
             <UBadge
               color="neutral"
               variant="subtle"
+              size="xs"
             >
               {{ sessions.length }}
             </UBadge>
           </div>
         </template>
 
-        <div class="p-1.5 space-y-1.5 h-[calc(100dvh-19rem)] min-h-[12rem] overflow-y-auto">
+        <div class="p-1.5 space-y-1 h-[calc(100dvh-19rem)] min-h-[12rem] overflow-y-auto">
           <div
             v-if="sessionListPending && sessions.length === 0"
             class="py-6 text-center text-muted text-sm"
@@ -436,7 +437,7 @@ async function submitPrompt() {
             v-for="item in sessions"
             :key="item.id"
             type="button"
-            class="w-full text-left rounded-md border px-2 py-1.5 transition-colors"
+            class="w-full text-left rounded-md border px-1.5 py-1.5 transition-colors"
             :class="[
               selectedSessionId === item.id
                 ? 'border-primary-500 bg-primary-500/10'
@@ -444,19 +445,19 @@ async function submitPrompt() {
             ]"
             @click="selectedSessionId = item.id"
           >
-            <p class="font-medium text-[13px] truncate leading-5">
+            <p class="font-medium text-xs truncate leading-5">
               {{ sessionTitle(item) }}
             </p>
-            <div class="mt-1 text-[11px] text-muted flex items-center gap-1">
+            <div class="mt-0.5 text-[10px] text-muted flex items-center gap-1">
               <span class="inline-flex items-center gap-1">
                 <UIcon
                   name="i-lucide-git-branch"
-                  class="w-3 h-3"
+                  class="w-2.5 h-2.5"
                 />
                 {{ item.working_branch || item.base_branch }}
               </span>
-              <span>·</span>
-              <span>{{ formatDateTime(item.updated_at) }}</span>
+              <span class="opacity-60">·</span>
+              <span class="truncate">{{ formatDateTime(item.updated_at) }}</span>
             </div>
           </button>
         </div>
@@ -659,7 +660,7 @@ async function submitPrompt() {
 <style scoped>
 .agents-layout {
   display: grid;
-  grid-template-columns: 16rem minmax(0, 1fr);
+  grid-template-columns: 13.5rem minmax(0, 1fr);
   align-items: stretch;
 }
 
