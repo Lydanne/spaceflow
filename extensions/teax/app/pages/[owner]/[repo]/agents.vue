@@ -351,13 +351,13 @@ async function submitPrompt() {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div class="flex flex-col gap-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div>
-        <h2 class="text-base font-semibold tracking-tight">
+        <h2 class="text-base font-semibold tracking-tight leading-none">
           Agents
         </h2>
-        <p class="text-xs text-muted mt-1">
+        <p class="text-xs text-muted mt-0.5">
           会话 + 聊天。运行状态和控制统一在设置页。
         </p>
       </div>
@@ -389,11 +389,9 @@ async function submitPrompt() {
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-      <UCard
-        class="lg:col-span-4 xl:col-span-3"
-        :ui="{ body: 'p-0' }"
-      >
+    <div class="flex flex-col lg:flex-row gap-3">
+      <aside class="lg:w-72 xl:w-80 lg:shrink-0">
+        <UCard :ui="{ body: 'p-0' }">
         <template #header>
           <div class="flex items-center justify-between gap-2">
             <h3 class="text-sm font-semibold">
@@ -408,7 +406,7 @@ async function submitPrompt() {
           </div>
         </template>
 
-        <div class="p-2 space-y-2 max-h-[32rem] overflow-y-auto">
+        <div class="p-2 space-y-2 h-[16rem] lg:h-[calc(100dvh-20rem)] min-h-[14rem] overflow-y-auto">
           <div
             v-if="sessionListPending && sessions.length === 0"
             class="py-10 text-center text-muted text-sm"
@@ -435,7 +433,7 @@ async function submitPrompt() {
             v-for="item in sessions"
             :key="item.id"
             type="button"
-            class="w-full text-left rounded-lg border px-3 py-2.5 transition-colors"
+            class="w-full text-left rounded-lg border px-2.5 py-2 transition-colors"
             :class="[
               selectedSessionId === item.id
                 ? 'border-primary-500 bg-primary-500/10'
@@ -446,7 +444,7 @@ async function submitPrompt() {
             <p class="font-medium text-sm truncate">
               {{ sessionTitle(item) }}
             </p>
-            <div class="mt-2 text-xs text-muted flex items-center gap-2">
+            <div class="mt-1.5 text-xs text-muted flex items-center gap-1.5">
               <span class="inline-flex items-center gap-1">
                 <UIcon
                   name="i-lucide-git-branch"
@@ -459,15 +457,14 @@ async function submitPrompt() {
             </div>
           </button>
         </div>
-      </UCard>
+        </UCard>
+      </aside>
 
-      <UCard
-        class="lg:col-span-8 xl:col-span-9"
-        :ui="{ body: 'p-0' }"
-      >
+      <section class="min-w-0 flex-1">
+        <UCard :ui="{ body: 'p-0' }">
         <div
           v-if="!selectedSessionId"
-          class="h-[32rem] flex items-center justify-center text-muted"
+          class="h-[20rem] lg:h-[calc(100dvh-20rem)] min-h-[16rem] flex items-center justify-center text-muted"
         >
           <div class="text-center">
             <UIcon
@@ -480,7 +477,7 @@ async function submitPrompt() {
 
         <div
           v-else-if="sessionContextPending"
-          class="h-[32rem] flex items-center justify-center text-muted"
+          class="h-[20rem] lg:h-[calc(100dvh-20rem)] min-h-[16rem] flex items-center justify-center text-muted"
         >
           <div class="text-center">
             <UIcon
@@ -493,7 +490,7 @@ async function submitPrompt() {
 
         <div
           v-else-if="sessionContextError"
-          class="h-[32rem] flex items-center justify-center text-red-500 px-6"
+          class="h-[20rem] lg:h-[calc(100dvh-20rem)] min-h-[16rem] flex items-center justify-center text-red-500 px-6"
         >
           <div class="text-center">
             <UIcon
@@ -514,12 +511,12 @@ async function submitPrompt() {
         </div>
 
         <template v-else-if="sessionDetail">
-          <div class="px-4 py-3 border-b border-default flex flex-wrap items-center justify-between gap-2">
+          <div class="px-3 py-2 border-b border-default flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 class="text-base font-semibold">
+              <h3 class="text-sm font-semibold">
                 {{ sessionTitle(sessionDetail) }}
               </h3>
-              <p class="text-xs text-muted mt-1">
+              <p class="text-xs text-muted mt-0.5">
                 分支 {{ sessionDetail.working_branch || sessionDetail.base_branch }} · {{ formatDateTime(sessionDetail.updated_at) }}
               </p>
             </div>
@@ -530,13 +527,13 @@ async function submitPrompt() {
               size="sm"
               :to="runtimeSettingsPath"
             >
-              去设置页
+              设置
             </UButton>
           </div>
 
           <div
             ref="messageViewportRef"
-            class="h-[32rem] overflow-y-auto px-4 py-4 space-y-3"
+            class="h-[18rem] lg:h-[calc(100dvh-24rem)] min-h-[14rem] overflow-y-auto px-3 py-3 space-y-2.5"
             @scroll="onMessageViewportScroll"
           >
             <div
@@ -552,10 +549,10 @@ async function submitPrompt() {
               :class="messageRowClass(msg)"
             >
               <div
-                class="max-w-[86%] rounded-2xl border px-4 py-3"
+                class="max-w-[82%] rounded-xl border px-3 py-2.5"
                 :class="messageBubbleClass(msg)"
               >
-                <div class="flex flex-wrap items-center gap-2 text-xs text-muted mb-2">
+                <div class="flex flex-wrap items-center gap-1.5 text-xs text-muted mb-1.5">
                   <span>{{ messageActorLabel(msg) }}</span>
                   <span>·</span>
                   <span>{{ formatDateTime(msg.created_at) }}</span>
@@ -575,10 +572,10 @@ async function submitPrompt() {
             </div>
           </div>
 
-          <div class="border-t border-default p-3 space-y-2">
+          <div class="border-t border-default p-2.5 space-y-2">
             <UTextarea
               v-model="promptDraft"
-              :rows="3"
+              :rows="2"
               placeholder="输入消息..."
               class="w-full"
               :disabled="!canChatInSession"
@@ -604,7 +601,8 @@ async function submitPrompt() {
             </div>
           </div>
         </template>
-      </UCard>
+        </UCard>
+      </section>
     </div>
 
     <UModal v-model:open="showCreateModal">
