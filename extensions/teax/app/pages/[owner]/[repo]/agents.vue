@@ -52,6 +52,18 @@ interface AgentSessionMessage {
   updated_at: string;
 }
 
+interface AgentSessionParticipant {
+  id: string;
+  session_id: string;
+  user_id: string;
+  role: "owner" | "collaborator" | "viewer";
+  can_chat: boolean;
+  invited_by: string | null;
+  joined_at: string;
+  gitea_username: string | null;
+  avatar_url: string | null;
+}
+
 interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -86,10 +98,16 @@ const sessionContextError = ref("");
 const promptDraft = ref("");
 
 const showCreateModal = ref(false);
+const showSessionSettingsModal = ref(false);
 const createLoading = ref(false);
 const sendPromptLoading = ref(false);
+const sessionSettingsPending = ref(false);
+const sessionVisibilitySaving = ref(false);
 const messageViewportRef = ref<HTMLElement | null>(null);
 const shouldStickToBottom = ref(true);
+const sessionParticipants = ref<AgentSessionParticipant[]>([]);
+const sessionVisibilityDraft = ref<"public" | "private">("public");
+const participantSavingState = reactive<Record<string, boolean>>({});
 
 let autoRefreshTimer: ReturnType<typeof setInterval> | null = null;
 const SESSION_MESSAGES_PAGE_LIMIT = 100;
@@ -98,6 +116,16 @@ const createForm = reactive({
   title: "",
   prompt: "",
 });
+
+const sessionVisibilityOptions = [
+  { label: "公开", value: "public" },
+  { label: "私有", value: "private" },
+];
+
+const participantRoleOptions = [
+  { label: "协作者", value: "collaborator" },
+  { label: "只读", value: "viewer" },
+];
 
 const canManageSession = computed(() => {
   if (!sessionDetail.value) return false;
@@ -129,6 +157,8 @@ watch(
 watch(
   selectedSessionId,
   async (sessionId) => {
+    showSessionSettingsModal.value = false;
+    sessionParticipants.value = [];
     if (!sessionId) {
       sessionDetail.value = null;
       messages.value = [];
@@ -197,6 +227,12 @@ function messageActorLabel(message: AgentSessionMessage): string {
   if (message.actor_type === "agent") return "Agent";
   if (message.actor_type === "system") return "System";
   return "Bot";
+}
+
+function participantRoleLabel(role: AgentSessionParticipant["role"]): string {
+  if (role === "owner") return "所有者";
+  if (role === "collaborator") return "协作者";
+  return "只读";
 }
 
 function onMessageViewportScroll() {
@@ -315,6 +351,81 @@ async function createSession() {
     toast.add({ title: getErrorMessage(error, "创建会话失败"), color: "error" });
   } finally {
     createLoading.value = false;
+  }
+}
+
+async function loadSessionParticipants(sessionId: string) {
+  sessionSettingsPending.value = true;
+  try {
+    const participants = await $fetch<AgentSessionParticipant[]>(`${sessionsApiBase}/${sessionId}/participants`);
+    if (selectedSessionId.value !== sessionId) return;
+    sessionParticipants.value = participants;
+  } catch (error: unknown) {
+    toast.add({ title: getErrorMessage(error, "加载会话参与者失败"), color: "error" });
+  } finally {
+    if (selectedSessionId.value === sessionId) {
+      sessionSettingsPending.value = false;
+    }
+  }
+}
+
+function openSessionSettingsModal() {
+  if (!selectedSessionId.value || !sessionDetail.value) return;
+  sessionVisibilityDraft.value = sessionDetail.value.visibility;
+  showSessionSettingsModal.value = true;
+  void loadSessionParticipants(selectedSessionId.value);
+}
+
+async function saveSessionVisibility() {
+  if (!selectedSessionId.value || !sessionDetail.value) return;
+  if (sessionVisibilityDraft.value === sessionDetail.value.visibility) return;
+
+  sessionVisibilitySaving.value = true;
+  try {
+    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/visibility`, {
+      method: "PATCH",
+      body: { visibility: sessionVisibilityDraft.value },
+    });
+    await Promise.all([refreshCurrentSession(), refreshSessionList()]);
+    toast.add({ title: "会话可见性已更新", color: "success" });
+  } catch (error: unknown) {
+    toast.add({ title: getErrorMessage(error, "更新可见性失败"), color: "error" });
+  } finally {
+    sessionVisibilitySaving.value = false;
+  }
+}
+
+async function updateParticipantRole(userId: string, role: "collaborator" | "viewer") {
+  if (!selectedSessionId.value) return;
+  participantSavingState[userId] = true;
+  try {
+    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/participants/${userId}`, {
+      method: "PATCH",
+      body: { role },
+    });
+    const target = sessionParticipants.value.find((item) => item.user_id === userId);
+    if (target) target.role = role;
+  } catch (error: unknown) {
+    toast.add({ title: getErrorMessage(error, "更新成员角色失败"), color: "error" });
+  } finally {
+    delete participantSavingState[userId];
+  }
+}
+
+async function updateParticipantCanChat(userId: string, canChat: boolean) {
+  if (!selectedSessionId.value) return;
+  participantSavingState[userId] = true;
+  try {
+    await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/participants/${userId}`, {
+      method: "PATCH",
+      body: { can_chat: canChat },
+    });
+    const target = sessionParticipants.value.find((item) => item.user_id === userId);
+    if (target) target.can_chat = canChat;
+  } catch (error: unknown) {
+    toast.add({ title: getErrorMessage(error, "更新发言权限失败"), color: "error" });
+  } finally {
+    delete participantSavingState[userId];
   }
 }
 
@@ -524,16 +635,16 @@ async function submitPrompt() {
                   分支 {{ sessionDetail.working_branch || sessionDetail.base_branch }} · {{ formatDateTime(sessionDetail.updated_at) }}
                 </p>
               </div>
-              <UButton
-                icon="i-lucide-settings-2"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                :to="runtimeSettingsPath"
-              >
-                设置
-              </UButton>
-            </div>
+            <UButton
+              icon="i-lucide-settings-2"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              @click="openSessionSettingsModal"
+            >
+              会话设置
+            </UButton>
+          </div>
 
             <div
               ref="messageViewportRef"
@@ -609,6 +720,141 @@ async function submitPrompt() {
         </UCard>
       </section>
     </div>
+
+    <UModal v-model:open="showSessionSettingsModal">
+      <template #content>
+        <div class="p-5 space-y-4">
+          <div>
+            <h3 class="text-base font-semibold">
+              会话设置
+            </h3>
+            <p
+              v-if="sessionDetail"
+              class="text-xs text-muted mt-1"
+            >
+              {{ sessionTitle(sessionDetail) }} · {{ sessionDetail.working_branch || sessionDetail.base_branch }}
+            </p>
+          </div>
+
+          <div class="rounded-lg border border-default p-3 space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-sm font-medium">
+                  可见性
+                </p>
+                <p class="text-xs text-muted mt-0.5">
+                  公开会话允许仓库成员查看，私有会话仅参与者可见
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <USelect
+                  v-model="sessionVisibilityDraft"
+                  :items="sessionVisibilityOptions"
+                  value-key="value"
+                  class="w-28"
+                  size="sm"
+                  :disabled="!canManageSession || sessionVisibilitySaving"
+                />
+                <UButton
+                  size="sm"
+                  color="primary"
+                  :loading="sessionVisibilitySaving"
+                  :disabled="!canManageSession || !sessionDetail || sessionVisibilityDraft === sessionDetail.visibility"
+                  @click="saveSessionVisibility"
+                >
+                  保存
+                </UButton>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-semibold">
+                参与者
+              </h4>
+              <UButton
+                icon="i-lucide-refresh-cw"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                :loading="sessionSettingsPending"
+                :disabled="!selectedSessionId"
+                @click="selectedSessionId && loadSessionParticipants(selectedSessionId)"
+              >
+                刷新
+              </UButton>
+            </div>
+
+            <div
+              v-if="sessionSettingsPending"
+              class="py-6 text-center text-sm text-muted"
+            >
+              正在加载参与者...
+            </div>
+
+            <div
+              v-else-if="sessionParticipants.length === 0"
+              class="py-6 text-center text-sm text-muted"
+            >
+              暂无参与者
+            </div>
+
+            <div
+              v-else
+              class="space-y-2 max-h-72 overflow-y-auto"
+            >
+              <div
+                v-for="participant in sessionParticipants"
+                :key="participant.id"
+                class="rounded-md border border-default p-2.5 flex items-center justify-between gap-3"
+              >
+                <div class="min-w-0">
+                  <p class="text-sm font-medium truncate">
+                    {{ participant.gitea_username || shortId(participant.user_id) }}
+                  </p>
+                  <p class="text-xs text-muted mt-0.5">
+                    {{ participantRoleLabel(participant.role) }} · 加入于 {{ formatDateTime(participant.joined_at) }}
+                  </p>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                  <template v-if="participant.role === 'owner'">
+                    <UBadge
+                      color="primary"
+                      variant="subtle"
+                      size="xs"
+                    >
+                      所有者
+                    </UBadge>
+                  </template>
+                  <template v-else>
+                    <USelect
+                      :model-value="participant.role"
+                      :items="participantRoleOptions"
+                      value-key="value"
+                      class="w-24"
+                      size="xs"
+                      :disabled="!canManageSession || participantSavingState[participant.user_id]"
+                      @update:model-value="(value) => updateParticipantRole(participant.user_id, value as 'collaborator' | 'viewer')"
+                    />
+                    <div class="inline-flex items-center gap-1.5">
+                      <span class="text-[11px] text-muted">发言</span>
+                      <USwitch
+                        :model-value="participant.can_chat"
+                        size="sm"
+                        :disabled="!canManageSession || participantSavingState[participant.user_id]"
+                        @update:model-value="(value) => updateParticipantCanChat(participant.user_id, Boolean(value))"
+                      />
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </UModal>
 
     <UModal v-model:open="showCreateModal">
       <template #content>
