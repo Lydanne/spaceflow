@@ -690,26 +690,6 @@ export async function createAgentSessionMessage(params: {
 }) {
   const db = useDB();
   const session = await ensureSessionChatAllowed(params.sessionId, params.repositoryId, params.actor);
-  const existingOpencodeSessionId = String(session.opencode_session_id || "").trim();
-  let beforeMaxSeq = 0;
-
-  if (existingOpencodeSessionId) {
-    try {
-      const beforeMessages = await listAgentSessionOpencodeMessages({
-        repositoryId: params.repositoryId,
-        sessionId: session.id,
-        opencodeSessionId: existingOpencodeSessionId,
-        limit: 5000,
-      });
-      beforeMaxSeq = beforeMessages.reduce((max, item) => Math.max(max, item.seq), 0);
-    } catch (error) {
-      console.warn("[agent-session] read opencode messages before prompt failed:", {
-        session_id: session.id,
-        opencode_session_id: existingOpencodeSessionId,
-        message: (error as { message?: string })?.message || "unknown",
-      });
-    }
-  }
 
   try {
     const opencode = await promptAgentSessionOpencode({
@@ -730,76 +710,29 @@ export async function createAgentSessionMessage(params: {
         .where(eq(schema.agentSessions.id, session.id));
     }
 
-    let userMessage:
-      | Awaited<ReturnType<typeof listAgentSessionOpencodeMessages>>[number]
-      | undefined;
-    let agentMessage:
-      | Awaited<ReturnType<typeof listAgentSessionOpencodeMessages>>[number]
-      | undefined;
-    try {
-      const afterMessages = await listAgentSessionOpencodeMessages({
-        repositoryId: params.repositoryId,
-        sessionId: session.id,
-        opencodeSessionId: opencode.opencode_session_id,
-        limit: 5000,
-      });
-
-      const baseSeq = opencode.opencode_session_id === existingOpencodeSessionId ? beforeMaxSeq : 0;
-      const deltaMessages = afterMessages.filter((item) => item.seq > baseSeq);
-      const latestUser = [...deltaMessages].reverse().find((item) => item.actor_type === "user")
-        || [...afterMessages].reverse().find((item) => item.actor_type === "user");
-      const latestAgent = [...deltaMessages].reverse().find((item) => item.actor_type === "agent")
-        || [...afterMessages].reverse().find((item) => item.actor_type === "agent");
-      userMessage = latestUser;
-      agentMessage = latestAgent;
-    } catch (error) {
-      console.warn("[agent-session] read opencode messages after prompt failed:", {
-        session_id: session.id,
-        opencode_session_id: opencode.opencode_session_id,
-        message: (error as { message?: string })?.message || "unknown",
-      });
-    }
-
     const nowIso = new Date().toISOString();
-    const fallbackUserSeq = beforeMaxSeq + 1;
-    const fallbackUserId = `opencode:${opencode.opencode_session_id}:${fallbackUserSeq}`;
-    const responseMessage = userMessage
-      ? {
-        id: `opencode:${userMessage.id}`,
-        session_id: session.id,
-        seq: userMessage.seq,
-        actor_type: userMessage.actor_type,
-        actor_id: userMessage.actor_id,
-        message_type: userMessage.message_type,
-        content: userMessage.content,
-        metadata: userMessage.metadata,
-        pinned: false,
-        pinned_by: null,
-        pinned_at: null,
-        created_at: userMessage.created_at,
-        updated_at: userMessage.updated_at,
-      }
-      : {
-        id: fallbackUserId,
-        session_id: session.id,
-        seq: fallbackUserSeq,
-        actor_type: "user" as const,
-        actor_id: params.actor.userId,
-        message_type: "user_prompt" as const,
-        content: params.content,
-        metadata: {
-          ...params.metadata,
-          source: "opencode_server",
-          opencode_session_id: opencode.opencode_session_id,
-          server_hostname: opencode.server_hostname,
-          server_port: opencode.server_port,
-        },
-        pinned: false,
-        pinned_by: null,
-        pinned_at: null,
-        created_at: nowIso,
-        updated_at: nowIso,
-      };
+    const responseMessage = {
+      id: `opencode:pending:${session.id}:${Date.now()}`,
+      session_id: session.id,
+      seq: 0,
+      actor_type: "user" as const,
+      actor_id: params.actor.userId,
+      message_type: "user_prompt" as const,
+      content: params.content,
+      metadata: {
+        ...params.metadata,
+        source: "opencode_server",
+        opencode_session_id: opencode.opencode_session_id,
+        server_hostname: opencode.server_hostname,
+        server_port: opencode.server_port,
+        provisional: true,
+      },
+      pinned: false,
+      pinned_by: null,
+      pinned_at: null,
+      created_at: nowIso,
+      updated_at: nowIso,
+    };
 
     await appendSessionEvent({
       sessionId: session.id,
@@ -807,25 +740,14 @@ export async function createAgentSessionMessage(params: {
       actorType: "user",
       actorId: params.actor.userId,
       payload: {
-        message_id: responseMessage.id,
-        seq: responseMessage.seq,
+        message_id: null,
+        seq: null,
         message_type: responseMessage.message_type,
+        source: "opencode_server",
       },
     });
 
-    if (agentMessage) {
-      await appendSessionEvent({
-        sessionId: session.id,
-        type: "message_created",
-        actorType: "agent",
-        actorId: "opencode",
-        payload: {
-          message_id: `opencode:${agentMessage.id}`,
-          seq: agentMessage.seq,
-          message_type: agentMessage.message_type,
-        },
-      });
-    } else if (opencode.agent_reply.trim()) {
+    if (opencode.agent_reply.trim()) {
       await appendSessionEvent({
         sessionId: session.id,
         type: "message_created",
@@ -835,6 +757,7 @@ export async function createAgentSessionMessage(params: {
           message_id: null,
           seq: null,
           message_type: "agent_reply",
+          source: "opencode_server",
         },
       });
     }
