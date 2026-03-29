@@ -502,10 +502,15 @@ async function submitPrompt() {
 
   sendPromptLoading.value = true;
   try {
+    const branchRef = sessionDetail.value?.working_branch || sessionDetail.value?.base_branch || null;
     await $fetch(`${sessionsApiBase}/${selectedSessionId.value}/prompt`, {
       method: "POST",
       body: {
         prompt: promptDraft.value.trim(),
+        metadata: {
+          branch_ref: branchRef,
+          session_id: selectedSessionId.value,
+        },
       },
     });
 
