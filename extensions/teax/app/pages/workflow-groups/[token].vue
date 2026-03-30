@@ -75,6 +75,7 @@ const newPresetName = ref("");
 const newPresetBranch = ref("");
 const newPresetInputs = ref<Record<string, string>>({});
 const newPresetLockedInputs = ref<string[]>([]);
+const newPresetAllowInputOverride = ref(true);
 const newPresetAllowBranchOverride = ref(false);
 const newPresetAllowSyncOverride = ref(false);
 const addingPreset = ref(false);
@@ -89,6 +90,7 @@ const batchNameTemplate = ref("子预设 {i}"); // 支持 {i} 和 {name} 占位�
 const batchBranch = ref("");
 const batchInputs = ref<Record<string, string>>({});
 const batchLockedInputs = ref<string[]>([]);
+const batchAllowInputOverride = ref(true);
 const batchAllowBranchOverride = ref(false);
 const batchAllowSyncOverride = ref(false);
 const batchCreating = ref(false);
@@ -245,6 +247,7 @@ function openAddPresetModal() {
   }
   newPresetInputs.value = initialInputs;
   newPresetLockedInputs.value = [];
+  newPresetAllowInputOverride.value = true;
   newPresetAllowBranchOverride.value = false;
   newPresetAllowSyncOverride.value = false;
   showAddPresetModal.value = true;
@@ -269,6 +272,7 @@ function openBatchCreateModal() {
   }
   batchInputs.value = initialInputs;
   batchLockedInputs.value = [];
+  batchAllowInputOverride.value = true;
   batchAllowBranchOverride.value = false;
   batchAllowSyncOverride.value = false;
   batchProgress.value = 0;
@@ -312,6 +316,7 @@ async function batchCreatePresets() {
           branch: resolvedBranch,
           inputs: resolvedInputs,
           locked_inputs: batchLockedInputs.value,
+          allow_input_override: batchAllowInputOverride.value,
           allow_branch_override: batchAllowBranchOverride.value,
           allow_sync_override: batchAllowSyncOverride.value,
         },
@@ -347,6 +352,7 @@ async function addPreset() {
         branch: newPresetBranch.value || groupData.value?.default_branch,
         inputs: { ...newPresetInputs.value },
         locked_inputs: newPresetLockedInputs.value,
+        allow_input_override: newPresetAllowInputOverride.value,
         allow_branch_override: newPresetAllowBranchOverride.value,
         allow_sync_override: newPresetAllowSyncOverride.value,
       },
@@ -833,6 +839,12 @@ function getStatusText(preset: SubPreset): string {
               <div class="space-y-3">
                 <div class="flex items-center justify-between">
                   <div>
+                    <label class="text-sm font-medium">允许用户修改参数</label>
+                  </div>
+                  <USwitch v-model="batchAllowInputOverride" />
+                </div>
+                <div class="flex items-center justify-between">
+                  <div>
                     <label class="text-sm font-medium">允许用户修改分支</label>
                   </div>
                   <USwitch v-model="batchAllowBranchOverride" />
@@ -935,6 +947,7 @@ function getStatusText(preset: SubPreset): string {
               <WorkflowPresetConfigForm
                 v-model:name="newPresetName"
                 v-model:branch="newPresetBranch"
+                v-model:allow-input-override="newPresetAllowInputOverride"
                 v-model:allow-branch-override="newPresetAllowBranchOverride"
                 v-model:allow-sync-override="newPresetAllowSyncOverride"
                 :inputs="newPresetInputs"

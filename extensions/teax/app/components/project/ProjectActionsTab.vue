@@ -136,6 +136,7 @@ const inputValues = reactive<Record<string, string>>({});
 const showSavePresetModal = ref(false);
 const presetName = ref("");
 const lockedInputs = ref<string[]>([]);
+const allowInputOverride = ref(true);
 const allowBranchOverride = ref(false);
 const allowSyncOverride = ref(false);
 const isPresetPublic = ref(false);
@@ -237,6 +238,7 @@ async function savePreset() {
           workflow_path: selectedWorkflow.value,
           branch: selectedBranch.value,
           inputs: { ...inputValues },
+          allow_input_override: allowInputOverride.value,
           locked_inputs: lockedInputs.value,
           allow_branch_override: allowBranchOverride.value,
           allow_sync_override: allowSyncOverride.value,
@@ -250,6 +252,7 @@ async function savePreset() {
     showSavePresetModal.value = false;
     showDispatchModal.value = false;
     presetName.value = "";
+    allowInputOverride.value = true;
     isPresetPublic.value = false;
   } catch (err: unknown) {
     const msg
@@ -947,11 +950,12 @@ function workflowFileName(path: string): string {
               <WorkflowPresetConfigForm
                 v-model:name="presetName"
                 v-model:branch="selectedBranch"
-                v-model:inputs="inputValues"
                 v-model:locked-inputs="lockedInputs"
+                v-model:allow-input-override="allowInputOverride"
                 v-model:allow-branch-override="allowBranchOverride"
                 v-model:allow-sync-override="allowSyncOverride"
                 v-model:is-public="isPresetPublic"
+                :inputs="inputValues"
                 :input-defs="currentInputs"
                 :branch-options="branchOptions"
                 :workflow-name="selectedWorkflowItem?.name"
@@ -959,6 +963,7 @@ function workflowFileName(path: string): string {
                 :show-public-option="true"
                 :show-preview="false"
                 name-placeholder="如：正式发布、预发布环境"
+                @update:inputs="Object.assign(inputValues, $event)"
               />
             </div>
 

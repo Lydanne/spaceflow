@@ -22,6 +22,7 @@ const props = withDefaults(
     workflowName?: string;
     showOverrideOptions?: boolean;
     lockedInputs?: string[];
+    allowInputOverride?: boolean;
     allowBranchOverride?: boolean;
     allowSyncOverride?: boolean;
     showPreview?: boolean;
@@ -35,6 +36,7 @@ const props = withDefaults(
     workflowName: "",
     showOverrideOptions: false,
     lockedInputs: () => [],
+    allowInputOverride: true,
     allowBranchOverride: false,
     allowSyncOverride: false,
     showPreview: false,
@@ -50,6 +52,7 @@ const emit = defineEmits<{
   "update:branch": [value: string];
   "update:inputs": [value: Record<string, string>];
   "update:lockedInputs": [value: string[]];
+  "update:allowInputOverride": [value: boolean];
   "update:allowBranchOverride": [value: boolean];
   "update:allowSyncOverride": [value: boolean];
   "update:isPublic": [value: boolean];
@@ -68,6 +71,11 @@ const localBranch = computed({
 const localAllowBranchOverride = computed({
   get: () => props.allowBranchOverride,
   set: (val) => emit("update:allowBranchOverride", val),
+});
+
+const localAllowInputOverride = computed({
+  get: () => props.allowInputOverride,
+  set: (val) => emit("update:allowInputOverride", val),
 });
 
 const localAllowSyncOverride = computed({
@@ -165,6 +173,15 @@ const hasInputs = computed(() => Object.keys(props.inputDefs).length > 0);
 
     <!-- 分支修改权限开关（可选） -->
     <template v-if="showOverrideOptions">
+      <div class="flex items-center justify-between">
+        <div>
+          <label class="text-sm font-medium">允许用户修改参数</label>
+          <p class="text-xs text-gray-400">
+            开启后，使用分享链接的用户可修改未锁定参数
+          </p>
+        </div>
+        <USwitch v-model="localAllowInputOverride" />
+      </div>
       <div class="flex items-center justify-between">
         <div>
           <label class="text-sm font-medium">允许用户修改分支</label>
