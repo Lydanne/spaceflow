@@ -9,6 +9,7 @@ set -euo pipefail
 #
 # 环境变量:
 #   SKIP_LOCAL_BUILD  可选，1 表示跳过本地 nuxt build（默认 0）
+#   DOCKER_PLATFORM   可选，目标平台，如 linux/amd64、linux/arm64
 #   说明: 构建完成后会自动生成两个标签:
 #         <IMAGE_NAME>:<VERSION_TAG> 和 <IMAGE_NAME>:latest
 
@@ -61,7 +62,11 @@ CMD ["node", ".output/server/index.mjs"]
 EOF
 
 echo "[3/4] 构建 Docker 镜像: $IMAGE_REF_VERSION"
-docker build -f "$DOCKERFILE_PATH" -t "$IMAGE_REF_VERSION" "$CONTEXT_DIR"
+BUILD_ARGS=()
+if [[ -n "${DOCKER_PLATFORM:-}" ]]; then
+  BUILD_ARGS+=(--platform "$DOCKER_PLATFORM")
+fi
+docker build "${BUILD_ARGS[@]}" -f "$DOCKERFILE_PATH" -t "$IMAGE_REF_VERSION" "$CONTEXT_DIR"
 
 if [[ "$VERSION_TAG" != "latest" ]]; then
   docker tag "$IMAGE_REF_VERSION" "$IMAGE_REF_LATEST"

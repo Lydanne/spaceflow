@@ -160,6 +160,8 @@ docker pull "${IMAGE_NAME}:latest"
 说明：
 - 如果要发布预发布版本，可显式传入标签，例如：`scripts/build-docker.sh "$IMAGE_NAME" "rc.1"`。
 - 发布脚本也支持显式标签，例如：`scripts/publish-docker.sh "$IMAGE_NAME" "rc.1"`。
+- 如果部署机是 x86_64（amd64），请在构建/发布时指定：
+  `DOCKER_PLATFORM=linux/amd64 scripts/publish-docker.sh`
 - 所有默认入口均为 local 模式；如需可复现构建，请设置 `BUILD_MODE=repro`。
 - 正式发布建议保持 `package.json` 的 `version` 与镜像版本一致。
 

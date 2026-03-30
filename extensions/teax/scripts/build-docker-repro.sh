@@ -9,6 +9,7 @@ set -euo pipefail
 #
 # 环境变量:
 #   PKG_DIR         可选，pnpm pack 产物目录，默认: .docker/pkg
+#   DOCKER_PLATFORM 可选，目标平台，如 linux/amd64、linux/arm64
 #   说明: 构建完成后会自动生成两个标签:
 #         <IMAGE_NAME>:<VERSION_TAG> 和 <IMAGE_NAME>:latest
 
@@ -37,7 +38,11 @@ fi
 echo "已生成: $PKG_FILE"
 
 echo "[2/3] 构建 Docker 镜像: $IMAGE_REF_VERSION"
-docker build -t "$IMAGE_REF_VERSION" .
+BUILD_ARGS=()
+if [[ -n "${DOCKER_PLATFORM:-}" ]]; then
+  BUILD_ARGS+=(--platform "$DOCKER_PLATFORM")
+fi
+docker build "${BUILD_ARGS[@]}" -t "$IMAGE_REF_VERSION" .
 
 if [[ "$VERSION_TAG" != "latest" ]]; then
   docker tag "$IMAGE_REF_VERSION" "$IMAGE_REF_LATEST"

@@ -9,6 +9,7 @@ set -euo pipefail
 #
 # 环境变量:
 #   BUILD_MODE      可选，local(默认) | repro
+#   DOCKER_PLATFORM 可选，目标平台，如 linux/amd64、linux/arm64（透传给构建脚本）
 #   PUSH_LATEST     可选，1(默认) | 0，是否推送 latest 标签
 #   DRY_RUN         可选，1 | 0(默认)，仅打印命令不执行
 #   IMAGE_NAME      可选，与 $1 等价（当 $1 未提供时使用）
