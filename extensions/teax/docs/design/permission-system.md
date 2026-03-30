@@ -306,7 +306,7 @@ export async function requirePermission(
 ### 组织级 API
 
 ```typescript
-// /api/orgs/{orgId}/sync
+// /api/orgs/{orgName}/sync
 export default defineEventHandler(async (event) => {
   const { orgId } = await resolveOrgId(event);
   await requireOrgOwnerOrAdmin(event, orgId);  // 仅 Owner/Admin
@@ -317,7 +317,7 @@ export default defineEventHandler(async (event) => {
 ### 权限组 API
 
 ```typescript
-// /api/orgs/{orgId}/permissions
+// /api/orgs/{orgName}/permissions
 export default defineEventHandler(async (event) => {
   const { orgId } = await resolveOrgId(event);
   await requireOrgOwnerOrAdmin(event, orgId);  // 仅 Owner/Admin
@@ -328,7 +328,7 @@ export default defineEventHandler(async (event) => {
 ### 项目操作 API
 
 ```typescript
-// /api/orgs/{orgId}/projects
+// /api/orgs/{orgName}/projects
 export default defineEventHandler(async (event) => {
   const { orgId } = await resolveOrgId(event);
   await requirePermission(event, orgId, 'project:create');
@@ -486,6 +486,6 @@ async function checkUserPermission(
 
 ## 相关文档
 
-- [架构概览](./overview/index.md) - 系统整体架构和用户体系
+- [架构概览](../overview/index.md) - 系统整体架构和用户体系
 - [API 规范](./api-specification.md) - API 访问控制规范
 - [数据库设计](./database-design.md) - 权限相关表结构

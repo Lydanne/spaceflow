@@ -363,8 +363,8 @@ Teax 使用权限组管理仓库访问：
 现在你已经完成了基础设置，可以：
 
 1. **探索更多功能**
-   - 查看 [架构概览](./overview/index.md) 了解系统设计
-   - 阅读 [权限系统](./permission-system.md) 深入理解权限模型
+   - 查看 [架构概览](./index.md) 了解系统设计
+   - 阅读 [权限系统](../design/permission-system.md) 深入理解权限模型
    - 学习 [飞书集成](./feishu-integration.md) 配置高级功能
 
 2. **准备生产部署**
@@ -372,7 +372,7 @@ Teax 使用权限组管理仓库访问：
    - 查看 [部署指南](./deployment.md) 准备生产环境
 
 3. **参与开发**
-   - 查看 [API 规范](./api-specification.md) 了解 API 设计
+   - 查看 [API 规范](../design/api-specification.md) 了解 API 设计
    - 阅读 [CI/CD 集成](./cicd-integration.md) 了解 Workflow 集成
 
 ## 获取帮助

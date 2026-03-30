@@ -343,6 +343,6 @@ Organization
 
 ## 相关文档
 
-- [架构概览](./overview/index.md) - 系统整体架构
+- [架构概览](../overview/index.md) - 系统整体架构
 - [Agent 系统](./agent-system.md) - Agent 执行隔离
-- [部署配置](./deployment.md) - Docker 配置
+- [部署配置](../overview/deployment.md) - Docker 配置

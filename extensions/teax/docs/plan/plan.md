@@ -395,7 +395,7 @@ Phase 4 (Week 7-8)     Phase 5 (Week 9-10)    Phase 6 (Week 11-13)
 | ---- | ------ | ---- | ---- |
 | `WorkspaceCard.vue` 组件（名称、分支、状态、操作按钮） | P0 | 4h | ⬜ |
 | `WorkspaceCreateModal.vue` 组件（名称、分支选择、资源配置） | P0 | 4h | ⬜ |
-| Workspaces Tab 页面（`/:orgName/:projectName/workspaces`） | P0 | 6h | ⬜ |
+| Workspaces Tab 页面（`/:owner/:repo/workspaces`） | P0 | 6h | ⬜ |
 | 管理员全局工作区页面（`/-/admin/workspaces`） | P0 | 4h | ⬜ |
 | Admin 侧边栏新增「工作区」导航项 | P0 | 1h | ⬜ |
 | 项目工作台 Tab 导航新增 Workspaces | P0 | 1h | ⬜ |

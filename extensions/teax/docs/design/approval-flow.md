@@ -1088,7 +1088,7 @@ export default defineTask({
 
 ## 相关文档
 
-- [飞书集成](./feishu-integration.md) — 消息通知、卡片交互
+- [飞书集成](../overview/feishu-integration.md) — 消息通知、卡片交互
 - [飞书卡片交互](./feishu-card-interaction.md) — FeishuCardBuilder
 - [权限系统](./permission-system.md) — 权限组、团队权限
 - [API 规范](./api-specification.md) — 路由设计规范

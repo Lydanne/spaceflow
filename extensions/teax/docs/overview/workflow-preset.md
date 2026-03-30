@@ -410,6 +410,6 @@ app/
 ## 相关文档
 
 - [CI/CD 集成](./cicd-integration.md) - Workflow 管理和触发
-- [权限系统](./permission-system.md) - 权限控制
-- [数据库设计](./database-design.md) - 表结构设计
-- [API 规范](./api-specification.md) - API 设计规范
+- [权限系统](../design/permission-system.md) - 权限控制
+- [数据库设计](../design/database-design.md) - 表结构设计
+- [API 规范](../design/api-specification.md) - API 设计规范

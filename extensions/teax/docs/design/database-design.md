@@ -540,6 +540,6 @@ find /backups -name "*.gz" -mtime +30 -delete
 
 ## 相关文档
 
-- [架构概览](./overview/index.md) - 系统整体架构
+- [架构概览](../overview/index.md) - 系统整体架构
 - [权限系统](./permission-system.md) - 权限相关表结构
-- [部署配置](./deployment.md) - 数据库部署配置
+- [部署配置](../overview/deployment.md) - 数据库部署配置

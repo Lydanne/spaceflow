@@ -149,6 +149,30 @@ runtimeConfig: {
 
 ---
 
+## 长连接模式（WebSocket，推荐本地开发）
+
+当前代码已支持飞书长连接模式（`server/plugins/feishu-longconnection.ts`）：
+
+- 启用条件：`FEISHU_APP_ID` 与 `FEISHU_APP_SECRET` 已配置，且未设置 `FEISHU_LONGCONNECTION_DISABLED=true`
+- 配置方式：在飞书开放平台中启用“长连接模式”，无需配置请求网址
+- 事件分发：消息、卡片交互、审批事件、菜单点击统一由 EventDispatcher 分发
+
+### 相关环境变量
+
+```bash
+FEISHU_APP_ID=cli_xxxxxxxxxxxx
+FEISHU_APP_SECRET=xxxxxxxxxxxxxxxx
+FEISHU_ENCRYPT_KEY=xxxxxxxxxxxxxxxx   # 可选，推荐
+FEISHU_LONGCONNECTION_DISABLED=false  # 可选，默认不禁用
+```
+
+### 注意事项
+
+- 长连接适合开发与单实例部署；多实例场景建议评估事件消费一致性策略。
+- 生产环境若采用 webhook 模式，可设置 `FEISHU_LONGCONNECTION_DISABLED=true` 显式关闭长连接。
+
+---
+
 ## 消息通知
 
 ### 通知类型

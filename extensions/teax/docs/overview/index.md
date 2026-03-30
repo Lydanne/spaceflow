@@ -19,7 +19,6 @@
 - [agents-runtime.md](./agents-runtime.md)
 - [cicd-integration.md](./cicd-integration.md)
 - [feishu-integration.md](./feishu-integration.md)
-- [FEISHU_LONGCONNECTION.md](./FEISHU_LONGCONNECTION.md)
 - [workflow-preset.md](./workflow-preset.md)
 
 ## 相关分组

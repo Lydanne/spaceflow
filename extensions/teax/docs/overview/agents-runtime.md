@@ -15,7 +15,7 @@
 
 - System Runtime
 - 跨仓库编排
-- Agent 自动回复执行链路
+- 多 Agent 编排与跨会话调度策略
 
 ## 2. 环境变量
 

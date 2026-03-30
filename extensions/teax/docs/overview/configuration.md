@@ -642,4 +642,4 @@ pnpm run feishu:test
 
 - [快速开始](../../README.md#快速开始)
 - [部署指南](./DEPLOYMENT.md)
-- [架构概览](./overview/index.md)
+- [架构概览](./index.md)

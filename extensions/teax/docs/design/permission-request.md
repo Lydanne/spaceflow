@@ -536,5 +536,5 @@ export default defineNitroPlugin(() => {
 
 - [通用审批流程框架](./approval-flow.md) — 核心框架设计
 - [权限系统设计](./permission-system.md) — 权限组、团队权限绑定
-- [飞书集成](./feishu-integration.md) — 消息通知
+- [飞书集成](../overview/feishu-integration.md) — 消息通知
 - [API 规范](./api-specification.md) — 路由设计规范
