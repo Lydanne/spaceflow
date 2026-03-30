@@ -22,6 +22,7 @@ export default defineNuxtConfig({
     feishuApprovalCode: "",
     giteaServiceToken: "",
     tokenEncryptSecret: "",
+    cardKitDebug: false,
     session: {
       password: "",
     },

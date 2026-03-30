@@ -17,10 +17,16 @@ import {
   DEFAULT_BOT_HOME_PAGE,
   resolveBotChatConfig,
 } from "./shared/bot-chat-config";
+import { parseBooleanFlag } from "../utils/parseRuntimeConfig";
 
 // ━━━ 全局单例 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export const cardRouter = new CardRouter();
+
+function syncRouterRuntimeFlags(): void {
+  const config = useRuntimeConfig();
+  cardRouter.debug = parseBooleanFlag(config.cardKitDebug, false);
+}
 
 // ━━━ define 函数（纯声明，不注册） ━━━━━━━━━━━━━━━━━━━
 
@@ -119,6 +125,7 @@ export async function ensureCommands(): Promise<void> {
 }
 
 export async function getRouter() {
+  syncRouterRuntimeFlags();
   await ensurePages();
   return cardRouter;
 }
