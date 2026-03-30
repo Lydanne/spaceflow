@@ -8,23 +8,22 @@ export default defineNuxtConfig({
 
   css: ["~/assets/css/main.css"],
 
+  // 仅声明 runtimeConfig 键，值由运行时 NUXT_* 环境变量注入
   runtimeConfig: {
-    databaseUrl:
-      process.env.DATABASE_URL
-      || "postgresql://postgres:postgres@localhost:5432/teax",
-    redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
-    giteaUrl: process.env.GITEA_URL || "",
-    giteaClientId: process.env.GITEA_CLIENT_ID || "",
-    giteaClientSecret: process.env.GITEA_CLIENT_SECRET || "",
-    feishuAppId: process.env.FEISHU_APP_ID || "",
-    feishuAppSecret: process.env.FEISHU_APP_SECRET || "",
-    feishuEncryptKey: process.env.FEISHU_ENCRYPT_KEY || "",
-    feishuVerificationToken: process.env.FEISHU_VERIFICATION_TOKEN || "",
-    feishuApprovalCode: process.env.FEISHU_APPROVAL_CODE || "",
-    giteaServiceToken: process.env.GITEA_SERVICE_TOKEN || "",
-    tokenEncryptSecret: process.env.TOKEN_ENCRYPT_SECRET || "",
+    databaseUrl: "",
+    redisUrl: "",
+    giteaUrl: "",
+    giteaClientId: "",
+    giteaClientSecret: "",
+    feishuAppId: "",
+    feishuAppSecret: "",
+    feishuEncryptKey: "",
+    feishuVerificationToken: "",
+    feishuApprovalCode: "",
+    giteaServiceToken: "",
+    tokenEncryptSecret: "",
     session: {
-      password: process.env.NUXT_SESSION_PASSWORD || "",
+      password: "",
     },
     public: {
       appName: process.env.NUXT_PUBLIC_APP_NAME || "Teax",
@@ -32,12 +31,14 @@ export default defineNuxtConfig({
     },
   },
 
-  routeRules: {
-    "/": { prerender: true },
-  },
   compatibilityDate: "2025-01-15",
 
   nitro: {
+    // 禁用 prerender，避免 build 阶段执行路由预渲染
+    prerender: {
+      crawlLinks: false,
+      routes: [],
+    },
     experimental: {
       tasks: true,
     },
