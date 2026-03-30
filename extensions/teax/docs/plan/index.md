@@ -5,7 +5,6 @@
 ## 文档清单（Plan）
 
 - [plan.md](./plan.md)
-- [messaging-service-migration.md](./messaging-service-migration.md)
 
 ## 相关分组
 
