@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 用途: 本地加速构建 Docker 镜像（本地先 nuxt build，再打包 .output）
+# 用途: 本地加速构建 Docker 镜像（本地先 nuxt build，并在镜像中保留源码）
 #
 # 参数:
 #   $1 IMAGE_NAME   可选，镜像名，默认: lydamirror/teax
@@ -29,14 +29,25 @@ CONTEXT_DIR=".docker/local-runtime-context"
 DOCKERFILE_PATH="$CONTEXT_DIR/Dockerfile"
 
 if [[ "${SKIP_LOCAL_BUILD:-0}" != "1" ]]; then
-  echo "[1/4] 本地构建 Nuxt 产物..."
+  echo "[1/5] 本地构建 Nuxt 产物..."
   pnpm nuxt:build
 else
-  echo "[1/4] 跳过本地构建 (SKIP_LOCAL_BUILD=1)"
+  echo "[1/5] 跳过本地构建 (SKIP_LOCAL_BUILD=1)"
 fi
 
-echo "[2/4] 准备最小 Docker 上下文..."
-mkdir -p "$CONTEXT_DIR/.output"
+echo "[2/5] 生成源码打包产物..."
+rm -rf "$CONTEXT_DIR"
+mkdir -p "$CONTEXT_DIR/.output" "$CONTEXT_DIR/pkg"
+pnpm pack --pack-destination "$CONTEXT_DIR/pkg" >/tmp/teax-pnpm-pack-local.log
+
+PKG_FILE="$(ls -1t "$CONTEXT_DIR"/pkg/*.tgz | head -n1)"
+if [[ -z "${PKG_FILE:-}" ]]; then
+  echo "未找到打包产物: $CONTEXT_DIR/pkg/*.tgz" >&2
+  exit 1
+fi
+echo "已生成: $PKG_FILE"
+
+echo "[3/5] 准备最小 Docker 上下文..."
 rsync -a --delete .output/ "$CONTEXT_DIR/.output/"
 
 cat > "$DOCKERFILE_PATH" <<'EOF'
@@ -51,8 +62,19 @@ ENV NITRO_HOST=0.0.0.0
 ENV NITRO_PORT=3000
 
 RUN addgroup -S nodejs && adduser -S nodeuser -G nodejs
+RUN npm install -g pnpm@10.29.3
 
 COPY .output ./.output
+COPY pkg/ /tmp/pkg/
+RUN set -eux; \
+    PKG="$(find /tmp/pkg -maxdepth 1 -name '*.tgz' | sort | tail -n1)"; \
+    test -n "$PKG"; \
+    BAD_ENV="$(tar -tzf "$PKG" | grep -E '^package/\.env($|\.)' | grep -v '^package/\.env\.example$' || true)"; \
+    test -z "$BAD_ENV"; \
+    mkdir -p /app/source; \
+    tar -xzf "$PKG" -C /app/source --strip-components=1; \
+    chown -R nodeuser:nodejs /app/.output /app/source; \
+    rm -rf /tmp/pkg
 
 EXPOSE 3000
 
@@ -61,18 +83,18 @@ USER nodeuser
 CMD ["node", ".output/server/index.mjs"]
 EOF
 
-echo "[3/4] 构建 Docker 镜像: $IMAGE_REF_VERSION"
-BUILD_ARGS=()
+echo "[4/5] 构建 Docker 镜像: $IMAGE_REF_VERSION"
 if [[ -n "${DOCKER_PLATFORM:-}" ]]; then
-  BUILD_ARGS+=(--platform "$DOCKER_PLATFORM")
+  docker build --platform "$DOCKER_PLATFORM" -f "$DOCKERFILE_PATH" -t "$IMAGE_REF_VERSION" "$CONTEXT_DIR"
+else
+  docker build -f "$DOCKERFILE_PATH" -t "$IMAGE_REF_VERSION" "$CONTEXT_DIR"
 fi
-docker build "${BUILD_ARGS[@]}" -f "$DOCKERFILE_PATH" -t "$IMAGE_REF_VERSION" "$CONTEXT_DIR"
 
 if [[ "$VERSION_TAG" != "latest" ]]; then
   docker tag "$IMAGE_REF_VERSION" "$IMAGE_REF_LATEST"
 fi
 
-echo "[4/4] 完成"
+echo "[5/5] 完成"
 if [[ "$VERSION_TAG" == "latest" ]]; then
   echo "镜像: $IMAGE_REF_VERSION"
 else

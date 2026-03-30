@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./server/db/migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/teax",
+    url: process.env.NUXT_DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/teax",
   },
 });

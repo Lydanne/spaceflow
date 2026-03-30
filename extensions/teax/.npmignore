@@ -16,6 +16,7 @@ dist
 
 docs
 *.log
+*.tgz
 *.md
 docker-compose.yml
 Dockerfile

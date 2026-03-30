@@ -1,6 +1,6 @@
 {
   "name": "@spaceflow/teax",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -11,8 +11,8 @@
     "nuxt:dev": "nuxt dev",
     "docker:build": "scripts/build-docker.sh lydamirror/teax",
     "docker:build:repro": "BUILD_MODE=repro scripts/build-docker.sh lydamirror/teax",
-    "docker:build:local": "scripts/build-docker-local.sh lydamirror/teax",
-    "docker:publish": "DOCKER_PLATFORM=linux/amd64 scripts/publish-docker.sh lydamirror/teax",
+    "docker:build:local": "BUILD_MODE=local scripts/build-docker-local.sh lydamirror/teax",
+    "docker:publish": "scripts/publish-docker.sh lydamirror/teax",
     "docker:publish:repro": "BUILD_MODE=repro scripts/publish-docker.sh lydamirror/teax",
     "docker:publish:local": "scripts/publish-docker.sh lydamirror/teax",
     "preview": "nuxt preview",

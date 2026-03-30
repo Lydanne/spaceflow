@@ -29,8 +29,19 @@ ENV NITRO_HOST=0.0.0.0
 ENV NITRO_PORT=3000
 
 RUN addgroup -S nodejs && adduser -S nodeuser -G nodejs
+RUN npm install -g pnpm@10.29.3
 
 COPY --from=builder /app/.output ./.output
+COPY --from=builder /tmp/pkg/ /tmp/pkg/
+RUN set -eux; \
+    PKG="$(find /tmp/pkg -maxdepth 1 -name '*.tgz' | sort | tail -n1)"; \
+    test -n "$PKG"; \
+    BAD_ENV="$(tar -tzf "$PKG" | grep -E '^package/\.env($|\.)' | grep -v '^package/\.env\.example$' || true)"; \
+    test -z "$BAD_ENV"; \
+    mkdir -p /app/source; \
+    tar -xzf "$PKG" -C /app/source --strip-components=1; \
+    chown -R nodeuser:nodejs /app/.output /app/source; \
+    rm -rf /tmp/pkg
 
 EXPOSE 3000
 

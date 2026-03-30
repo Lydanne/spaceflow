@@ -182,6 +182,8 @@ docker run -d \
 
 - 项目已通过 `.dockerignore` 和 `.npmignore` 排除 `.env` 与 `.env.*`（保留 `.env.example`）。
 - Docker 默认构建流程会检查 `pnpm pack` 产物，若包含 `.env`（非 `.env.example`）会直接失败。
+- 镜像中会保留一份源码快照，路径为 `/app/source`（运行目录仍是 `.output`）。
+- 运行镜像已内置 `pnpm@10.29.3`，可在容器内直接执行 `pnpm -v` 与相关命令。
 - 请勿把真实密钥写入仓库文件，统一通过运行时环境变量注入。
 
 ## 8. 常用命令
