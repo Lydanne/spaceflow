@@ -15,6 +15,7 @@ export default defineNuxtConfig({
     giteaUrl: "",
     giteaClientId: "",
     giteaClientSecret: "",
+    giteaWebhookSecret: "",
     feishuAppId: "",
     feishuAppSecret: "",
     feishuEncryptKey: "",
@@ -22,6 +23,7 @@ export default defineNuxtConfig({
     feishuApprovalCode: "",
     giteaServiceToken: "",
     tokenEncryptSecret: "",
+    verboseDefault: "1",
     cardKitDebug: false,
     session: {
       password: "",
