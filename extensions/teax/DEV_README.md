@@ -62,9 +62,9 @@ pnpm dev
 
 ## 4. Docker 构建模式
 
-### 模式 A：可复现构建（默认）
+### 模式 A：本地加速构建（默认）
 
-流程：`pnpm pack` -> 容器内安装依赖并 `nuxt build` -> 产出运行镜像。
+流程：本地 `pnpm nuxt:build` -> 仅把 `.output` 打进运行镜像，不在容器内重复构建。
 
 ```bash
 pnpm docker:build
@@ -74,18 +74,18 @@ pnpm docker:build
 - `<image>:<version>`
 - `<image>:latest`
 
-自定义镜像名与标签：
+自定义镜像名与标签（默认 local）：
 
 ```bash
-scripts/build-docker.sh teax test
+scripts/build-docker.sh lydamirror/teax test
 ```
 
-### 模式 B：本地加速构建（推荐本机开发）
+### 模式 B：可复现构建（容器内 build）
 
-流程：本地 `pnpm nuxt:build` -> 仅把 `.output` 打进运行镜像，不在容器内重复构建。
+流程：`pnpm pack` -> 容器内安装依赖并 `nuxt build` -> 产出运行镜像。
 
 ```bash
-pnpm docker:build:local
+pnpm docker:build:repro
 ```
 
 默认会读取 `package.json` 的 `version`，生成两个 tag：
@@ -95,16 +95,75 @@ pnpm docker:build:local
 自定义镜像名与标签：
 
 ```bash
-scripts/build-docker-local.sh teax local
+BUILD_MODE=repro scripts/build-docker.sh lydamirror/teax test
 ```
 
-如果你已经有最新 `.output`，可跳过本地二次构建：
+如果你已经有最新 `.output`，可在 local 模式跳过本地二次构建：
 
 ```bash
-SKIP_LOCAL_BUILD=1 scripts/build-docker-local.sh teax local
+SKIP_LOCAL_BUILD=1 scripts/build-docker-local.sh lydamirror/teax local
 ```
 
-## 5. 运行容器
+## 5. 发布到 Docker Hub
+
+1. 先在 Docker Hub 创建仓库（默认使用：`lydamirror/teax`）
+
+2. 登录 Docker Hub
+
+```bash
+docker login
+```
+
+3. 设置镜像名与版本号（可选）
+
+```bash
+IMAGE_NAME="lydamirror/teax"
+VERSION="$(node -p "require('./package.json').version")"
+echo "$IMAGE_NAME:$VERSION"
+```
+
+4. 构建镜像（会自动打 `version` 和 `latest` 两个标签）
+
+```bash
+# 默认本地加速构建
+scripts/build-docker.sh "$IMAGE_NAME"
+
+# 可复现构建（容器内 build）
+BUILD_MODE=repro scripts/build-docker.sh "$IMAGE_NAME"
+```
+
+推荐：使用发布脚本一条命令完成“构建 + 推送”
+
+```bash
+# 默认本地加速构建并发布（默认镜像名: lydamirror/teax）
+scripts/publish-docker.sh "$IMAGE_NAME"
+scripts/publish-docker.sh
+
+# 可复现构建并发布
+BUILD_MODE=repro scripts/publish-docker.sh "$IMAGE_NAME"
+```
+
+5. 推送镜像
+
+```bash
+docker push "${IMAGE_NAME}:${VERSION}"
+docker push "${IMAGE_NAME}:latest"
+```
+
+6. 验证推送结果
+
+```bash
+docker pull "${IMAGE_NAME}:${VERSION}"
+docker pull "${IMAGE_NAME}:latest"
+```
+
+说明：
+- 如果要发布预发布版本，可显式传入标签，例如：`scripts/build-docker.sh "$IMAGE_NAME" "rc.1"`。
+- 发布脚本也支持显式标签，例如：`scripts/publish-docker.sh "$IMAGE_NAME" "rc.1"`。
+- 所有默认入口均为 local 模式；如需可复现构建，请设置 `BUILD_MODE=repro`。
+- 正式发布建议保持 `package.json` 的 `version` 与镜像版本一致。
+
+## 6. 运行容器
 
 推荐使用 `--env-file .env.docker`：
 
@@ -114,16 +173,16 @@ docker run -d \
   --network teax_default \
   --env-file .env.docker \
   -p 3000:3000 \
-  teax:local
+  lydamirror/teax:latest
 ```
 
-## 6. 安全与打包说明
+## 7. 安全与打包说明
 
 - 项目已通过 `.dockerignore` 和 `.npmignore` 排除 `.env` 与 `.env.*`（保留 `.env.example`）。
 - Docker 默认构建流程会检查 `pnpm pack` 产物，若包含 `.env`（非 `.env.example`）会直接失败。
 - 请勿把真实密钥写入仓库文件，统一通过运行时环境变量注入。
 
-## 7. 常用命令
+## 8. 常用命令
 
 ```bash
 # 开发
@@ -143,5 +202,8 @@ pnpm db:studio
 
 # Docker
 pnpm docker:build
+pnpm docker:build:repro
 pnpm docker:build:local
+pnpm docker:publish
+pnpm docker:publish:repro
 ```

@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# 用途: 本地加速构建 Docker 镜像（本地先 nuxt build，再打包 .output）
+#
+# 参数:
+#   $1 IMAGE_NAME   可选，镜像名，默认: lydamirror/teax
+#   $2 VERSION_TAG  可选，镜像标签，默认读取 package.json.version
+#
+# 环境变量:
+#   SKIP_LOCAL_BUILD  可选，1 表示跳过本地 nuxt build（默认 0）
+#   说明: 构建完成后会自动生成两个标签:
+#         <IMAGE_NAME>:<VERSION_TAG> 和 <IMAGE_NAME>:latest
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-IMAGE_NAME="${1:-teax}"
+IMAGE_NAME="${1:-lydamirror/teax}"
 VERSION_TAG="${2:-$(node -p "require('./package.json').version || ''")}"
 if [[ -z "$VERSION_TAG" ]]; then
   echo "package.json 中缺少 version，且未传入镜像 tag" >&2
