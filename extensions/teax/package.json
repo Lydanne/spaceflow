@@ -9,6 +9,8 @@
     "dev": "spaceflow dev",
     "nuxt:build": "nuxt build",
     "nuxt:dev": "nuxt dev",
+    "docker:build": "scripts/build-docker.sh teax latest",
+    "docker:build:local": "SKIP_LOCAL_BUILD=1 scripts/build-docker-local.sh teax local",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
