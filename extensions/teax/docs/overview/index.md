@@ -1,40 +1,29 @@
 # Teax Overview 文档导航
 
-> 本目录用于承载 Teax 的高层设计与 Agents 方案说明。  
-> 目录约束：`docs/overview/` 仅保留一级文件，不再使用子目录。
+> 本目录只放“使用与运维”文档，不放系统设计与实施计划。
 
 ## 建议阅读顺序
 
-1. [平台架构总览](./architecture.md)
-2. [Agents 系统设计](./agents-design.md)
-3. [Agents Runtime 配置与使用](./agents-runtime.md)
+1. [快速开始](./getting-started.md)
+2. [配置指南](./configuration.md)
+3. [部署指南](./deployment.md)
+4. [Agents Runtime 使用与配置](./agents-runtime.md)
+5. [CI/CD 集成](./cicd-integration.md)
+6. [飞书集成](./feishu-integration.md)
 
-## Overview 目录文件
+## 文档清单（Overview）
 
-- `architecture.md`
-  - 平台定位、用户体系、功能模块、技术栈
-- `agents-design.md`
-  - 会话中心版规范（左会话右聊天、分支绑定、设置分层、`.teax` 本地化）
-- `agents-runtime.md`
-  - Runtime 运维手册（Docker Runtime + Session 目录生命周期 + Opencode 控制）
+- [getting-started.md](./getting-started.md)
+- [configuration.md](./configuration.md)
+- [deployment.md](./deployment.md)
+- [agents-runtime.md](./agents-runtime.md)
+- [cicd-integration.md](./cicd-integration.md)
+- [feishu-integration.md](./feishu-integration.md)
+- [FEISHU_LONGCONNECTION.md](./FEISHU_LONGCONNECTION.md)
+- [workflow-preset.md](./workflow-preset.md)
 
-## 关联文档（位于 `docs/` 根目录）
+## 相关分组
 
-- [API 规范](../api-specification.md)
-- [权限系统](../permission-system.md)
-- [CI/CD 集成](../cicd-integration.md)
-- [Agents 当前实现文档](../agent-system.md)
-- [数据库设计](../database-design.md)
-- [部署配置](../deployment.md)
-- [飞书集成](../feishu-integration.md)
-- [飞书卡片交互](../feishu-card-interaction.md)
-- [开发计划](../plan.md)
-
-## 本次整理说明
-
-- 已将旧入口与旧路径合并到 `docs/overview/`：
-  - `docs/overview.md` -> `docs/overview/architecture.md`
-  - `docs/design.md` -> `docs/overview/index.md`
-  - `docs/agents.md` -> `docs/overview/agents-design.md`
-  - `docs/overview/agents/runtime.md` -> `docs/overview/agents-runtime.md`
-- 已移除 `docs/overview/agents/` 子目录，保持 overview 单层结构。
+- [系统设计文档（design）](../design/index.md)
+- [实现计划（plan）](../plan/index.md)
+- [Docs 总导航](../index.md)

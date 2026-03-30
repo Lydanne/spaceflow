@@ -410,6 +410,6 @@ A: 消息服务层可以轻松 mock，使用依赖注入替换 provider 即可�
 
 ## 相关文档
 
-- [消息服务 README](../server/services/messaging/README.md)
+- [消息服务 README](../../server/services/messaging/README.md)
 - [飞书集成文档](./feishu-integration.md)
 - [API 设计规范](./api-specification.md)
