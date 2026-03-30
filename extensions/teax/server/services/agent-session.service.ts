@@ -29,6 +29,7 @@ export interface AgentSessionPagination {
 }
 
 function toNumber(value: unknown): number {
+  // 统一数值化入口，避免不同查询结果类型（string/number/null）带来分支噪音。
   return Number(value ?? 0);
 }
 
@@ -36,6 +37,7 @@ function resolveSessionBranchRef(session: {
   base_branch?: string | null;
   working_branch?: string | null;
 }) {
+  // 优先使用 working_branch；不存在时回退到 base_branch，用于消息元数据标注。
   const branchRef = String(session.working_branch || session.base_branch || "").trim();
   return branchRef || null;
 }
@@ -49,6 +51,7 @@ function withBranchRefMetadata(
     : {};
 
   if (branchRef) {
+    // branch_ref 仅在可解析时补充，避免把空值写回 metadata。
     metadataObject.branch_ref = branchRef;
   }
 
@@ -57,6 +60,7 @@ function withBranchRefMetadata(
 
 function isUniqueViolation(error: unknown): boolean {
   const err = error as { code?: string; cause?: { code?: string } };
+  // PostgreSQL 唯一键冲突码：append event 重试逻辑仅针对这类并发冲突触发。
   return err?.code === "23505" || err?.cause?.code === "23505";
 }
 
@@ -94,6 +98,7 @@ async function appendSessionEvent(params: {
         });
         return;
       } catch (error) {
+        // 仅唯一键冲突且还有重试次数时继续，其他错误直接上抛。
         if (isUniqueViolation(error) && attempt < 2) {
           continue;
         }
@@ -156,17 +161,21 @@ async function ensureSessionReadable(
   const session = await getSessionById(sessionId, repositoryId);
 
   if (actor.isAdmin) {
+    // 管理员绕过可见性限制，直接可读。
     return session;
   }
   if (session.creator_id === actor.userId) {
+    // 会话创建者始终可读。
     return session;
   }
   if (session.visibility === "public") {
+    // public 会话允许仓库内具备读权限的用户查看。
     return session;
   }
 
   const participant = await getParticipant(session.id, actor.userId);
   if (!participant) {
+    // private 且非 owner/admin 时，必须在参与者列表中。
     throw createError({ statusCode: 403, message: "No access to this agent session" });
   }
 
@@ -187,12 +196,14 @@ async function ensureSessionChatAllowed(
   const session = await ensureSessionReadable(sessionId, repositoryId, actor);
 
   if (actor.isAdmin || session.creator_id === actor.userId) {
+    // owner/admin 不受 can_chat 限制。
     return session;
   }
 
   const participant = await getParticipant(session.id, actor.userId);
   if (participant) {
     if (!participant.can_chat) {
+      // 参与者存在但无发言权限时显式拒绝。
       throw createError({ statusCode: 403, message: "Chat permission denied in this session" });
     }
     return session;
@@ -215,6 +226,7 @@ async function ensureSessionChatAllowed(
           schema.agentSessionParticipants.user_id,
         ],
       });
+    // 幂等插入：并发首次发言时允许重复请求安全落库。
     return session;
   }
 
@@ -363,6 +375,7 @@ export async function listAgentSessions(params: {
       eq(schema.agentSessions.creator_id, params.actor.userId),
     ];
     if (participantSessionIds.length > 0) {
+      // 仅在确实参与过会话时追加 inArray，避免生成空 IN () 语句。
       visibilityConditions.push(inArray(schema.agentSessions.id, participantSessionIds));
     }
 
@@ -435,6 +448,7 @@ export async function getAgentSessionDetail(params: {
       });
       messageCount = opencodeMessages.length;
     } catch (error) {
+      // 远端消息读取失败时回退 DB 统计，保证详情页仍可用。
       console.warn("[agent-session] get detail opencode message_count failed, fallback to db:", {
         session_id: session.id,
         opencode_session_id: opencodeSessionId,
@@ -460,6 +474,7 @@ export async function getAgentSessionDetail(params: {
         .from(schema.agentRuntimes)
         .where(eq(schema.agentRuntimes.id, session.runtime_id))
         .limit(1)
+    // 没有关联 runtime 的历史会话直接返回 null，避免无意义查询。
     : [null];
 
   return {
@@ -516,6 +531,7 @@ export async function addAgentSessionParticipant(params: {
   const session = await getSessionById(params.sessionId, params.repositoryId);
 
   if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    // 仅 owner/admin 可管理成员，避免协作者横向扩权。
     throw createError({ statusCode: 403, message: "Only session owner can invite participants" });
   }
 
@@ -575,6 +591,7 @@ export async function updateAgentSessionParticipant(params: {
   const patch: { role?: "collaborator" | "viewer"; can_chat?: boolean; updated_at: Date } = {
     updated_at: new Date(),
   };
+  // 仅对传入字段打 patch，未传字段保持原值。
   if (params.role !== undefined) patch.role = params.role;
   if (params.canChat !== undefined) patch.can_chat = params.canChat;
 
@@ -623,6 +640,7 @@ export async function listAgentSessionMessages(params: {
   const opencodeSessionId = String(session.opencode_session_id || "").trim();
   if (opencodeSessionId) {
     try {
+      // 为了分页一致性，先按“当前页上界”读取足够条数，再切片返回当前页。
       const readLimit = Math.max(params.limit, params.page * params.limit);
       const opencodeMessages = await listAgentSessionOpencodeMessages({
         repositoryId: params.repositoryId,
@@ -674,6 +692,7 @@ export async function listAgentSessionMessages(params: {
         hasMore: offset + params.limit < opencodeMessages.length,
       };
     } catch (error) {
+      // opencode 拉取失败时回退 DB，保障聊天页面可读。
       console.warn("[agent-session] list opencode messages failed, fallback to db:", {
         session_id: session.id,
         opencode_session_id: opencodeSessionId,
@@ -734,6 +753,7 @@ export async function createAgentSessionMessage(params: {
   const branchRef = String(params.metadata.branch_ref || "").trim()
     || resolveSessionBranchRef(session)
     || null;
+  // model/agent 支持多个兼容字段，兼容不同客户端入参命名。
   const modelRef = String(
     params.metadata.model
     || params.metadata.model_name
@@ -759,6 +779,7 @@ export async function createAgentSessionMessage(params: {
     });
 
     if (opencode.opencode_session_id !== session.opencode_session_id) {
+      // 首次发言可能创建新的 opencode session，需要回写会话表。
       await db
         .update(schema.agentSessions)
         .set({
@@ -810,6 +831,7 @@ export async function createAgentSessionMessage(params: {
     });
 
     if (opencode.agent_reply.trim()) {
+      // 仅在返回非空回复时写入 agent 事件，避免空消息污染时间线。
       await appendSessionEvent({
         sessionId: session.id,
         type: "message_created",
@@ -849,6 +871,7 @@ export async function joinAgentSession(params: {
   const session = await getSessionById(params.sessionId, params.repositoryId);
 
   if (!params.actor.isAdmin && session.visibility === "private" && session.creator_id !== params.actor.userId) {
+    // private 会话非 owner/admin 必须先被邀请。
     const participant = await getParticipant(session.id, params.actor.userId);
     if (!participant) {
       throw createError({ statusCode: 403, message: "Private session requires invitation" });
@@ -856,6 +879,7 @@ export async function joinAgentSession(params: {
   }
 
   const role = session.creator_id === params.actor.userId ? "owner" : "collaborator";
+  // public 会话默认允许协作者发言；private 则需要 owner 手动授权 can_chat。
   const canChat = session.creator_id === params.actor.userId ? true : session.visibility === "public";
 
   const [joined] = await db
@@ -903,6 +927,7 @@ export async function leaveAgentSession(params: {
   const session = await getSessionById(params.sessionId, params.repositoryId);
 
   if (!params.actor.isAdmin && session.creator_id === params.actor.userId) {
+    // owner 离开会导致会话无管理者，因此显式禁止。
     throw createError({ statusCode: 400, message: "Session owner cannot leave the session" });
   }
 
@@ -942,6 +967,7 @@ export async function pinAgentSessionMessage(params: {
   if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
     const participant = await getParticipant(session.id, params.actor.userId);
     if (!participant || participant.role === "viewer") {
+      // viewer 仅可读，不允许进行 pin 等会话编辑动作。
       throw createError({ statusCode: 403, message: "Only owner/collaborator can pin messages" });
     }
   }
@@ -970,6 +996,7 @@ export async function pinAgentSessionMessage(params: {
     const opencodeMessageToken = params.messageId.startsWith("opencode:")
       ? params.messageId.slice("opencode:".length).trim()
       : "";
+    // 兼容前端“opencode:{id}”占位消息：尝试从 opencode 拉取并补写本地 DB。
     if (opencodeSessionId && opencodeMessageToken) {
       try {
         const opencodeMessages = await listAgentSessionOpencodeMessages({
@@ -1037,6 +1064,7 @@ export async function pinAgentSessionMessage(params: {
             if (inserted) {
               message = inserted;
             } else {
+              // 处理并发插入：当前插入失败时再按 seq 回读一次。
               const [reloaded] = await db
                 .select({
                   id: schema.agentSessionMessages.id,
@@ -1121,6 +1149,7 @@ export async function updateAgentSessionVisibility(params: {
   const session = await getSessionById(params.sessionId, params.repositoryId);
 
   if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    // 可见性影响会话曝光范围，限制为 owner/admin 修改。
     throw createError({ statusCode: 403, message: "Only session owner can change visibility" });
   }
 
@@ -1164,9 +1193,11 @@ export async function stopAgentSession(params: {
   const session = await getSessionById(params.sessionId, params.repositoryId);
 
   if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    // 停止会话属于破坏性动作，仅 owner/admin 允许。
     throw createError({ statusCode: 403, message: "Only session owner can stop session" });
   }
   if (session.status === "stopped" || session.status === "completed") {
+    // 对终态会话保持幂等返回。
     return session;
   }
 
@@ -1197,6 +1228,7 @@ export async function stopAgentSession(params: {
       actorId: params.actor.userId,
     });
   } catch (error) {
+    // 清理失败不阻断 stop 主流程，但记录事件便于后续人工处理。
     await appendSessionEvent({
       sessionId: session.id,
       type: "worktree_cleanup_failed",
@@ -1230,6 +1262,7 @@ export async function controlAgentSessionOpencode(params: {
   const session = await getSessionById(params.sessionId, params.repositoryId);
 
   if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    // 控制底层进程属于高权限操作，仅 owner/admin 可执行。
     throw createError({ statusCode: 403, message: "Only session owner can control opencode" });
   }
 
@@ -1270,6 +1303,7 @@ export async function retryAgentSession(params: {
     throw createError({ statusCode: 403, message: "Only session owner can retry session" });
   }
   if (session.status !== "failed" && session.status !== "stopped") {
+    // 仅失败或已停止的会话允许重试，避免覆盖运行中上下文。
     throw createError({
       statusCode: 400,
       message: "Only failed or stopped sessions can be retried",
@@ -1374,6 +1408,7 @@ export async function deleteAgentSession(params: {
   const session = await getSessionById(params.sessionId, params.repositoryId);
 
   if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    // 删除会话会移除主记录，限制为 owner/admin。
     throw createError({ statusCode: 403, message: "Only session owner can delete session" });
   }
 
@@ -1425,6 +1460,7 @@ export async function listAgentSessionEvents(params: {
 
   const conditions = [eq(schema.agentSessionEvents.session_id, session.id)];
   if (params.afterSeq !== undefined) {
+    // 增量拉取：只返回 afterSeq 之后的事件，供前端轮询续传。
     conditions.push(gt(schema.agentSessionEvents.seq, params.afterSeq));
   }
   const whereCondition = and(...conditions)!;

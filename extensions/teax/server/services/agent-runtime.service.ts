@@ -8,12 +8,17 @@ import { resolveAgentMetaRepoConfig } from "~~/server/services/agent-meta-config
 import { ensureAgentRuntimeGlobalsDefaults } from "~~/server/services/agent-runtime-globals.service";
 
 const repoLocks = new Map<string, Promise<void>>();
+// 固定基础镜像标签：所有仓库运行镜像都从该基线镜像派生。
 const AGENT_RUNTIME_FIXED_BASE_IMAGE_TAG = "teax-agent-runtime:base";
+// 每个 session 下 opencode 进程文件约定名（写在 worktree 目录内）。
 const AGENT_RUNTIME_OPENCODE_PID_FILENAME = ".teax-opencode.pid";
 const AGENT_RUNTIME_OPENCODE_LOG_FILENAME = ".teax-opencode.log";
+// opencode server 默认只监听容器内本机地址，避免无意对外暴露。
 const AGENT_RUNTIME_OPENCODE_SERVER_HOSTNAME = "127.0.0.1";
+// 端口基数 + 跨度用于按 sessionId 派生稳定端口，避免多个会话冲突。
 const AGENT_RUNTIME_OPENCODE_SERVER_PORT_BASE = 20000;
 const AGENT_RUNTIME_OPENCODE_SERVER_PORT_SPAN = 20000;
+// 健康检查重试策略：用于 server 启动后的就绪等待窗口。
 const AGENT_RUNTIME_OPENCODE_HEALTH_RETRY_COUNT = 20;
 const AGENT_RUNTIME_OPENCODE_HEALTH_RETRY_INTERVAL_MS = 500;
 
@@ -203,7 +208,9 @@ function resolveRuntimeConfig(): RuntimeResolvedConfig {
 }
 
 function buildWorkingBranch(sessionId: string, specified?: string): string {
+  // 显式传入优先，便于外部恢复/重试时复用既有分支命名。
   if (specified?.trim()) return specified.trim();
+  // 未指定时按 sessionId 派生稳定短分支名，便于排障和追踪。
   return `agent/${sessionId.slice(0, 8)}`;
 }
 
@@ -218,6 +225,7 @@ function toDockerSafeSegment(value: string): string {
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^-+/, "")
     .replace(/-+$/, "");
+  // Docker 名称必须非空；全部被清洗掉时回退 default。
   return normalized || "default";
 }
 
@@ -593,6 +601,7 @@ async function ensureDockerGitCredentials(params: {
 
 function buildRepoPaths(sessionId: string): RepoPathInfo {
   const config = resolveRuntimeConfig();
+  // 宿主机会话目录：每个 session 独占一个目录。
   const sessionPath = join(config.sessionsRootDir, sessionId);
   return { sessionPath };
 }
@@ -600,6 +609,7 @@ function buildRepoPaths(sessionId: string): RepoPathInfo {
 function buildRepoContainerPaths(sessionId: string): RepoContainerPathInfo {
   const config = resolveRuntimeConfig();
   return {
+    // 容器内目录与宿主机目录一一映射到 /runtime/sessions/{sessionId}。
     containerSessionPath: posix.join(config.dockerWorkspaceRoot, "sessions", sessionId),
   };
 }
@@ -623,6 +633,7 @@ function sleep(ms: number) {
 
 function toPositivePort(value: unknown): number | null {
   const parsed = Number(value);
+  // 只接受合法 TCP 端口整数，非法值回退到默认派生逻辑。
   if (!Number.isInteger(parsed)) return null;
   if (parsed <= 0 || parsed > 65535) return null;
   return parsed;
@@ -639,6 +650,7 @@ function deriveOpencodeServerPortFromSessionId(sessionId: string): number {
   const compact = sessionId.replace(/-/g, "");
   const hex = compact.slice(0, 8);
   const seed = Number.parseInt(hex, 16);
+  // 端口派生保持“同 session 稳定、不同 session 分散”，同时可预测便于排障。
   const normalized = Number.isFinite(seed) ? seed : 0;
   return AGENT_RUNTIME_OPENCODE_SERVER_PORT_BASE + (normalized % AGENT_RUNTIME_OPENCODE_SERVER_PORT_SPAN);
 }
@@ -648,6 +660,7 @@ function resolveSessionOpencodeServerEndpoint(params: {
   worktreeMetadata: Record<string, unknown>;
 }): SessionOpencodeServerEndpoint {
   const serverMetadata = asRecord(params.worktreeMetadata.opencode_server);
+  // 优先使用 worktree metadata 中记录的 endpoint，缺失时再按 sessionId 派生。
   const hostname = String(serverMetadata.hostname || AGENT_RUNTIME_OPENCODE_SERVER_HOSTNAME).trim()
     || AGENT_RUNTIME_OPENCODE_SERVER_HOSTNAME;
   const port = toPositivePort(serverMetadata.port) || deriveOpencodeServerPortFromSessionId(params.sessionId);
@@ -690,6 +703,7 @@ function parseCommandKvOutput(output: string): Record<string, string> {
     if (separatorIndex <= 0) continue;
     const key = trimmed.slice(0, separatorIndex).trim();
     const value = trimmed.slice(separatorIndex + 1).trim();
+    // 忽略非法行，仅解析 key=value 结构，降低 shell 输出噪声影响。
     if (!key) continue;
     parsed[key] = value;
   }
@@ -855,6 +869,7 @@ async function ensureDockerRuntimeContainer(params: {
 
   const existing = await inspectDockerContainer(containerName);
   if (existing?.running) {
+    // 容器已运行时直接复用，避免重复 build 与容器重建造成中断。
     logRuntimeStep("runtime bootstrap reuse running container", {
       container_name: containerName,
       container_id: existing.containerId,
@@ -876,6 +891,7 @@ async function ensureDockerRuntimeContainer(params: {
   }
 
   if (!runtimeConfig.dockerBuildOnStart && existing && !existing.running) {
+    // 配置关闭“启动即重建”时，若容器仅是 stopped，则优先直接 start 复用。
     logRuntimeStep("runtime bootstrap start existing stopped container", {
       container_name: containerName,
     });
@@ -937,6 +953,7 @@ async function ensureDockerRuntimeContainer(params: {
   }
 
   if (existing) {
+    // 走重建流程时，先移除旧容器以释放同名占位。
     logRuntimeStep("runtime bootstrap step 3/4 remove old container", {
       container_name: containerName,
     });
@@ -1016,6 +1033,7 @@ async function ensureDockerRuntimeContainer(params: {
 async function stopAndRemoveDockerContainer(containerName: string) {
   const container = await inspectDockerContainer(containerName);
   if (!container) {
+    // 不存在视为幂等成功，便于上层无状态调用。
     return false;
   }
   if (container.running) {
@@ -1046,6 +1064,7 @@ function buildOpencodeStartCommandCandidates(endpoint: SessionOpencodeServerEndp
   for (const command of commands) {
     deduped.add(command);
   }
+  // 去重并保持原顺序：优先使用配置命令，其次再尝试内置回退命令。
   return Array.from(deduped);
 }
 
@@ -1883,6 +1902,7 @@ export async function ensureRepoRuntime(params: {
     };
 
     if (existing) {
+      // 已存在 runtime 记录时走 update，保留同一条 runtime 主键，方便关联历史会话。
       const [updated] = await db
         .update(schema.agentRuntimes)
         .set({
@@ -1904,6 +1924,7 @@ export async function ensureRepoRuntime(params: {
       };
     }
 
+    // 首次启动仓库 runtime 时创建记录。
     const [created] = await db
       .insert(schema.agentRuntimes)
       .values({
@@ -1955,6 +1976,7 @@ async function prepareWorktreeInDockerMode(params: {
   });
 
   if (await pathExists(paths.sessionPath)) {
+    // 同 session 重试前先清空宿主目录，避免残留文件污染新 worktree。
     await rm(paths.sessionPath, { recursive: true, force: true });
   }
 
@@ -2128,6 +2150,7 @@ export async function prepareRepoSessionWorktree(params: {
         mode: prepared.mode,
       };
     } catch (error) {
+      // 失败时既要回写 session 状态，也要写 worktree 失败信息，便于前端展示具体错误。
       const message = (error as { message?: string })?.message || "Failed to prepare worktree";
       await db
         .insert(schema.agentSessionWorktrees)
@@ -2186,6 +2209,7 @@ export async function cleanupSessionWorktree(params: {
     .limit(1);
 
   if (!worktree) {
+    // worktree 可能被手动清理，返回显式原因供调用方区分“未找到”和“删除失败”。
     return { removed: false, reason: "worktree_not_found" as const };
   }
 
@@ -2194,6 +2218,7 @@ export async function cleanupSessionWorktree(params: {
     const shouldDeletePath = !runtimeConfig.keepWorktreeOnStop;
 
     if (shouldDeletePath) {
+      // 默认策略是停止会话即删除目录；若开启 keepWorktreeOnStop 则仅更新状态不删目录。
       await rm(sessionPath, { recursive: true, force: true });
     }
 
@@ -2305,6 +2330,7 @@ export async function stopRepoRuntime(params: {
     .limit(1);
 
   if (!runtime) {
+    // 没有 runtime 记录时保持幂等返回，避免调用端额外处理 404。
     return {
       runtime: null,
       stopped: true,
@@ -2325,6 +2351,7 @@ export async function stopRepoRuntime(params: {
     );
 
   if (activeWorktrees.length > 0 && !params.force) {
+    // 非强制模式禁止在有活跃 worktree 时停机，避免误中断进行中的会话。
     throw createError({
       statusCode: 409,
       message: "Runtime has active worktrees, use force=true to stop",
@@ -2332,6 +2359,7 @@ export async function stopRepoRuntime(params: {
   }
 
   if (params.force && activeWorktrees.length > 0) {
+    // 强制停机时先清理 worktree，并将活跃会话统一置为 stopped。
     for (const row of activeWorktrees) {
       await cleanupSessionWorktree({
         repositoryId: params.repositoryId,
@@ -2392,6 +2420,7 @@ export async function controlAgentSessionOpencodeProcess(params: {
   await withRepositoryLock(params.repositoryId, async () => {
     try {
       if (params.action === "start") {
+        // start: 仅尝试拉起，不主动 stop 已存在进程。
         const started = await startSessionOpencodeInContainer({
           runtimeKey: context.runtimeKey,
           sessionId: params.sessionId,
@@ -2399,11 +2428,13 @@ export async function controlAgentSessionOpencodeProcess(params: {
         });
         command = started.command;
       } else if (params.action === "stop") {
+        // stop: 只做停止，不再重启。
         await stopSessionOpencodeInContainer({
           runtimeKey: context.runtimeKey,
           sessionId: params.sessionId,
         });
       } else {
+        // restart: 先停后启，确保拿到最新 command/pid 状态。
         await stopSessionOpencodeInContainer({
           runtimeKey: context.runtimeKey,
           sessionId: params.sessionId,
