@@ -7,7 +7,7 @@ import {
   type WorkflowInputDef,
 } from "./workflow-yaml";
 import {
-  DEFAULT_VERBOSE_LEVEL,
+  getRuntimeVerboseDefault,
   parseVerboseLevel,
   VERBOSE_FORM_FIELD,
   type VerboseLevel,
@@ -350,7 +350,7 @@ export function renderWorkflowForm(
 
   if (opts.showVerboseSelect) {
     const verboseFieldName = opts.verboseName || VERBOSE_FORM_FIELD;
-    const verboseDefault = String(parseVerboseLevel(opts.verboseDefault, DEFAULT_VERBOSE_LEVEL));
+    const verboseDefault = String(parseVerboseLevel(opts.verboseDefault, getRuntimeVerboseDefault()));
     card.select({
       name: verboseFieldName,
       label: "日志级别",

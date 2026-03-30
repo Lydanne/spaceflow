@@ -36,6 +36,8 @@ export const NOTIFY_EVENTS = [
   "workflow_success",
   "workflow_failure",
   "push",
+  "pr_opened",
+  "issue_opened",
   "agent_completed",
   "agent_failed",
 ] as const;

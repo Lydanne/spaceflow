@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { verifyWebhookSignature } from "~~/server/utils/webhook-verify";
 import {
+  notifyIssueOpened,
+  notifyPullRequestOpened,
   notifyPushEvent,
   notifyWorkflowRunComplete,
   type NotifyContext,
@@ -27,6 +29,20 @@ interface GiteaWebhookPayload {
   };
   sender?: { id: number; login: string; email?: string };
   pusher?: { id: number; login: string; email: string };
+  pull_request?: {
+    number: number;
+    title: string;
+    html_url: string;
+    user?: { login: string };
+    head?: { ref: string };
+    base?: { ref: string };
+  };
+  issue?: {
+    number: number;
+    title: string;
+    html_url: string;
+    user?: { login: string };
+  };
   workflow_run?: {
     id: number;
     run_number: number;
@@ -78,8 +94,14 @@ export default defineEventHandler(async (event) => {
     .where(eq(schema.repositories.gitea_repo_id, repoId))
     .limit(1);
 
+  const config = useRuntimeConfig();
+  const webhookSecret = project?.webhook_secret || config.giteaWebhookSecret;
+
   // 验证签名：无论项目是否存在都返回统一的 401，避免泄漏项目存在性
-  if (!project?.webhook_secret || !verifyWebhookSignature(body, project.webhook_secret, signature)) {
+  if (!webhookSecret || !verifyWebhookSignature(body, webhookSecret, signature)) {
+    throw createError({ statusCode: 401, message: "Invalid webhook signature" });
+  }
+  if (!project) {
     throw createError({ statusCode: 401, message: "Invalid webhook signature" });
   }
 
@@ -109,6 +131,46 @@ export default defineEventHandler(async (event) => {
       received: true,
       action: "notified",
       branch,
+      project: project.full_name,
+    };
+  }
+
+  // ─── pull_request 事件（PR 创建通知）──────────────────
+  if (giteaEvent === "pull_request" && payload.action === "opened" && payload.pull_request) {
+    const pr = payload.pull_request;
+
+    notifyPullRequestOpened(ctx, {
+      number: pr.number,
+      title: pr.title,
+      author: pr.user?.login || payload.sender?.login || "unknown",
+      sourceBranch: pr.head?.ref || "unknown",
+      targetBranch: pr.base?.ref || "unknown",
+      htmlUrl: pr.html_url || "",
+    }, settings).catch((err) => console.error("[webhook] pull request notify error:", err));
+
+    return {
+      received: true,
+      action: "notified",
+      prNumber: pr.number,
+      project: project.full_name,
+    };
+  }
+
+  // ─── issues 事件（Issue 创建通知）──────────────────────
+  if (giteaEvent === "issues" && payload.action === "opened" && payload.issue) {
+    const issue = payload.issue;
+
+    notifyIssueOpened(ctx, {
+      number: issue.number,
+      title: issue.title,
+      author: issue.user?.login || payload.sender?.login || "unknown",
+      htmlUrl: issue.html_url || "",
+    }, settings).catch((err) => console.error("[webhook] issue notify error:", err));
+
+    return {
+      received: true,
+      action: "notified",
+      issueNumber: issue.number,
       project: project.full_name,
     };
   }

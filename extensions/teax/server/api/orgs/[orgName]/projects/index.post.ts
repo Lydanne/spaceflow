@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
 import { useGiteaSdk } from "~~/server/utils/gitea";
-import { generateWebhookSecret } from "~~/server/utils/webhook-verify";
 import { writeAuditLog } from "~~/server/utils/audit";
 import { createProjectBodySchema } from "~~/server/shared/dto";
 import { resolveOrgId } from "~~/server/utils/resolve-org";
@@ -38,20 +37,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, message: "Repository already linked to a project" });
   }
 
-  // 注册 Webhook
   const config = useRuntimeConfig();
-  const webhookSecret = generateWebhookSecret();
-  const webhookUrl = `${config.public.appUrl}/api/webhooks/gitea`;
-
-  let webhookIdValue: number | undefined;
-  try {
-    // 订阅所有事件（["*"]），在 Teax 内部通过配置控制处理哪些事件
-    const webhook = await gitea.createWebhook(owner!, repo!, webhookUrl, webhookSecret);
-    webhookIdValue = webhook.id;
-  } catch (err: unknown) {
-    console.error("Failed to create webhook:", err);
-    // Webhook 创建失败不阻塞项目创建
-  }
+  const webhookSecret = config.giteaWebhookSecret || null;
 
   const [project] = await db
     .insert(schema.repositories)
@@ -63,7 +50,7 @@ export default defineEventHandler(async (event) => {
       description: giteaRepo.description,
       default_branch: giteaRepo.default_branch,
       clone_url: giteaRepo.clone_url,
-      webhook_id: webhookIdValue ?? null,
+      webhook_id: null,
       webhook_secret: webhookSecret,
       created_by: session.user.id,
       settings: {

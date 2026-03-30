@@ -11,6 +11,7 @@ import type { NotifyRule, NotifyEvent } from "~~/server/shared/dto/repository.dt
 // ─── 通知类型 ─────────────────────────────────────────────
 
 export type NotificationType = "publish" | "approval" | "agent" | "system";
+const DEFAULT_OFF_EVENTS: NotifyEvent[] = ["push", "pr_opened", "issue_opened"];
 
 export interface NotifyContext {
   /** 组织 ID（用于查找团队成员） */
@@ -115,6 +116,52 @@ export function buildPushCard(params: {
   if (params.compareUrl) {
     card.button("查看对比", { url: params.compareUrl });
   }
+
+  return card.build() as FeishuInteractiveCard;
+}
+
+/**
+ * 构建 PR 创建通知卡片。
+ */
+export function buildPullRequestOpenedCard(params: {
+  repoFullName: string;
+  number: number;
+  title: string;
+  author: string;
+  sourceBranch: string;
+  targetBranch: string;
+  htmlUrl: string;
+  appUrl: string;
+}): FeishuInteractiveCard {
+  const card = new EnhancedCardBuilder(
+    { title: `🔀 ${params.repoFullName} 新 PR #${params.number}`, theme: "blue" },
+    "",
+  )
+    .text(`**${params.title}**`, true)
+    .text(`👤 ${params.author}  🌿 ${params.sourceBranch} → ${params.targetBranch}`, true)
+    .button("查看 PR", { type: "primary", url: params.htmlUrl || `${params.appUrl}/${params.repoFullName}/pulls/${params.number}` });
+
+  return card.build() as FeishuInteractiveCard;
+}
+
+/**
+ * 构建 Issue 创建通知卡片。
+ */
+export function buildIssueOpenedCard(params: {
+  repoFullName: string;
+  number: number;
+  title: string;
+  author: string;
+  htmlUrl: string;
+  appUrl: string;
+}): FeishuInteractiveCard {
+  const card = new EnhancedCardBuilder(
+    { title: `🐞 ${params.repoFullName} 新 Issue #${params.number}`, theme: "blue" },
+    "",
+  )
+    .text(`**${params.title}**`, true)
+    .text(`👤 ${params.author}`, true)
+    .button("查看 Issue", { type: "primary", url: params.htmlUrl || `${params.appUrl}/${params.repoFullName}/issues/${params.number}` });
 
   return card.build() as FeishuInteractiveCard;
 }
@@ -246,7 +293,7 @@ async function dispatchByRules(
     const orgRules = await getOrgNotifyRules(organizationId);
     if (orgRules.length > 0) {
       chatIds = matchRules(orgRules, event, branch, workflowFile);
-    } else if (settings.feishuChatId) {
+    } else if (settings.feishuChatId && !DEFAULT_OFF_EVENTS.includes(event)) {
       // 3. 旧字段兼容
       chatIds = [settings.feishuChatId];
     }
@@ -260,6 +307,10 @@ async function dispatchByRules(
       }),
     );
   } else {
+    if (DEFAULT_OFF_EVENTS.includes(event)) {
+      console.log(`[notification] skip ${event}: no matched notify rules`);
+      return;
+    }
     // 4. 最终 fallback：私信组织成员
     const targets = await getNotifyTargets(organizationId, notifyType);
     if (targets.length === 0) return;
@@ -411,6 +462,75 @@ export async function notifyPushEvent(
     );
   } catch (err) {
     console.error("[notification] Failed to send push notification:", err);
+  }
+}
+
+/**
+ * 发送 PR 创建通知。
+ */
+export async function notifyPullRequestOpened(
+  ctx: NotifyContext,
+  pr: {
+    number: number;
+    title: string;
+    author: string;
+    sourceBranch: string;
+    targetBranch: string;
+    htmlUrl: string;
+  },
+  repoSettings: RepoNotifySettings = {},
+): Promise<void> {
+  try {
+    const config = useRuntimeConfig();
+    const card = buildPullRequestOpenedCard({
+      repoFullName: ctx.repoFullName,
+      number: pr.number,
+      title: pr.title,
+      author: pr.author,
+      sourceBranch: pr.sourceBranch,
+      targetBranch: pr.targetBranch,
+      htmlUrl: pr.htmlUrl,
+      appUrl: config.public.appUrl,
+    });
+
+    await dispatchByRules(
+      card, repoSettings, ctx.organizationId, "pr_opened", "publish",
+      pr.targetBranch,
+    );
+  } catch (err) {
+    console.error("[notification] Failed to send pull request notification:", err);
+  }
+}
+
+/**
+ * 发送 Issue 创建通知。
+ */
+export async function notifyIssueOpened(
+  ctx: NotifyContext,
+  issue: {
+    number: number;
+    title: string;
+    author: string;
+    htmlUrl: string;
+  },
+  repoSettings: RepoNotifySettings = {},
+): Promise<void> {
+  try {
+    const config = useRuntimeConfig();
+    const card = buildIssueOpenedCard({
+      repoFullName: ctx.repoFullName,
+      number: issue.number,
+      title: issue.title,
+      author: issue.author,
+      htmlUrl: issue.htmlUrl,
+      appUrl: config.public.appUrl,
+    });
+
+    await dispatchByRules(
+      card, repoSettings, ctx.organizationId, "issue_opened", "publish",
+    );
+  } catch (err) {
+    console.error("[notification] Failed to send issue notification:", err);
   }
 }
 

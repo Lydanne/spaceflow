@@ -5,6 +5,8 @@ const NOTIFY_EVENTS = [
   { value: "workflow_success", label: "Action 成功", icon: "i-lucide-check-circle" },
   { value: "workflow_failure", label: "Action 失败", icon: "i-lucide-x-circle" },
   { value: "push", label: "代码推送", icon: "i-lucide-git-commit" },
+  { value: "pr_opened", label: "PR 创建", icon: "i-lucide-git-pull-request" },
+  { value: "issue_opened", label: "Issue 创建", icon: "i-lucide-circle-dot" },
   { value: "agent_completed", label: "Agent 完成", icon: "i-lucide-bot" },
   { value: "agent_failed", label: "Agent 失败", icon: "i-lucide-bot" },
 ] as const;
@@ -38,7 +40,7 @@ watch(
         id: crypto.randomUUID(),
         name: "默认通知",
         chatId: os.feishuChatId,
-        events: ["workflow_success", "workflow_failure", "push"],
+        events: ["workflow_success", "workflow_failure"],
         branches: [],
         workflows: [],
       }];
