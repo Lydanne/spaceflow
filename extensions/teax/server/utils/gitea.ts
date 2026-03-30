@@ -1,4 +1,5 @@
 import type { H3Event } from "h3";
+import { resolveVerboseLevel } from "~~/server/utils/verbose";
 
 export interface GiteaUser {
   id: number;
@@ -630,7 +631,13 @@ interface GiteaSdk {
    * - 'fallback-admin': 优先用户 token，失败时 fallback 到 Service Token（卡片/bot 交互场景）
    * - 'user': 必须使用用户 OAuth Token，失败则报错（需要传入 event 或 userTokenProvider）
    */
-  role(role: GiteaRole): Promise<GiteaService>;
+  role(
+    role: GiteaRole,
+    options?: {
+      verbose?: number;
+      logTag?: string;
+    },
+  ): Promise<GiteaService>;
 }
 
 /**
@@ -753,16 +760,38 @@ export function useGiteaSdk(
   }
 
   return {
-    async role(role: GiteaRole): Promise<GiteaService> {
+    async role(
+      role: GiteaRole,
+      options?: {
+        verbose?: number;
+        logTag?: string;
+      },
+    ): Promise<GiteaService> {
+      const verbose = resolveVerboseLevel(options?.verbose);
+      const tag = options?.logTag ? `[gitea-sdk:${options.logTag}]` : "[gitea-sdk]";
+
       if (role === "fallback-admin") {
-        // admin 角色：有 event/provider 时优先用户 token（维护刷新），fallback 到 service token
+        // fallback-admin：有 event/provider 时优先用户 token，失败后回退 service token
         if (ctx.event || ctx.userTokenProvider) {
           const userGitea = await getUserGiteaService();
-          if (userGitea) return userGitea;
+          if (userGitea) {
+            if (verbose >= 2) {
+              console.log(`${tag} role=fallback-admin, using user token`);
+            }
+            return userGitea;
+          }
+          if (verbose >= 1) {
+            console.warn(`${tag} role=fallback-admin, user token unavailable, fallback to service token`);
+          }
+        } else if (verbose >= 1) {
+          console.warn(`${tag} role=fallback-admin, missing user context, fallback to service token`);
         }
         return getServiceGiteaService();
       }
       if (role === "admin") {
+        if (verbose >= 2) {
+          console.log(`${tag} role=admin, using service token`);
+        }
         return getServiceGiteaService();
       }
 
@@ -776,10 +805,17 @@ export function useGiteaSdk(
 
       const userGitea = await getUserGiteaService();
       if (!userGitea) {
+        if (verbose >= 1) {
+          console.warn(`${tag} role=user, user token unavailable`);
+        }
         throw createError({
           statusCode: 401,
           message: "User not authenticated or Gitea token expired",
         });
+      }
+
+      if (verbose >= 2) {
+        console.log(`${tag} role=user, using user token`);
       }
 
       return userGitea;

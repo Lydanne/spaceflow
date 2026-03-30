@@ -7,7 +7,7 @@ import {
   requireBinding,
 } from "~~/server/card-kit";
 import { resolvePresetByShareToken } from "~~/server/utils/resolve-preset";
-import { useGiteaSdk } from "~~/server/utils/gitea";
+import { useGiteaSdk, botLogin } from "~~/server/utils/gitea";
 import {
   buildDispatchErrorCard,
   buildTriggerResultCard,
@@ -23,6 +23,7 @@ import {
   unlockPresetByShareToken,
 } from "~~/server/services/preset-run.service";
 import { runWorkflowWithPreset } from "~~/server/services/workflow-run.service";
+import { resolveVerboseLevel, VERBOSE_FORM_FIELD } from "~~/server/utils/verbose";
 import type { User } from "~~/server/db/schema";
 
 // --- Helper: permission check without H3Event ---
@@ -45,6 +46,7 @@ export default defineCardPage({
 
   async render(ctx) {
     const shareToken = ctx.params.shareToken as string;
+    const verbose = resolveVerboseLevel(ctx.params.verbose);
     if (!shareToken) {
       return ctx
         .card({ title: "❌ 参数错误", theme: "red" })
@@ -99,6 +101,8 @@ export default defineCardPage({
     }
     renderWorkflowForm(card, formData, {
       formName: "preset_form",
+      showVerboseSelect: true,
+      verboseDefault: verbose,
       disableBranch: isLockedByOther || !preset.allow_branch_override,
       disableBranchReason: isLockedByOther
         ? "🔒 当前预设被他人锁定，仅锁定者可修改"
@@ -140,6 +144,10 @@ export default defineCardPage({
     const shareToken = ctx.params.shareToken as string;
     const activeUser = ctx.inject<User>(requireBinding);
     const activeUserId = activeUser?.id;
+    const verbose = resolveVerboseLevel(
+      (ctx.formValue as Record<string, unknown> | undefined)?.[VERBOSE_FORM_FIELD]
+      ?? ctx.params.verbose,
+    );
 
     // 处理解锁操作
     if (ctx.action === "unlock") {
@@ -198,9 +206,12 @@ export default defineCardPage({
           return;
         }
 
-        const gitea = await useGiteaSdk().role("fallback-admin");
+        const gitea = await useGiteaSdk(botLogin(ctx.openId)).role("fallback-admin", {
+          verbose,
+          logTag: "preset-console",
+        });
         const inputOverrides = Object.fromEntries(
-          Object.entries(formValue as Record<string, unknown>).filter(([key]) => key !== "branch"),
+          Object.entries(formValue as Record<string, unknown>).filter(([key]) => key !== "branch" && key !== VERBOSE_FORM_FIELD),
         );
         let runResult: Awaited<ReturnType<typeof runWorkflowWithPreset>>;
         try {

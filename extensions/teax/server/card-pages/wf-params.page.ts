@@ -3,6 +3,7 @@ import { useDB, schema } from "~~/server/db";
 import { defineCardPage, navigate, asyncTask } from "~~/server/card-kit";
 import { useGiteaSdk, botLogin } from "~~/server/utils/gitea";
 import { buildDispatchErrorCard, buildTriggerResultCard, fetchWorkflowFormData, renderWorkflowForm } from "~~/server/utils/workflow-trigger";
+import { resolveVerboseLevel, VERBOSE_FORM_FIELD } from "~~/server/utils/verbose";
 
 export default defineCardPage({
   name: "wf-params",
@@ -20,6 +21,7 @@ export default defineCardPage({
     }
 
     const [owner, repo] = repoFullName.split("/");
+    const verbose = resolveVerboseLevel(ctx.params.verbose);
 
     // 获取仓库默认分支
     const db = useDB();
@@ -43,7 +45,11 @@ export default defineCardPage({
     card.text(`**工作流**: ${workflowName}\n**仓库**: ${repoFullName}`, true);
     card.divider();
 
-    renderWorkflowForm(card, formData, { formName: "wf_params_form" });
+    renderWorkflowForm(card, formData, {
+      formName: "wf_params_form",
+      showVerboseSelect: true,
+      verboseDefault: verbose,
+    });
 
     card.systemButtons();
 
@@ -55,6 +61,9 @@ export default defineCardPage({
     const workflowPath = ctx.params.workflowPath as string;
     const workflowName = ctx.params.workflowName as string;
     const formValue = ctx.formValue || {};
+    const verbose = resolveVerboseLevel(
+      (formValue as Record<string, unknown>)[VERBOSE_FORM_FIELD] ?? ctx.params.verbose,
+    );
 
     const [owner, repo] = repoFullName.split("/");
 
@@ -70,7 +79,7 @@ export default defineCardPage({
     // Collect input parameters
     const inputs: Record<string, string> = {};
     for (const [key, value] of Object.entries(formValue)) {
-      if (key === "branch") continue;
+      if (key === "branch" || key === VERBOSE_FORM_FIELD) continue;
       inputs[key] = String(value);
     }
 
@@ -79,7 +88,10 @@ export default defineCardPage({
       `**仓库**: ${repoFullName}\n**工作流**: ${workflowName}\n\n⏳ 正在触发工作流，请稍候...`,
       async () => {
         try {
-          const gitea = await useGiteaSdk(botLogin(ctx.openId)).role("fallback-admin");
+          const gitea = await useGiteaSdk(botLogin(ctx.openId)).role("fallback-admin", {
+            verbose,
+            logTag: "wf-params",
+          });
           await gitea.dispatchWorkflow(owner!, repo!, workflowPath, branch, inputs);
         } catch (err) {
           console.error("[wf-params] dispatchWorkflow error:", err);
