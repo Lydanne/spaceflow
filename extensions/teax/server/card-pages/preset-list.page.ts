@@ -224,8 +224,6 @@ export default defineCardPage({
       publicGroupSummary.set(item.group_id, summary);
     }
 
-    card.text("**组织公开项（📁 预设组 / 📌 预设）**", true);
-
     const publicItems = [
       ...publicGroups.map((group) => ({
         kind: "group" as const,
@@ -244,9 +242,10 @@ export default defineCardPage({
       })),
     ];
 
-    if (publicItems.length === 0) {
-      card.text("暂无组织公开项", true);
-    } else {
+    let hasSection = false;
+
+    if (publicItems.length > 0) {
+      card.text("**组织公开项（📁 预设组 / 📌 预设）**", true);
       const publicButtons: EnhancedButtonConfig[] = publicItems.map((item) => {
         const emoji = item.kind === "group" ? "📁" : "📌";
         const navigate: EnhancedButtonConfig["navigate"] = item.kind === "group"
@@ -264,16 +263,15 @@ export default defineCardPage({
       for (let i = 0; i < publicButtons.length; i += 2) {
         card.buttons(publicButtons.slice(i, i + 2));
       }
+      hasSection = true;
     }
 
-    card.divider();
-
-    card.text("**我的预设组**", true);
-    card.divider();
-
-    if (groups.length === 0) {
-      card.text("暂无预设组", true);
-    } else {
+    if (groups.length > 0) {
+      if (hasSection) {
+        card.divider();
+      }
+      card.text("**我的预设组**", true);
+      card.divider();
       const groupButtons: EnhancedButtonConfig[] = [];
       for (const group of groups) {
         const groupItems = (presetsByGroup.get(group.id) ?? []).sort((a, b) => {
@@ -303,13 +301,14 @@ export default defineCardPage({
       for (let i = 0; i < groupButtons.length; i += 2) {
         card.buttons(groupButtons.slice(i, i + 2));
       }
+      hasSection = true;
     }
 
-    card.divider();
-    card.text("**独立预设**", true);
-    if (standalonePresets.length === 0) {
-      card.text("暂无独立预设", true);
-    } else {
+    if (standalonePresets.length > 0) {
+      if (hasSection) {
+        card.divider();
+      }
+      card.text("**独立预设**", true);
       const standaloneButtons: EnhancedButtonConfig[] = standalonePresets.map((preset) => {
         const repoName = preset.repository?.full_name ?? "";
         return {
