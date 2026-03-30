@@ -70,6 +70,10 @@ pnpm dev
 pnpm docker:build
 ```
 
+默认会读取 `package.json` 的 `version`，生成两个 tag：
+- `<image>:<version>`
+- `<image>:latest`
+
 自定义镜像名与标签：
 
 ```bash
@@ -83,6 +87,10 @@ scripts/build-docker.sh teax test
 ```bash
 pnpm docker:build:local
 ```
+
+默认会读取 `package.json` 的 `version`，生成两个 tag：
+- `<image>:<version>`
+- `<image>:latest`
 
 自定义镜像名与标签：
 
@@ -137,4 +145,3 @@ pnpm db:studio
 pnpm docker:build
 pnpm docker:build:local
 ```
-

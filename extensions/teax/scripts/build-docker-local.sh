@@ -5,8 +5,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 IMAGE_NAME="${1:-teax}"
-IMAGE_TAG="${2:-latest}"
-IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
+VERSION_TAG="${2:-$(node -p "require('./package.json').version || ''")}"
+if [[ -z "$VERSION_TAG" ]]; then
+  echo "package.json 中缺少 version，且未传入镜像 tag" >&2
+  exit 1
+fi
+IMAGE_REF_VERSION="${IMAGE_NAME}:${VERSION_TAG}"
+IMAGE_REF_LATEST="${IMAGE_NAME}:latest"
 
 CONTEXT_DIR=".docker/local-runtime-context"
 DOCKERFILE_PATH="$CONTEXT_DIR/Dockerfile"
@@ -44,8 +49,17 @@ USER nodeuser
 CMD ["node", ".output/server/index.mjs"]
 EOF
 
-echo "[3/4] 构建 Docker 镜像: $IMAGE_REF"
-docker build -f "$DOCKERFILE_PATH" -t "$IMAGE_REF" "$CONTEXT_DIR"
+echo "[3/4] 构建 Docker 镜像: $IMAGE_REF_VERSION"
+docker build -f "$DOCKERFILE_PATH" -t "$IMAGE_REF_VERSION" "$CONTEXT_DIR"
+
+if [[ "$VERSION_TAG" != "latest" ]]; then
+  docker tag "$IMAGE_REF_VERSION" "$IMAGE_REF_LATEST"
+fi
 
 echo "[4/4] 完成"
-echo "镜像: $IMAGE_REF"
+if [[ "$VERSION_TAG" == "latest" ]]; then
+  echo "镜像: $IMAGE_REF_VERSION"
+else
+  echo "镜像: $IMAGE_REF_VERSION"
+  echo "镜像: $IMAGE_REF_LATEST"
+fi
