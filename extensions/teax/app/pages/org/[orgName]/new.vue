@@ -1,21 +1,14 @@
 <script setup lang="ts">
+import type { OrgRepoItemDto, OrgReposResponseDto } from "~~/server/shared/dto";
+
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const orgName = route.params.orgName as string;
 
-interface RepoItem {
-  id: number;
-  name: string;
-  full_name: string;
-  description: string;
-  default_branch: string;
-  updated_at: string;
-}
-
 const searchQuery = ref("");
 const debouncedQuery = ref("");
-const selectedRepo = ref<RepoItem | null>(null);
+const selectedRepo = ref<OrgRepoItemDto | null>(null);
 const creating = ref(false);
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -26,13 +19,14 @@ watch(searchQuery, (val) => {
   }, 300);
 });
 
-const { data: reposData, status: reposStatus } = await useFetch<{
-  data: RepoItem[];
-}>(`/api/orgs/${orgName}/repos`, { query: { q: debouncedQuery, limit: 20 } });
+const { data: reposData, status: reposStatus } = await useFetch<OrgReposResponseDto>(
+  `/api/orgs/${orgName}/repos`,
+  { query: { q: debouncedQuery, limit: 20 } },
+);
 
 const repos = computed(() => reposData.value?.data ?? []);
 
-function selectRepo(repo: RepoItem) {
+function selectRepo(repo: OrgRepoItemDto) {
   selectedRepo.value = repo;
 }
 

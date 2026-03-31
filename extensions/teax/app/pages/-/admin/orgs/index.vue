@@ -1,29 +1,16 @@
 <script setup lang="ts">
+import type { AdminOrgListItemDto, AdminOrgsResponseDto } from "~~/server/shared/dto";
+
 definePageMeta({
   layout: "admin",
   middleware: "admin",
 });
 
-interface OrgItem {
-  id: string;
-  gitea_org_id: number;
-  name: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  synced_at: string | null;
-  created_at: string;
-  teamCount: number;
-  member_count: number;
-}
-
 const toast = useToast();
 const page = ref(1);
 const limit = 20;
 
-const { data, refresh, status } = await useFetch<{
-  data: OrgItem[];
-  total: number;
-}>("/api/admin/orgs", {
+const { data, refresh, status } = await useFetch<AdminOrgsResponseDto>("/api/admin/orgs", {
   query: { page, limit },
 });
 
@@ -32,7 +19,7 @@ const total = computed(() => data.value?.total ?? 0);
 
 const syncing = ref<string | null>(null);
 
-async function syncOrg(org: OrgItem) {
+async function syncOrg(org: AdminOrgListItemDto) {
   syncing.value = org.name;
   try {
     await $fetch(`/api/admin/orgs/${org.name}/sync`, { method: "POST" });

@@ -54,6 +54,41 @@ export type ProjectListItemDto = z.infer<typeof projectListItemSchema>;
 export const orgProjectsResponseSchema = paginatedResponseSchema(projectListItemSchema);
 export type OrgProjectsResponseDto = z.infer<typeof orgProjectsResponseSchema>;
 
+export const repoReadmeInfoSchema = z.object({
+  full_name: z.string(),
+  description: z.string().nullable(),
+  default_branch: z.string().nullable(),
+  clone_url: z.string().nullable(),
+  created_at: z.string().nullable(),
+  html_url: z.string(),
+  stars: z.number(),
+  forks: z.number(),
+  language: z.string().nullable(),
+});
+export type RepoReadmeInfoDto = z.infer<typeof repoReadmeInfoSchema>;
+
+export const repoReadmeResponseSchema = z.object({
+  content: z.string().nullable(),
+  source: z.string().nullable(),
+  repoInfo: repoReadmeInfoSchema.nullable(),
+});
+export type RepoReadmeResponseDto = z.infer<typeof repoReadmeResponseSchema>;
+
+export const repoBranchItemSchema = z.object({
+  name: z.string(),
+  commit: z.object({
+    id: z.string(),
+    message: z.string(),
+  }),
+});
+export type RepoBranchItemDto = z.infer<typeof repoBranchItemSchema>;
+
+export const repoBranchesResponseSchema = z.object({
+  data: z.array(repoBranchItemSchema),
+  default_branch: z.string().nullable(),
+});
+export type RepoBranchesResponseDto = z.infer<typeof repoBranchesResponseSchema>;
+
 // ─── 创建项目 request body ───────────────────────────────
 export const createProjectBodySchema = z.object({
   repo_full_name: z.string().min(1).includes("/"),

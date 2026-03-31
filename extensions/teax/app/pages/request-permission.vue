@@ -1,9 +1,5 @@
 <script setup lang="ts">
-interface ApprovalFlow {
-  id: string;
-  status: string;
-  payload?: { sceneName?: string };
-}
+import type { ApprovalFlowSummaryDto, SelectApprovalFlow } from "~~/server/shared/dto";
 
 const route = useRoute();
 const router = useRouter();
@@ -36,7 +32,7 @@ const isRejected = computed(() => status.value === "rejected");
 const isCancelled = computed(() => status.value === "cancelled");
 
 // 检查是否已有待处理的申请
-const { data: existingFlows, refresh: refreshFlows } = await useFetch<ApprovalFlow[]>("/api/approval-flows/my", {
+const { data: existingFlows, refresh: refreshFlows } = await useFetch<ApprovalFlowSummaryDto[]>("/api/approval-flows/my", {
   query: {
     flow_type: "permission:scene",
     status: "pending",
@@ -103,7 +99,7 @@ function startPolling() {
     if (!flowId.value) return;
 
     try {
-      const flow = await $fetch<ApprovalFlow>(`/api/approval-flows/${flowId.value}`);
+      const flow = await $fetch<SelectApprovalFlow>(`/api/approval-flows/${flowId.value}`);
       if (flow.status === "approved") {
         status.value = "approved";
         stopPolling();

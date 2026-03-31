@@ -1,11 +1,5 @@
 <script setup lang="ts">
-interface WorkflowInputDef {
-  description?: string;
-  required?: boolean;
-  default?: string;
-  type?: string;
-  options?: string[];
-}
+import type { WorkflowInputDef } from "~~/server/shared/dto";
 
 const props = withDefaults(
   defineProps<{

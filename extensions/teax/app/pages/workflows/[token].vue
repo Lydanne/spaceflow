@@ -1,55 +1,15 @@
 <script setup lang="ts">
+import type { WorkflowPresetPageDataDto } from "~~/server/shared/dto";
+
 definePageMeta({
   layout: "default",
 });
-
-interface WorkflowInputDef {
-  description?: string;
-  required?: boolean;
-  default?: string;
-  type?: string;
-  options?: string[];
-}
-
-interface PresetData {
-  preset: {
-    id: string;
-    share_token: string;
-    name: string;
-    workflow_path: string;
-    workflow_name: string;
-    branch: string;
-    inputs: Record<string, string>;
-    allow_input_override: boolean;
-    locked_inputs: string[];
-    allow_branch_override: boolean;
-    allow_sync_override: boolean;
-    // 子预设锁定状态
-    locked_by?: string | null;
-    locked_at?: string | null;
-    auto_unlock_at?: string | null;
-  };
-  group?: {
-    id: string;
-    name: string;
-    description: string | null;
-    auto_unlock_minutes: number | null;
-    share_token: string;
-  } | null;
-  inputDefs: Record<string, WorkflowInputDef>;
-  branches: string[];
-  repository: {
-    id: string;
-    full_name: string;
-    name: string;
-  };
-}
 
 const token = computed(() => useRoute().params.token as string);
 const { handlePermissionError } = useScenePermission();
 
 // 获取预设信息
-const { data: presetData, error: presetError, status: presetStatus } = useLazyFetch<PresetData>(
+const { data: presetData, error: presetError, status: presetStatus } = useLazyFetch<WorkflowPresetPageDataDto>(
   () => `/api/workflow-presets/${token.value}`,
 );
 

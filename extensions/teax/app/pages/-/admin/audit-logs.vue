@@ -1,31 +1,15 @@
 <script setup lang="ts">
+import type { AuditLogsResponseDto } from "~~/server/shared/dto";
+
 definePageMeta({
   layout: "admin",
   middleware: "admin",
 });
 
-interface AuditLogItem {
-  id: number;
-  action: string;
-  resource_type: string | null;
-  resource_id: string | null;
-  ip_address: string | null;
-  detail: Record<string, unknown> | null;
-  created_at: string;
-  username: string | null;
-  userAvatar: string | null;
-  orgName: string | null;
-}
-
 const page = ref(1);
 const limit = 30;
 
-const { data, status } = await useFetch<{
-  data: AuditLogItem[];
-  total: number;
-  page: number;
-  limit: number;
-}>("/api/admin/audit-logs", {
+const { data, status } = await useFetch<AuditLogsResponseDto>("/api/admin/audit-logs", {
   query: { page, limit },
 });
 

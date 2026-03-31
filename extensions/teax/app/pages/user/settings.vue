@@ -1,45 +1,26 @@
 <script setup lang="ts">
-import type { PresetItem } from "~/components/preset/PresetCard.vue";
-import type { PresetGroupItem } from "~/components/preset/PresetGroupCard.vue";
 import {
   REPO_NOTIFY_EVENT_OPTIONS,
   type RepoNotifyEvent,
   normalizeNotifyPreferences,
 } from "~~/shared/notify-events";
 import type { UserSettings } from "~~/shared/user-settings";
+import type {
+  FeishuBindingDto,
+  UserFeishuBindingResponseDto,
+  UserTeamsResponseDto,
+  UserWorkflowPresetGroupItemDto,
+  UserWorkflowPresetGroupsResponseDto,
+  UserWorkflowPresetItemDto,
+  UserWorkflowPresetsResponseDto,
+} from "~~/server/shared/dto";
 
 const { user } = useUserSession();
 const toast = useToast();
 
 // ─── 我的团队 ─────────────────────────────────────────────
 
-interface TeamMemberInfo {
-  id: string;
-  username: string;
-  avatar_url: string | null;
-  role: string | null;
-}
-
-interface PermissionGroupInfo {
-  id: string;
-  name: string;
-  type: string;
-  permissions: string[];
-}
-
-interface TeamInfo {
-  id: string;
-  name: string;
-  organization: {
-    id: string;
-    name: string;
-  };
-  role: string | null;
-  permissions: PermissionGroupInfo[];
-  members: TeamMemberInfo[];
-}
-
-const { data: teamsData } = await useFetch<{ data: TeamInfo[] }>(
+const { data: teamsData } = await useFetch<UserTeamsResponseDto>(
   "/api/user/teams",
   { key: "user-teams" },
 );
@@ -54,18 +35,18 @@ function toggleTeam(teamId: string) {
 
 // ─── 工作流预设管理 ─────────────────────────────────────────
 
-type WorkflowPreset = PresetItem;
-type PresetGroup = PresetGroupItem;
+type WorkflowPreset = UserWorkflowPresetItemDto;
+type PresetGroup = UserWorkflowPresetGroupItemDto;
 
 // 独立预设
-const { data: presetsData, refresh: refreshPresets } = await useFetch<{ data: WorkflowPreset[] }>(
+const { data: presetsData, refresh: refreshPresets } = await useFetch<UserWorkflowPresetsResponseDto>(
   "/api/user/workflow-presets",
   { key: "user-workflow-presets" },
 );
 const presets = computed(() => presetsData.value?.data ?? []);
 
 // 预设组
-const { data: groupsData, refresh: refreshGroups } = await useFetch<{ data: PresetGroup[] }>(
+const { data: groupsData, refresh: refreshGroups } = await useFetch<UserWorkflowPresetGroupsResponseDto>(
   "/api/user/workflow-preset-groups",
   { key: "user-workflow-preset-groups" },
 );
@@ -112,19 +93,11 @@ async function deletePreset(preset: WorkflowPreset) {
 
 // ─── 飞书绑定状态 ─────────────────────────────────────────
 
-interface FeishuBinding {
-  id: string;
-  feishu_open_id: string;
-  feishu_name: string;
-  feishu_avatar: string | null;
-  created_at: string;
-}
-
-const { data: bindingData, refresh: refreshBinding } = await useFetch<{ data: FeishuBinding | null }>(
+const { data: bindingData, refresh: refreshBinding } = await useFetch<UserFeishuBindingResponseDto>(
   "/api/user/feishu-binding",
   { key: "user-feishu-binding" },
 );
-const binding = computed(() => bindingData.value?.data ?? null);
+const binding = computed<FeishuBindingDto | null>(() => bindingData.value?.data ?? null);
 
 const { data: userSettingsData, refresh: refreshUserSettings } = await useFetch<{
   data: { settings: UserSettings };

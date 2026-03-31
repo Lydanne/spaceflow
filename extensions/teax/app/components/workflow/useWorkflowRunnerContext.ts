@@ -1,83 +1,18 @@
 import type { Ref, ComputedRef } from "vue";
 import type { LockInfo } from "~/composables/usePresetLock";
+import type {
+  WorkflowPresetHistoryItemDto,
+  WorkflowPresetPageDataDto,
+  WorkflowPresetStatusDto,
+  WorkflowPresetStatusRunDto,
+  WorkflowPresetStatusRunJobDto,
+} from "~~/server/shared/dto";
 
-export interface WorkflowInputDef {
-  description?: string;
-  required?: boolean;
-  default?: string;
-  type?: string;
-  options?: string[];
-}
-
-export interface PresetData {
-  preset: {
-    id: string;
-    share_token: string;
-    name: string;
-    workflow_path: string;
-    workflow_name: string;
-    branch: string;
-    inputs: Record<string, string>;
-    allow_input_override: boolean;
-    locked_inputs: string[];
-    allow_branch_override: boolean;
-    allow_sync_override: boolean;
-    locked_by?: string | null;
-    locked_at?: string | null;
-    auto_unlock_at?: string | null;
-  };
-  group?: {
-    id: string;
-    name: string;
-    description: string | null;
-    auto_unlock_minutes: number | null;
-    share_token: string;
-  } | null;
-  inputDefs: Record<string, WorkflowInputDef>;
-  branches: string[];
-  repository: {
-    id: string;
-    full_name: string;
-    name: string;
-  };
-}
-
-export interface HistoryItem {
-  id: string;
-  action: string;
-  actor_name: string | null;
-  actor_avatar: string | null;
-  created_at: string;
-}
-
-export interface JobInfo {
-  id: number;
-  name: string;
-  status: string;
-  conclusion: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-}
-
-export interface RunInfo {
-  id: number;
-  run_number: number;
-  status: string;
-  conclusion: string | null;
-  started_at: string | null;
-  completed_at: string | null;
-  html_url: string | null;
-  jobs: JobInfo[];
-}
-
-export interface StatusData {
-  run: RunInfo | null;
-  hasRunning: boolean;
-  triggeredBy?: {
-    name: string;
-    avatar_url: string | null;
-  } | null;
-}
+export type PresetData = WorkflowPresetPageDataDto;
+export type HistoryItem = WorkflowPresetHistoryItemDto;
+export type JobInfo = WorkflowPresetStatusRunJobDto;
+export type RunInfo = WorkflowPresetStatusRunDto;
+export type StatusData = WorkflowPresetStatusDto;
 
 export interface WorkflowRunnerContext {
   // 数据

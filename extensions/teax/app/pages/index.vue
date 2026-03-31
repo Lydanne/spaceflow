@@ -1,15 +1,12 @@
 <script setup lang="ts">
+import type {
+  OrgListResponseDto,
+  RecentCommitsResponseDto,
+  RepoCountResponseDto,
+} from "~~/server/shared/dto";
+
 const { user } = useUserSession();
-
-interface OrgItem {
-  id: string;
-  name: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  repoCount: number;
-}
-
-const { data: orgsData, status } = await useFetch<{ data: OrgItem[] }>(
+const { data: orgsData, status } = await useFetch<OrgListResponseDto>(
   "/api/orgs",
   { key: "home-orgs" },
 );
@@ -18,24 +15,12 @@ const totalRepos = computed(() =>
   orgs.value.reduce((sum, o) => sum + Number(o.repoCount || 0), 0),
 );
 
-const { data: repoCountData } = await useFetch<{ count: number }>(
+const { data: repoCountData } = await useFetch<RepoCountResponseDto>(
   "/api/stats/repo-count",
   { key: "home-repo-count" },
 );
 const repoCount = computed(() => repoCountData.value?.count ?? 0);
-
-interface CommitItem {
-  sha: string;
-  message: string;
-  author_name: string;
-  author_email: string;
-  date: string;
-  html_url: string;
-  project_name: string;
-  project_full_name: string;
-}
-
-const { data: commitsData } = await useFetch<{ data: CommitItem[] }>(
+const { data: commitsData } = await useFetch<RecentCommitsResponseDto>(
   "/api/stats/recent-commits",
   { key: "home-recent-commits" },
 );

@@ -1,24 +1,7 @@
 <script setup lang="ts">
-export interface PresetItem {
-  id: string;
-  name: string;
-  workflow_path: string;
-  branch: string;
-  share_token: string;
-  is_public?: boolean;
-  allow_input_override?: boolean | null;
-  allow_branch_override?: boolean | null;
-  created_at?: string;
-  repository: {
-    id: string;
-    full_name: string;
-  };
-  creator?: {
-    id: string;
-    gitea_username: string;
-    avatar_url: string | null;
-  };
-}
+import type { WorkflowPresetCardItemDto } from "~~/server/shared/dto";
+
+export type PresetItem = WorkflowPresetCardItemDto;
 
 const props = withDefaults(defineProps<{
   preset: PresetItem;

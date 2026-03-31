@@ -1,29 +1,12 @@
 <script setup lang="ts">
+import type {
+  RepositoryWorkflowPageDataDto,
+  WorkflowPresetPageDataDto,
+} from "~~/server/shared/dto";
+
 definePageMeta({
   layout: "default",
 });
-
-interface WorkflowInputDef {
-  description?: string;
-  required?: boolean;
-  default?: string;
-  type?: string;
-  options?: string[];
-}
-
-interface WorkflowData {
-  workflow: {
-    name: string;
-    path: string;
-  };
-  inputDefs: Record<string, WorkflowInputDef>;
-  branches: string[];
-  repository: {
-    id: string;
-    full_name: string;
-    name: string;
-  };
-}
 
 const route = useRoute();
 
@@ -41,7 +24,7 @@ const {
   data: workflowData,
   error,
   status,
-} = useLazyFetch<WorkflowData>(
+} = useLazyFetch<RepositoryWorkflowPageDataDto>(
   () => `/api/repos/${owner.value}/${repo.value}/workflows/${workflowFileName.value}`,
   {
     query: { branch: defaultBranch.value },
@@ -49,7 +32,7 @@ const {
 );
 
 // 将工作流数据转换为预设数据结构
-const presetData = computed(() => {
+const presetData = computed<WorkflowPresetPageDataDto | null>(() => {
   if (!workflowData.value) return null;
   const data = workflowData.value;
   // 从 inputDefs 中提取默认值，并用 URL query 参数覆盖

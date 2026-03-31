@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { FeishuSelectDataDto, FeishuSelectResultDto } from "~~/server/shared/dto";
+
 definePageMeta({
   layout: false,
 });
@@ -11,20 +13,7 @@ const token = computed(() => route.query.token as string);
 const selecting = ref(false);
 const error = ref<string | null>(null);
 
-interface SelectableUser {
-  id: string;
-  gitea_username: string;
-  email: string;
-  avatar_url: string | null;
-}
-
-interface SelectData {
-  feishu_name: string;
-  feishu_avatar: string;
-  users: SelectableUser[];
-}
-
-const { data, status } = await useFetch<SelectData>("/api/auth/feishu-select", {
+const { data, status } = await useFetch<FeishuSelectDataDto>("/api/auth/feishu-select", {
   query: { token },
 });
 
@@ -34,7 +23,7 @@ async function selectAccount(userId: string) {
   error.value = null;
 
   try {
-    const result = await $fetch<{ success: boolean; redirect: string }>("/api/auth/feishu-select", {
+    const result = await $fetch<FeishuSelectResultDto>("/api/auth/feishu-select", {
       method: "POST",
       body: {
         token: token.value,

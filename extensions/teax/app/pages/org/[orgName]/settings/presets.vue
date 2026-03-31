@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import type { PresetItem } from "~/components/preset/PresetCard.vue";
 import type { PresetGroupItem } from "~/components/preset/PresetGroupCard.vue";
+import type {
+  OrgWorkflowPresetGroupsResponseDto,
+  OrgWorkflowPresetsResponseDto,
+} from "~~/server/shared/dto";
 
 const orgName = inject<string>("orgName")!;
 const isOwnerOrAdmin = inject<ComputedRef<boolean>>("isOwnerOrAdmin")!;
 
 // 预设
-const { data: presetsData, pending: presetsPending, refresh: refreshPresets } = await useFetch<{ data: PresetItem[] }>(
+const { data: presetsData, pending: presetsPending, refresh: refreshPresets } = await useFetch<OrgWorkflowPresetsResponseDto>(
   `/api/orgs/${orgName}/presets`,
 );
 const presets = computed(() => presetsData.value?.data ?? []);
 
 // 预设组
-const { data: groupsData, pending: groupsPending, refresh: refreshGroups } = await useFetch<{ data: PresetGroupItem[] }>(
+const { data: groupsData, pending: groupsPending, refresh: refreshGroups } = await useFetch<OrgWorkflowPresetGroupsResponseDto>(
   `/api/orgs/${orgName}/preset-groups`,
 );
 const groups = computed(() => groupsData.value?.data ?? []);

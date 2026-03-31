@@ -1,66 +1,18 @@
 <script setup lang="ts">
+import type { WorkflowPresetGroupDetailDto, WorkflowPresetGroupSubPresetDto } from "~~/server/shared/dto";
+
 definePageMeta({
   layout: "default",
 });
 
 const toast = useToast();
 
-interface PresetUser {
-  id: string;
-  name: string;
-  avatar_url: string | null;
-}
-
-interface SubPreset {
-  id: string;
-  name: string;
-  preset_index: number;
-  branch: string;
-  inputs: Record<string, string | boolean | number> | null;
-  share_token: string;
-  current_run_id: number | null;
-  locked_by: string | null;
-  locked_at: string | null;
-  auto_unlock_at: string | null;
-  locked_by_user: PresetUser | null;
-  status: "idle" | "locked" | "running";
-}
-
-interface WorkflowInput {
-  description?: string;
-  required?: boolean;
-  default?: string;
-  type?: string;
-  options?: string[];
-}
-
-interface PresetGroupData {
-  id: string;
-  name: string;
-  description: string | null;
-  workflow_path: string;
-  default_branch: string;
-  default_inputs: Record<string, string | boolean | number> | null;
-  auto_unlock_minutes: number | null;
-  share_token: string;
-  created_by: string;
-  created_at: string;
-  repository: {
-    id: string;
-    name: string;
-    full_name: string;
-  };
-  creator: PresetUser;
-  presets: SubPreset[];
-  workflow_inputs: Record<string, WorkflowInput>;
-}
-
 const route = useRoute();
 const token = computed(() => route.params.token as string);
 const { loggedIn, user } = useUserSession();
 
 // 获取预设组信息
-const { data: groupData, error: groupError, status: groupStatus, refresh } = useLazyFetch<PresetGroupData>(
+const { data: groupData, error: groupError, status: groupStatus, refresh } = useLazyFetch<WorkflowPresetGroupDetailDto>(
   () => `/api/workflow-preset-groups/${token.value}`,
 );
 
@@ -208,7 +160,7 @@ async function triggerPreset(index: number) {
 }
 
 // 判断当前用户是否是锁定者
-function isLockedByMe(preset: SubPreset): boolean {
+function isLockedByMe(preset: WorkflowPresetGroupSubPresetDto): boolean {
   return preset.locked_by === user.value?.id;
 }
 
@@ -368,7 +320,7 @@ async function addPreset() {
 }
 
 // 跳转到预设页面触发
-function goToPreset(preset: SubPreset) {
+function goToPreset(preset: WorkflowPresetGroupSubPresetDto) {
   navigateTo(`/workflows/${preset.share_token}`);
 }
 
@@ -397,7 +349,7 @@ function getStatusColor(status: string): "info" | "warning" | "neutral" {
 }
 
 // 状态文本
-function getStatusText(preset: SubPreset): string {
+function getStatusText(preset: WorkflowPresetGroupSubPresetDto): string {
   if (preset.status === "running") return "运行中";
   if (preset.status === "locked") {
     return `已锁定 (${preset.locked_by_user?.name || "未知"})`;

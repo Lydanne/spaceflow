@@ -1,38 +1,23 @@
 <script setup lang="ts">
+import type { AdminUserListItemDto, AdminUsersResponseDto } from "~~/server/shared/dto";
+
 definePageMeta({
   layout: "admin",
   middleware: "admin",
 });
 
-interface UserItem {
-  id: string;
-  gitea_id: number;
-  gitea_username: string;
-  email: string;
-  avatar_url: string | null;
-  is_admin: boolean | null;
-  created_at: string;
-  updated_at: string;
-}
-
 const toast = useToast();
 const page = ref(1);
 const limit = 20;
 
-const { data, refresh, status } = await useFetch<{
-  data: UserItem[];
-  total: number;
-  page: number;
-  limit: number;
-  hasMore: boolean;
-}>("/api/admin/users", {
+const { data, refresh, status } = await useFetch<AdminUsersResponseDto>("/api/admin/users", {
   query: { page, limit },
 });
 
 const users = computed(() => data.value?.data ?? []);
 const total = computed(() => data.value?.total ?? 0);
 
-async function toggleAdmin(user: UserItem) {
+async function toggleAdmin(user: AdminUserListItemDto) {
   try {
     await $fetch(`/api/admin/users/${user.id}/toggle-admin`, {
       method: "POST",

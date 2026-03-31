@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import cronstrue from "cronstrue/i18n";
 import type {
+  CreatePresetGroupResultDto,
+  ProjectDetailDto,
+  RepoBranchesResponseDto,
   WorkflowRun,
   WorkflowRunsResponse,
   WorkflowDefinition,
@@ -14,11 +17,6 @@ const props = defineProps<{
 }>();
 
 const toast = useToast();
-
-interface BranchItem {
-  name: string;
-  commit: { id: string; message: string };
-}
 
 // Gitea Actions workflow runs
 const actionsPage = ref(1);
@@ -39,10 +37,9 @@ const { data: workflowsData, error: workflowsError, status: workflowsStatus } = 
 const workflows = computed(() => workflowsData.value?.data ?? []);
 
 // 分支列表
-const { data: branchesData, error: branchesError, status: branchesStatus } = useLazyFetch<{
-  data: BranchItem[];
-  default_branch: string | null;
-}>(`/api/repos/${props.owner}/${props.repo}/branches`);
+const { data: branchesData, error: branchesError, status: branchesStatus } = useLazyFetch<RepoBranchesResponseDto>(
+  `/api/repos/${props.owner}/${props.repo}/branches`,
+);
 const branches = computed(() => branchesData.value?.data ?? []);
 const defaultBranch = computed(
   () => branchesData.value?.default_branch || "main",
@@ -283,16 +280,6 @@ function openCreateGroupModal() {
   showCreateGroupModal.value = true;
 }
 
-// 创建预设组
-interface CreateGroupResult {
-  success: boolean;
-  group: {
-    id: string;
-    name: string;
-    share_token: string;
-  };
-}
-
 async function createPresetGroup() {
   if (!groupName.value.trim()) return;
   if (!selectedWorkflow.value || !selectedBranch.value) {
@@ -302,9 +289,9 @@ async function createPresetGroup() {
   creatingGroup.value = true;
   try {
     // 先获取仓库 ID
-    const repoInfo = await $fetch<{ id: string }>(`/api/repos/${props.owner}/${props.repo}`);
+    const repoInfo = await $fetch<ProjectDetailDto>(`/api/repos/${props.owner}/${props.repo}`);
 
-    const result = await $fetch<CreateGroupResult>(
+    const result = await $fetch<CreatePresetGroupResultDto>(
       `/api/workflow-preset-groups`,
       {
         method: "POST",

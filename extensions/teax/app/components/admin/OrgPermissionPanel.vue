@@ -1,11 +1,6 @@
 <script setup lang="ts">
+import type { ProjectListItemDto } from "~~/server/shared/dto";
 import type { PermissionGroup, PermissionDef } from "~/types/admin";
-
-interface RepositoryItem {
-  id: string;
-  name: string;
-  full_name: string;
-}
 
 const props = withDefaults(defineProps<{
   orgName: string;
@@ -42,7 +37,7 @@ const savedFormState = ref<{
   repositoryIds: string[];
 } | null>(null);
 
-const { data: reposData } = useFetch<{ data: RepositoryItem[] }>(`/api/orgs/${props.orgName}/projects?limit=100`);
+const { data: reposData } = useFetch<{ data: ProjectListItemDto[] }>(`/api/orgs/${props.orgName}/projects?limit=100`);
 const repoList = computed(() => reposData.value?.data ?? []);
 
 function openCreateGroup() {

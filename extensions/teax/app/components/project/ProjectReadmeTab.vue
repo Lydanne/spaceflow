@@ -1,26 +1,12 @@
 <script setup lang="ts">
-interface RepoInfo {
-  full_name: string;
-  description: string | null;
-  default_branch: string | null;
-  clone_url: string | null;
-  created_at: string | null;
-  html_url: string;
-  stars: number;
-  forks: number;
-  language: string | null;
-}
+import type { RepoReadmeResponseDto } from "~~/server/shared/dto";
 
 const props = defineProps<{
   owner: string;
   repo: string;
 }>();
 
-const { data, status } = useLazyFetch<{
-  content: string | null;
-  source: string | null;
-  repoInfo: RepoInfo | null;
-}>(
+const { data, status } = useLazyFetch<RepoReadmeResponseDto>(
   `/api/repos/${props.owner}/${props.repo}/readme`,
 );
 

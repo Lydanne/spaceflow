@@ -1,58 +1,24 @@
 <script setup lang="ts">
-import type { PresetItem } from "~/components/preset/PresetCard.vue";
-import type { PresetGroupItem } from "~/components/preset/PresetGroupCard.vue";
+import type {
+  RepoPresetGroupItemDto,
+  RepoPresetItemDto,
+  RepoPresetsResponseDto,
+} from "~~/server/shared/dto";
 
 const route = useRoute();
 const owner = route.params.owner as string;
 const repo = route.params.repo as string;
 const { user } = useUserSession();
 
-interface RepoPresetItem {
-  id: string;
-  name: string;
-  workflow_path: string;
-  branch: string;
-  share_token: string;
-  is_public: boolean;
-  created_by?: string;
-  creator?: {
-    name: string | null;
-    username: string;
-    avatar_url: string | null;
-  } | null;
-  created_at: string;
-}
-
-interface RepoPresetGroupItem {
-  id: string;
-  name: string;
-  description?: string | null;
-  workflow_path: string;
-  default_branch: string;
-  share_token: string;
-  is_public: boolean;
-  created_by?: string;
-  creator?: {
-    name: string | null;
-    username: string;
-    avatar_url: string | null;
-  } | null;
-  created_at: string;
-}
-
-const { data, pending, refresh } = await useFetch<{
-  org_presets: RepoPresetItem[];
-  my_presets: RepoPresetItem[];
-  preset_groups: RepoPresetGroupItem[];
-}>(`/api/repos/${owner}/${repo}/presets`);
+const { data, pending, refresh } = await useFetch<RepoPresetsResponseDto>(`/api/repos/${owner}/${repo}/presets`);
 
 const orgPresets = computed(() => data.value?.org_presets ?? []);
 const myPresets = computed(() => data.value?.my_presets ?? []);
 const presetGroups = computed(() => data.value?.preset_groups ?? []);
 
 type OrgPresetCardItem
-  = | (RepoPresetGroupItem & { kind: "group" })
-    | (RepoPresetItem & { kind: "preset" });
+  = | (RepoPresetGroupItemDto & { kind: "group" })
+    | (RepoPresetItemDto & { kind: "preset" });
 
 const orgPresetCards = computed<OrgPresetCardItem[]>(() => {
   const publicGroups = presetGroups.value
@@ -85,7 +51,7 @@ function copyGroupUrl(group: { share_token: string }) {
 }
 
 // 公开/私有切换
-async function togglePresetPublic(preset: RepoPresetItem) {
+async function togglePresetPublic(preset: RepoPresetItemDto) {
   try {
     await $fetch(`/api/repos/${owner}/${repo}/workflow-presets/${preset.id}`, {
       method: "PATCH",
@@ -117,15 +83,15 @@ async function togglePresetPublic(preset: RepoPresetItem) {
 //   }
 // }
 
-function canManagePreset(preset: RepoPresetItem): boolean {
+function canManagePreset(preset: RepoPresetItemDto): boolean {
   return preset.created_by === user.value?.id || user.value?.is_admin === true;
 }
 
-function canManageGroup(group: RepoPresetGroupItem): boolean {
+function canManageGroup(group: RepoPresetGroupItemDto): boolean {
   return group.created_by === user.value?.id || user.value?.is_admin === true;
 }
 
-async function toggleGroupPublic(group: RepoPresetGroupItem) {
+async function toggleGroupPublic(group: RepoPresetGroupItemDto) {
   if (!canManageGroup(group)) {
     toast.add({ title: "无权限修改该预设组", color: "warning" });
     return;
@@ -145,7 +111,7 @@ async function toggleGroupPublic(group: RepoPresetGroupItem) {
   }
 }
 
-async function deleteGroup(group: RepoPresetGroupItem) {
+async function deleteGroup(group: RepoPresetGroupItemDto) {
   if (!canManageGroup(group)) {
     toast.add({ title: "无权限删除该预设组", color: "warning" });
     return;
@@ -163,7 +129,7 @@ async function deleteGroup(group: RepoPresetGroupItem) {
 }
 
 // 删除预设
-async function deletePreset(preset: RepoPresetItem) {
+async function deletePreset(preset: RepoPresetItemDto) {
   if (!confirm(`确定要删除预设「${preset.name}」吗？`)) return;
   try {
     await $fetch(`/api/repos/${owner}/${repo}/workflow-presets/${preset.id}`, {

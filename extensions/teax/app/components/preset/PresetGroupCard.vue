@@ -1,35 +1,11 @@
 <script setup lang="ts">
-export interface SubPresetItem {
-  id: string;
-  name: string;
-  branch: string;
-  share_token: string;
-  preset_index: number | null;
-  locked_by: string | null;
-  locked_at: string | null;
-  current_run_id: number | null;
-}
+import type {
+  WorkflowPresetGroupCardItemDto,
+  UserWorkflowPresetSubItemDto,
+} from "~~/server/shared/dto";
 
-export interface PresetGroupItem {
-  id: string;
-  name: string;
-  description?: string | null;
-  workflow_path: string;
-  default_branch: string;
-  share_token: string;
-  is_public?: boolean;
-  created_at?: string;
-  repository: {
-    id: string;
-    full_name: string;
-  };
-  presets?: SubPresetItem[];
-  creator?: {
-    id: string;
-    gitea_username: string;
-    avatar_url: string | null;
-  };
-}
+export type SubPresetItem = UserWorkflowPresetSubItemDto;
+export type PresetGroupItem = WorkflowPresetGroupCardItemDto;
 
 const props = withDefaults(defineProps<{
   group: PresetGroupItem;
