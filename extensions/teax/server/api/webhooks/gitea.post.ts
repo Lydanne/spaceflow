@@ -113,7 +113,7 @@ export default defineEventHandler(async (event) => {
 
   const config = useRuntimeConfig();
   // const webhookSecret = project?.webhook_secret || config.giteaWebhookSecret;
-  const webhookSecret = config.giteaWebhookSecret;
+  const webhookSecret = config.giteaWebhookSecret; // TIP: 暂时统一使用全局 webhook secret，避免项目泄漏风险
 
   // 验证签名：无论项目是否存在都返回统一的 401，避免泄漏项目存在性
   if (!webhookSecret || !verifyWebhookSignature(body, webhookSecret, signature)) {
