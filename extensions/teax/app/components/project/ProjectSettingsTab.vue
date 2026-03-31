@@ -10,7 +10,6 @@ const props = defineProps<{
     full_name: string;
     default_branch: string | null;
     clone_url: string;
-    webhook_id: number | null;
     watching: boolean;
     watch_synced_at: string | null;
     settings: Record<string, unknown>;
@@ -213,11 +212,7 @@ async function deleteProject() {
             Webhook
           </p>
           <p class="font-medium mt-0.5">
-            {{
-              project.webhook_id
-                ? `已配置 (ID: ${project.webhook_id})`
-                : "未配置"
-            }}
+            系统级 Webhook（全局统一）
           </p>
         </div>
       </div>
@@ -482,7 +477,7 @@ async function deleteProject() {
       </template>
       <div class="space-y-4">
         <p class="text-sm text-gray-600 dark:text-gray-400">
-          删除项目将同时移除所有发布记录和 Webhook 配置，此操作不可恢复。
+          删除项目将移除项目相关记录，但不会修改系统级 Webhook 配置，此操作不可恢复。
         </p>
         <div>
           <p class="text-sm mb-2">

@@ -1,12 +1,11 @@
 import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
-import { useGiteaSdk } from "~~/server/utils/gitea";
 import { writeAuditLog } from "~~/server/utils/audit";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
 
 export default defineEventHandler(async (event) => {
-  const { repoId, orgId, owner, repo } = await resolveRepoId(event);
+  const { repoId, orgId } = await resolveRepoId(event);
   const session = await requirePermission(event, orgId, "repo:delete", repoId);
   const db = useDB();
 
@@ -20,15 +19,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Project not found" });
   }
 
-  // 尝试删除 Gitea Webhook
-  if (project.webhook_id) {
-    try {
-      const gitea = await useGiteaSdk(event).role("user");
-      await gitea.deleteWebhook(owner, repo, project.webhook_id);
-    } catch (err: unknown) {
-      console.warn("Failed to delete webhook on Gitea:", err);
-    }
-  }
+  // 当前统一使用系统级 webhook，删除项目时不再删除项目级 webhook（字段仅保留兼容）
 
   await db
     .delete(schema.repositories)

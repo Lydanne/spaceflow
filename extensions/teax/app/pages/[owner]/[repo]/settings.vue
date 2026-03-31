@@ -7,7 +7,6 @@ const props = defineProps<{
     full_name: string;
     default_branch: string | null;
     clone_url: string;
-    webhook_id: number | null;
     watching: boolean;
     watch_synced_at: string | null;
     settings: Record<string, unknown>;

@@ -37,7 +37,6 @@ export default defineEventHandler(async (event) => {
       description: schema.repositories.description,
       default_branch: schema.repositories.default_branch,
       clone_url: schema.repositories.clone_url,
-      webhook_id: schema.repositories.webhook_id,
       settings: schema.repositories.settings,
       created_by: schema.repositories.created_by,
       created_at: schema.repositories.created_at,

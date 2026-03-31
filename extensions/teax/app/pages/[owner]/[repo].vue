@@ -11,7 +11,6 @@ interface ProjectDetail {
   description: string | null;
   default_branch: string | null;
   clone_url: string;
-  webhook_id: number | null;
   watching: boolean;
   watch_synced_at: string | null;
   settings: Record<string, unknown>;
@@ -127,11 +126,10 @@ const activeTab = computed(() => {
             {{ project.watching ? "Watching" : "Watch" }}
           </UButton>
           <UBadge
-            v-if="!project.webhook_id"
-            color="warning"
+            color="neutral"
             variant="subtle"
           >
-            Webhook 未配置
+            系统 Webhook
           </UBadge>
         </div>
       </div>

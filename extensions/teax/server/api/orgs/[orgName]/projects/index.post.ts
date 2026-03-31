@@ -37,9 +37,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, message: "Repository already linked to a project" });
   }
 
-  const config = useRuntimeConfig();
-  const webhookSecret = config.giteaWebhookSecret || null;
-
   const [project] = await db
     .insert(schema.repositories)
     .values({
@@ -50,8 +47,9 @@ export default defineEventHandler(async (event) => {
       description: giteaRepo.description,
       default_branch: giteaRepo.default_branch,
       clone_url: giteaRepo.clone_url,
+      // 项目级 webhook 字段保留（数据库兼容），但当前统一走系统级 webhook，不在项目维度维护
       webhook_id: null,
-      webhook_secret: webhookSecret,
+      webhook_secret: null,
       created_by: session.user.id,
       settings: {
         autoDeploy: false,
@@ -70,7 +68,6 @@ export default defineEventHandler(async (event) => {
       description: schema.repositories.description,
       default_branch: schema.repositories.default_branch,
       clone_url: schema.repositories.clone_url,
-      webhook_id: schema.repositories.webhook_id,
       settings: schema.repositories.settings,
       created_by: schema.repositories.created_by,
       created_at: schema.repositories.created_at,

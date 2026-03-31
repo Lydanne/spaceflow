@@ -31,6 +31,7 @@ export const repositories = pgTable(
     description: text("description"),
     default_branch: varchar("default_branch", { length: 255 }).default("main"),
     clone_url: text("clone_url").notNull(),
+    // 兼容历史项目级 webhook 结构（当前统一使用系统级 webhook，不再在项目维度读写）
     webhook_id: integer("webhook_id"),
     webhook_secret: varchar("webhook_secret", { length: 255 }),
     // 仓库级设置（通知规则等）
