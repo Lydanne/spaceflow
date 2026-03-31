@@ -14,6 +14,7 @@ export const organizations = pgTable("organizations", {
   name: varchar("name", { length: 255 }).notNull(),
   full_name: varchar("full_name", { length: 255 }),
   avatar_url: text("avatar_url"),
+  // 组织级设置（默认通知规则等）
   settings: jsonb("settings").$type<OrganizationSettings>().default({}),
   synced_at: timestamp("synced_at", { withTimezone: true }),
   ...baseColumns(),

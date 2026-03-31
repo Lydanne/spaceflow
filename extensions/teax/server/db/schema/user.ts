@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull(),
   avatar_url: text("avatar_url"),
   is_admin: boolean("is_admin").default(false),
+  // 用户设置（通知偏好等），统一放在 JSONB 中管理
   settings: jsonb("settings").$type<UserSettings>().default(DEFAULT_USER_SETTINGS),
   // Gitea token（加密存储）
   gitea_access_token: text("gitea_access_token"),

@@ -1,3 +1,4 @@
+/** 仓库事件常量（用于规则配置与偏好开关） */
 export const REPO_NOTIFY_EVENTS = [
   "workflow_success",
   "workflow_failure",
@@ -10,6 +11,7 @@ export const REPO_NOTIFY_EVENTS = [
 
 export type RepoNotifyEvent = (typeof REPO_NOTIFY_EVENTS)[number];
 
+/** 个人事件常量（不依赖仓库上下文） */
 export const PERSONAL_NOTIFY_EVENTS = [
   "approval",
   "system",
@@ -17,6 +19,7 @@ export const PERSONAL_NOTIFY_EVENTS = [
 
 export type PersonalNotifyEvent = (typeof PERSONAL_NOTIFY_EVENTS)[number];
 
+/** 前端展示用事件元数据（标签 + 图标） */
 export const REPO_NOTIFY_EVENT_OPTIONS: Array<{
   value: RepoNotifyEvent;
   label: string;
@@ -41,6 +44,7 @@ export interface NotifyPreferencesInput {
   personalEvents?: Partial<Record<PersonalNotifyEvent, boolean>>;
 }
 
+/** 通知偏好默认值：push / PR / issue 默认关闭，其余核心事件默认开启 */
 export const DEFAULT_NOTIFY_PREFERENCES: NotifyPreferences = {
   repoEvents: {
     workflow_success: true,
@@ -57,6 +61,7 @@ export const DEFAULT_NOTIFY_PREFERENCES: NotifyPreferences = {
   },
 };
 
+/** 将外部输入归一为完整结构，避免缺省字段导致判空分支扩散 */
 export function normalizeNotifyPreferences(input?: NotifyPreferencesInput | null): NotifyPreferences {
   const repoEvents = {
     ...DEFAULT_NOTIFY_PREFERENCES.repoEvents,

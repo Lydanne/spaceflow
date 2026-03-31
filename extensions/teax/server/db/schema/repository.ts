@@ -33,6 +33,7 @@ export const repositories = pgTable(
     clone_url: text("clone_url").notNull(),
     webhook_id: integer("webhook_id"),
     webhook_secret: varchar("webhook_secret", { length: 255 }),
+    // 仓库级设置（通知规则等）
     settings: jsonb("settings").$type<RepositorySettings>().default({}),
     created_by: uuid("created_by").references(() => users.id),
     ...baseColumns(),

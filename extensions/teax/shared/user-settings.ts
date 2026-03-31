@@ -21,6 +21,7 @@ export interface UserSettingsInput {
   notifyPreferences?: NotifyPreferencesInput | null;
 }
 
+/** 用户设置默认值（新用户初始化 / 缺省回填使用） */
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   notifyPreferences: DEFAULT_NOTIFY_PREFERENCES,
 };
