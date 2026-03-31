@@ -1,7 +1,6 @@
 export type VerboseLevel = 0 | 1 | 2;
 
 export const DEFAULT_VERBOSE_LEVEL: VerboseLevel = 1;
-export const VERBOSE_FORM_FIELD = "__teax_verbose" as const;
 
 export function parseVerboseLevel(
   input: unknown,

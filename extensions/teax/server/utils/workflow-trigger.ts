@@ -6,12 +6,6 @@ import {
   extractInputs,
   type WorkflowInputDef,
 } from "./workflow-yaml";
-import {
-  getRuntimeVerboseDefault,
-  parseVerboseLevel,
-  VERBOSE_FORM_FIELD,
-  type VerboseLevel,
-} from "./verbose";
 
 // ─── dispatch + poll ──────────────────────────
 
@@ -242,12 +236,6 @@ export interface RenderWorkflowFormOptions {
   lockedValues?: Record<string, unknown>;
   /** 参数初始值（优先于 workflow 默认值） */
   initialValues?: Record<string, unknown>;
-  /** 是否显示 verbose 选择器（0/1/2） */
-  showVerboseSelect?: boolean;
-  /** verbose 字段名，默认 VERBOSE_FORM_FIELD */
-  verboseName?: string;
-  /** verbose 默认值，默认 1 */
-  verboseDefault?: VerboseLevel;
 }
 
 /**
@@ -346,23 +334,6 @@ export function renderWorkflowForm(
         });
       }
     }
-  }
-
-  if (opts.showVerboseSelect) {
-    const verboseFieldName = opts.verboseName || VERBOSE_FORM_FIELD;
-    const verboseDefault = String(parseVerboseLevel(opts.verboseDefault, getRuntimeVerboseDefault()));
-    card.select({
-      name: verboseFieldName,
-      label: "日志级别",
-      placeholder: "选择日志级别",
-      required: false,
-      options: [
-        { label: "0 - 静默", value: "0" },
-        { label: "1 - 标准", value: "1" },
-        { label: "2 - 调试", value: "2" },
-      ],
-      initial_option: verboseDefault,
-    });
   }
 
   card.formButtons({
