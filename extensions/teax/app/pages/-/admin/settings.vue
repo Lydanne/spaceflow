@@ -387,6 +387,16 @@ onMounted(() => {
               />
               在 Gitea 中创建系统 Webhook 时使用此地址
             </p>
+            <div class="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+              <p class="font-medium">
+                Action 成功/失败通知依赖 Webhook 签名
+              </p>
+              <p class="mt-1">
+                请在 Gitea 系统 Webhook 中配置非空 Secret，并与 Teax 侧保持一致。
+                若日志出现 <code>Missing webhook signature</code> 或
+                <code>Invalid webhook signature</code>，通常是 Secret 未配置或不一致。
+              </p>
+            </div>
           </div>
 
           <!-- Webhook 状态 -->
