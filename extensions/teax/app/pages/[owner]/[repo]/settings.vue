@@ -1,16 +1,10 @@
 <script setup lang="ts">
+import type { ProjectDetailDto } from "~~/server/shared/dto";
+
 const props = defineProps<{
   owner: string;
   repo: string;
-  project: {
-    id: string;
-    full_name: string;
-    default_branch: string | null;
-    clone_url: string;
-    watching: boolean;
-    watch_synced_at: string | null;
-    settings: Record<string, unknown>;
-  };
+  project: ProjectDetailDto;
   isOwnerOrAdmin: boolean;
 }>();
 </script>

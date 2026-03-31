@@ -1,4 +1,5 @@
 export * from "./user.dto";
+export * from "./admin.dto";
 export * from "./organization.dto";
 export * from "./repository.dto";
 export * from "./permission.dto";

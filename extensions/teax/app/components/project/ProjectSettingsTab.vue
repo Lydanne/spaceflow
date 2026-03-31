@@ -1,19 +1,12 @@
 <script setup lang="ts">
+import type { ProjectDetailDto } from "~~/server/shared/dto";
 import { REPO_NOTIFY_EVENT_OPTIONS, type RepoNotifyEvent } from "~~/shared/notify-events";
 import type { NotifyRule, RepoNotifySettings } from "~~/shared/notify-rules";
 
 const props = defineProps<{
   owner: string;
   repo: string;
-  project: {
-    id: string;
-    full_name: string;
-    default_branch: string | null;
-    clone_url: string;
-    watching: boolean;
-    watch_synced_at: string | null;
-    settings: Record<string, unknown>;
-  };
+  project: ProjectDetailDto;
 }>();
 
 const toast = useToast();

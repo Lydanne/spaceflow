@@ -1,24 +1,11 @@
 <script setup lang="ts">
+import type { ProjectDetailDto } from "~~/server/shared/dto";
+
 const route = useRoute();
 const owner = route.params.owner as string;
 const repo = route.params.repo as string;
 
-interface ProjectDetail {
-  id: string;
-  organization_id: string;
-  name: string;
-  full_name: string;
-  description: string | null;
-  default_branch: string | null;
-  clone_url: string;
-  watching: boolean;
-  watch_synced_at: string | null;
-  settings: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-}
-
-const { data: project, status: projectStatus } = await useFetch<ProjectDetail>(
+const { data: project, status: projectStatus } = await useFetch<ProjectDetailDto>(
   `/api/repos/${owner}/${repo}`,
 );
 const toast = useToast();

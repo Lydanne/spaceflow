@@ -1,27 +1,15 @@
 <script setup lang="ts">
+import type { OrgProjectsResponseDto } from "~~/server/shared/dto";
+
 const route = useRoute();
 const orgName = route.params.owner as string;
 
 const { isOwnerOrAdmin } = useOrgRole(orgName);
 
-interface ProjectItem {
-  id: string;
-  name: string;
-  full_name: string;
-  description: string | null;
-  default_branch: string | null;
-  watching: boolean;
-  watch_synced_at: string | null;
-  updated_at: string;
-}
-
 const page = ref(1);
 const limit = 20;
 
-const { data, status } = await useFetch<{
-  data: ProjectItem[];
-  total: number;
-}>(`/api/orgs/${orgName}/projects`, {
+const { data, status } = await useFetch<OrgProjectsResponseDto>(`/api/orgs/${orgName}/projects`, {
   query: { page, limit },
   watch: false,
 });
@@ -130,7 +118,9 @@ const total = computed(() => data.value?.total ?? 0);
                   <span class="text-xs text-gray-400">
                     更新于
                     {{
-                      new Date(project.updated_at).toLocaleDateString("zh-CN")
+                      project.updated_at
+                        ? new Date(project.updated_at).toLocaleDateString("zh-CN")
+                        : "-"
                     }}
                   </span>
                 </div>

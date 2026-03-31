@@ -1,39 +1,23 @@
 <script setup lang="ts">
+import type {
+  AdminFeishuStatusResponseDto,
+  FeishuStatusDto,
+  SystemWebhookDto,
+} from "~~/server/shared/dto";
+
 definePageMeta({
   layout: "admin",
   middleware: "admin",
 });
 
-interface FeishuStatus {
-  configured: boolean;
-  connected: boolean;
-  error: string | null;
-  features: {
-    encrypt: boolean;
-    approval: boolean;
-  };
-}
-
-interface SystemWebhook {
-  id: number;
-  type: string;
-  url: string;
-  active: boolean;
-  events: string[];
-  config: {
-    url: string;
-    content_type: string;
-    secret: string;
-  };
-}
-
 const toast = useToast();
 
-const { data: statusData, refresh, status: fetchStatus } = await useFetch<{
-  data: FeishuStatus;
-}>("/api/admin/feishu-status", { key: "admin-feishu-status" });
+const { data: statusData, refresh, status: fetchStatus } = await useFetch<AdminFeishuStatusResponseDto>(
+  "/api/admin/feishu-status",
+  { key: "admin-feishu-status" },
+);
 
-const feishu = computed(() => statusData.value?.data ?? null);
+const feishu = computed<FeishuStatusDto | null>(() => statusData.value?.data ?? null);
 const loading = computed(() => fetchStatus.value === "pending");
 
 const config = useRuntimeConfig();
@@ -81,7 +65,7 @@ const loadingWebhook = ref(false);
 async function checkWebhookStatus() {
   loadingWebhook.value = true;
   try {
-    const hooks = await $fetch<SystemWebhook[]>("/api/admin/webhooks");
+    const hooks = await $fetch<SystemWebhookDto[]>("/api/admin/webhooks");
     const hook = hooks[0];
     if (hook) {
       webhookStatus.value = {

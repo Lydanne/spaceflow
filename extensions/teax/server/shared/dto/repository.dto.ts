@@ -3,6 +3,7 @@ import { repositories } from "~~/server/db/schema/repository";
 import { z } from "zod";
 import { REPO_NOTIFY_EVENTS } from "~~/shared/notify-events";
 import type { NotifyRule as SharedNotifyRule } from "~~/shared/notify-rules";
+import { paginatedResponseSchema } from "./common.dto";
 
 // ─── repositories ────────────────────────────────────────
 export const insertRepositorySchema = createInsertSchema(repositories);
@@ -18,6 +19,40 @@ export const repositoryResponseSchema = selectRepositorySchema.omit({
   webhook_secret: true,
 });
 export type RepositoryResponse = z.infer<typeof repositoryResponseSchema>;
+
+export const projectBaseSchema = repositoryResponseSchema.pick({
+  id: true,
+  organization_id: true,
+  gitea_repo_id: true,
+  name: true,
+  full_name: true,
+  description: true,
+  default_branch: true,
+  clone_url: true,
+  settings: true,
+  created_by: true,
+  created_at: true,
+  updated_at: true,
+});
+export type ProjectBaseDto = z.infer<typeof projectBaseSchema>;
+
+export const projectWatchStateSchema = z.object({
+  watching: z.boolean(),
+  watch_synced_at: z.string().nullable(),
+});
+export type ProjectWatchStateDto = z.infer<typeof projectWatchStateSchema>;
+
+export const projectDetailSchema = projectBaseSchema.extend({
+  watching: projectWatchStateSchema.shape.watching,
+  watch_synced_at: projectWatchStateSchema.shape.watch_synced_at,
+});
+export type ProjectDetailDto = z.infer<typeof projectDetailSchema>;
+
+export const projectListItemSchema = projectDetailSchema;
+export type ProjectListItemDto = z.infer<typeof projectListItemSchema>;
+
+export const orgProjectsResponseSchema = paginatedResponseSchema(projectListItemSchema);
+export type OrgProjectsResponseDto = z.infer<typeof orgProjectsResponseSchema>;
 
 // ─── 创建项目 request body ───────────────────────────────
 export const createProjectBodySchema = z.object({
