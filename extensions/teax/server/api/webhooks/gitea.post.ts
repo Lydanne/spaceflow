@@ -10,6 +10,16 @@ import {
 } from "~~/server/services/notification.service";
 import type { RepoNotifySettings } from "~~/shared/notify-rules";
 
+function normalizeWebhookSignature(input: string | undefined): string {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+
+  const lower = raw.toLowerCase();
+  if (lower.startsWith("sha256=")) return raw.slice(7).trim();
+
+  return raw;
+}
+
 interface GiteaWebhookPayload {
   ref?: string;
   before?: string;
@@ -67,9 +77,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: "Empty request body" });
   }
 
-  const signature = getRequestHeader(event, "x-gitea-signature");
+  const signature = normalizeWebhookSignature(
+    getRequestHeader(event, "x-gitea-signature")
+    || getRequestHeader(event, "x-hub-signature-256")
+    || "",
+  );
   if (!signature) {
-    throw createError({ statusCode: 401, message: "Missing webhook signature" });
+    throw createError({
+      statusCode: 401,
+      message: "Missing webhook signature (check webhook secret configuration)",
+    });
   }
 
   const giteaEvent = getRequestHeader(event, "x-gitea-event");
@@ -99,7 +116,10 @@ export default defineEventHandler(async (event) => {
 
   // 验证签名：无论项目是否存在都返回统一的 401，避免泄漏项目存在性
   if (!webhookSecret || !verifyWebhookSignature(body, webhookSecret, signature)) {
-    throw createError({ statusCode: 401, message: "Invalid webhook signature" });
+    throw createError({
+      statusCode: 401,
+      message: "Invalid webhook signature (missing/mismatched webhook secret)",
+    });
   }
   if (!project) {
     throw createError({ statusCode: 401, message: "Invalid webhook signature" });
@@ -177,8 +197,30 @@ export default defineEventHandler(async (event) => {
   }
 
   // ─── workflow_run 事件（构建完成通知） ──────────────────
-  if (giteaEvent === "workflow_run" && payload.workflow_run && payload.action === "completed") {
+  if (giteaEvent === "workflow_run" && payload.workflow_run) {
     const run = payload.workflow_run;
+    const action = String(payload.action || "").toLowerCase();
+    const status = String(run.status || "").toLowerCase();
+    const conclusion = String(run.conclusion || "").toLowerCase();
+
+    // 兼容不同 Gitea 版本：
+    // - 有些版本使用 payload.action === "completed"
+    // - 有些版本只在 workflow_run.status/conclusion 中体现完成态
+    const isCompleted = action === "completed"
+      || status === "completed"
+      || [
+        "success",
+        "failure",
+        "cancelled",
+        "skipped",
+        "neutral",
+        "timed_out",
+        "action_required",
+      ].includes(conclusion);
+
+    if (!isCompleted) {
+      return { received: true, action: "ignored", reason: `workflow_run_not_completed_${action || status || "unknown"}` };
+    }
 
     // 异步发送通知，不阻塞 webhook 响应
     // 从 path 提取 workflow 文件名（如 .gitea/workflows/deploy.yml → deploy.yml）
@@ -187,7 +229,7 @@ export default defineEventHandler(async (event) => {
     notifyWorkflowRunComplete(ctx, {
       run_number: run.run_number,
       display_title: run.display_title,
-      conclusion: run.conclusion,
+      conclusion,
       event: run.event,
       head_branch: run.head_branch,
       head_sha: run.head_sha,

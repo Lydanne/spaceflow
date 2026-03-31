@@ -46,15 +46,16 @@ export function buildWorkflowRunCard(params: {
   htmlUrl: string;
   appUrl: string;
 }): FeishuInteractiveCard {
-  const isSuccess = params.conclusion === "success";
+  const normalizedConclusion = String(params.conclusion || "").toLowerCase();
+  const isSuccess = normalizedConclusion === "success";
   const conclusionMap: Record<string, string> = {
     success: "✅ 成功",
     failure: "❌ 失败",
     cancelled: "⚫ 已取消",
     skipped: "⏭ 已跳过",
   };
-  const conclusionText = conclusionMap[params.conclusion] || params.conclusion;
-  const template = isSuccess ? "green" : params.conclusion === "failure" ? "red" : "grey";
+  const conclusionText = conclusionMap[normalizedConclusion] || params.conclusion;
+  const template = isSuccess ? "green" : normalizedConclusion === "failure" ? "red" : "grey";
 
   const eventMap: Record<string, string> = {
     push: "推送",
@@ -410,8 +411,9 @@ export async function notifyWorkflowRunComplete(
   },
   repoSettings: RepoNotifySettings,
 ): Promise<void> {
-  const isSuccess = run.conclusion === "success";
-  const isFailure = run.conclusion === "failure";
+  const normalizedConclusion = String(run.conclusion || "").toLowerCase();
+  const isSuccess = normalizedConclusion === "success";
+  const isFailure = normalizedConclusion === "failure";
 
   if (isSuccess && repoSettings.notifyOnSuccess === false) return;
   if (isFailure && repoSettings.notifyOnFailure === false) return;
@@ -426,6 +428,7 @@ export async function notifyWorkflowRunComplete(
       repoFullName: ctx.repoFullName,
       runNumber: run.run_number,
       displayTitle: run.display_title,
+      conclusion: normalizedConclusion,
       headBranch: run.head_branch,
       headSha: run.head_sha,
       startedAt: run.started_at,
