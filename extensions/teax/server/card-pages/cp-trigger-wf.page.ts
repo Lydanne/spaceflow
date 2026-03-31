@@ -1,7 +1,7 @@
 import { defineCardPage, asyncTask, guards, requireBinding, requireRepoPermission } from "~~/server/card-kit";
 import { useGiteaSdk, botLogin } from "~~/server/utils/gitea";
 import { dispatchAndPoll, buildDispatchErrorCard, buildTriggerResultCard, fetchWorkflowFormData, renderWorkflowForm } from "~~/server/utils/workflow-trigger";
-import { resolveVerboseLevel, VERBOSE_FORM_FIELD } from "~~/server/utils/verbose";
+import { getRuntimeVerboseDefault } from "~~/server/utils/verbose";
 
 export default defineCardPage({
   name: "cp-trigger-wf",
@@ -16,7 +16,7 @@ export default defineCardPage({
     const repo = ctx.params.repo as string;
     const workflowPath = ctx.params.workflowPath as string;
 
-    const verbose = resolveVerboseLevel(ctx.params.verbose);
+    const verbose = getRuntimeVerboseDefault();
     const giteaService = await useGiteaSdk(botLogin(ctx.openId)).role("fallback-admin", {
       verbose,
       logTag: "cp-trigger-wf:render",
@@ -32,8 +32,6 @@ export default defineCardPage({
     renderWorkflowForm(card, formData, {
       formName: "trigger_wf_form",
       submitText: "🚀 触发",
-      showVerboseSelect: true,
-      verboseDefault: verbose,
     });
 
     card.systemButtons();
@@ -48,15 +46,13 @@ export default defineCardPage({
     const formValue = ctx.formValue || {};
     const workflowFileName = workflowPath.split("/").pop() || workflowPath;
     const openId = ctx.openId;
-    const verbose = resolveVerboseLevel(
-      (formValue as Record<string, unknown>)[VERBOSE_FORM_FIELD] ?? ctx.params.verbose,
-    );
+    const verbose = getRuntimeVerboseDefault();
 
     // Build inputs synchronously
     const branch = formValue.branch || "main";
     const inputs: Record<string, string> = {};
     for (const [key, value] of Object.entries(formValue)) {
-      if (key === "branch" || key === VERBOSE_FORM_FIELD) continue;
+      if (key === "branch") continue;
       inputs[key] = String(value);
     }
 
