@@ -1,6 +1,8 @@
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "drizzle-zod";
 import { repositories } from "~~/server/db/schema/repository";
 import { z } from "zod";
+import { REPO_NOTIFY_EVENTS } from "~~/shared/notify-events";
+import type { NotifyRule as SharedNotifyRule } from "~~/shared/notify-rules";
 
 // ─── repositories ────────────────────────────────────────
 export const insertRepositorySchema = createInsertSchema(repositories);
@@ -33,17 +35,11 @@ export type TriggerWorkflowBody = z.infer<typeof triggerWorkflowBodySchema>;
 
 // ─── 通知规则 ─────────────────────────────────────────────
 export const NOTIFY_EVENTS = [
-  "workflow_success",
-  "workflow_failure",
-  "push",
-  "pr_opened",
-  "issue_opened",
-  "agent_completed",
-  "agent_failed",
+  ...REPO_NOTIFY_EVENTS,
 ] as const;
 export type NotifyEvent = (typeof NOTIFY_EVENTS)[number];
 
-export const notifyRuleSchema = z.object({
+export const notifyRuleSchema: z.ZodType<SharedNotifyRule> = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(100),
   chatId: z.string().min(1).max(255),
@@ -51,7 +47,7 @@ export const notifyRuleSchema = z.object({
   branches: z.array(z.string().max(255)).max(20).default([]),
   workflows: z.array(z.string().max(255)).max(20).default([]),
 });
-export type NotifyRule = z.infer<typeof notifyRuleSchema>;
+export type NotifyRule = SharedNotifyRule;
 
 // ─── 更新仓库设置 request body（JSONB 内部保持 camelCase）──
 export const updateRepoSettingsBodySchema = z.object({
@@ -59,8 +55,5 @@ export const updateRepoSettingsBodySchema = z.object({
   notifyOnFailure: z.boolean().optional(),
   approvalRequired: z.boolean().optional(),
   notifyRules: z.array(notifyRuleSchema).max(20).optional(),
-  // 向后兼容（旧字段，逐步废弃）
-  feishuChatId: z.string().max(255).optional(),
-  notifyBranches: z.array(z.string().max(255)).max(20).optional(),
 });
 export type UpdateRepoSettingsBody = z.infer<typeof updateRepoSettingsBodySchema>;

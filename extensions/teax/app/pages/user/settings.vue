@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import type { PresetItem } from "~/components/preset/PresetCard.vue";
 import type { PresetGroupItem } from "~/components/preset/PresetGroupCard.vue";
+import {
+  REPO_NOTIFY_EVENT_OPTIONS,
+  type RepoNotifyEvent,
+  normalizeNotifyPreferences,
+} from "~~/shared/notify-events";
+import type { UserSettings } from "~~/shared/user-settings";
 
 const { user } = useUserSession();
 const toast = useToast();
@@ -111,10 +117,6 @@ interface FeishuBinding {
   feishu_open_id: string;
   feishu_name: string;
   feishu_avatar: string | null;
-  notify_publish: boolean | null;
-  notify_approval: boolean | null;
-  notify_agent: boolean | null;
-  notify_system: boolean | null;
   created_at: string;
 }
 
@@ -123,6 +125,14 @@ const { data: bindingData, refresh: refreshBinding } = await useFetch<{ data: Fe
   { key: "user-feishu-binding" },
 );
 const binding = computed(() => bindingData.value?.data ?? null);
+
+const { data: userSettingsData, refresh: refreshUserSettings } = await useFetch<{
+  data: { settings: UserSettings };
+}>(
+  "/api/user/settings",
+  { key: "user-settings" },
+);
+const userSettings = computed(() => userSettingsData.value?.data?.settings ?? null);
 
 // ─── 解绑飞书 ─────────────────────────────────────────────
 
@@ -150,18 +160,39 @@ function bindFeishu() {
 
 // ─── 通知偏好 ─────────────────────────────────────────────
 
-const notifyPublish = ref(true);
+const repoEventPreferences = reactive<Record<RepoNotifyEvent, boolean>>({
+  workflow_success: true,
+  workflow_failure: true,
+  push: false,
+  pr_opened: false,
+  issue_opened: false,
+  agent_completed: true,
+  agent_failed: true,
+});
 const notifyApproval = ref(true);
-const notifyAgent = ref(true);
 const notifySystem = ref(false);
 
-watch(binding, (val) => {
-  if (val) {
-    notifyPublish.value = val.notify_publish ?? true;
-    notifyApproval.value = val.notify_approval ?? true;
-    notifyAgent.value = val.notify_agent ?? true;
-    notifySystem.value = val.notify_system ?? false;
-  }
+const repoEventDescriptions: Record<RepoNotifyEvent, string> = {
+  workflow_success: "Action 成功时通知",
+  workflow_failure: "Action 失败时通知",
+  push: "代码 push 时通知",
+  pr_opened: "新建 Pull Request 时通知",
+  issue_opened: "新建 Issue 时通知",
+  agent_completed: "Agent 任务完成时通知",
+  agent_failed: "Agent 任务失败时通知",
+};
+
+watch(userSettings, (val) => {
+  const prefs = normalizeNotifyPreferences(val?.notifyPreferences);
+  repoEventPreferences.workflow_success = prefs.repoEvents.workflow_success;
+  repoEventPreferences.workflow_failure = prefs.repoEvents.workflow_failure;
+  repoEventPreferences.push = prefs.repoEvents.push;
+  repoEventPreferences.pr_opened = prefs.repoEvents.pr_opened;
+  repoEventPreferences.issue_opened = prefs.repoEvents.issue_opened;
+  repoEventPreferences.agent_completed = prefs.repoEvents.agent_completed;
+  repoEventPreferences.agent_failed = prefs.repoEvents.agent_failed;
+  notifyApproval.value = prefs.personalEvents.approval;
+  notifySystem.value = prefs.personalEvents.system;
 }, { immediate: true });
 
 const savingPreferences = ref(false);
@@ -171,14 +202,17 @@ async function savePreferences() {
     await $fetch("/api/user/notify-preferences", {
       method: "PATCH",
       body: {
-        notify_publish: notifyPublish.value,
-        notify_approval: notifyApproval.value,
-        notify_agent: notifyAgent.value,
-        notify_system: notifySystem.value,
+        notifyPreferences: {
+          repoEvents: { ...repoEventPreferences },
+          personalEvents: {
+            approval: notifyApproval.value,
+            system: notifySystem.value,
+          },
+        },
       },
     });
     toast.add({ title: "通知偏好已保存", color: "success" });
-    await refreshBinding();
+    await refreshUserSettings();
   } catch (err: unknown) {
     const msg = (err as { data?: { message?: string } })?.data?.message || "保存失败";
     toast.add({ title: msg, color: "error" });
@@ -601,30 +635,41 @@ async function savePreferences() {
         </h2>
       </template>
 
-      <div
-        v-if="!binding"
-        class="text-center py-4 text-gray-400"
-      >
-        <p>请先绑定飞书账号</p>
-      </div>
+      <div class="space-y-4">
+        <p
+          v-if="!binding"
+          class="text-xs text-amber-600 dark:text-amber-400"
+        >
+          当前未绑定飞书账号，通知偏好会在绑定后生效
+        </p>
 
-      <div
-        v-else
-        class="space-y-4"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="font-medium">
-              构建通知
-            </p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              CI/CD 构建成功或失败时发送通知
-            </p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          仓库事件（你所在组织下的仓库触发）
+        </p>
+
+        <template
+          v-for="(ev, idx) in REPO_NOTIFY_EVENT_OPTIONS"
+          :key="ev.value"
+        >
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="font-medium">
+                {{ ev.label }}
+              </p>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                {{ repoEventDescriptions[ev.value] }}
+              </p>
+            </div>
+            <USwitch v-model="repoEventPreferences[ev.value]" />
           </div>
-          <USwitch v-model="notifyPublish" />
-        </div>
+          <USeparator v-if="idx < REPO_NOTIFY_EVENT_OPTIONS.length - 1" />
+        </template>
 
         <USeparator />
+
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          个人事件
+        </p>
 
         <div class="flex items-center justify-between">
           <div>
@@ -636,20 +681,6 @@ async function savePreferences() {
             </p>
           </div>
           <USwitch v-model="notifyApproval" />
-        </div>
-
-        <USeparator />
-
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="font-medium">
-              Agent 通知
-            </p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              AI Agent 运行完成或失败通知
-            </p>
-          </div>
-          <USwitch v-model="notifyAgent" />
         </div>
 
         <USeparator />

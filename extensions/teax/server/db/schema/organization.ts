@@ -1,6 +1,12 @@
 import { pgTable, uuid, integer, varchar, text, timestamp, unique, jsonb } from "drizzle-orm/pg-core";
 import { users } from "./user";
 import { baseColumns } from "./base";
+import type { OrgNotifySettings } from "../../../shared/notify-rules";
+
+/**
+ * 组织 settings 为 JSONB：通知规则使用强类型，其余字段允许按需扩展。
+ */
+export type OrganizationSettings = OrgNotifySettings & Record<string, unknown>;
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -8,7 +14,7 @@ export const organizations = pgTable("organizations", {
   name: varchar("name", { length: 255 }).notNull(),
   full_name: varchar("full_name", { length: 255 }),
   avatar_url: text("avatar_url"),
-  settings: jsonb("settings").default({}),
+  settings: jsonb("settings").$type<OrganizationSettings>().default({}),
   synced_at: timestamp("synced_at", { withTimezone: true }),
   ...baseColumns(),
 });

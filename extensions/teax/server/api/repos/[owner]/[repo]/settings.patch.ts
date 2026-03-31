@@ -3,6 +3,7 @@ import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
 import { updateRepoSettingsBodySchema } from "~~/server/shared/dto";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
+import type { RepoNotifySettings } from "~~/shared/notify-rules";
 
 export default defineEventHandler(async (event) => {
   const { repoId, orgId } = await resolveRepoId(event);
@@ -21,16 +22,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Project not found" });
   }
 
-  const currentSettings = (project.settings || {}) as Record<string, unknown>;
-  const newSettings = { ...currentSettings };
+  const currentSettings = (project.settings || {}) as RepoNotifySettings;
+  // 仅覆盖请求体显式传入的字段，避免误清空其他设置项。
+  const newSettings: RepoNotifySettings = { ...currentSettings };
 
   if (body.notifyOnSuccess !== undefined) newSettings.notifyOnSuccess = body.notifyOnSuccess;
   if (body.notifyOnFailure !== undefined) newSettings.notifyOnFailure = body.notifyOnFailure;
   if (body.approvalRequired !== undefined) newSettings.approvalRequired = body.approvalRequired;
   if (body.notifyRules !== undefined) newSettings.notifyRules = body.notifyRules;
-  // 向后兼容旧字段
-  if (body.feishuChatId !== undefined) newSettings.feishuChatId = body.feishuChatId;
-  if (body.notifyBranches !== undefined) newSettings.notifyBranches = body.notifyBranches;
 
   const [updated] = await db
     .update(schema.repositories)

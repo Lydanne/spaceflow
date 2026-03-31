@@ -4,11 +4,11 @@ import { resolveOrgId } from "~~/server/utils/resolve-org";
 import { requireOrgOwnerOrAdmin } from "~~/server/utils/org-owner";
 import { z } from "zod";
 import { notifyRuleSchema } from "~~/server/shared/dto/repository.dto";
+import type { OrgNotifySettings } from "~~/shared/notify-rules";
 
+// 组织级默认通知规则（仅影响未配置仓库规则的仓库）
 const updateOrgSettingsBodySchema = z.object({
   notifyRules: z.array(notifyRuleSchema).max(20).optional(),
-  // 向后兼容旧字段
-  feishuChatId: z.string().max(255).optional(),
 });
 
 export default defineEventHandler(async (event) => {
@@ -28,11 +28,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Organization not found" });
   }
 
-  const currentSettings = (org.settings || {}) as Record<string, unknown>;
-  const newSettings = { ...currentSettings };
+  const currentSettings = (org.settings || {}) as OrgNotifySettings;
+  // 仅覆盖请求体显式传入的字段，避免误清空其他设置项。
+  const newSettings: OrgNotifySettings = { ...currentSettings };
 
   if (body.notifyRules !== undefined) newSettings.notifyRules = body.notifyRules;
-  if (body.feishuChatId !== undefined) newSettings.feishuChatId = body.feishuChatId;
 
   const [updated] = await db
     .update(schema.organizations)

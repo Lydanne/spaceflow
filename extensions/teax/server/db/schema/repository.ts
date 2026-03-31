@@ -11,6 +11,12 @@ import {
 import { organizations } from "./organization";
 import { users } from "./user";
 import { baseColumns } from "./base";
+import type { RepoNotifySettings } from "../../../shared/notify-rules";
+
+/**
+ * 仓库 settings 为 JSONB：通知规则使用强类型，其余字段允许按需扩展。
+ */
+export type RepositorySettings = RepoNotifySettings & Record<string, unknown>;
 
 export const repositories = pgTable(
   "repositories",
@@ -27,7 +33,7 @@ export const repositories = pgTable(
     clone_url: text("clone_url").notNull(),
     webhook_id: integer("webhook_id"),
     webhook_secret: varchar("webhook_secret", { length: 255 }),
-    settings: jsonb("settings").default({}),
+    settings: jsonb("settings").$type<RepositorySettings>().default({}),
     created_by: uuid("created_by").references(() => users.id),
     ...baseColumns(),
   },

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { REPO_NOTIFY_EVENT_OPTIONS, type RepoNotifyEvent } from "~~/shared/notify-events";
+import type { NotifyRule, RepoNotifySettings } from "~~/shared/notify-rules";
+
 const props = defineProps<{
   owner: string;
   repo: string;
@@ -15,26 +18,9 @@ const props = defineProps<{
 const toast = useToast();
 
 // ─── 事件类型常量 ──────────────────────────────────────
-const NOTIFY_EVENTS = [
-  { value: "workflow_success", label: "Action 成功", icon: "i-lucide-check-circle" },
-  { value: "workflow_failure", label: "Action 失败", icon: "i-lucide-x-circle" },
-  { value: "push", label: "代码推送", icon: "i-lucide-git-commit" },
-  { value: "pr_opened", label: "PR 创建", icon: "i-lucide-git-pull-request" },
-  { value: "issue_opened", label: "Issue 创建", icon: "i-lucide-circle-dot" },
-  { value: "agent_completed", label: "Agent 完成", icon: "i-lucide-bot" },
-  { value: "agent_failed", label: "Agent 失败", icon: "i-lucide-bot" },
-] as const;
+const NOTIFY_EVENTS = REPO_NOTIFY_EVENT_OPTIONS;
 
-// ─── 通知规则 ──────────────────────────────────────────
-interface NotifyRule {
-  id: string;
-  name: string;
-  chatId: string;
-  events: string[];
-  branches: string[];
-  workflows: string[];
-}
-
+// 表单内使用“布尔开关 + 规则数组”
 interface ProjectSettings {
   notifyOnSuccess: boolean;
   notifyOnFailure: boolean;
@@ -56,25 +42,11 @@ watch(
   () => props.project.settings,
   (s) => {
     if (!s) return;
-    const ps = s as unknown as ProjectSettings & { feishuChatId?: string; notifyBranches?: string[] };
+    const ps = s as RepoNotifySettings;
     settingsForm.notifyOnSuccess = ps.notifyOnSuccess ?? true;
     settingsForm.notifyOnFailure = ps.notifyOnFailure ?? true;
     settingsForm.approvalRequired = ps.approvalRequired ?? false;
-    // 优先使用 notifyRules，向后兼容旧字段
-    if (ps.notifyRules && ps.notifyRules.length > 0) {
-      settingsForm.notifyRules = ps.notifyRules.map((r) => ({ ...r }));
-    } else if (ps.feishuChatId) {
-      settingsForm.notifyRules = [{
-        id: crypto.randomUUID(),
-        name: "默认通知",
-        chatId: ps.feishuChatId,
-        events: ["workflow_success", "workflow_failure"],
-        branches: ps.notifyBranches || [],
-        workflows: [],
-      }];
-    } else {
-      settingsForm.notifyRules = [];
-    }
+    settingsForm.notifyRules = (ps.notifyRules || []).map((r) => ({ ...r }));
   },
   { immediate: true },
 );
@@ -97,7 +69,7 @@ function removeRule(id: string) {
   if (editingRuleId.value === id) editingRuleId.value = null;
 }
 
-function toggleEvent(rule: NotifyRule, event: string) {
+function toggleEvent(rule: NotifyRule, event: RepoNotifyEvent) {
   const idx = rule.events.indexOf(event);
   if (idx >= 0) rule.events.splice(idx, 1);
   else rule.events.push(event);

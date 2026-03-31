@@ -7,8 +7,8 @@ import {
   notifyPushEvent,
   notifyWorkflowRunComplete,
   type NotifyContext,
-  type RepoNotifySettings,
 } from "~~/server/services/notification.service";
+import type { RepoNotifySettings } from "~~/shared/notify-rules";
 
 interface GiteaWebhookPayload {
   ref?: string;

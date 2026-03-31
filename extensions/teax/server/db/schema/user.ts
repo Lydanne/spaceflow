@@ -1,5 +1,7 @@
-import { pgTable, uuid, integer, varchar, text, boolean, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, integer, varchar, text, boolean, timestamp, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
 import { baseColumns } from "./base";
+import type { UserSettings } from "../../../shared/user-settings";
+import { DEFAULT_USER_SETTINGS } from "../../../shared/user-settings";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -8,6 +10,7 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull(),
   avatar_url: text("avatar_url"),
   is_admin: boolean("is_admin").default(false),
+  settings: jsonb("settings").$type<UserSettings>().default(DEFAULT_USER_SETTINGS),
   // Gitea token（加密存储）
   gitea_access_token: text("gitea_access_token"),
   gitea_refresh_token: text("gitea_refresh_token"),
@@ -27,10 +30,6 @@ export const userFeishu = pgTable("user_feishu", {
   access_token: text("access_token"),
   refresh_token: text("refresh_token"),
   token_expires_at: timestamp("token_expires_at", { withTimezone: true }),
-  notify_publish: boolean("notify_publish").default(true),
-  notify_approval: boolean("notify_approval").default(true),
-  notify_agent: boolean("notify_agent").default(true),
-  notify_system: boolean("notify_system").default(false),
   ...baseColumns(),
 }, (table) => [
   uniqueIndex("user_feishu_user_open_idx").on(table.user_id, table.feishu_open_id),

@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { defineCardPage, requireBinding } from "~~/server/card-kit";
 import type { User } from "~~/server/db/schema";
+import { REPO_NOTIFY_EVENT_OPTIONS, type RepoNotifyEvent } from "~~/shared/notify-events";
+import { normalizeUserSettings } from "~~/shared/user-settings";
 
 export default defineCardPage({
   name: "notify",
@@ -12,18 +14,15 @@ export default defineCardPage({
     const db = useDB();
     const activeUser = ctx.inject<User>(requireBinding)!;
 
-    const [binding] = await db
+    const [userRow] = await db
       .select({
-        notify_publish: schema.userFeishu.notify_publish,
-        notify_approval: schema.userFeishu.notify_approval,
-        notify_agent: schema.userFeishu.notify_agent,
-        notify_system: schema.userFeishu.notify_system,
+        settings: schema.users.settings,
       })
-      .from(schema.userFeishu)
-      .where(eq(schema.userFeishu.user_id, activeUser.id))
+      .from(schema.users)
+      .where(eq(schema.users.id, activeUser.id))
       .limit(1);
 
-    if (!binding) {
+    if (!userRow) {
       return ctx
         .card({ title: "❌ 未找到设置", theme: "red" })
         .text("未找到通知设置", true)
@@ -32,12 +31,22 @@ export default defineCardPage({
 
     const config = useRuntimeConfig();
     const baseUrl = config.public.appUrl;
+    const prefs = normalizeUserSettings(userRow.settings).notifyPreferences;
+
+    const eventValueMap: Record<RepoNotifyEvent, boolean> = {
+      workflow_success: prefs.repoEvents.workflow_success,
+      workflow_failure: prefs.repoEvents.workflow_failure,
+      push: prefs.repoEvents.push,
+      pr_opened: prefs.repoEvents.pr_opened,
+      issue_opened: prefs.repoEvents.issue_opened,
+      agent_completed: prefs.repoEvents.agent_completed,
+      agent_failed: prefs.repoEvents.agent_failed,
+    };
 
     const settings = [
-      `${binding.notify_publish ? "✅" : "❌"} 发布通知`,
-      `${binding.notify_approval ? "✅" : "❌"} 审批通知`,
-      `${binding.notify_agent ? "✅" : "❌"} Agent 通知`,
-      `${binding.notify_system ? "✅" : "❌"} 系统通知`,
+      ...REPO_NOTIFY_EVENT_OPTIONS.map((ev) => `${eventValueMap[ev.value] ? "✅" : "❌"} ${ev.label}`),
+      `${prefs.personalEvents.approval ? "✅" : "❌"} 审批通知`,
+      `${prefs.personalEvents.system ? "✅" : "❌"} 系统通知`,
     ];
 
     return ctx

@@ -1,24 +1,9 @@
 <script setup lang="ts">
 import type { Ref } from "vue";
+import { REPO_NOTIFY_EVENT_OPTIONS, type RepoNotifyEvent } from "~~/shared/notify-events";
+import type { NotifyRule, OrgNotifySettings } from "~~/shared/notify-rules";
 
-const NOTIFY_EVENTS = [
-  { value: "workflow_success", label: "Action 成功", icon: "i-lucide-check-circle" },
-  { value: "workflow_failure", label: "Action 失败", icon: "i-lucide-x-circle" },
-  { value: "push", label: "代码推送", icon: "i-lucide-git-commit" },
-  { value: "pr_opened", label: "PR 创建", icon: "i-lucide-git-pull-request" },
-  { value: "issue_opened", label: "Issue 创建", icon: "i-lucide-circle-dot" },
-  { value: "agent_completed", label: "Agent 完成", icon: "i-lucide-bot" },
-  { value: "agent_failed", label: "Agent 失败", icon: "i-lucide-bot" },
-] as const;
-
-interface NotifyRule {
-  id: string;
-  name: string;
-  chatId: string;
-  events: string[];
-  branches: string[];
-  workflows: string[];
-}
+const NOTIFY_EVENTS = REPO_NOTIFY_EVENT_OPTIONS;
 
 const toast = useToast();
 const orgName = inject<string>("orgName")!;
@@ -32,21 +17,8 @@ watch(
   () => orgDetailData.value?.data?.settings,
   (s) => {
     if (!s) return;
-    const os = s as { notifyRules?: NotifyRule[]; feishuChatId?: string };
-    if (os.notifyRules && os.notifyRules.length > 0) {
-      orgNotifyRules.value = os.notifyRules.map((r) => ({ ...r }));
-    } else if (os.feishuChatId) {
-      orgNotifyRules.value = [{
-        id: crypto.randomUUID(),
-        name: "默认通知",
-        chatId: os.feishuChatId,
-        events: ["workflow_success", "workflow_failure"],
-        branches: [],
-        workflows: [],
-      }];
-    } else {
-      orgNotifyRules.value = [];
-    }
+    const os = s as OrgNotifySettings;
+    orgNotifyRules.value = (os.notifyRules || []).map((r) => ({ ...r }));
   },
   { immediate: true },
 );
@@ -69,7 +41,7 @@ function removeOrgRule(id: string) {
   if (editingRuleId.value === id) editingRuleId.value = null;
 }
 
-function toggleOrgEvent(rule: NotifyRule, event: string) {
+function toggleOrgEvent(rule: NotifyRule, event: RepoNotifyEvent) {
   const idx = rule.events.indexOf(event);
   if (idx >= 0) rule.events.splice(idx, 1);
   else rule.events.push(event);

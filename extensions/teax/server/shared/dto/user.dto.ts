@@ -21,10 +21,31 @@ export type SelectUserFeishu = z.infer<typeof selectUserFeishuSchema>;
 export type UpdateUserFeishu = z.infer<typeof updateUserFeishuSchema>;
 
 // ─── 通知偏好更新 request body ───────────────────────────
+const repoEventPreferenceSchema = z.object({
+  workflow_success: z.boolean().optional(),
+  workflow_failure: z.boolean().optional(),
+  push: z.boolean().optional(),
+  pr_opened: z.boolean().optional(),
+  issue_opened: z.boolean().optional(),
+  agent_completed: z.boolean().optional(),
+  agent_failed: z.boolean().optional(),
+});
+
+const personalEventPreferenceSchema = z.object({
+  approval: z.boolean().optional(),
+  system: z.boolean().optional(),
+});
+
+export const notifyPreferencesSchema = z.object({
+  repoEvents: repoEventPreferenceSchema.optional(),
+  personalEvents: personalEventPreferenceSchema.optional(),
+});
+
+export const userSettingsSchema = z.object({
+  notifyPreferences: notifyPreferencesSchema.optional(),
+});
+
 export const updateNotifyPreferencesBodySchema = z.object({
-  notify_publish: z.boolean().optional(),
-  notify_approval: z.boolean().optional(),
-  notify_agent: z.boolean().optional(),
-  notify_system: z.boolean().optional(),
+  notifyPreferences: notifyPreferencesSchema.optional(),
 });
 export type UpdateNotifyPreferencesBody = z.infer<typeof updateNotifyPreferencesBodySchema>;

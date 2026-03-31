@@ -1,4 +1,4 @@
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import {
   sendFeishuBatchMessage,
@@ -6,12 +6,13 @@ import {
   type FeishuInteractiveCard,
 } from "~~/server/services/messaging";
 import { EnhancedCardBuilder } from "~~/server/card-kit";
-import type { NotifyRule, NotifyEvent } from "~~/server/shared/dto/repository.dto";
+import type { RepoNotifyEvent } from "~~/shared/notify-events";
+import type { NotifyRule, OrgNotifySettings, RepoNotifySettings } from "~~/shared/notify-rules";
+import { normalizeUserSettings } from "~~/shared/user-settings";
 
 // ─── 通知类型 ─────────────────────────────────────────────
 
 export type NotificationType = "publish" | "approval" | "agent" | "system";
-const DEFAULT_OFF_EVENTS: NotifyEvent[] = ["push", "pr_opened", "issue_opened"];
 
 export interface NotifyContext {
   /** 组织 ID（用于查找团队成员） */
@@ -222,22 +223,12 @@ export function matchPattern(value: string, patterns: string[]): boolean {
 
 // ─── 规则匹配引擎 ─────────────────────────────────────────
 
-export interface RepoNotifySettings {
-  notifyRules?: NotifyRule[];
-  notifyOnSuccess?: boolean;
-  notifyOnFailure?: boolean;
-  approvalRequired?: boolean;
-  // 向后兼容旧字段
-  feishuChatId?: string;
-  notifyBranches?: string[];
-}
-
 /**
  * 根据事件类型、分支、workflow 文件名匹配 notifyRules，返回命中的 chatId 列表。
  */
 export function matchRules(
   rules: NotifyRule[],
-  event: NotifyEvent,
+  event: RepoNotifyEvent,
   branch?: string,
   workflowFile?: string,
 ): string[] {
@@ -262,7 +253,7 @@ async function getOrgNotifyRules(organizationId: string): Promise<NotifyRule[]> 
       .from(schema.organizations)
       .where(eq(schema.organizations.id, organizationId))
       .limit(1);
-    const settings = (org?.settings || {}) as { notifyRules?: NotifyRule[] };
+    const settings = (org?.settings || {}) as OrgNotifySettings;
     return settings.notifyRules || [];
   } catch {
     return [];
@@ -271,13 +262,13 @@ async function getOrgNotifyRules(organizationId: string): Promise<NotifyRule[]> 
 
 /**
  * 基于通知规则分发卡片。
- * 优先级：仓库规则 → 组织默认规则 → 旧 feishuChatId → 私信组织成员。
+ * 优先级：仓库规则 → 组织默认规则 → 私信组织成员。
  */
 async function dispatchByRules(
   card: FeishuInteractiveCard,
   settings: RepoNotifySettings,
   organizationId: string,
-  event: NotifyEvent,
+  event: RepoNotifyEvent,
   notifyType: NotificationType,
   branch?: string,
   workflowFile?: string,
@@ -293,9 +284,6 @@ async function dispatchByRules(
     const orgRules = await getOrgNotifyRules(organizationId);
     if (orgRules.length > 0) {
       chatIds = matchRules(orgRules, event, branch, workflowFile);
-    } else if (settings.feishuChatId && !DEFAULT_OFF_EVENTS.includes(event)) {
-      // 3. 旧字段兼容
-      chatIds = [settings.feishuChatId];
     }
   }
 
@@ -307,12 +295,8 @@ async function dispatchByRules(
       }),
     );
   } else {
-    if (DEFAULT_OFF_EVENTS.includes(event)) {
-      console.log(`[notification] skip ${event}: no matched notify rules`);
-      return;
-    }
     // 4. 最终 fallback：私信组织成员
-    const targets = await getNotifyTargets(organizationId, notifyType);
+    const targets = await getNotifyTargets(organizationId, notifyType, event);
     if (targets.length === 0) return;
     const result = await sendFeishuBatchMessage(targets, card);
     console.log(`[notification] sent=${result.sent}, failed=${result.failed}`);
@@ -327,6 +311,7 @@ async function dispatchByRules(
 export async function getNotifyTargets(
   organizationId: string,
   notifyType: NotificationType,
+  event?: RepoNotifyEvent,
 ): Promise<string[]> {
   const db = useDB();
 
@@ -346,25 +331,41 @@ export async function getNotifyTargets(
   const userIds = [...new Set(memberRows.map((m) => m.user_id).filter(Boolean))] as string[];
   if (userIds.length === 0) return [];
 
-  // 查找已绑定飞书且启用通知的用户
-  const notifyColumn = {
-    publish: schema.userFeishu.notify_publish,
-    approval: schema.userFeishu.notify_approval,
-    agent: schema.userFeishu.notify_agent,
-    system: schema.userFeishu.notify_system,
-  }[notifyType];
-
   const feishuBindings = await db
-    .select({ feishu_open_id: schema.userFeishu.feishu_open_id })
+    .select({
+      feishu_open_id: schema.userFeishu.feishu_open_id,
+      user_settings: schema.users.settings,
+    })
     .from(schema.userFeishu)
+    .innerJoin(schema.users, eq(schema.userFeishu.user_id, schema.users.id))
     .where(
-      and(
-        inArray(schema.userFeishu.user_id, userIds),
-        eq(notifyColumn, true),
-      ),
+      inArray(schema.userFeishu.user_id, userIds),
     );
 
-  return feishuBindings.map((b) => b.feishu_open_id);
+  const matched = feishuBindings.filter((b) => {
+    const prefs = normalizeUserSettings(b.user_settings).notifyPreferences;
+    if (notifyType === "approval") return prefs.personalEvents.approval;
+    if (notifyType === "system") return prefs.personalEvents.system;
+
+    if (notifyType === "publish") {
+      if (event === "workflow_success") return prefs.repoEvents.workflow_success;
+      if (event === "workflow_failure") return prefs.repoEvents.workflow_failure;
+      if (event === "push") return prefs.repoEvents.push;
+      if (event === "pr_opened") return prefs.repoEvents.pr_opened;
+      if (event === "issue_opened") return prefs.repoEvents.issue_opened;
+      return false;
+    }
+
+    if (notifyType === "agent") {
+      if (event === "agent_completed") return prefs.repoEvents.agent_completed;
+      if (event === "agent_failed") return prefs.repoEvents.agent_failed;
+      return false;
+    }
+
+    return false;
+  });
+
+  return matched.map((b) => b.feishu_open_id);
 }
 
 // ─── 通知发送入口 ─────────────────────────────────────────
@@ -393,16 +394,11 @@ export async function notifyWorkflowRunComplete(
   const isSuccess = run.conclusion === "success";
   const isFailure = run.conclusion === "failure";
 
-  // 旧字段兼容：notifyOnSuccess / notifyOnFailure
   if (isSuccess && repoSettings.notifyOnSuccess === false) return;
   if (isFailure && repoSettings.notifyOnFailure === false) return;
   if (!isSuccess && !isFailure) return;
 
-  // 旧字段兼容：分支过滤
-  const hasRules = (repoSettings.notifyRules || []).length > 0;
-  if (!hasRules && !matchPattern(run.head_branch, repoSettings.notifyBranches || [])) return;
-
-  const event: NotifyEvent = isSuccess ? "workflow_success" : "workflow_failure";
+  const event: RepoNotifyEvent = isSuccess ? "workflow_success" : "workflow_failure";
 
   try {
     const config = useRuntimeConfig();
@@ -441,10 +437,6 @@ export async function notifyPushEvent(
   },
   repoSettings: RepoNotifySettings = {},
 ): Promise<void> {
-  // 旧字段兼容
-  const hasRules = (repoSettings.notifyRules || []).length > 0;
-  if (!hasRules && !matchPattern(push.branch, repoSettings.notifyBranches || [])) return;
-
   try {
     const config = useRuntimeConfig();
     const card = buildPushCard({
@@ -548,7 +540,7 @@ export async function notifyAgentResult(
   },
   repoSettings: RepoNotifySettings = {},
 ): Promise<void> {
-  const eventMap: Record<string, NotifyEvent> = {
+  const eventMap: Record<string, RepoNotifyEvent> = {
     completed: "agent_completed",
     failed: "agent_failed",
     stopped: "agent_failed",
