@@ -644,7 +644,7 @@ async function savePreferences() {
         </p>
 
         <p class="text-xs text-gray-500 dark:text-gray-400">
-          仓库事件（你所在组织下的仓库触发）
+          仓库事件（你所在组织下或者你Watch的仓库触发）
         </p>
 
         <template
