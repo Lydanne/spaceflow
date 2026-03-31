@@ -109,6 +109,7 @@ export default defineEventHandler(async (event) => {
 
   const [owner, repoName] = project.full_name.split("/");
   const ctx: NotifyContext = {
+    repositoryId: project.id,
     organizationId: project.organization_id,
     repoFullName: project.full_name,
     repoOwner: owner || "",

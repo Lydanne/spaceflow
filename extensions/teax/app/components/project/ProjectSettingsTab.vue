@@ -11,6 +11,8 @@ const props = defineProps<{
     default_branch: string | null;
     clone_url: string;
     webhook_id: number | null;
+    watching: boolean;
+    watch_synced_at: string | null;
     settings: Record<string, unknown>;
   };
 }>();
@@ -37,6 +39,11 @@ const settingsForm = reactive<ProjectSettings>({
 
 const savingSettings = ref(false);
 const editingRuleId = ref<string | null>(null);
+const syncingWatch = ref(false);
+const watchState = reactive({
+  watching: false,
+  watchSyncedAt: null as string | null,
+});
 
 watch(
   () => props.project.settings,
@@ -47,6 +54,15 @@ watch(
     settingsForm.notifyOnFailure = ps.notifyOnFailure ?? true;
     settingsForm.approvalRequired = ps.approvalRequired ?? false;
     settingsForm.notifyRules = (ps.notifyRules || []).map((r) => ({ ...r }));
+  },
+  { immediate: true },
+);
+
+watch(
+  () => [props.project.watching, props.project.watch_synced_at] as const,
+  ([watching, watchSyncedAt]) => {
+    watchState.watching = watching;
+    watchState.watchSyncedAt = watchSyncedAt;
   },
   { immediate: true },
 );
@@ -77,6 +93,24 @@ function toggleEvent(rule: NotifyRule, event: RepoNotifyEvent) {
 
 function parseTags(input: string): string[] {
   return input.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+async function syncWatchState() {
+  if (syncingWatch.value) return;
+  syncingWatch.value = true;
+  try {
+    const res = await $fetch<{ data: { watching: boolean; synced_at: string | null } }>(
+      `/api/repos/${props.owner}/${props.repo}/watch-sync`,
+      { method: "POST" },
+    );
+    watchState.watching = res.data.watching;
+    watchState.watchSyncedAt = res.data.synced_at;
+    toast.add({ title: "Watch 状态已同步", color: "success" });
+  } catch {
+    toast.add({ title: "同步 Watch 状态失败", color: "error" });
+  } finally {
+    syncingWatch.value = false;
+  }
 }
 
 async function saveSettings() {
@@ -407,6 +441,35 @@ async function deleteProject() {
             保存设置
           </UButton>
         </div>
+      </div>
+    </UCard>
+
+    <!-- Watch 同步 -->
+    <UCard>
+      <template #header>
+        <h3 class="font-semibold">
+          Watch 同步
+        </h3>
+      </template>
+      <div class="flex items-center justify-between gap-4">
+        <div class="text-sm text-gray-500 dark:text-gray-400">
+          <p>
+            当前状态：{{ watchState.watching ? "Watching" : "Not Watching" }}
+          </p>
+          <p class="mt-1">
+            上次同步：
+            {{ watchState.watchSyncedAt ? new Date(watchState.watchSyncedAt).toLocaleString("zh-CN") : "未同步" }}
+          </p>
+        </div>
+        <UButton
+          icon="i-lucide-refresh-cw"
+          color="neutral"
+          variant="soft"
+          :loading="syncingWatch"
+          @click="syncWatchState"
+        >
+          同步状态
+        </UButton>
       </div>
     </UCard>
 

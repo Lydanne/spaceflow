@@ -180,6 +180,14 @@ export interface GiteaAccessToken {
   scopes: string[];
 }
 
+export interface GiteaRepoSubscription {
+  subscribed: boolean;
+  ignored?: boolean;
+  reason?: string | null;
+  created_at?: string;
+  repository_url?: string;
+}
+
 export class GiteaService {
   private baseUrl: string;
   private accessToken: string;
@@ -271,6 +279,18 @@ export class GiteaService {
 
   async getRepo(owner: string, repo: string): Promise<GiteaRepository> {
     return this.fetch(`/repos/${owner}/${repo}`) as Promise<GiteaRepository>;
+  }
+
+  async getRepoSubscription(owner: string, repo: string): Promise<GiteaRepoSubscription> {
+    return this.fetch(`/repos/${owner}/${repo}/subscription`) as Promise<GiteaRepoSubscription>;
+  }
+
+  async watchRepo(owner: string, repo: string): Promise<GiteaRepoSubscription> {
+    return this.fetch(`/repos/${owner}/${repo}/subscription`, "PUT") as Promise<GiteaRepoSubscription>;
+  }
+
+  async unwatchRepo(owner: string, repo: string): Promise<void> {
+    await this.fetch(`/repos/${owner}/${repo}/subscription`, "DELETE");
   }
 
   async getRepoBranches(owner: string, repo: string): Promise<GiteaBranch[]> {

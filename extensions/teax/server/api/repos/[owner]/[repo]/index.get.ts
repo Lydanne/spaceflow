@@ -2,10 +2,11 @@ import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requirePermission } from "~~/server/utils/permission";
 import { resolveRepoId } from "~~/server/utils/resolve-repo";
+import { syncRepositoryWatchForUser } from "~~/server/services/repository-watch.service";
 
 export default defineEventHandler(async (event) => {
-  const { repoId, orgId } = await resolveRepoId(event);
-  await requirePermission(event, orgId, "repo:view", repoId);
+  const { repoId, orgId, owner, repo } = await resolveRepoId(event);
+  const session = await requirePermission(event, orgId, "repo:view", repoId);
   const db = useDB();
 
   const [project] = await db
@@ -32,5 +33,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Project not found" });
   }
 
-  return project;
+  const watchState = await syncRepositoryWatchForUser(event, {
+    userId: session.user.id,
+    repoId,
+    owner,
+    repo,
+  });
+
+  return {
+    ...project,
+    watching: watchState.watching,
+    watch_synced_at: watchState.syncedAt,
+  };
 });

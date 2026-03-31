@@ -10,6 +10,8 @@ interface ProjectItem {
   full_name: string;
   description: string | null;
   default_branch: string | null;
+  watching: boolean;
+  watch_synced_at: string | null;
   updated_at: string;
 }
 
@@ -112,6 +114,18 @@ const total = computed(() => data.value?.total ?? 0);
                       class="w-3 h-3 mr-1"
                     />
                     {{ project.default_branch || "main" }}
+                  </UBadge>
+                  <UBadge
+                    v-if="project.watching"
+                    color="primary"
+                    variant="soft"
+                    size="sm"
+                  >
+                    <UIcon
+                      name="i-lucide-eye"
+                      class="w-3 h-3 mr-1"
+                    />
+                    Watching
                   </UBadge>
                   <span class="text-xs text-gray-400">
                     更新于

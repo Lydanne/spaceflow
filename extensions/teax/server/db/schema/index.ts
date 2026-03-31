@@ -2,6 +2,7 @@ export * from "./user";
 export * from "./organization";
 export * from "./permission";
 export * from "./repository";
+export * from "./repository-watch";
 export * from "./audit";
 export * from "./approval";
 export * from "./approval-flow";

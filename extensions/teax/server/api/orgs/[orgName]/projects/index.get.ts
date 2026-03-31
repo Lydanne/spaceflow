@@ -3,6 +3,7 @@ import { useDB, schema } from "~~/server/db";
 import { requireAuth } from "~~/server/utils/auth";
 import { getVisibleRepositoryIds } from "~~/server/utils/permission";
 import { resolveOrgId } from "~~/server/utils/resolve-org";
+import { syncRepositoryWatchForUser } from "~~/server/services/repository-watch.service";
 
 export default defineEventHandler(async (event) => {
   const { orgId } = await resolveOrgId(event);
@@ -55,8 +56,76 @@ export default defineEventHandler(async (event) => {
 
   const total = Number(totalResult[0]?.count ?? 0);
 
+  const repoIds = projectList.map((p) => p.id);
+  const watchMap = new Map<string, { watching: boolean; synced_at: Date | null }>();
+
+  if (repoIds.length > 0) {
+    const watchRows = await db
+      .select({
+        repository_id: schema.repositoryWatches.repository_id,
+        watching: schema.repositoryWatches.watching,
+        synced_at: schema.repositoryWatches.synced_at,
+      })
+      .from(schema.repositoryWatches)
+      .where(and(
+        eq(schema.repositoryWatches.user_id, session.user.id),
+        inArray(schema.repositoryWatches.repository_id, repoIds),
+      ));
+
+    for (const row of watchRows) {
+      watchMap.set(row.repository_id, {
+        watching: row.watching,
+        synced_at: row.synced_at,
+      });
+    }
+
+    // 自动同步当前页仓库 watch 状态：
+    // - 缓存新鲜时直接用本地
+    // - 过期或缺失时才拉取 Gitea
+    const syncResults = await Promise.allSettled(
+      projectList.map(async (project) => {
+        const [owner, repo] = project.full_name.split("/", 2);
+        if (!owner || !repo) return;
+
+        const current = watchMap.get(project.id);
+        const synced = await syncRepositoryWatchForUser(event, {
+          userId: session.user.id,
+          repoId: project.id,
+          owner,
+          repo,
+          current: current
+            ? {
+                watching: current.watching,
+                synced_at: current.synced_at,
+              }
+            : null,
+        });
+
+        watchMap.set(project.id, {
+          watching: synced.watching,
+          synced_at: synced.syncedAt,
+        });
+      }),
+    );
+
+    for (const result of syncResults) {
+      if (result.status === "rejected") {
+        console.warn("[projects] sync watch state failed:", result.reason);
+      }
+    }
+  }
+
+  const projectListWithWatch = projectList.map((p) => {
+    const state = watchMap.get(p.id);
+    return {
+      ...p,
+      watching: state?.watching ?? false,
+      watch_synced_at: state?.synced_at ?? null,
+    };
+  });
+
   return {
-    data: projectList,
+    data: projectListWithWatch,
     total,
     page,
     limit,

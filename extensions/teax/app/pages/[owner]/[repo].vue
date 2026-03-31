@@ -12,6 +12,8 @@ interface ProjectDetail {
   default_branch: string | null;
   clone_url: string;
   webhook_id: number | null;
+  watching: boolean;
+  watch_synced_at: string | null;
   settings: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -20,6 +22,33 @@ interface ProjectDetail {
 const { data: project, status: projectStatus } = await useFetch<ProjectDetail>(
   `/api/repos/${owner}/${repo}`,
 );
+const toast = useToast();
+const updatingWatch = ref(false);
+
+async function toggleWatch() {
+  if (!project.value || updatingWatch.value) return;
+  const targetWatching = !project.value.watching;
+  updatingWatch.value = true;
+  try {
+    const res = await $fetch<{ data: { watching: boolean; synced_at: string | null } }>(
+      `/api/repos/${owner}/${repo}/watch`,
+      {
+        method: "PUT",
+        body: { watching: targetWatching },
+      },
+    );
+    project.value.watching = res.data.watching;
+    project.value.watch_synced_at = res.data.synced_at;
+    toast.add({
+      title: res.data.watching ? "已关注仓库" : "已取消关注",
+      color: "success",
+    });
+  } catch {
+    toast.add({ title: "更新 Watch 状态失败", color: "error" });
+  } finally {
+    updatingWatch.value = false;
+  }
+}
 
 const { isOwnerOrAdmin } = useOrgRole(owner);
 
@@ -86,13 +115,25 @@ const activeTab = computed(() => {
           </div>
         </div>
 
-        <UBadge
-          v-if="!project.webhook_id"
-          color="warning"
-          variant="subtle"
-        >
-          Webhook 未配置
-        </UBadge>
+        <div class="flex items-center gap-2">
+          <UButton
+            :icon="project.watching ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+            color="neutral"
+            variant="soft"
+            size="sm"
+            :loading="updatingWatch"
+            @click="toggleWatch"
+          >
+            {{ project.watching ? "Watching" : "Watch" }}
+          </UButton>
+          <UBadge
+            v-if="!project.webhook_id"
+            color="warning"
+            variant="subtle"
+          >
+            Webhook 未配置
+          </UBadge>
+        </div>
       </div>
 
       <!-- Tab 导航 -->

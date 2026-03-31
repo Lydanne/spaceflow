@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import {
   sendFeishuBatchMessage,
@@ -15,6 +15,8 @@ import { normalizeUserSettings } from "~~/shared/user-settings";
 export type NotificationType = "publish" | "approval" | "agent" | "system";
 
 export interface NotifyContext {
+  /** 仓库 ID（用于按 watch 状态过滤接收人） */
+  repositoryId: string;
   /** 组织 ID（用于查找团队成员） */
   organizationId: string;
   /** 仓库全名（如 org/repo） */
@@ -267,6 +269,7 @@ async function getOrgNotifyRules(organizationId: string): Promise<NotifyRule[]> 
 async function dispatchByRules(
   card: FeishuInteractiveCard,
   settings: RepoNotifySettings,
+  repositoryId: string,
   organizationId: string,
   event: RepoNotifyEvent,
   notifyType: NotificationType,
@@ -296,7 +299,7 @@ async function dispatchByRules(
     );
   } else {
     // 4. 最终 fallback：私信组织成员
-    const targets = await getNotifyTargets(organizationId, notifyType, event);
+    const targets = await getNotifyTargets(organizationId, notifyType, event, repositoryId);
     if (targets.length === 0) return;
     const result = await sendFeishuBatchMessage(targets, card);
     console.log(`[notification] sent=${result.sent}, failed=${result.failed}`);
@@ -312,6 +315,7 @@ export async function getNotifyTargets(
   organizationId: string,
   notifyType: NotificationType,
   event?: RepoNotifyEvent,
+  repositoryId?: string,
 ): Promise<string[]> {
   const db = useDB();
 
@@ -331,6 +335,21 @@ export async function getNotifyTargets(
   const userIds = [...new Set(memberRows.map((m) => m.user_id).filter(Boolean))] as string[];
   if (userIds.length === 0) return [];
 
+  let candidateUserIds = userIds;
+  if (repositoryId && (notifyType === "publish" || notifyType === "agent")) {
+    const watchRows = await db
+      .select({ user_id: schema.repositoryWatches.user_id })
+      .from(schema.repositoryWatches)
+      .where(and(
+        eq(schema.repositoryWatches.repository_id, repositoryId),
+        eq(schema.repositoryWatches.watching, true),
+        inArray(schema.repositoryWatches.user_id, userIds),
+      ));
+
+    candidateUserIds = [...new Set(watchRows.map((r) => r.user_id).filter(Boolean))] as string[];
+    if (candidateUserIds.length === 0) return [];
+  }
+
   const feishuBindings = await db
     .select({
       feishu_open_id: schema.userFeishu.feishu_open_id,
@@ -339,7 +358,7 @@ export async function getNotifyTargets(
     .from(schema.userFeishu)
     .innerJoin(schema.users, eq(schema.userFeishu.user_id, schema.users.id))
     .where(
-      inArray(schema.userFeishu.user_id, userIds),
+      inArray(schema.userFeishu.user_id, candidateUserIds),
     );
 
   const matched = feishuBindings.filter((b) => {
@@ -416,7 +435,7 @@ export async function notifyWorkflowRunComplete(
     });
 
     await dispatchByRules(
-      card, repoSettings, ctx.organizationId, event, "publish",
+      card, repoSettings, ctx.repositoryId, ctx.organizationId, event, "publish",
       run.head_branch, run.workflow_name,
     );
   } catch (err) {
@@ -449,7 +468,7 @@ export async function notifyPushEvent(
     });
 
     await dispatchByRules(
-      card, repoSettings, ctx.organizationId, "push", "publish",
+      card, repoSettings, ctx.repositoryId, ctx.organizationId, "push", "publish",
       push.branch,
     );
   } catch (err) {
@@ -486,7 +505,7 @@ export async function notifyPullRequestOpened(
     });
 
     await dispatchByRules(
-      card, repoSettings, ctx.organizationId, "pr_opened", "publish",
+      card, repoSettings, ctx.repositoryId, ctx.organizationId, "pr_opened", "publish",
       pr.targetBranch,
     );
   } catch (err) {
@@ -519,7 +538,7 @@ export async function notifyIssueOpened(
     });
 
     await dispatchByRules(
-      card, repoSettings, ctx.organizationId, "issue_opened", "publish",
+      card, repoSettings, ctx.repositoryId, ctx.organizationId, "issue_opened", "publish",
     );
   } catch (err) {
     console.error("[notification] Failed to send issue notification:", err);
@@ -556,7 +575,7 @@ export async function notifyAgentResult(
     });
 
     await dispatchByRules(
-      card, repoSettings, ctx.organizationId, event, "agent",
+      card, repoSettings, ctx.repositoryId, ctx.organizationId, event, "agent",
     );
   } catch (err) {
     console.error("[notification] Failed to send agent notification:", err);
