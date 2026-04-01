@@ -189,9 +189,7 @@ async function handleMessageEvent(data: {
       `[feishu-ws] 📨 Message from ${senderId}: ${textContent || "(empty)"}`,
     );
 
-    // 确保命令已注册
-    const { ensureCommands, hasLinkMatch, handleBotMessage } = await import("~~/server/card-kit");
-    await ensureCommands();
+    const { hasLinkMatch, handleBotMessage } = await import("~~/server/card-kit");
     if (!isTextMessage && !hasLinkMatch(textContent)) {
       return;
     }

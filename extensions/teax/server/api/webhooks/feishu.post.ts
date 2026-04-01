@@ -179,9 +179,6 @@ export default defineEventHandler(async (event) => {
 
     // 异步处理：统一走 handleBotMessage（内部先匹配链接，再匹配指令）
     (async () => {
-      const { ensureCommands } = await import("~~/server/card-kit");
-      await ensureCommands();
-
       if (!isTextMessage && !hasLinkMatch(textContent)) return;
 
       await handleBotMessage({

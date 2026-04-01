@@ -1,10 +1,9 @@
 import type { CardInteractionContext } from "../types";
+import { cardRouter } from "../register";
 
 export async function handleCardInteraction(
   ctx: CardInteractionContext,
 ): Promise<Record<string, unknown> | undefined> {
-  const { getRouter } = await import("../register");
-  const cardRouter = await getRouter();
   const formVal = (ctx.action.form_value ?? ctx.action.form_values) as
     | Record<string, string>
     | undefined;
