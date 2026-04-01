@@ -404,6 +404,44 @@ export async function cancelItem(itemId: string): Promise<void> {
   });
 }
 
+/**
+ * 重置队列：强制完成所有 running items，取消所有 waiting items
+ * 用于队列卡住时的手动恢复
+ * @returns 被重置的 item 数量
+ */
+export async function resetQueue(queueId: string): Promise<{ completedCount: number; cancelledCount: number }> {
+  const db = useDB();
+  const now = new Date();
+
+  // 强制完成所有 running items
+  const completed = await db
+    .update(schema.taskQueueItems)
+    .set({ status: "completed", result: { reset: true }, completed_at: now })
+    .where(
+      and(
+        eq(schema.taskQueueItems.queue_id, queueId),
+        eq(schema.taskQueueItems.status, "running"),
+      ),
+    )
+    .returning({ id: schema.taskQueueItems.id });
+
+  // 取消所有 waiting items
+  const cancelled = await db
+    .update(schema.taskQueueItems)
+    .set({ status: "cancelled", completed_at: now })
+    .where(
+      and(
+        eq(schema.taskQueueItems.queue_id, queueId),
+        eq(schema.taskQueueItems.status, "waiting"),
+      ),
+    )
+    .returning({ id: schema.taskQueueItems.id });
+
+  console.log(`[queue] Reset queue ${queueId}: completed ${completed.length} running, cancelled ${cancelled.length} waiting`);
+
+  return { completedCount: completed.length, cancelledCount: cancelled.length };
+}
+
 // ─── 辅助：入队并自动触发 ─────────────────────────────────
 
 /**
@@ -423,4 +461,78 @@ export async function enqueueAndTrigger(opts: EnqueueOpts): Promise<EnqueueResul
   }
 
   return { ...result, triggered: false };
+}
+
+// ─── 按 payload 查询 / 操作 ──────────────────────────────
+
+export interface ItemStatusResult {
+  itemId: string;
+  status: "waiting" | "running";
+  position: number | null;
+}
+
+/**
+ * 按 queue_key + payload 字段匹配，查找 waiting/running 的 item
+ * @param queueKey  队列唯一标识
+ * @param payloadField  payload 中要匹配的 JSON 字段名
+ * @param payloadValue  字段值（将转为字符串比较）
+ */
+export async function getItemByPayload(
+  queueKey: string,
+  payloadField: string,
+  payloadValue: string,
+): Promise<ItemStatusResult | null> {
+  const db = useDB();
+  const rows = await db.execute(
+    sql`SELECT tqi.id, tqi.status, tqi.position
+        FROM task_queue_items tqi
+        JOIN task_queues tq ON tq.id = tqi.queue_id
+        WHERE tq.queue_key = ${queueKey}
+          AND tqi.payload->>  ${payloadField} = ${payloadValue}
+          AND tqi.status IN ('waiting', 'running')
+        ORDER BY tqi.created_at DESC
+        LIMIT 1`,
+  );
+  const row = rows[0] as { id: string; status: string; position: number } | undefined;
+  if (!row) return null;
+  return {
+    itemId: row.id,
+    status: row.status as "waiting" | "running",
+    position: row.status === "waiting" ? row.position : null,
+  };
+}
+
+/**
+ * Complete 指定 queue_key 下 payload 字段匹配的 running item
+ * @returns 是否成功 complete 了一个 item
+ */
+export async function completeRunningByPayload(
+  queueKey: string,
+  payloadField: string,
+  payloadValue: string,
+  result?: Record<string, unknown>,
+): Promise<boolean> {
+  const db = useDB();
+
+  // 找到队列
+  const [queue] = await db
+    .select({ id: schema.taskQueues.id })
+    .from(schema.taskQueues)
+    .where(eq(schema.taskQueues.queue_key, queueKey))
+    .limit(1);
+  if (!queue) return false;
+
+  // 找到 running 的 item
+  const rows = await db.execute(
+    sql`SELECT id FROM task_queue_items
+        WHERE queue_id = ${queue.id}
+          AND status = 'running'
+          AND payload->>  ${payloadField} = ${payloadValue}
+        LIMIT 1`,
+  );
+  const item = rows[0] as { id: string } | undefined;
+  if (!item) return false;
+
+  await completeItem(item.id, result);
+  return true;
 }

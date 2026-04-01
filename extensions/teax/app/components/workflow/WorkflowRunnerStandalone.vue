@@ -136,14 +136,22 @@ function statusIconClass(status: string, conclusion: string | null): string {
         <!-- 运行按钮 -->
         <UButton
           size="lg"
-          color="primary"
-          :icon="statusData?.hasRunning ? 'i-lucide-loader' : 'i-lucide-play'"
+          :color="statusData?.queueStatus?.status === 'waiting' ? 'info' : 'primary'"
+          :icon="
+            statusData?.queueStatus?.status === 'waiting' ? 'i-lucide-clock'
+            : statusData?.hasRunning ? 'i-lucide-loader'
+              : 'i-lucide-play'
+          "
           :loading="isTriggering"
-          :disabled="statusData?.hasRunning"
+          :disabled="!!statusData?.hasRunning || statusData?.queueStatus?.status === 'waiting'"
           class="whitespace-nowrap"
           @click="triggerRun"
         >
-          {{ statusData?.hasRunning ? "运行中..." : "运行" }}
+          {{
+            statusData?.queueStatus?.status === "waiting"
+              ? `排队中（#${statusData.queueStatus.position}）`
+              : statusData?.hasRunning ? "运行中..." : "运行"
+          }}
         </UButton>
       </div>
     </div>

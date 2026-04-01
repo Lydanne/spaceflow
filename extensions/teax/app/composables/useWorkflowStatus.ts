@@ -10,6 +10,11 @@ export interface RunJob {
   runner_name?: string | null;
 }
 
+export interface QueueStatus {
+  status: "waiting" | "running";
+  position: number | null;
+}
+
 export interface RunStatus {
   hasRunning: boolean;
   run: {
@@ -27,6 +32,7 @@ export interface RunStatus {
     name: string;
     avatar_url: string | null;
   } | null;
+  queueStatus: QueueStatus | null;
 }
 
 export interface UseWorkflowStatusOptions {
@@ -79,6 +85,7 @@ export function useWorkflowStatus(options: UseWorkflowStatusOptions) {
             jobs,
           },
           triggeredBy: null,
+          queueStatus: null,
         };
       }
     } catch {

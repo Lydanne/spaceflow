@@ -161,6 +161,10 @@ async function triggerRun() {
     toast.add({ title: "请等待当前运行完成", color: "warning" });
     return;
   }
+  if (statusData.value?.queueStatus?.status === "waiting") {
+    toast.add({ title: "当前预设已在排队中，请等待执行", color: "warning" });
+    return;
+  }
 
   isTriggering.value = true;
   try {
@@ -197,7 +201,18 @@ async function triggerRun() {
         locked_at: string;
         auto_unlock_at: string | null;
       };
+      queued?: boolean;
+      position?: number;
     }>(props.runUrl, { method: "POST", body });
+
+    if (result.queued) {
+      toast.add({ title: `已加入排队队列（位置 ${result.position}）`, color: "info" });
+      // 刷新状态以展示排队信息
+      await refreshStatus();
+      startPolling();
+      return;
+    }
+
     toast.add({ title: "工作流已触发", color: "success" });
 
     if (result.run_id) {

@@ -1,5 +1,16 @@
 import { registerConsumer, type ConsumerHandler, type TaskQueue, type TaskQueueItem } from "./registry";
-import { findOrCreateQueue, enqueue, enqueueAndTrigger, completeItem, failItem, type FindOrCreateQueueOpts, type EnqueueResult } from "./service";
+import {
+  findOrCreateQueue,
+  enqueue,
+  enqueueAndTrigger,
+  completeItem,
+  failItem,
+  getItemByPayload,
+  completeRunningByPayload,
+  type FindOrCreateQueueOpts,
+  type EnqueueResult,
+  type ItemStatusResult,
+} from "./service";
 
 // ─── 模板字符串类型推导 ───────────────────────────────────────
 //
@@ -102,6 +113,21 @@ export interface QueueInstance<TId extends string, TPayload> {
 
   /** 入队并自动触发 */
   enqueueAndTrigger: (queueId: string, payload: TPayload, createdBy?: string) => Promise<EnqueueResult & { triggered: boolean }>;
+
+  /** 按 queue_key + payload 字段查找 waiting/running 的 item */
+  getItemByPayload: (
+    keyArgs: StringTuple<ParamNames<TId>>,
+    payloadField: keyof TPayload & string,
+    payloadValue: string,
+  ) => Promise<ItemStatusResult | null>;
+
+  /** Complete 指定 queue_key 下 payload 字段匹配的 running item */
+  completeRunningByPayload: (
+    keyArgs: StringTuple<ParamNames<TId>>,
+    payloadField: keyof TPayload & string,
+    payloadValue: string,
+    result?: Record<string, unknown>,
+  ) => Promise<boolean>;
 }
 
 // ─── 运行时模板解析 ──────────────────────────────────────────
@@ -267,6 +293,25 @@ implements QueueInstance<TId, TPayload> {
 
   async enqueueAndTrigger(queueId: string, payload: TPayload, createdBy?: string): Promise<EnqueueResult & { triggered: boolean }> {
     return enqueueAndTrigger({ queueId, payload: payload as Record<string, unknown>, createdBy });
+  }
+
+  async getItemByPayload(
+    keyArgs: StringTuple<ParamNames<TId>>,
+    payloadField: keyof TPayload & string,
+    payloadValue: string,
+  ): Promise<ItemStatusResult | null> {
+    const queueKey = buildKeyFromTemplate(this.tmpl, keyArgs);
+    return getItemByPayload(queueKey, payloadField, payloadValue);
+  }
+
+  async completeRunningByPayload(
+    keyArgs: StringTuple<ParamNames<TId>>,
+    payloadField: keyof TPayload & string,
+    payloadValue: string,
+    result?: Record<string, unknown>,
+  ): Promise<boolean> {
+    const queueKey = buildKeyFromTemplate(this.tmpl, keyArgs);
+    return completeRunningByPayload(queueKey, payloadField, payloadValue, result);
   }
 }
 

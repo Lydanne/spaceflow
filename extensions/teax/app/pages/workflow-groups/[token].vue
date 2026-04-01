@@ -212,7 +212,7 @@ async function removeQueueItem(itemId: string) {
 // 强制触发下一个（管理员）
 const forcingTrigger = ref(false);
 async function forceTriggerNext() {
-  const queueId = (groupData.value as Record<string, unknown> | undefined)?.queue_id as string | undefined;
+  const queueId = groupData.value?.queue_id;
   if (!queueId) {
     toast.add({ title: "队列尚未创建", color: "warning" });
     return;
@@ -231,6 +231,28 @@ async function forceTriggerNext() {
     toast.add({ title: (err as { data?: { message?: string } })?.data?.message || "触发失败", color: "error" });
   } finally {
     forcingTrigger.value = false;
+  }
+}
+
+// 重置队列（管理员）
+const resettingQueue = ref(false);
+async function resetQueue() {
+  const queueId = groupData.value?.queue_id;
+  if (!queueId) {
+    toast.add({ title: "队列尚未创建", color: "warning" });
+    return;
+  }
+  if (!confirm("确定要重置队列吗？\n将强制完成所有运行中的任务，取消所有等待中的任务，并清除所有预设的运行状态。")) return;
+  resettingQueue.value = true;
+  try {
+    const result = await $fetch<{ message: string }>(`/api/queues/${queueId}/reset`, { method: "POST" });
+    await refresh();
+    toast.add({ title: result.message || "队列已重置", color: "success" });
+  } catch (err) {
+    console.error("Failed to reset queue:", err);
+    toast.add({ title: (err as { data?: { message?: string } })?.data?.message || "重置失败", color: "error" });
+  } finally {
+    resettingQueue.value = false;
   }
 }
 
@@ -787,9 +809,9 @@ function getStatusText(preset: WorkflowPresetGroupSubPresetDto): string {
           </div>
         </div>
 
-        <!-- 右侧：队列面板 -->
+        <!-- 右侧：队列面板（仅管理员/创建者可见） -->
         <div
-          v-if="groupData.queue_enabled"
+          v-if="groupData.queue_enabled && canManagePresets"
           class="w-72 shrink-0 sticky top-8"
         >
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
@@ -828,7 +850,7 @@ function getStatusText(preset: WorkflowPresetGroupSubPresetDto): string {
               <!-- 管理员操作按钮 -->
               <div
                 v-if="isAdmin"
-                class="p-3 border-b border-gray-100 dark:border-gray-700"
+                class="p-3 border-b border-gray-100 dark:border-gray-700 space-y-2"
               >
                 <UButton
                   icon="i-lucide-play"
@@ -841,6 +863,17 @@ function getStatusText(preset: WorkflowPresetGroupSubPresetDto): string {
                   @click="forceTriggerNext"
                 >
                   强制触发下一个
+                </UButton>
+                <UButton
+                  icon="i-lucide-rotate-ccw"
+                  color="error"
+                  variant="soft"
+                  size="xs"
+                  block
+                  :loading="resettingQueue"
+                  @click="resetQueue"
+                >
+                  重置队列
                 </UButton>
               </div>
 

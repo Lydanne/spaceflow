@@ -4,6 +4,7 @@ import { requireAuth } from "~~/server/utils/auth";
 import { requirePermission } from "~~/server/utils/permission";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { resolvePresetByToken } from "~~/server/utils/resolve-preset";
+import { presetWorkflowQueue } from "~~/server/queue-services/preset-workflow";
 
 export default defineEventHandler(async (event) => {
   await requireAuth(event);
@@ -34,8 +35,34 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // 查询队列状态（当前预设是否在队列中 waiting/running）
+  let queueStatus: { status: "waiting" | "running"; position: number | null } | null = null;
+  if (preset.group_id) {
+    const db2 = useDB();
+    const [group] = await db2
+      .select({
+        queue_enabled: schema.workflowPresetGroups.queue_enabled,
+        repository_id: schema.workflowPresetGroups.repository_id,
+        workflow_path: schema.workflowPresetGroups.workflow_path,
+      })
+      .from(schema.workflowPresetGroups)
+      .where(eq(schema.workflowPresetGroups.id, preset.group_id))
+      .limit(1);
+
+    if (group?.queue_enabled) {
+      const item = await presetWorkflowQueue.getItemByPayload(
+        [group.repository_id, group.workflow_path],
+        "preset_id",
+        preset.id,
+      );
+      if (item) {
+        queueStatus = { status: item.status, position: item.position };
+      }
+    }
+  }
+
   if (!runId) {
-    return { hasRunning: false, run: null, triggeredBy };
+    return { hasRunning: false, run: null, triggeredBy, queueStatus };
   }
 
   const gitea = await useGiteaSdk(event).role("user");
@@ -45,7 +72,7 @@ export default defineEventHandler(async (event) => {
     const userRun = await gitea.getWorkflowRun(owner, repoName, runId);
 
     if (!userRun) {
-      return { hasRunning: false, run: null, triggeredBy };
+      return { hasRunning: false, run: null, triggeredBy, queueStatus };
     }
 
     const isRunning = userRun.status === "running" || userRun.status === "waiting" || userRun.status === "queued" || userRun.status === "in_progress";
@@ -89,8 +116,9 @@ export default defineEventHandler(async (event) => {
         jobs,
       },
       triggeredBy,
+      queueStatus,
     };
   } catch {
-    return { hasRunning: false, run: null, triggeredBy };
+    return { hasRunning: false, run: null, triggeredBy, queueStatus };
   }
 });

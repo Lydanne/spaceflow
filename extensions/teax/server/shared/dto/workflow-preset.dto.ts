@@ -123,10 +123,17 @@ export const workflowPresetStatusTriggeredBySchema = z.object({
 });
 export type WorkflowPresetStatusTriggeredByDto = z.infer<typeof workflowPresetStatusTriggeredBySchema>;
 
+export const workflowPresetQueueStatusSchema = z.object({
+  status: z.enum(["waiting", "running"]),
+  position: z.number().nullable(),
+});
+export type WorkflowPresetQueueStatusDto = z.infer<typeof workflowPresetQueueStatusSchema>;
+
 export const workflowPresetStatusSchema = z.object({
   run: workflowPresetStatusRunSchema.nullable(),
   hasRunning: z.boolean(),
   triggeredBy: workflowPresetStatusTriggeredBySchema.nullable().optional(),
+  queueStatus: workflowPresetQueueStatusSchema.nullable().optional(),
 });
 export type WorkflowPresetStatusDto = z.infer<typeof workflowPresetStatusSchema>;
 
@@ -177,6 +184,7 @@ export const workflowPresetGroupDetailSchema = z.object({
   default_inputs: inputsSchema.nullable(),
   auto_unlock_minutes: z.number().nullable(),
   queue_enabled: z.boolean(),
+  queue_id: z.string().nullable().optional(),
   share_token: z.string(),
   created_by: z.string(),
   created_at: z.string(),
