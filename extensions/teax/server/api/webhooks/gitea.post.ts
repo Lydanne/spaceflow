@@ -8,6 +8,9 @@ import {
   notifyWorkflowRunComplete,
   type NotifyContext,
 } from "~~/server/services/notification.service";
+import { clearCurrentRunId } from "~~/server/services/preset-queue.service";
+import { getQueueByKey, triggerNext } from "~~/server/queue-kit/service";
+import { buildWorkflowQueueKey } from "~~/server/queue-services/preset-workflow";
 import type { RepoNotifySettings } from "~~/shared/notify-rules";
 
 function normalizeWebhookSignature(input: string | undefined): string {
@@ -240,6 +243,18 @@ export default defineEventHandler(async (event) => {
       html_url: run.html_url,
       workflow_name: workflowName,
     }, settings).catch((err) => console.error("[webhook] workflow_run notify error:", err));
+
+    // 清理 current_run_id 并通过通用队列触发下一个任务
+    clearCurrentRunId(run.id).then(async (workflowKey) => {
+      if (workflowKey) {
+        console.log(`[webhook] Cleared current_run_id for run ${run.id}, checking queue for workflow ${workflowKey.workflowPath}`);
+        const queueKey = buildWorkflowQueueKey(workflowKey.repositoryId, workflowKey.workflowPath);
+        const queue = await getQueueByKey(queueKey);
+        if (queue) {
+          await triggerNext(queue.id);
+        }
+      }
+    }).catch((err) => console.error("[webhook] Failed to clear current_run_id:", err));
 
     return {
       received: true,

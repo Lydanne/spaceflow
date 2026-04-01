@@ -38,6 +38,9 @@ export const workflowPresetGroups = pgTable(
     // 分享
     share_token: varchar("share_token", { length: 32 }).notNull().unique(),
 
+    // 排队运行：开启后，触发子预设时如果 workflow 有 CI 在运行，自动排队等待
+    queue_enabled: boolean("queue_enabled").default(false),
+
     // 组织公开相关字段
     organization_id: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
     is_public: boolean("is_public").default(false), // 是否公开到组织

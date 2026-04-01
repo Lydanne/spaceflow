@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import { parse as parseYaml } from "yaml";
 import { useDB, schema } from "~~/server/db";
 import { useGiteaSdk } from "~~/server/utils/gitea";
+import { getQueueByKey, getQueueItems } from "~~/server/queue-kit/service";
+import { buildWorkflowQueueKey } from "~~/server/queue-services/preset-workflow";
 
 interface WorkflowInput {
   description?: string;
@@ -42,6 +44,7 @@ export default defineEventHandler(async (event) => {
       default_branch: schema.workflowPresetGroups.default_branch,
       default_inputs: schema.workflowPresetGroups.default_inputs,
       auto_unlock_minutes: schema.workflowPresetGroups.auto_unlock_minutes,
+      queue_enabled: schema.workflowPresetGroups.queue_enabled,
       share_token: schema.workflowPresetGroups.share_token,
       created_by: schema.workflowPresetGroups.created_by,
       created_at: schema.workflowPresetGroups.created_at,
@@ -148,11 +151,76 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // 获取排队队列（仅 queue_enabled 时查询）
+  let queueItems: Array<{
+    id: string;
+    preset_id: string;
+    preset_name: string;
+    preset_index: number;
+    queued_by: string;
+    queued_by_user: { id: string; name: string; avatar_url: string | null } | null;
+    branch: string;
+    inputs: Record<string, string | boolean | number> | null;
+    position: number;
+    status: string;
+    created_at: string;
+  }> = [];
+
+  let queueId: string | null = null;
+
+  if (group.queue_enabled) {
+    const queueKey = buildWorkflowQueueKey(group.repository_id, group.workflow_path);
+    const queue = await getQueueByKey(queueKey);
+
+    if (queue) {
+      queueId = queue.id;
+      const rawQueue = await getQueueItems(queue.id, "waiting");
+
+      // 获取排队者用户信息
+      const creatorIds = [...new Set(rawQueue.map((q) => q.created_by).filter(Boolean))] as string[];
+      const queueUsers: { id: string; name: string; avatar_url: string | null }[] = [];
+      for (const uid of creatorIds) {
+        const [u] = await db
+          .select({ id: schema.users.id, name: schema.users.gitea_username, avatar_url: schema.users.avatar_url })
+          .from(schema.users)
+          .where(eq(schema.users.id, uid))
+          .limit(1);
+        if (u) queueUsers.push(u);
+      }
+      const queueUserMap = new Map(queueUsers.map((u) => [u.id, u]));
+
+      // 构建预设名称映射
+      const presetMap = new Map(presets.map((p) => [p.id, p]));
+
+      queueItems = rawQueue.map((q) => {
+        const payload = (q.payload || {}) as Record<string, unknown>;
+        const presetId = String(payload.preset_id || "");
+        const p = presetMap.get(presetId);
+        return {
+          id: q.id,
+          preset_id: presetId,
+          preset_name: p?.name || "未知",
+          preset_index: p?.preset_index ?? 0,
+          queued_by: q.created_by || "",
+          queued_by_user: queueUserMap.get(q.created_by || "") || null,
+          branch: String(payload.branch || ""),
+          inputs: (payload.inputs as Record<string, string | boolean | number>) || null,
+          position: q.position,
+          status: q.status || "waiting",
+          created_at: q.created_at?.toISOString() || "",
+        };
+      });
+    }
+  }
+
   return {
     ...group,
+    queue_enabled: group.queue_enabled ?? false,
+    queue_id: queueId,
     repository: repo,
     creator,
     presets: presetsWithUsers,
+    queue: queueItems,
     workflow_inputs: workflowInputs,
   };
 });

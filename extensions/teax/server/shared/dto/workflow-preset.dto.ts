@@ -33,6 +33,7 @@ export const createPresetGroupBodySchema = z.object({
   default_branch: z.string().min(1).max(255),
   default_inputs: z.record(z.string(), z.union([z.string(), z.boolean(), z.number()])).optional(),
   auto_unlock_minutes: z.number().int().positive().optional(),
+  queue_enabled: z.boolean().optional().default(false), // 排队运行
   is_public: z.boolean().optional().default(false), // 是否公开到组织
 });
 
@@ -48,6 +49,7 @@ export const workflowPresetGroupSummarySchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   auto_unlock_minutes: z.number().nullable(),
+  queue_enabled: z.boolean(),
   share_token: z.string(),
 });
 export type WorkflowPresetGroupSummaryDto = z.infer<typeof workflowPresetGroupSummarySchema>;
@@ -151,6 +153,21 @@ export const workflowPresetGroupSubPresetSchema = z.object({
 });
 export type WorkflowPresetGroupSubPresetDto = z.infer<typeof workflowPresetGroupSubPresetSchema>;
 
+export const presetQueueItemSchema = z.object({
+  id: z.string(),
+  preset_id: z.string(),
+  preset_name: z.string(),
+  preset_index: z.number(),
+  queued_by: z.string(),
+  queued_by_user: workflowPresetUserSchema.nullable(),
+  branch: z.string(),
+  inputs: inputsSchema.nullable(),
+  position: z.number(),
+  status: z.enum(["waiting", "running", "completed", "failed", "cancelled"]),
+  created_at: z.string(),
+});
+export type PresetQueueItemDto = z.infer<typeof presetQueueItemSchema>;
+
 export const workflowPresetGroupDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -159,12 +176,14 @@ export const workflowPresetGroupDetailSchema = z.object({
   default_branch: z.string(),
   default_inputs: inputsSchema.nullable(),
   auto_unlock_minutes: z.number().nullable(),
+  queue_enabled: z.boolean(),
   share_token: z.string(),
   created_by: z.string(),
   created_at: z.string(),
   repository: workflowPresetRepositorySchema,
   creator: workflowPresetUserSchema,
   presets: z.array(workflowPresetGroupSubPresetSchema),
+  queue: z.array(presetQueueItemSchema).optional(),
   workflow_inputs: z.record(z.string(), workflowInputDefSchema),
 });
 export type WorkflowPresetGroupDetailDto = z.infer<typeof workflowPresetGroupDetailSchema>;

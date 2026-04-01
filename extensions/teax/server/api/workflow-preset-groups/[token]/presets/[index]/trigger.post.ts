@@ -1,14 +1,18 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNotNull } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireAuth } from "~~/server/utils/auth";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { buildTriggerLockRefresh } from "~~/server/services/preset-lock.service";
+import { findOrCreateQueue, enqueue, getRunningCount } from "~~/server/queue-kit/service";
+import { buildWorkflowQueueKey } from "~~/server/queue-services/preset-workflow";
 
 /**
  * 触发子预设的 CI
  * - 锁定者：使用当前配置触发
  * - 非锁定者：也使用当前配置触发（不能修改）
- * - 如果有 CI 正在运行，不能触发新的
+ * - 如果有 CI 正在运行：
+ *   - queue_enabled=true → 加入排队队列
+ *   - queue_enabled=false → 返回 409
  */
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event);
@@ -33,6 +37,7 @@ export default defineEventHandler(async (event) => {
       workflow_path: schema.workflowPresetGroups.workflow_path,
       repository_id: schema.workflowPresetGroups.repository_id,
       auto_unlock_minutes: schema.workflowPresetGroups.auto_unlock_minutes,
+      queue_enabled: schema.workflowPresetGroups.queue_enabled,
     })
     .from(schema.workflowPresetGroups)
     .where(eq(schema.workflowPresetGroups.share_token, token));
@@ -56,8 +61,84 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Preset not found" });
   }
 
-  // 检查是否有 CI 正在运行
-  if (preset.current_run_id) {
+  const branch = preset.branch;
+  const inputs = (preset.inputs || {}) as Record<string, string | boolean | number>;
+
+  // 检查是否有 CI 正在运行（全局 workflow 维度）
+  const queueKey = buildWorkflowQueueKey(group.repository_id, group.workflow_path);
+
+  let isRunning = !!preset.current_run_id;
+  if (!isRunning && group.queue_enabled) {
+    // 跨组检查同仓库同 workflow 下所有 preset 的 current_run_id
+    const groups = await db
+      .select({ id: schema.workflowPresetGroups.id })
+      .from(schema.workflowPresetGroups)
+      .where(
+        and(
+          eq(schema.workflowPresetGroups.repository_id, group.repository_id),
+          eq(schema.workflowPresetGroups.workflow_path, group.workflow_path),
+        ),
+      );
+    for (const g of groups) {
+      const [running] = await db
+        .select({ id: schema.workflowPresets.id })
+        .from(schema.workflowPresets)
+        .where(
+          and(
+            eq(schema.workflowPresets.group_id, g.id),
+            isNotNull(schema.workflowPresets.current_run_id),
+          ),
+        )
+        .limit(1);
+      if (running) {
+        isRunning = true;
+        break;
+      }
+    }
+    // 也检查通用队列中是否有 running 的任务
+    if (!isRunning) {
+      const queue = await findOrCreateQueue({
+        queueKey,
+        name: `Workflow: ${group.workflow_path}`,
+        autoRun: true,
+      });
+      const runningCount = await getRunningCount(queue.id);
+      if (runningCount > 0) isRunning = true;
+    }
+  }
+
+  if (isRunning) {
+    // 排队模式：加入通用队列
+    if (group.queue_enabled) {
+      const queue = await findOrCreateQueue({
+        queueKey,
+        name: `Workflow: ${group.workflow_path}`,
+        autoRun: true,
+        createdBy: session.user.id,
+      });
+
+      const result = await enqueue({
+        queueId: queue.id,
+        payload: {
+          preset_id: preset.id,
+          group_id: group.id,
+          queued_by: session.user.id,
+          branch,
+          inputs,
+        },
+        createdBy: session.user.id,
+      });
+
+      return {
+        success: true,
+        queued: true,
+        queue_item_id: result.itemId,
+        position: result.position,
+        message: `已加入排队队列，当前排队位置: ${result.position}`,
+      };
+    }
+
+    // 非排队模式：返回 409
     throw createError({ statusCode: 409, message: "A CI run is already in progress" });
   }
 
@@ -85,8 +166,6 @@ export default defineEventHandler(async (event) => {
 
   // 触发 Gitea Actions
   const gitea = await useGiteaSdk(event).role("user");
-  const branch = preset.branch;
-  const inputs = preset.inputs || {};
 
   try {
     // dispatchWorkflow 不返回 run_id，需要后续通过其他方式获取
@@ -95,7 +174,7 @@ export default defineEventHandler(async (event) => {
       repoName,
       group.workflow_path,
       branch,
-      inputs as Record<string, string | boolean | number>,
+      inputs,
     );
 
     // 更新子预设状态（暂时不设置 current_run_id，因为 dispatch 不返回）
@@ -130,6 +209,7 @@ export default defineEventHandler(async (event) => {
 
     return {
       success: true,
+      queued: false,
       message: "Workflow dispatched successfully",
     };
   } catch (error) {

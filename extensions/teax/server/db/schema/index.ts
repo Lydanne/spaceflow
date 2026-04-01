@@ -9,4 +9,5 @@ export * from "./approval-flow";
 export * from "./workflow-preset-group";
 export * from "./workflow-preset";
 export * from "./workflow-preset-history";
+export * from "./task-queue";
 export * from "./task-log";

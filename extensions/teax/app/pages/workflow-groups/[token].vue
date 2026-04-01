@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { WorkflowPresetGroupDetailDto, WorkflowPresetGroupSubPresetDto } from "~~/server/shared/dto";
+import type { WorkflowPresetGroupDetailDto, WorkflowPresetGroupSubPresetDto, PresetQueueItemDto } from "~~/server/shared/dto";
 
 definePageMeta({
   layout: "default",
@@ -146,16 +146,91 @@ async function unlockPreset(index: number) {
 async function triggerPreset(index: number) {
   triggeringIndex.value = index;
   try {
-    await $fetch(`/api/workflow-preset-groups/${token.value}/presets/${index}/trigger`, {
-      method: "POST",
-    });
+    const result = await $fetch<{ success: boolean; queued?: boolean; position?: number; message?: string }>(
+      `/api/workflow-preset-groups/${token.value}/presets/${index}/trigger`,
+      { method: "POST" },
+    );
     await refresh();
-    alert("工作流已触发");
+    if (result.queued) {
+      toast.add({ title: result.message || `已加入排队队列，位置: ${result.position}`, color: "info" });
+    } else {
+      toast.add({ title: "工作流已触发", color: "success" });
+    }
   } catch (err) {
     console.error("Failed to trigger preset:", err);
-    alert((err as { data?: { message?: string } })?.data?.message || "触发失败");
+    toast.add({ title: (err as { data?: { message?: string } })?.data?.message || "触发失败", color: "error" });
   } finally {
     triggeringIndex.value = null;
+  }
+}
+
+// 排队开关
+const togglingQueue = ref(false);
+async function toggleQueueEnabled() {
+  if (!groupData.value) return;
+  togglingQueue.value = true;
+  try {
+    const newVal = !groupData.value.queue_enabled;
+    await $fetch(`/api/workflow-preset-groups/${token.value}`, {
+      method: "PATCH",
+      body: { queue_enabled: newVal },
+    });
+    await refresh();
+    toast.add({ title: newVal ? "已开启排队运行" : "已关闭排队运行", color: "success" });
+  } catch (err) {
+    console.error("Failed to toggle queue:", err);
+    toast.add({ title: "操作失败", color: "error" });
+  } finally {
+    togglingQueue.value = false;
+  }
+}
+
+// 排队队列
+const waitingQueue = computed<PresetQueueItemDto[]>(() => {
+  return (groupData.value?.queue || []) as PresetQueueItemDto[];
+});
+
+// 队列面板折叠状态
+const queuePanelOpen = ref(true);
+
+// 移除队列项（管理员）
+const removingItemId = ref<string | null>(null);
+async function removeQueueItem(itemId: string) {
+  removingItemId.value = itemId;
+  try {
+    await $fetch(`/api/queues/items/${itemId}`, { method: "DELETE" });
+    await refresh();
+    toast.add({ title: "已移除排队项", color: "success" });
+  } catch (err) {
+    console.error("Failed to remove queue item:", err);
+    toast.add({ title: (err as { data?: { message?: string } })?.data?.message || "移除失败", color: "error" });
+  } finally {
+    removingItemId.value = null;
+  }
+}
+
+// 强制触发下一个（管理员）
+const forcingTrigger = ref(false);
+async function forceTriggerNext() {
+  const queueId = (groupData.value as Record<string, unknown> | undefined)?.queue_id as string | undefined;
+  if (!queueId) {
+    toast.add({ title: "队列尚未创建", color: "warning" });
+    return;
+  }
+  forcingTrigger.value = true;
+  try {
+    const result = await $fetch<{ triggered: boolean; message?: string }>(`/api/queues/${queueId}/trigger`, { method: "POST" });
+    await refresh();
+    if (result.triggered) {
+      toast.add({ title: "已强制触发下一个任务", color: "success" });
+    } else {
+      toast.add({ title: result.message || "当前无可触发的任务", color: "info" });
+    }
+  } catch (err) {
+    console.error("Failed to force trigger:", err);
+    toast.add({ title: (err as { data?: { message?: string } })?.data?.message || "触发失败", color: "error" });
+  } finally {
+    forcingTrigger.value = false;
   }
 }
 
@@ -461,214 +536,368 @@ function getStatusText(preset: WorkflowPresetGroupSubPresetDto): string {
         </div>
       </div>
 
-      <!-- 子预设列表 -->
-      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div
-          v-for="preset in groupData.presets"
-          :key="preset.id"
-          class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm flex flex-col"
-        >
-          <!-- 卡片头部 -->
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span class="font-medium text-gray-900 dark:text-white">
-                {{ preset.name }}
-              </span>
-              <UBadge
-                :color="getStatusColor(preset.status)"
-                size="xs"
-              >
-                {{ getStatusText(preset) }}
-              </UBadge>
-            </div>
-            <span class="text-xs text-gray-400">
-              #{{ preset.preset_index }}
-            </span>
+      <!-- 排队运行设置 -->
+      <div
+        v-if="canManagePresets"
+        class="mb-6 flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+      >
+        <UIcon
+          name="i-lucide-list-ordered"
+          class="w-5 h-5 text-gray-500"
+        />
+        <div class="flex-1">
+          <div class="font-medium text-sm text-gray-900 dark:text-white">
+            排队运行
+          </div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">
+            开启后，当 workflow 有 CI 在运行时，新的触发会自动排队等待
+          </div>
+        </div>
+        <USwitch
+          :model-value="groupData.queue_enabled"
+          :loading="togglingQueue"
+          @update:model-value="toggleQueueEnabled"
+        />
+      </div>
+
+      <!-- 主体：左右两栏 -->
+      <div class="flex gap-6 items-start">
+        <!-- 左侧：子预设列表 -->
+        <div class="flex-1 min-w-0">
+          <!-- 非管理员但已开启排队时的提示 -->
+          <div
+            v-if="groupData.queue_enabled && !canManagePresets"
+            class="mb-4 flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-300"
+          >
+            <UIcon
+              name="i-lucide-list-ordered"
+              class="w-4 h-4"
+            />
+            <span>此预设组已开启排队运行模式</span>
           </div>
 
-          <!-- 配置信息 -->
-          <div class="text-sm text-gray-600 dark:text-gray-400 mb-4 space-y-1">
-            <div class="flex items-center gap-1">
-              <UIcon
-                name="i-lucide-git-branch"
-                class="w-3 h-3"
-              />
-              <span>{{ preset.branch }}</span>
-            </div>
+          <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div
-              v-if="preset.auto_unlock_at"
-              class="flex items-center gap-1"
+              v-for="preset in groupData.presets"
+              :key="preset.id"
+              class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 shadow-sm flex flex-col"
+            >
+              <!-- 卡片头部 -->
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="font-medium text-gray-900 dark:text-white">
+                    {{ preset.name }}
+                  </span>
+                  <UBadge
+                    :color="getStatusColor(preset.status)"
+                    size="xs"
+                  >
+                    {{ getStatusText(preset) }}
+                  </UBadge>
+                </div>
+                <span class="text-xs text-gray-400">
+                  #{{ preset.preset_index }}
+                </span>
+              </div>
+
+              <!-- 配置信息 -->
+              <div class="text-sm text-gray-600 dark:text-gray-400 mb-4 space-y-1">
+                <div class="flex items-center gap-1">
+                  <UIcon
+                    name="i-lucide-git-branch"
+                    class="w-3 h-3"
+                  />
+                  <span>{{ preset.branch }}</span>
+                </div>
+                <div
+                  v-if="preset.auto_unlock_at"
+                  class="flex items-center gap-1"
+                >
+                  <UIcon
+                    name="i-lucide-clock"
+                    class="w-3 h-3"
+                  />
+                  <span>自动解锁: {{ formatTime(preset.auto_unlock_at) }}</span>
+                </div>
+              </div>
+
+              <!-- 锁定者信息 -->
+              <div
+                v-if="preset.locked_by_user"
+                class="flex items-center gap-2 mb-4 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded"
+              >
+                <UAvatar
+                  :src="preset.locked_by_user.avatar_url || undefined"
+                  :alt="preset.locked_by_user.name"
+                  size="xs"
+                />
+                <span class="text-sm text-yellow-700 dark:text-yellow-300">
+                  {{ preset.locked_by_user.name }} 锁定于 {{ formatTime(preset.locked_at) }}
+                </span>
+              </div>
+
+              <!-- 操作按钮 -->
+              <div class="flex gap-2 flex-wrap mt-auto pt-4">
+                <!-- 未锁定状态 -->
+                <template v-if="!preset.locked_by">
+                  <UButton
+                    v-if="loggedIn"
+                    color="primary"
+                    size="sm"
+                    :loading="lockingIndex === preset.preset_index"
+                    @click="lockPreset(preset.preset_index)"
+                  >
+                    <UIcon
+                      name="i-lucide-lock"
+                      class="w-4 h-4 mr-1"
+                    />
+                    锁定
+                  </UButton>
+                  <UButton
+                    color="neutral"
+                    size="sm"
+                    @click="goToPreset(preset)"
+                  >
+                    <UIcon
+                      name="i-lucide-external-link"
+                      class="w-4 h-4 mr-1"
+                    />
+                    打开
+                  </UButton>
+                  <UButton
+                    v-if="canManagePresets"
+                    color="error"
+                    variant="ghost"
+                    size="sm"
+                    :loading="deletingIndex === preset.preset_index"
+                    @click="deletePreset(preset.preset_index)"
+                  >
+                    <UIcon
+                      name="i-lucide-trash-2"
+                      class="w-4 h-4"
+                    />
+                  </UButton>
+                </template>
+
+                <!-- 被我锁定 -->
+                <template v-else-if="isLockedByMe(preset)">
+                  <UButton
+                    color="warning"
+                    size="sm"
+                    :loading="unlockingIndex === preset.preset_index"
+                    @click="unlockPreset(preset.preset_index)"
+                  >
+                    <UIcon
+                      name="i-lucide-unlock"
+                      class="w-4 h-4 mr-1"
+                    />
+                    解锁
+                  </UButton>
+                  <UButton
+                    color="primary"
+                    size="sm"
+                    @click="goToPreset(preset)"
+                  >
+                    <UIcon
+                      name="i-lucide-play"
+                      class="w-4 h-4 mr-1"
+                    />
+                    触发
+                  </UButton>
+                  <UButton
+                    v-if="canManagePresets"
+                    color="error"
+                    variant="ghost"
+                    size="sm"
+                    :loading="deletingIndex === preset.preset_index"
+                    @click="deletePreset(preset.preset_index)"
+                  >
+                    <UIcon
+                      name="i-lucide-trash-2"
+                      class="w-4 h-4"
+                    />
+                  </UButton>
+                </template>
+
+                <!-- 被他人锁定 -->
+                <template v-else>
+                  <UButton
+                    color="neutral"
+                    size="sm"
+                    @click="goToPreset(preset)"
+                  >
+                    <UIcon
+                      name="i-lucide-external-link"
+                      class="w-4 h-4 mr-1"
+                    />
+                    打开
+                  </UButton>
+                  <UButton
+                    v-if="loggedIn"
+                    color="warning"
+                    variant="outline"
+                    size="sm"
+                    :loading="requestingUnlockIndex === preset.preset_index"
+                    @click="requestUnlock(preset.preset_index)"
+                  >
+                    <UIcon
+                      name="i-lucide-hand"
+                      class="w-4 h-4 mr-1"
+                    />
+                    申请解锁
+                  </UButton>
+                  <UButton
+                    v-if="canManagePresets"
+                    color="error"
+                    variant="ghost"
+                    size="sm"
+                    :loading="deletingIndex === preset.preset_index"
+                    @click="deletePreset(preset.preset_index)"
+                  >
+                    <UIcon
+                      name="i-lucide-trash-2"
+                      class="w-4 h-4"
+                    />
+                  </UButton>
+                </template>
+              </div>
+            </div>
+
+            <!-- 空状态 -->
+            <div
+              v-if="groupData.presets.length === 0"
+              class="col-span-full flex flex-col items-center justify-center py-12 text-gray-500"
             >
               <UIcon
-                name="i-lucide-clock"
-                class="w-3 h-3"
+                name="i-lucide-inbox"
+                class="w-12 h-12 mb-4"
               />
-              <span>自动解锁: {{ formatTime(preset.auto_unlock_at) }}</span>
+              <p>暂无子预设</p>
+              <UButton
+                v-if="canManagePresets"
+                icon="i-lucide-plus"
+                color="primary"
+                variant="soft"
+                class="mt-4"
+                @click="openAddPresetModal"
+              >
+                添加第一个子预设
+              </UButton>
             </div>
-          </div>
-
-          <!-- 锁定者信息 -->
-          <div
-            v-if="preset.locked_by_user"
-            class="flex items-center gap-2 mb-4 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded"
-          >
-            <UAvatar
-              :src="preset.locked_by_user.avatar_url || undefined"
-              :alt="preset.locked_by_user.name"
-              size="xs"
-            />
-            <span class="text-sm text-yellow-700 dark:text-yellow-300">
-              {{ preset.locked_by_user.name }} 锁定于 {{ formatTime(preset.locked_at) }}
-            </span>
-          </div>
-
-          <!-- 操作按钮 -->
-          <div class="flex gap-2 flex-wrap mt-auto pt-4">
-            <!-- 未锁定状态 -->
-            <template v-if="!preset.locked_by">
-              <UButton
-                v-if="loggedIn"
-                color="primary"
-                size="sm"
-                :loading="lockingIndex === preset.preset_index"
-                @click="lockPreset(preset.preset_index)"
-              >
-                <UIcon
-                  name="i-lucide-lock"
-                  class="w-4 h-4 mr-1"
-                />
-                锁定
-              </UButton>
-              <UButton
-                color="neutral"
-                size="sm"
-                @click="goToPreset(preset)"
-              >
-                <UIcon
-                  name="i-lucide-external-link"
-                  class="w-4 h-4 mr-1"
-                />
-                打开
-              </UButton>
-              <UButton
-                v-if="canManagePresets"
-                color="error"
-                variant="ghost"
-                size="sm"
-                :loading="deletingIndex === preset.preset_index"
-                @click="deletePreset(preset.preset_index)"
-              >
-                <UIcon
-                  name="i-lucide-trash-2"
-                  class="w-4 h-4"
-                />
-              </UButton>
-            </template>
-
-            <!-- 被我锁定 -->
-            <template v-else-if="isLockedByMe(preset)">
-              <UButton
-                color="warning"
-                size="sm"
-                :loading="unlockingIndex === preset.preset_index"
-                @click="unlockPreset(preset.preset_index)"
-              >
-                <UIcon
-                  name="i-lucide-unlock"
-                  class="w-4 h-4 mr-1"
-                />
-                解锁
-              </UButton>
-              <UButton
-                color="primary"
-                size="sm"
-                @click="goToPreset(preset)"
-              >
-                <UIcon
-                  name="i-lucide-play"
-                  class="w-4 h-4 mr-1"
-                />
-                触发
-              </UButton>
-              <UButton
-                v-if="canManagePresets"
-                color="error"
-                variant="ghost"
-                size="sm"
-                :loading="deletingIndex === preset.preset_index"
-                @click="deletePreset(preset.preset_index)"
-              >
-                <UIcon
-                  name="i-lucide-trash-2"
-                  class="w-4 h-4"
-                />
-              </UButton>
-            </template>
-
-            <!-- 被他人锁定 -->
-            <template v-else>
-              <UButton
-                color="neutral"
-                size="sm"
-                @click="goToPreset(preset)"
-              >
-                <UIcon
-                  name="i-lucide-external-link"
-                  class="w-4 h-4 mr-1"
-                />
-                打开
-              </UButton>
-              <UButton
-                v-if="loggedIn"
-                color="warning"
-                variant="outline"
-                size="sm"
-                :loading="requestingUnlockIndex === preset.preset_index"
-                @click="requestUnlock(preset.preset_index)"
-              >
-                <UIcon
-                  name="i-lucide-hand"
-                  class="w-4 h-4 mr-1"
-                />
-                申请解锁
-              </UButton>
-              <UButton
-                v-if="canManagePresets"
-                color="error"
-                variant="ghost"
-                size="sm"
-                :loading="deletingIndex === preset.preset_index"
-                @click="deletePreset(preset.preset_index)"
-              >
-                <UIcon
-                  name="i-lucide-trash-2"
-                  class="w-4 h-4"
-                />
-              </UButton>
-            </template>
           </div>
         </div>
 
-        <!-- 空状态 -->
+        <!-- 右侧：队列面板 -->
         <div
-          v-if="groupData.presets.length === 0"
-          class="col-span-full flex flex-col items-center justify-center py-12 text-gray-500"
+          v-if="groupData.queue_enabled"
+          class="w-72 shrink-0 sticky top-8"
         >
-          <UIcon
-            name="i-lucide-inbox"
-            class="w-12 h-12 mb-4"
-          />
-          <p>暂无子预设</p>
-          <UButton
-            v-if="canManagePresets"
-            icon="i-lucide-plus"
-            color="primary"
-            variant="soft"
-            class="mt-4"
-            @click="openAddPresetModal"
-          >
-            添加第一个子预设
-          </UButton>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+            <!-- 面板头部（可折叠） -->
+            <button
+              class="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors rounded-t-lg"
+              @click="queuePanelOpen = !queuePanelOpen"
+            >
+              <div class="flex items-center gap-2">
+                <UIcon
+                  name="i-lucide-list-ordered"
+                  class="w-5 h-5 text-blue-500"
+                />
+                <span class="font-medium text-gray-900 dark:text-white text-sm">
+                  排队队列
+                </span>
+                <UBadge
+                  v-if="waitingQueue.length > 0"
+                  color="info"
+                  size="xs"
+                >
+                  {{ waitingQueue.length }}
+                </UBadge>
+              </div>
+              <UIcon
+                :name="queuePanelOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                class="w-4 h-4 text-gray-400"
+              />
+            </button>
+
+            <!-- 面板内容 -->
+            <div
+              v-if="queuePanelOpen"
+              class="border-t border-gray-200 dark:border-gray-700"
+            >
+              <!-- 管理员操作按钮 -->
+              <div
+                v-if="isAdmin"
+                class="p-3 border-b border-gray-100 dark:border-gray-700"
+              >
+                <UButton
+                  icon="i-lucide-play"
+                  color="primary"
+                  variant="soft"
+                  size="xs"
+                  block
+                  :loading="forcingTrigger"
+                  :disabled="waitingQueue.length === 0"
+                  @click="forceTriggerNext"
+                >
+                  强制触发下一个
+                </UButton>
+              </div>
+
+              <!-- 队列列表 -->
+              <div
+                v-if="waitingQueue.length > 0"
+                class="max-h-80 overflow-y-auto"
+              >
+                <div
+                  v-for="(item, idx) in waitingQueue"
+                  :key="item.id"
+                  class="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 dark:border-gray-700 last:border-b-0 group"
+                >
+                  <span class="text-blue-500 font-mono text-xs w-5 text-center shrink-0">
+                    {{ idx + 1 }}
+                  </span>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {{ item.preset_name }}
+                    </div>
+                    <div class="text-xs text-gray-400 flex items-center gap-1">
+                      <span
+                        v-if="item.queued_by_user"
+                      >
+                        {{ item.queued_by_user.name }}
+                      </span>
+                      <span>&middot;</span>
+                      <span>{{ formatTime(item.created_at) }}</span>
+                    </div>
+                  </div>
+                  <!-- 管理员可移除 -->
+                  <UButton
+                    v-if="isAdmin"
+                    icon="i-lucide-x"
+                    color="error"
+                    variant="ghost"
+                    size="xs"
+                    class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    :loading="removingItemId === item.id"
+                    @click="removeQueueItem(item.id)"
+                  />
+                </div>
+              </div>
+
+              <!-- 空队列 -->
+              <div
+                v-else
+                class="p-4 text-center text-sm text-gray-400"
+              >
+                <UIcon
+                  name="i-lucide-inbox"
+                  class="w-6 h-6 mx-auto mb-1"
+                />
+                <p>暂无排队任务</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

@@ -38,6 +38,7 @@ export default defineEventHandler(async (event) => {
       default_branch: body.default_branch,
       default_inputs: body.default_inputs || {},
       auto_unlock_minutes: body.auto_unlock_minutes ?? 60,
+      queue_enabled: body.queue_enabled ?? false,
       share_token: groupToken,
       is_public: body.is_public,
       created_by: session.user.id,

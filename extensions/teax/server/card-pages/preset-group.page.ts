@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import { defineCardPage, guards, requireBinding, type EnhancedButtonConfig } from "~~/server/card-kit";
 import { useDB, schema } from "~~/server/db";
 import type { User } from "../db/schema";
+import { getQueueByKey, getWaitingCount } from "~~/server/queue-kit/service";
+import { buildWorkflowQueueKey } from "~~/server/queue-services/preset-workflow";
 
 function getPresetStatus(
   activeUserId: string,
@@ -50,6 +52,9 @@ export default defineCardPage({
         name: schema.workflowPresetGroups.name,
         description: schema.workflowPresetGroups.description,
         share_token: schema.workflowPresetGroups.share_token,
+        queue_enabled: schema.workflowPresetGroups.queue_enabled,
+        repository_id: schema.workflowPresetGroups.repository_id,
+        workflow_path: schema.workflowPresetGroups.workflow_path,
       })
       .from(schema.workflowPresetGroups)
       .where(eq(schema.workflowPresetGroups.share_token, groupToken))
@@ -96,6 +101,16 @@ export default defineCardPage({
       return acc;
     }, { mine: 0, idle: 0, busy: 0 });
 
+    // 查询排队队列（通用队列系统）
+    let queueCount = 0;
+    if (group.queue_enabled) {
+      const queueKey = buildWorkflowQueueKey(group.repository_id, group.workflow_path);
+      const queue = await getQueueByKey(queueKey);
+      if (queue) {
+        queueCount = await getWaitingCount(queue.id);
+      }
+    }
+
     const card = ctx.card({ title: `📦 ${group.name}`, theme: "blue" });
 
     if (group.description) {
@@ -106,10 +121,11 @@ export default defineCardPage({
       card.text("该预设组内暂无预设", true);
     } else {
       card.divider();
-      card.text(
-        `共 ${sortedPresets.length} 个子预设 · 🟡 ${summary.busy} · 🟢 ${summary.mine} · ⚪ ${summary.idle}`,
-        true,
-      );
+      let summaryText = `共 ${sortedPresets.length} 个子预设 · 🟡 ${summary.busy} · 🟢 ${summary.mine} · ⚪ ${summary.idle}`;
+      if (group.queue_enabled) {
+        summaryText += ` · 🕐 排队 ${queueCount}`;
+      }
+      card.text(summaryText, true);
       card.divider();
 
       const buttons: EnhancedButtonConfig[] = sortedPresets.map((preset) => {
