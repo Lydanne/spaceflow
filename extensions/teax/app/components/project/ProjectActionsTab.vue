@@ -145,6 +145,7 @@ const groupName = ref("");
 const groupDescription = ref("");
 const groupAutoUnlockMinutes = ref(60);
 const groupIsPublic = ref(false);
+const groupQueueEnabled = ref(false);
 const creatingGroup = ref(false);
 
 // 当前选中 workflow 的信息（用于 dispatch modal）
@@ -277,6 +278,7 @@ function openCreateGroupModal() {
   groupDescription.value = "";
   groupAutoUnlockMinutes.value = 60;
   groupIsPublic.value = false;
+  groupQueueEnabled.value = false;
   showCreateGroupModal.value = true;
 }
 
@@ -303,6 +305,7 @@ async function createPresetGroup() {
           default_branch: selectedBranch.value,
           default_inputs: { ...inputValues },
           auto_unlock_minutes: groupAutoUnlockMinutes.value,
+          queue_enabled: groupQueueEnabled.value,
           is_public: groupIsPublic.value,
         },
       },
@@ -1020,6 +1023,16 @@ function workflowFileName(path: string): string {
             </div>
 
             <div class="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div>
+                <label class="text-sm font-medium">排队运行</label>
+                <p class="text-xs text-gray-400">
+                  开启后，触发时如有 CI 正在运行，自动排队等待
+                </p>
+              </div>
+              <USwitch v-model="groupQueueEnabled" />
+            </div>
+
+            <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium">公开到组织</label>
                 <p class="text-xs text-gray-400">

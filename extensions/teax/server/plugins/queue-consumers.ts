@@ -1,6 +1,6 @@
-import { registerPresetWorkflowConsumer } from "~~/server/queue-services/preset-workflow";
+import { presetWorkflowQueue } from "~~/server/queue-services/preset-workflow";
 
 export default defineNitroPlugin(() => {
-  registerPresetWorkflowConsumer();
+  presetWorkflowQueue.register();
   console.log("[Queue] Consumers registered");
 });

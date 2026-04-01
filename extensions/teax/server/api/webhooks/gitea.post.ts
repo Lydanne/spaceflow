@@ -10,7 +10,7 @@ import {
 } from "~~/server/services/notification.service";
 import { clearCurrentRunId } from "~~/server/services/preset-queue.service";
 import { getQueueByKey, triggerNext } from "~~/server/queue-kit/service";
-import { buildWorkflowQueueKey } from "~~/server/queue-services/preset-workflow";
+import { presetWorkflowQueue } from "~~/server/queue-services/preset-workflow";
 import type { RepoNotifySettings } from "~~/shared/notify-rules";
 
 function normalizeWebhookSignature(input: string | undefined): string {
@@ -248,7 +248,7 @@ export default defineEventHandler(async (event) => {
     clearCurrentRunId(run.id).then(async (workflowKey) => {
       if (workflowKey) {
         console.log(`[webhook] Cleared current_run_id for run ${run.id}, checking queue for workflow ${workflowKey.workflowPath}`);
-        const queueKey = buildWorkflowQueueKey(workflowKey.repositoryId, workflowKey.workflowPath);
+        const queueKey = presetWorkflowQueue.buildQueueKey(workflowKey.repositoryId, workflowKey.workflowPath);
         const queue = await getQueueByKey(queueKey);
         if (queue) {
           await triggerNext(queue.id);

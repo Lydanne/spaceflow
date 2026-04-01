@@ -1,18 +1,20 @@
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireAuth } from "~~/server/utils/auth";
 import { useGiteaSdk } from "~~/server/utils/gitea";
-import { buildTriggerLockRefresh } from "~~/server/services/preset-lock.service";
-import { findOrCreateQueue, enqueue, getRunningCount } from "~~/server/queue-kit/service";
-import { buildWorkflowQueueKey } from "~~/server/queue-services/preset-workflow";
+import { buildTriggerLockRefresh, recordTriggerHistory } from "~~/server/services/preset-lock.service";
+import { presetWorkflowQueue } from "~~/server/queue-services/preset-workflow";
 
 /**
  * 触发子预设的 CI
- * - 锁定者：使用当前配置触发
- * - 非锁定者：也使用当前配置触发（不能修改）
- * - 如果有 CI 正在运行：
- *   - queue_enabled=true → 加入排队队列
- *   - queue_enabled=false → 返回 409
+ *
+ * queue_enabled=true 时：
+ *   统一走 enqueueAndTrigger → consumer(dispatchAndPoll) → complete → triggerNext
+ *   空闲时立即执行，忙碌时排队等待，形成完整闭环。
+ *
+ * queue_enabled=false 时：
+ *   直接调用 gitea.dispatchWorkflow（原有逻辑）。
+ *   如果当前 preset 有 CI 运行中则返回 409。
  */
 export default defineEventHandler(async (event) => {
   const session = await requireAuth(event);
@@ -64,81 +66,53 @@ export default defineEventHandler(async (event) => {
   const branch = preset.branch;
   const inputs = (preset.inputs || {}) as Record<string, string | boolean | number>;
 
-  // 检查是否有 CI 正在运行（全局 workflow 维度）
-  const queueKey = buildWorkflowQueueKey(group.repository_id, group.workflow_path);
+  // ─── 队列模式：统一走 enqueueAndTrigger ─────────────────
+  if (group.queue_enabled) {
+    const queue = await presetWorkflowQueue.findOrCreate(
+      [group.repository_id, group.workflow_path],
+      { name: `Workflow: ${group.workflow_path}`, createdBy: session.user.id },
+    );
 
-  let isRunning = !!preset.current_run_id;
-  if (!isRunning && group.queue_enabled) {
-    // 跨组检查同仓库同 workflow 下所有 preset 的 current_run_id
-    const groups = await db
-      .select({ id: schema.workflowPresetGroups.id })
-      .from(schema.workflowPresetGroups)
-      .where(
-        and(
-          eq(schema.workflowPresetGroups.repository_id, group.repository_id),
-          eq(schema.workflowPresetGroups.workflow_path, group.workflow_path),
-        ),
-      );
-    for (const g of groups) {
-      const [running] = await db
-        .select({ id: schema.workflowPresets.id })
-        .from(schema.workflowPresets)
-        .where(
-          and(
-            eq(schema.workflowPresets.group_id, g.id),
-            isNotNull(schema.workflowPresets.current_run_id),
-          ),
-        )
-        .limit(1);
-      if (running) {
-        isRunning = true;
-        break;
-      }
-    }
-    // 也检查通用队列中是否有 running 的任务
-    if (!isRunning) {
-      const queue = await findOrCreateQueue({
-        queueKey,
-        name: `Workflow: ${group.workflow_path}`,
-        autoRun: true,
-      });
-      const runningCount = await getRunningCount(queue.id);
-      if (runningCount > 0) isRunning = true;
-    }
-  }
+    const result = await presetWorkflowQueue.enqueueAndTrigger(
+      queue.id,
+      {
+        preset_id: preset.id,
+        group_id: group.id,
+        queued_by: session.user.id,
+        branch,
+        inputs,
+      },
+      session.user.id,
+    );
 
-  if (isRunning) {
-    // 排队模式：加入通用队列
-    if (group.queue_enabled) {
-      const queue = await findOrCreateQueue({
-        queueKey,
-        name: `Workflow: ${group.workflow_path}`,
-        autoRun: true,
-        createdBy: session.user.id,
-      });
+    // 记录入队/触发历史（锁更新由 consumer 内 persistPresetTriggerResult 统一处理）
+    await recordTriggerHistory(preset.id, session.user.id, {
+      run_id: null,
+      run_number: null,
+      branch,
+      inputs,
+      ...(result.triggered ? {} : { queued: true, position: result.position }),
+    } as Parameters<typeof recordTriggerHistory>[2]);
 
-      const result = await enqueue({
-        queueId: queue.id,
-        payload: {
-          preset_id: preset.id,
-          group_id: group.id,
-          queued_by: session.user.id,
-          branch,
-          inputs,
-        },
-        createdBy: session.user.id,
-      });
-
+    if (result.triggered) {
       return {
         success: true,
-        queued: true,
-        queue_item_id: result.itemId,
-        position: result.position,
-        message: `已加入排队队列，当前排队位置: ${result.position}`,
+        queued: false,
+        message: "Workflow dispatched via queue",
       };
     }
 
-    // 非排队模式：返回 409
+    return {
+      success: true,
+      queued: true,
+      queue_item_id: result.itemId,
+      position: result.position,
+      message: `已加入排队队列，当前排队位置: ${result.position}`,
+    };
+  }
+
+  // ─── 非队列模式：直接触发 ──────────────────────────────
+  if (preset.current_run_id) {
     throw createError({ statusCode: 409, message: "A CI run is already in progress" });
   }
 
@@ -155,7 +129,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Repository not found" });
   }
 
-  // 从 full_name 解析 owner
   const parts = repo.full_name.split("/");
   const owner = parts[0] || "";
   const repoName = parts[1] || "";
@@ -164,11 +137,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, message: "Invalid repository full_name" });
   }
 
-  // 触发 Gitea Actions
   const gitea = await useGiteaSdk(event).role("user");
 
   try {
-    // dispatchWorkflow 不返回 run_id，需要后续通过其他方式获取
     await gitea.dispatchWorkflow(
       owner,
       repoName,
@@ -177,7 +148,6 @@ export default defineEventHandler(async (event) => {
       inputs,
     );
 
-    // 更新子预设状态（暂时不设置 current_run_id，因为 dispatch 不返回）
     await db.transaction(async (tx) => {
       const lockRefresh = buildTriggerLockRefresh({
         currentLockedBy: preset.locked_by,
@@ -195,15 +165,11 @@ export default defineEventHandler(async (event) => {
         })
         .where(eq(schema.workflowPresets.id, preset.id));
 
-      // 记录历史
       await tx.insert(schema.workflowPresetHistory).values({
         preset_id: preset.id,
         action: "trigger",
         actor_id: session.user.id,
-        details: {
-          branch,
-          inputs,
-        },
+        details: { branch, inputs },
       });
     });
 

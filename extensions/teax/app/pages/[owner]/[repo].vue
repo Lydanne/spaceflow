@@ -112,12 +112,6 @@ const activeTab = computed(() => {
           >
             {{ project.watching ? "Watching" : "Watch" }}
           </UButton>
-          <UBadge
-            color="neutral"
-            variant="subtle"
-          >
-            系统 Webhook
-          </UBadge>
         </div>
       </div>
 

@@ -3,7 +3,7 @@ import { defineCardPage, guards, requireBinding, type EnhancedButtonConfig } fro
 import { useDB, schema } from "~~/server/db";
 import type { User } from "../db/schema";
 import { getQueueByKey, getWaitingCount } from "~~/server/queue-kit/service";
-import { buildWorkflowQueueKey } from "~~/server/queue-services/preset-workflow";
+import { presetWorkflowQueue } from "~~/server/queue-services/preset-workflow";
 
 function getPresetStatus(
   activeUserId: string,
@@ -104,7 +104,7 @@ export default defineCardPage({
     // 查询排队队列（通用队列系统）
     let queueCount = 0;
     if (group.queue_enabled) {
-      const queueKey = buildWorkflowQueueKey(group.repository_id, group.workflow_path);
+      const queueKey = presetWorkflowQueue.buildQueueKey(group.repository_id, group.workflow_path);
       const queue = await getQueueByKey(queueKey);
       if (queue) {
         queueCount = await getWaitingCount(queue.id);

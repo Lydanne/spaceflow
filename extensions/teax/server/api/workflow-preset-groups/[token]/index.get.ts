@@ -3,7 +3,7 @@ import { parse as parseYaml } from "yaml";
 import { useDB, schema } from "~~/server/db";
 import { useGiteaSdk } from "~~/server/utils/gitea";
 import { getQueueByKey, getQueueItems } from "~~/server/queue-kit/service";
-import { buildWorkflowQueueKey } from "~~/server/queue-services/preset-workflow";
+import { presetWorkflowQueue } from "~~/server/queue-services/preset-workflow";
 
 interface WorkflowInput {
   description?: string;
@@ -169,7 +169,7 @@ export default defineEventHandler(async (event) => {
   let queueId: string | null = null;
 
   if (group.queue_enabled) {
-    const queueKey = buildWorkflowQueueKey(group.repository_id, group.workflow_path);
+    const queueKey = presetWorkflowQueue.buildQueueKey(group.repository_id, group.workflow_path);
     const queue = await getQueueByKey(queueKey);
 
     if (queue) {
