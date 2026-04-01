@@ -69,7 +69,7 @@ export const presetWorkflowQueue
         inputs,
       });
 
-      // 持久化触发结果
+      // 持久化触发结果（写入 current_run_id，webhook 回调时据此关联）
       await persistPresetTriggerResult({
         preset: {
           ...preset,
@@ -83,11 +83,9 @@ export const presetWorkflowQueue
         inputs,
       });
 
-      // 标记完成
-      await ctx.complete({
-        run_id: runResult.runId,
-        run_number: runResult.runNumber,
-      });
+      // 注意：不调用 ctx.complete()，queue item 保持 running 状态。
+      // CI 完成后由 webhook handler（gitea.post.ts）调用 completeRunningItem 来 complete，
+      // 从而确保队列串行执行（下一个任务等前一个 CI 真正跑完才触发）。
 
-      console.log(`[preset-workflow-consumer] Triggered item ${ctx.item.id}, run_id=${runResult.runId}`);
+      console.log(`[preset-workflow-consumer] Dispatched item ${ctx.item.id}, run_id=${runResult.runId}, waiting for webhook to complete`);
     });

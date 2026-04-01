@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Queue not found" });
   }
 
-  const item = await triggerNext(queueId);
+  const item = await triggerNext(queueId, { force: true });
 
   if (!item) {
     return {

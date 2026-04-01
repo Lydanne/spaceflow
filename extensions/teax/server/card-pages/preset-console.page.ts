@@ -247,7 +247,22 @@ export default defineCardPage({
           finalBranch,
           finalInputs,
           lockInfo,
+          queued,
+          position,
         } = runResult;
+
+        // 排队模式：显示排队卡片
+        if (queued) {
+          await updateCard(
+            new EnhancedCardBuilder(
+              { title: "📋 已加入排队队列", theme: "blue" },
+              "",
+            )
+              .text(`当前排队位置: **${position}**\n工作流将在前序任务完成后自动触发`, true)
+              .build(),
+          );
+          return;
+        }
 
         // Build result card
         const extraLines: string[] = [];

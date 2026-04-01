@@ -42,9 +42,13 @@ export default defineEventHandler(async (event) => {
 
   return {
     success: true,
-    message: "工作流已触发",
+    message: runResult.queued
+      ? `已加入排队队列，当前排队位置: ${runResult.position}`
+      : "工作流已触发",
     run_id: runResult.runId,
     run_number: runResult.runNumber,
     lock_info: runResult.lockInfo,
+    queued: runResult.queued ?? false,
+    position: runResult.position,
   };
 });

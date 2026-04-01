@@ -234,7 +234,7 @@ export async function getWaitingCount(queueId: string): Promise<number> {
  * 触发队列中下一个等待的任务
  * 集群安全：使用事务 + FOR UPDATE SKIP LOCKED，同一任务只会被一个节点获取
  */
-export async function triggerNext(queueId: string): Promise<TaskQueueItem | null> {
+export async function triggerNext(queueId: string, opts?: { force?: boolean }): Promise<TaskQueueItem | null> {
   const db = useDB();
 
   const queue = await getQueueById(queueId);
@@ -242,18 +242,20 @@ export async function triggerNext(queueId: string): Promise<TaskQueueItem | null
 
   // 在事务中原子地：检查并发 → 锁定 waiting 项 → 标记 running
   const claimedItem = await db.transaction(async (tx) => {
-    // 事务内计数运行中任务，保证一致性
-    const [runningRow] = await tx
-      .select({ count: sql<number>`count(*)` })
-      .from(schema.taskQueueItems)
-      .where(
-        and(
-          eq(schema.taskQueueItems.queue_id, queueId),
-          eq(schema.taskQueueItems.status, "running"),
-        ),
-      );
-    const running = Number(runningRow?.count ?? 0);
-    if (running >= queue.concurrency) return null;
+    if (!opts?.force) {
+      // 事务内计数运行中任务，保证一致性
+      const [runningRow] = await tx
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.taskQueueItems)
+        .where(
+          and(
+            eq(schema.taskQueueItems.queue_id, queueId),
+            eq(schema.taskQueueItems.status, "running"),
+          ),
+        );
+      const running = Number(runningRow?.count ?? 0);
+      if (running >= queue.concurrency) return null;
+    }
 
     // FOR UPDATE SKIP LOCKED: 被其他节点锁定的行会被跳过，避免重复执行
     const rows = await tx.execute(

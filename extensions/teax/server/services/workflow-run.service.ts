@@ -1,10 +1,14 @@
+import { eq } from "drizzle-orm";
+import { useDB, schema } from "~~/server/db";
 import type { GiteaService } from "~~/server/utils/gitea";
 import { dispatchAndPoll } from "~~/server/utils/workflow-trigger";
 import type { ResolvedPreset } from "~~/server/utils/resolve-preset";
+import { recordTriggerHistory } from "./preset-lock.service";
 import {
   buildRunConfig,
   persistPresetTriggerResult,
 } from "./preset-run.service";
+import { presetWorkflowQueue } from "~~/server/queue-services/preset-workflow";
 
 export interface RunWorkflowWithPresetParams {
   preset: ResolvedPreset["preset"];
@@ -28,6 +32,10 @@ export interface RunWorkflowWithPresetResult {
     locked_at: string;
     auto_unlock_at: string | null;
   } | null;
+  /** 是否被加入排队队列 */
+  queued?: boolean;
+  /** 排队位置 */
+  position?: number;
 }
 
 /**
@@ -58,6 +66,55 @@ export async function runWorkflowWithPreset(
     inputOverrides,
   });
 
+  // ─── 队列模式：预设组开启 queue_enabled 时统一走 enqueueAndTrigger ───
+  if (preset.group_id) {
+    const db = useDB();
+    const [group] = await db
+      .select({ queue_enabled: schema.workflowPresetGroups.queue_enabled })
+      .from(schema.workflowPresetGroups)
+      .where(eq(schema.workflowPresetGroups.id, preset.group_id))
+      .limit(1);
+
+    if (group?.queue_enabled) {
+      const queue = await presetWorkflowQueue.findOrCreate(
+        [preset.repository_id, preset.workflow_path],
+        { name: `Workflow: ${preset.workflow_path}`, createdBy: actorId },
+      );
+
+      const result = await presetWorkflowQueue.enqueueAndTrigger(
+        queue.id,
+        {
+          preset_id: preset.id,
+          group_id: preset.group_id,
+          queued_by: actorId,
+          branch: finalBranch,
+          inputs: finalInputs as Record<string, string | boolean | number>,
+        },
+        actorId,
+      );
+
+      await recordTriggerHistory(preset.id, actorId, {
+        run_id: null,
+        run_number: null,
+        branch: finalBranch,
+        inputs: finalInputs,
+        ...(result.triggered ? {} : { queued: true, position: result.position }),
+      } as Parameters<typeof recordTriggerHistory>[2]);
+
+      return {
+        finalBranch,
+        finalInputs,
+        canModifyOverride,
+        runId: null,
+        runNumber: null,
+        lockInfo: null,
+        queued: !result.triggered,
+        position: result.position,
+      };
+    }
+  }
+
+  // ─── 非队列模式：直接 dispatch ─────────────────────────
   if (preset.current_run_id) {
     try {
       const currentRun = await gitea.getWorkflowRun(owner, repoName, preset.current_run_id);
