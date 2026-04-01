@@ -173,7 +173,7 @@ async function confirmDelete() {
         class="flex justify-center pt-4"
       >
         <UPagination
-          v-model="page"
+          v-model:page="page"
           :total="total"
           :items-per-page="limit"
         />
