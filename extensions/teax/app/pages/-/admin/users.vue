@@ -11,7 +11,8 @@ const page = ref(1);
 const limit = 20;
 
 const { data, refresh, status } = await useFetch<AdminUsersResponseDto>("/api/admin/users", {
-  query: () => ({ page: page.value, limit }),
+  query: { page, limit },
+  watch: [page],
 });
 
 const users = computed(() => data.value?.data ?? []);
