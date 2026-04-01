@@ -16,10 +16,11 @@ interface WorkflowPayload {
 /**
  * Preset workflow 队列定义
  *
- * queue_key 格式: "workflow:{repositoryId}:{workflowPath}"
+ * queue_key 格式: "workflow:{repositoryId}:{workflowPath}:{branch}"
+ * 按仓库 + workflow 文件 + 分支隔离队列
  */
 export const presetWorkflowQueue
-  = defineQueue("workflow:{repositoryId}:{workflowPath}")
+  = defineQueue("workflow:{repositoryId}:{workflowPath}:{branch}")
     .defaults({ concurrency: 1, autoRun: true })
     .handler<WorkflowPayload>(async (params, payload, ctx) => {
       const db = useDB();

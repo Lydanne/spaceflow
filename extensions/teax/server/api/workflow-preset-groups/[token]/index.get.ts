@@ -2,8 +2,7 @@ import { eq } from "drizzle-orm";
 import { parse as parseYaml } from "yaml";
 import { useDB, schema } from "~~/server/db";
 import { useGiteaSdk } from "~~/server/utils/gitea";
-import { getQueueByKey, getQueueItems } from "~~/server/queue-kit/service";
-import { presetWorkflowQueue } from "~~/server/queue-services/preset-workflow";
+import { getQueueItemsByKeyPrefix, getQueueIdsByKeyPrefix } from "~~/server/queue-kit/service";
 
 interface WorkflowInput {
   description?: string;
@@ -169,12 +168,13 @@ export default defineEventHandler(async (event) => {
   let queueId: string | null = null;
 
   if (group.queue_enabled) {
-    const queueKey = presetWorkflowQueue.buildQueueKey(group.repository_id, group.workflow_path);
-    const queue = await getQueueByKey(queueKey);
+    const keyPrefix = `workflow:${group.repository_id}:${group.workflow_path}:`;
+    const queueIds = await getQueueIdsByKeyPrefix(keyPrefix);
+    // 取第一个 queueId 作为面板的标识（用于重置等操作）
+    queueId = queueIds[0] ?? null;
 
-    if (queue) {
-      queueId = queue.id;
-      const rawQueue = await getQueueItems(queue.id, "waiting");
+    if (queueIds.length > 0) {
+      const rawQueue = await getQueueItemsByKeyPrefix(keyPrefix, "waiting");
 
       // 获取排队者用户信息
       const creatorIds = [...new Set(rawQueue.map((q) => q.created_by).filter(Boolean))] as string[];
@@ -207,7 +207,7 @@ export default defineEventHandler(async (event) => {
           inputs: (payload.inputs as Record<string, string | boolean | number>) || null,
           position: q.position,
           status: q.status || "waiting",
-          created_at: q.created_at?.toISOString() || "",
+          created_at: q.created_at instanceof Date ? q.created_at.toISOString() : String(q.created_at || ""),
         };
       });
     }

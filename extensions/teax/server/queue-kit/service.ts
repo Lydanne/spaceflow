@@ -182,6 +182,38 @@ export async function getQueueItems(
 }
 
 /**
+ * 按 queue_key 前缀获取所有匹配队列的任务列表
+ */
+export async function getQueueItemsByKeyPrefix(
+  keyPrefix: string,
+  status?: string,
+): Promise<TaskQueueItem[]> {
+  const db = useDB();
+  const conditions = [sql`tq.queue_key LIKE ${keyPrefix + "%"}`];
+  if (status) {
+    conditions.push(sql`tqi.status = ${status}`);
+  }
+  const rows = await db.execute(
+    sql`SELECT tqi.* FROM task_queue_items tqi
+        JOIN task_queues tq ON tq.id = tqi.queue_id
+        WHERE ${sql.join(conditions, sql` AND `)}
+        ORDER BY tqi.position ASC`,
+  );
+  return rows as unknown as TaskQueueItem[];
+}
+
+/**
+ * 按 queue_key 前缀获取所有匹配队列的 ID 列表
+ */
+export async function getQueueIdsByKeyPrefix(keyPrefix: string): Promise<string[]> {
+  const db = useDB();
+  const rows = await db.execute(
+    sql`SELECT id FROM task_queues WHERE queue_key LIKE ${keyPrefix + "%"}`,
+  );
+  return (rows as unknown as { id: string }[]).map((r) => r.id);
+}
+
+/**
  * 获取单个任务项
  */
 export async function getQueueItem(itemId: string): Promise<TaskQueueItem | null> {
@@ -226,6 +258,25 @@ export async function getWaitingCount(queueId: string): Promise<number> {
       ),
     );
   return Number(row?.count ?? 0);
+}
+
+/**
+ * 按 queue_key 前缀查询所有匹配队列的 waiting 数量总和
+ * 用于跨分支统计排队数
+ */
+export async function getWaitingCountByKeyPrefix(keyPrefix: string): Promise<number> {
+  const db = useDB();
+  const [row] = await db.execute(
+    sql`SELECT COALESCE(SUM(sub.cnt), 0)::int AS count
+        FROM (
+          SELECT COUNT(*) AS cnt
+          FROM task_queue_items tqi
+          JOIN task_queues tq ON tq.id = tqi.queue_id
+          WHERE tq.queue_key LIKE ${keyPrefix + "%"}
+            AND tqi.status = 'waiting'
+        ) sub`,
+  );
+  return Number((row as { count: number } | undefined)?.count ?? 0);
 }
 
 // ─── 触发 / 完成 / 失败 / 取消 ──────────────────────────────

@@ -1,12 +1,11 @@
 import { eq } from "drizzle-orm";
 import { useDB, schema } from "~~/server/db";
 import { requireAdmin } from "~~/server/utils/auth";
-import { resetQueue, getQueueById } from "~~/server/queue-kit/service";
-import { presetWorkflowQueue } from "~~/server/queue-services/preset-workflow";
+import { resetQueue, getQueueById, getQueueIdsByKeyPrefix } from "~~/server/queue-kit/service";
 
 /**
  * POST /api/queues/:queueId/reset — 重置队列状态
- * 强制完成所有 running items，取消所有 waiting items，
+ * 通过任意一个 queueId 找到同 workflow 的所有分支队列，全部重置。
  * 同时清除关联预设的 current_run_id。
  * 仅管理员可用。
  */
@@ -23,35 +22,43 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: "Queue not found" });
   }
 
-  // 重置队列（complete running + cancel waiting）
-  const { completedCount, cancelledCount } = await resetQueue(queueId);
+  // 从 queue_key "workflow:{repoId}:{workflowPath}:{branch}" 中提取前缀（去掉 branch）
+  const parts = queue.queue_key.split(":");
+  // 前缀 = "workflow:{repoId}:{workflowPath}:"
+  const keyPrefix = parts.slice(0, 3).join(":") + ":";
 
-  // 通过 queue_key 解析出 repositoryId + workflowPath，找到对应的 group
-  const params = presetWorkflowQueue.parseQueueKey(queue.queue_key);
-  if (params) {
+  // 找到所有分支的队列并逐一重置
+  const allQueueIds = await getQueueIdsByKeyPrefix(keyPrefix);
+  let totalCompleted = 0;
+  let totalCancelled = 0;
+  for (const qId of allQueueIds) {
+    const { completedCount, cancelledCount } = await resetQueue(qId);
+    totalCompleted += completedCount;
+    totalCancelled += cancelledCount;
+  }
+
+  // 通过 queue_key 解析 repositoryId，找到对应的 group 并清除 current_run_id
+  const repositoryId = parts[1];
+  if (repositoryId) {
     const db = useDB();
-    // 找到 group
     const [group] = await db
       .select({ id: schema.workflowPresetGroups.id })
       .from(schema.workflowPresetGroups)
-      .where(eq(schema.workflowPresetGroups.repository_id, params.repositoryId))
+      .where(eq(schema.workflowPresetGroups.repository_id, repositoryId))
       .limit(1);
 
     if (group) {
-      // 清除该 group 下所有预设的 current_run_id
       await db
         .update(schema.workflowPresets)
         .set({ current_run_id: null })
-        .where(
-          eq(schema.workflowPresets.group_id, group.id),
-        );
+        .where(eq(schema.workflowPresets.group_id, group.id));
     }
   }
 
   return {
     success: true,
-    completed_count: completedCount,
-    cancelled_count: cancelledCount,
-    message: `已重置队列：完成 ${completedCount} 个运行中任务，取消 ${cancelledCount} 个等待任务`,
+    completed_count: totalCompleted,
+    cancelled_count: totalCancelled,
+    message: `已重置队列：完成 ${totalCompleted} 个运行中任务，取消 ${totalCancelled} 个等待任务`,
   };
 });

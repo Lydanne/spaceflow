@@ -69,8 +69,8 @@ export default defineEventHandler(async (event) => {
   // ─── 队列模式：统一走 enqueueAndTrigger ─────────────────
   if (group.queue_enabled) {
     const queue = await presetWorkflowQueue.findOrCreate(
-      [group.repository_id, group.workflow_path],
-      { name: `Workflow: ${group.workflow_path}`, createdBy: session.user.id },
+      [group.repository_id, group.workflow_path, branch],
+      { name: `Workflow: ${group.workflow_path} (${branch})`, createdBy: session.user.id },
     );
 
     const result = await presetWorkflowQueue.enqueueAndTrigger(

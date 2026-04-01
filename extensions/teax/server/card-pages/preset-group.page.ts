@@ -2,8 +2,7 @@ import { eq } from "drizzle-orm";
 import { defineCardPage, guards, requireBinding, type EnhancedButtonConfig } from "~~/server/card-kit";
 import { useDB, schema } from "~~/server/db";
 import type { User } from "../db/schema";
-import { getQueueByKey, getWaitingCount } from "~~/server/queue-kit/service";
-import { presetWorkflowQueue } from "~~/server/queue-services/preset-workflow";
+import { getWaitingCountByKeyPrefix } from "~~/server/queue-kit/service";
 
 function getPresetStatus(
   activeUserId: string,
@@ -101,14 +100,11 @@ export default defineCardPage({
       return acc;
     }, { mine: 0, idle: 0, busy: 0 });
 
-    // 查询排队队列（通用队列系统）
+    // 查询排队队列（按 repositoryId + workflowPath 前缀跨分支统计）
     let queueCount = 0;
     if (group.queue_enabled) {
-      const queueKey = presetWorkflowQueue.buildQueueKey(group.repository_id, group.workflow_path);
-      const queue = await getQueueByKey(queueKey);
-      if (queue) {
-        queueCount = await getWaitingCount(queue.id);
-      }
+      const keyPrefix = `workflow:${group.repository_id}:${group.workflow_path}:`;
+      queueCount = await getWaitingCountByKeyPrefix(keyPrefix);
     }
 
     const card = ctx.card({ title: `📦 ${group.name}`, theme: "blue" });

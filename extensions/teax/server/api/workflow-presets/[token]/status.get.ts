@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
 
     if (group?.queue_enabled) {
       const item = await presetWorkflowQueue.getItemByPayload(
-        [group.repository_id, group.workflow_path],
+        [group.repository_id, group.workflow_path, preset.branch],
         "preset_id",
         preset.id,
       );

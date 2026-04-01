@@ -77,8 +77,8 @@ export async function runWorkflowWithPreset(
 
     if (group?.queue_enabled) {
       const queue = await presetWorkflowQueue.findOrCreate(
-        [preset.repository_id, preset.workflow_path],
-        { name: `Workflow: ${preset.workflow_path}`, createdBy: actorId },
+        [preset.repository_id, preset.workflow_path, finalBranch],
+        { name: `Workflow: ${preset.workflow_path} (${finalBranch})`, createdBy: actorId },
       );
 
       const result = await presetWorkflowQueue.enqueueAndTrigger(
