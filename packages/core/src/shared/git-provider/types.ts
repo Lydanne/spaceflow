@@ -461,3 +461,34 @@ export interface Reaction {
   /** 创建时间 */
   created_at?: string;
 }
+
+/** Workflow Run 状态 */
+export type WorkflowRunStatus =
+  | "pending"
+  | "queued"
+  | "in_progress"
+  | "success"
+  | "failure"
+  | "skipped";
+
+/** Workflow Run */
+export interface WorkflowRun {
+  /** Run ID */
+  id: number;
+  /** Run 编号 */
+  run_number?: number;
+  /** Workflow 名称 */
+  name?: string;
+  /** 状态 */
+  status?: string;
+  /** 触发分支 */
+  branch?: string;
+  /** 触发 SHA */
+  sha?: string;
+  /** 触发用户 */
+  actor?: User;
+  /** 创建时间 */
+  created_at?: string;
+  /** 更新时间 */
+  updated_at?: string;
+}

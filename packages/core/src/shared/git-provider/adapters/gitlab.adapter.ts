@@ -28,6 +28,7 @@ import {
   type User,
   type RepositoryContent,
   type ResolvedThread,
+  type WorkflowRun,
 } from "../types";
 
 /**
@@ -515,7 +516,9 @@ export class GitlabAdapter implements GitProvider {
     const result = await this.request<Record<string, unknown>>(
       "POST",
       `/projects/${project}/merge_requests/${index}/notes`,
-      { body: options.body },
+      {
+        body: options.body,
+      },
     );
     return this.mapNote(result);
   }
@@ -549,7 +552,9 @@ export class GitlabAdapter implements GitProvider {
       const result = await this.request<Record<string, unknown>>(
         "POST",
         `/projects/${project}/merge_requests/${index}/notes`,
-        { body: options.body },
+        {
+          body: options.body,
+        },
       );
       const note = this.mapNote(result);
       return {
@@ -567,7 +572,9 @@ export class GitlabAdapter implements GitProvider {
         await this.request<Record<string, unknown>>(
           "POST",
           `/projects/${project}/merge_requests/${index}/notes`,
-          { body: `**${comment.path}** (line ${comment.new_position})\n\n${comment.body}` },
+          {
+            body: `**${comment.path}** (line ${comment.new_position})\n\n${comment.body}`,
+          },
         );
       }
     }
@@ -615,7 +622,9 @@ export class GitlabAdapter implements GitProvider {
     const result = await this.request<Record<string, unknown>>(
       "PUT",
       `/projects/${project}/merge_requests/${index}/notes/${reviewId}`,
-      { body },
+      {
+        body,
+      },
     );
     return {
       id: result.id as number,
@@ -726,6 +735,17 @@ export class GitlabAdapter implements GitProvider {
     } catch {
       return [];
     }
+  }
+
+  // ============ Actions 操作 ============
+
+  async listWorkflowRuns(
+    _owner: string,
+    _repo: string,
+    _options?: { status?: string; sha?: string },
+  ): Promise<WorkflowRun[]> {
+    // GitLab CI pipelines API 暂不实现
+    return [];
   }
 
   // ============ 用户操作 ============

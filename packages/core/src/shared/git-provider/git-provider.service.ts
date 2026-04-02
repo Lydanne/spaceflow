@@ -26,6 +26,7 @@ import {
   type User,
   type RepositoryContent,
   type ResolvedThread,
+  type WorkflowRun,
 } from "./types";
 import { GiteaAdapter } from "./adapters/gitea.adapter";
 import { GithubAdapter } from "./adapters/github.adapter";
@@ -317,6 +318,16 @@ export class GitProviderService implements GitProvider {
 
   async getIssueReactions(owner: string, repo: string, index: number): Promise<Reaction[]> {
     return this.adapter.getIssueReactions(owner, repo, index);
+  }
+
+  // ============ Actions 操作 ============
+
+  async listWorkflowRuns(
+    owner: string,
+    repo: string,
+    options?: { status?: string; sha?: string },
+  ): Promise<WorkflowRun[]> {
+    return this.adapter.listWorkflowRuns(owner, repo, options);
   }
 
   // ============ 用户操作 ============

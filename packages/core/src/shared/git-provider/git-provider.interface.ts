@@ -20,6 +20,7 @@ import type {
   User,
   RepositoryContent,
   ResolvedThread,
+  WorkflowRun,
 } from "./types";
 
 /** PR 列表查询选项 */
@@ -198,6 +199,14 @@ export interface GitProvider {
   ): Promise<Reaction[]>;
   /** 获取 Issue/PR 的 reactions */
   getIssueReactions(owner: string, repo: string, index: number): Promise<Reaction[]>;
+
+  // ============ Actions 操作 ============
+  /** 列出仓库的 workflow runs，可选过滤状态 */
+  listWorkflowRuns(
+    owner: string,
+    repo: string,
+    options?: { status?: string; sha?: string },
+  ): Promise<WorkflowRun[]>;
 
   // ============ 用户操作 ============
   /** 搜索用户 */

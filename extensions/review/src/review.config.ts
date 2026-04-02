@@ -79,6 +79,12 @@ export interface ReviewOptions {
    * 在非 CI 和非 PR 模式下默认为 'uncommitted'
    */
   local?: LocalReviewMode;
+  /**
+   * 跳过重复的 review workflow 检查
+   * - true: 启用检查，当检测到同名 workflow 正在运行时跳过审查
+   * - false: 禁用检查（默认）
+   */
+  skipDuplicateWorkflow?: boolean;
 }
 
 /** review 命令配置 schema（LLM 敏感配置由系统 llm.config.ts 管理） */
@@ -100,6 +106,7 @@ export const reviewSchema = () =>
     retries: z.number().default(0).optional(),
     retryDelay: z.number().default(1000).optional(),
     invalidateChangedFiles: invalidateChangedFilesSchema.default("invalidate").optional(),
+    skipDuplicateWorkflow: z.boolean().default(false).optional(),
   });
 
 /** review 配置类型（从 schema 推导） */

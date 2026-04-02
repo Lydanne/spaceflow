@@ -29,6 +29,7 @@ import {
   type User,
   type RepositoryContent,
   type ResolvedThread,
+  type WorkflowRun,
 } from "../types";
 
 /**
@@ -579,6 +580,45 @@ export class GiteaAdapter implements GitProvider {
 
   async getIssueReactions(owner: string, repo: string, index: number): Promise<Reaction[]> {
     return this.request<Reaction[]>("GET", `/repos/${owner}/${repo}/issues/${index}/reactions`);
+  }
+
+  // ============ Actions 操作 ============
+
+  async listWorkflowRuns(
+    owner: string,
+    repo: string,
+    options?: { status?: string; sha?: string },
+  ): Promise<WorkflowRun[]> {
+    const params = new URLSearchParams();
+    if (options?.status) {
+      params.set("status", options.status);
+    }
+    if (options?.sha) {
+      params.set("head_sha", options.sha);
+    }
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const result = await this.request<
+      { workflow_runs: Array<Record<string, unknown>> } | Array<Record<string, unknown>>
+    >("GET", `/repos/${owner}/${repo}/actions/runs${query}`);
+    // Gitea 可能返回 { workflow_runs: [...] } 或直接返回数组
+    const runs = Array.isArray(result) ? result : result.workflow_runs || [];
+    // 映射字段名：head_sha -> sha, head_branch -> branch
+    return runs.map((run) => ({
+      id: run.id as number,
+      run_number: (run.run_number as number) || undefined,
+      name: (run.name as string) || undefined,
+      status: run.status as string,
+      branch: (run.head_branch as string) || undefined,
+      sha: (run.head_sha as string) || undefined,
+      actor: run.actor
+        ? {
+            id: (run.actor as Record<string, unknown>).id as number,
+            login: (run.actor as Record<string, unknown>).login as string,
+          }
+        : undefined,
+      created_at: (run.created_at as string) || undefined,
+      updated_at: (run.updated_at as string) || undefined,
+    }));
   }
 
   // ============ 用户操作 ============
