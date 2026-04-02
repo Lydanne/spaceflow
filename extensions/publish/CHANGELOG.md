@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.51.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/publish@0.50.0...@spaceflow/publish@0.51.0) (2026-04-02)
+
+### 新特性
+
+* **review:** 新增自动批准功能，当所有问题解决时自动提交 APPROVE review ([4155342](https://github.com/Lydanne/spaceflow/commit/4155342511f76d6cd9001a14a144fce55a7a8946))
+* **review:** 添加 workflow 重复运行检测，防止同一 PR 并发审查 ([a3777af](https://github.com/Lydanne/spaceflow/commit/a3777affb10b6fb4f88a83660ce2a81f9f2d6498))
+
+### 代码重构
+
+* **review:** 优化问题统计逻辑，区分 fixed 和 resolved 状态 ([c4dda30](https://github.com/Lydanne/spaceflow/commit/c4dda30fed17ce020fcce9af8874dfa89ccca20b))
+* **review:** 区分 ☹️ 和 👎 reaction 的语义，☹️ 标记无效，👎 标记未解决 ([f1419fe](https://github.com/Lydanne/spaceflow/commit/f1419fe47448a80f373ffac082ac3a2e9320d200))
+
+### 其他修改
+
+* **core:** released version 0.27.0 [no ci] ([053d624](https://github.com/Lydanne/spaceflow/commit/053d624997b04e47537dac4ca0c7a99ed4a4cd36))
+* **review-summary:** released version 0.35.0 [no ci] ([4f2607d](https://github.com/Lydanne/spaceflow/commit/4f2607def2725946f32eccc4aa4e687a3cdd9bab))
+* **review-summary:** released version 0.36.0 [no ci] ([95c3d5c](https://github.com/Lydanne/spaceflow/commit/95c3d5cbac67c1ffa4c821faaffb476c502fe2c7))
+* **review-summary:** released version 0.37.0 [no ci] ([455c581](https://github.com/Lydanne/spaceflow/commit/455c58140def453d95c8fc85b1ea8fde39037abc))
+* **review:** released version 0.67.0 [no ci] ([8a95083](https://github.com/Lydanne/spaceflow/commit/8a95083d4ffd3367dc96cfa1754b9b0e3fea15dc))
+* **review:** released version 0.68.0 [no ci] ([c58b0e7](https://github.com/Lydanne/spaceflow/commit/c58b0e7718191bd8c9652df21485a1e962eb1c0e))
+* **review:** released version 0.69.0 [no ci] ([826661c](https://github.com/Lydanne/spaceflow/commit/826661c5c162aefd4424989fe54681c323d51588))
+* **scripts:** released version 0.28.0 [no ci] ([55db5cf](https://github.com/Lydanne/spaceflow/commit/55db5cfa1dc0a1e318085caa0cfd9f91b06dcb21))
+* **shell:** released version 0.28.0 [no ci] ([01f180f](https://github.com/Lydanne/spaceflow/commit/01f180f2508e75524a33e66fea580a738adc689f))
+
 ## [0.50.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/publish@0.49.0...@spaceflow/publish@0.50.0) (2026-03-03)
 
 ### 新特性
