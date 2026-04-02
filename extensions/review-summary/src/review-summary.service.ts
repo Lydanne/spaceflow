@@ -753,7 +753,7 @@ export class PeriodSummaryService {
       lines.push(`|------|------|------|------|------|------|--------|`);
       result.userStats.forEach((user, index) => {
         lines.push(
-          `| #${index + 1} | ${user.username} | ${user.prCount} | +${user.totalAdditions} | -${user.totalDeletions} | ${user.totalIssues} | ${(user.defectRate ?? 0).toFixed(1)}% |`,
+          `| #${index + 1} | @${user.username} | ${user.prCount} | +${user.totalAdditions} | -${user.totalDeletions} | ${user.totalIssues} | ${(user.defectRate ?? 0).toFixed(1)}% |`,
         );
       });
     } else {
@@ -761,7 +761,7 @@ export class PeriodSummaryService {
       lines.push(`|------|------|------|------|------|------|------|`);
       result.userStats.forEach((user, index) => {
         lines.push(
-          `| #${index + 1} | ${user.username} | ${user.prCount} | +${user.totalAdditions} | -${user.totalDeletions} | ${user.totalIssues} | ${user.score.toFixed(1)} |`,
+          `| #${index + 1} | @${user.username} | ${user.prCount} | +${user.totalAdditions} | -${user.totalDeletions} | ${user.totalIssues} | ${user.score.toFixed(1)} |`,
         );
       });
     }
@@ -770,7 +770,7 @@ export class PeriodSummaryService {
     lines.push("");
     for (const user of result.userStats) {
       if (user.features.length > 0) {
-        lines.push(`### 👤 ${user.username}`);
+        lines.push(`### 👤 @${user.username}`);
         lines.push("");
         for (const feature of user.features) {
           lines.push(`- ${feature}`);
