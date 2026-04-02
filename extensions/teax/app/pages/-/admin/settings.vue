@@ -59,8 +59,39 @@ interface WebhookStatus {
   message?: string;
 }
 
+interface AgentRuntimeGlobalsPaths {
+  rootDir: string;
+  teaxDir: string;
+  globalsDir: string;
+  globalsDockerfilePath: string;
+  opencodeDir: string;
+  opencodeConfigPath: string;
+  opencodeAgentsDir: string;
+  opencodeSkillsDir: string;
+  opencodeMcpDir: string;
+  dockerWorkspaceRoot: string;
+  containerTeaxDir: string;
+  containerGlobalsDir: string;
+  containerOpencodeDir: string;
+  containerRootConfigDir: string;
+  containerNodeConfigDir: string;
+}
+
+interface AgentRuntimeGlobalsResponse {
+  paths: AgentRuntimeGlobalsPaths;
+  dockerfile: string;
+  opencode_config: string;
+}
+
 const webhookStatus = ref<WebhookStatus | null>(null);
 const loadingWebhook = ref(false);
+const globalsLoading = ref(false);
+const globalsSaving = ref(false);
+const globalsPaths = ref<AgentRuntimeGlobalsPaths | null>(null);
+const globalsForm = reactive({
+  dockerfile: "",
+  opencodeConfig: "",
+});
 
 async function checkWebhookStatus() {
   loadingWebhook.value = true;
@@ -96,8 +127,54 @@ function openGiteaWebhooks() {
   window.open("https://git.bjxgj.com/-/admin/hooks", "_blank");
 }
 
+async function loadAgentRuntimeGlobals() {
+  globalsLoading.value = true;
+  try {
+    const response = await $fetch<AgentRuntimeGlobalsResponse>("/api/admin/agent-runtime/globals");
+    globalsPaths.value = response.paths;
+    globalsForm.dockerfile = response.dockerfile;
+    globalsForm.opencodeConfig = response.opencode_config;
+  } catch {
+    toast.add({
+      title: "加载 Agent Globals 失败",
+      color: "error",
+    });
+  } finally {
+    globalsLoading.value = false;
+  }
+}
+
+async function saveAgentRuntimeGlobals() {
+  globalsSaving.value = true;
+  try {
+    const response = await $fetch<AgentRuntimeGlobalsResponse>("/api/admin/agent-runtime/globals", {
+      method: "PATCH",
+      body: {
+        dockerfile: globalsForm.dockerfile,
+        opencode_config: globalsForm.opencodeConfig,
+      },
+    });
+    globalsPaths.value = response.paths;
+    globalsForm.dockerfile = response.dockerfile;
+    globalsForm.opencodeConfig = response.opencode_config;
+    toast.add({
+      title: "Agent Globals 已保存",
+      color: "success",
+    });
+  } catch (error: unknown) {
+    const message = (error as { data?: { message?: string } })?.data?.message || "保存 Agent Globals 失败";
+    toast.add({
+      title: message,
+      color: "error",
+    });
+  } finally {
+    globalsSaving.value = false;
+  }
+}
+
 onMounted(() => {
   checkWebhookStatus();
+  loadAgentRuntimeGlobals();
 });
 </script>
 
@@ -491,6 +568,93 @@ onMounted(() => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">
+                Agent Runtime Globals
+              </h2>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                统一管理全局 Dockerfile 与 opencode 配置（skills / mcp / agents）
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <UButton
+                icon="i-lucide-refresh-cw"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :loading="globalsLoading"
+                @click="loadAgentRuntimeGlobals"
+              >
+                刷新
+              </UButton>
+              <UButton
+                icon="i-lucide-save"
+                color="primary"
+                size="sm"
+                :loading="globalsSaving"
+                @click="saveAgentRuntimeGlobals"
+              >
+                保存
+              </UButton>
+            </div>
+          </div>
+        </template>
+
+        <div
+          v-if="globalsLoading && !globalsForm.dockerfile && !globalsForm.opencodeConfig"
+          class="py-8 text-center text-gray-500 dark:text-gray-400 text-sm"
+        >
+          <UIcon
+            name="i-lucide-loader-2"
+            class="w-5 h-5 animate-spin mx-auto mb-2"
+          />
+          正在加载全局配置...
+        </div>
+
+        <div
+          v-else
+          class="space-y-4"
+        >
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-500 dark:text-gray-400">
+            <p>Globals 目录：{{ globalsPaths?.globalsDir || "-" }}</p>
+            <p>容器映射：{{ globalsPaths?.containerRootConfigDir || "-" }}</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Globals Dockerfile
+            </label>
+            <UTextarea
+              v-model="globalsForm.dockerfile"
+              :rows="8"
+              class="w-full font-mono text-xs"
+              placeholder="FROM teax-agent-runtime:base"
+            />
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              所有仓库 Runtime 镜像都会使用这个全局 Dockerfile。
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              opencode.json（全局）
+            </label>
+            <UTextarea
+              v-model="globalsForm.opencodeConfig"
+              :rows="10"
+              class="w-full font-mono text-xs"
+              placeholder="例如：opencode 全局 JSON 配置"
+            />
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              对应目录：{{ globalsPaths?.opencodeDir || "-" }}，可放置 `agents/`、`skills/`、`mcp/`。
+            </p>
           </div>
         </div>
       </UCard>

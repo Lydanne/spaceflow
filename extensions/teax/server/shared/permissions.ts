@@ -76,6 +76,12 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   },
 
   // Agent 权限
+  { key: "agent:read", label: "查看 Agent 会话", group: "agent" },
+  { key: "agent:create", label: "创建 Agent 会话", group: "agent" },
+  { key: "agent:chat", label: "在 Agent 会话中对话", group: "agent" },
+  { key: "agent:write", label: "执行 Agent 写入操作", group: "agent" },
+  { key: "agent:manage", label: "管理 Agent 会话", group: "agent" },
+  { key: "agent:system", label: "创建系统级 Agent 会话", group: "agent" },
   { key: "agent:start", label: "启动所有 Agent", group: "agent" },
   { key: "agent:stop", label: "停止所有 Agent", group: "agent" },
   {

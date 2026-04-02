@@ -94,10 +94,16 @@ NUXT_PUBLIC_APP_NAME=Teax
 NUXT_PUBLIC_APP_URL=http://localhost:3000
 
 # 数据库
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teax
+POSTGRES_DB=teax
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
 
 # Redis
-REDIS_URL=redis://localhost:6379
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
 
 # Gitea OAuth（必需）
 GITEA_URL=https://gitea.example.com
@@ -134,7 +140,24 @@ pnpm db:migrate
 pnpm db:push
 ```
 
-5. **启动开发服务器**
+5. **启动本地依赖环境**
+
+如果你用 VS Code 打开这个工作区，首次会看到“是否允许自动任务”的提示。允许后会自动执行 `infra: start`，拉起开发需要的 `PostgreSQL` 和 `Redis`。
+
+如果没有看到提示，也可以手动运行：
+
+```bash
+docker compose up -d db redis
+```
+
+或者在 VS Code 里执行以下任务：
+
+- `infra: start` - 启动 PostgreSQL 和 Redis
+- `infra: status` - 查看依赖环境状态
+- `infra: stop` - 停止 PostgreSQL 和 Redis
+- `infra: down` - 停止并移除 Compose 资源
+
+6. **启动开发服务器**
 
 ```bash
 pnpm dev
@@ -165,7 +188,7 @@ pnpm dev
 - [部署指南](./docs/deployment.md) - 生产环境部署
 
 ### 设计文档
-- [架构概览](./docs/overview.md) - 系统架构和定位
+- [架构概览](./docs/overview/index.md) - 系统架构和定位
 - [API 规范](./docs/api-specification.md) - 前后端 API 设计
 - [权限系统](./docs/permission-system.md) - 权限模型和访问控制
 - [CI/CD 集成](./docs/cicd-integration.md) - Gitea Actions 集成

@@ -11,3 +11,5 @@ export * from "./workflow-preset";
 export * from "./workflow-preset-history";
 export * from "./task-queue";
 export * from "./task-log";
+export * from "./agent-session";
+export * from "./agent-runtime";

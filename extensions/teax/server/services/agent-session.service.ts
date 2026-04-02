@@ -1,0 +1,1490 @@
+import { and, desc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
+import { schema, useDB } from "~~/server/db";
+import {
+  cleanupSessionWorktree,
+  controlAgentSessionOpencodeProcess,
+  getSessionWorktreeBySessionId,
+  listAgentSessionOpencodeModels,
+  listAgentSessionOpencodeMessages,
+  type AgentSessionOpencodeAction,
+  promptAgentSessionOpencode,
+  prepareRepoSessionWorktree,
+} from "~~/server/services/agent-runtime.service";
+
+/**
+ * 当前请求执行主体。
+ * service 层只依赖最小鉴权信息，避免与上层 session 结构强耦合。
+ */
+export interface AgentSessionActor {
+  userId: string;
+  isAdmin: boolean;
+}
+
+/**
+ * 通用分页参数。
+ */
+export interface AgentSessionPagination {
+  page: number;
+  limit: number;
+}
+
+function toNumber(value: unknown): number {
+  // 统一数值化入口，避免不同查询结果类型（string/number/null）带来分支噪音。
+  return Number(value ?? 0);
+}
+
+function resolveSessionBranchRef(session: {
+  base_branch?: string | null;
+  working_branch?: string | null;
+}) {
+  // 优先使用 working_branch；不存在时回退到 base_branch，用于消息元数据标注。
+  const branchRef = String(session.working_branch || session.base_branch || "").trim();
+  return branchRef || null;
+}
+
+function withBranchRefMetadata(
+  metadata: unknown,
+  branchRef: string | null,
+): Record<string, unknown> {
+  const metadataObject = (metadata && typeof metadata === "object")
+    ? { ...(metadata as Record<string, unknown>) }
+    : {};
+
+  if (branchRef) {
+    // branch_ref 仅在可解析时补充，避免把空值写回 metadata。
+    metadataObject.branch_ref = branchRef;
+  }
+
+  return metadataObject;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  const err = error as { code?: string; cause?: { code?: string } };
+  // PostgreSQL 唯一键冲突码：append event 重试逻辑仅针对这类并发冲突触发。
+  return err?.code === "23505" || err?.cause?.code === "23505";
+}
+
+/**
+ * 写入会话事件（失败不阻断主流程）。
+ */
+async function appendSessionEvent(params: {
+  sessionId: string;
+  type: string;
+  actorType: "user" | "agent" | "system" | "bot";
+  actorId: string;
+  payload?: Record<string, unknown>;
+}) {
+  const db = useDB();
+  try {
+    // 事件序号在会话内唯一；并发写入冲突时重试，避免活动日志丢失。
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const [maxSeqRow] = await db
+        .select({
+          maxSeq: sql<number>`COALESCE(MAX(${schema.agentSessionEvents.seq}), 0)`,
+        })
+        .from(schema.agentSessionEvents)
+        .where(eq(schema.agentSessionEvents.session_id, params.sessionId));
+
+      const nextSeq = toNumber(maxSeqRow?.maxSeq) + 1;
+
+      try {
+        await db.insert(schema.agentSessionEvents).values({
+          session_id: params.sessionId,
+          seq: nextSeq,
+          type: params.type,
+          payload: params.payload || {},
+          actor_type: params.actorType,
+          actor_id: params.actorId,
+        });
+        return;
+      } catch (error) {
+        // 仅唯一键冲突且还有重试次数时继续，其他错误直接上抛。
+        if (isUniqueViolation(error) && attempt < 2) {
+          continue;
+        }
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.warn("[agent-session] append event failed:", error);
+  }
+}
+
+async function getSessionById(sessionId: string, repositoryId: string) {
+  const db = useDB();
+  const [session] = await db
+    .select()
+    .from(schema.agentSessions)
+    .where(
+      and(
+        eq(schema.agentSessions.id, sessionId),
+        eq(schema.agentSessions.repository_id, repositoryId),
+      ),
+    )
+    .limit(1);
+
+  if (!session) {
+    throw createError({ statusCode: 404, message: "Agent session not found" });
+  }
+
+  return session;
+}
+
+async function getParticipant(sessionId: string, userId: string) {
+  const db = useDB();
+  const [participant] = await db
+    .select()
+    .from(schema.agentSessionParticipants)
+    .where(
+      and(
+        eq(schema.agentSessionParticipants.session_id, sessionId),
+        eq(schema.agentSessionParticipants.user_id, userId),
+      ),
+    )
+    .limit(1);
+
+  return participant || null;
+}
+
+/**
+ * 会话读取权限校验：
+ * - 管理员可读
+ * - owner 可读
+ * - public 会话可读
+ * - private 会话需在 participant 列表中
+ */
+async function ensureSessionReadable(
+  sessionId: string,
+  repositoryId: string,
+  actor: AgentSessionActor,
+) {
+  const session = await getSessionById(sessionId, repositoryId);
+
+  if (actor.isAdmin) {
+    // 管理员绕过可见性限制，直接可读。
+    return session;
+  }
+  if (session.creator_id === actor.userId) {
+    // 会话创建者始终可读。
+    return session;
+  }
+  if (session.visibility === "public") {
+    // public 会话允许仓库内具备读权限的用户查看。
+    return session;
+  }
+
+  const participant = await getParticipant(session.id, actor.userId);
+  if (!participant) {
+    // private 且非 owner/admin 时，必须在参与者列表中。
+    throw createError({ statusCode: 403, message: "No access to this agent session" });
+  }
+
+  return session;
+}
+
+/**
+ * 会话发言权限校验：
+ * - 满足读取权限后，进一步校验 can_chat
+ * - public 会话允许首次发言自动加入参与者
+ */
+async function ensureSessionChatAllowed(
+  sessionId: string,
+  repositoryId: string,
+  actor: AgentSessionActor,
+) {
+  const db = useDB();
+  const session = await ensureSessionReadable(sessionId, repositoryId, actor);
+
+  if (actor.isAdmin || session.creator_id === actor.userId) {
+    // owner/admin 不受 can_chat 限制。
+    return session;
+  }
+
+  const participant = await getParticipant(session.id, actor.userId);
+  if (participant) {
+    if (!participant.can_chat) {
+      // 参与者存在但无发言权限时显式拒绝。
+      throw createError({ statusCode: 403, message: "Chat permission denied in this session" });
+    }
+    return session;
+  }
+
+  if (session.visibility === "public") {
+    // 公开会话支持多人协作，首次发言自动加入参与者列表
+    await db
+      .insert(schema.agentSessionParticipants)
+      .values({
+        session_id: session.id,
+        user_id: actor.userId,
+        role: "collaborator",
+        can_chat: true,
+        invited_by: session.creator_id,
+      })
+      .onConflictDoNothing({
+        target: [
+          schema.agentSessionParticipants.session_id,
+          schema.agentSessionParticipants.user_id,
+        ],
+      });
+    // 幂等插入：并发首次发言时允许重复请求安全落库。
+    return session;
+  }
+
+  throw createError({ statusCode: 403, message: "Chat permission denied in this session" });
+}
+
+export async function createAgentSession(params: {
+  repositoryId: string;
+  creatorId: string;
+  title?: string;
+  prompt: string;
+  visibility: "public" | "private";
+  baseBranch: string;
+  workingBranch?: string;
+  autoCommit: boolean;
+  autoPr: boolean;
+}) {
+  const db = useDB();
+
+  const [created] = await db
+    .insert(schema.agentSessions)
+    .values({
+      repository_id: params.repositoryId,
+      title: params.title,
+      prompt: params.prompt,
+      visibility: params.visibility,
+      creator_id: params.creatorId,
+      base_branch: params.baseBranch,
+      working_branch: params.workingBranch,
+      auto_commit: params.autoCommit,
+      auto_pr: params.autoPr,
+      status: "created",
+    })
+    .returning();
+
+  if (!created) {
+    throw createError({ statusCode: 500, message: "Failed to create agent session" });
+  }
+
+  await db
+    .insert(schema.agentSessionParticipants)
+    .values({
+      session_id: created.id,
+      user_id: params.creatorId,
+      role: "owner",
+      can_chat: true,
+      invited_by: params.creatorId,
+    })
+    .onConflictDoNothing({
+      target: [
+        schema.agentSessionParticipants.session_id,
+        schema.agentSessionParticipants.user_id,
+      ],
+    });
+
+  await appendSessionEvent({
+    sessionId: created.id,
+    type: "session_created",
+    actorType: "user",
+    actorId: params.creatorId,
+    payload: {
+      visibility: params.visibility,
+      base_branch: params.baseBranch,
+      working_branch: params.workingBranch || null,
+    },
+  });
+
+  await appendSessionEvent({
+    sessionId: created.id,
+    type: "session_preparing",
+    actorType: "system",
+    actorId: "runtime",
+  });
+
+  let prepared: Awaited<ReturnType<typeof prepareRepoSessionWorktree>>;
+  try {
+    prepared = await prepareRepoSessionWorktree({
+      repositoryId: params.repositoryId,
+      sessionId: created.id,
+      baseBranch: params.baseBranch,
+      workingBranch: params.workingBranch,
+      actorId: params.creatorId,
+    });
+  } catch (error) {
+    await appendSessionEvent({
+      sessionId: created.id,
+      type: "worktree_prepare_failed",
+      actorType: "system",
+      actorId: "runtime",
+      payload: {
+        error: (error as { message?: string })?.message || "prepare failed",
+      },
+    });
+    throw error;
+  }
+
+  await appendSessionEvent({
+    sessionId: created.id,
+    type: "worktree_prepared",
+    actorType: "system",
+    actorId: "runtime",
+    payload: {
+      session_path: prepared.sessionPath,
+      base_branch: prepared.baseBranch,
+      working_branch: prepared.workingBranch,
+      mode: prepared.mode,
+    },
+  });
+
+  const [latest] = await db
+    .select()
+    .from(schema.agentSessions)
+    .where(eq(schema.agentSessions.id, created.id))
+    .limit(1);
+
+  return latest || created;
+}
+
+/**
+ * 会话列表（按可见性过滤）：
+ * - admin: 当前仓库全部会话
+ * - 非 admin: public + 自己创建 + 自己参与
+ */
+export async function listAgentSessions(params: {
+  repositoryId: string;
+  actor: AgentSessionActor;
+  page: number;
+  limit: number;
+}) {
+  const db = useDB();
+  const offset = (params.page - 1) * params.limit;
+
+  const repositoryCondition = eq(schema.agentSessions.repository_id, params.repositoryId);
+
+  let whereCondition = repositoryCondition;
+
+  if (!params.actor.isAdmin) {
+    const participantRows = await db
+      .select({ session_id: schema.agentSessionParticipants.session_id })
+      .from(schema.agentSessionParticipants)
+      .where(eq(schema.agentSessionParticipants.user_id, params.actor.userId));
+    const participantSessionIds = participantRows.map((row) => row.session_id);
+
+    const visibilityConditions = [
+      eq(schema.agentSessions.visibility, "public"),
+      eq(schema.agentSessions.creator_id, params.actor.userId),
+    ];
+    if (participantSessionIds.length > 0) {
+      // 仅在确实参与过会话时追加 inArray，避免生成空 IN () 语句。
+      visibilityConditions.push(inArray(schema.agentSessions.id, participantSessionIds));
+    }
+
+    whereCondition = and(repositoryCondition, or(...visibilityConditions))!;
+  }
+
+  const sessions = await db
+    .select({
+      id: schema.agentSessions.id,
+      title: schema.agentSessions.title,
+      visibility: schema.agentSessions.visibility,
+      creator_id: schema.agentSessions.creator_id,
+      runtime_id: schema.agentSessions.runtime_id,
+      status: schema.agentSessions.status,
+      base_branch: schema.agentSessions.base_branch,
+      working_branch: schema.agentSessions.working_branch,
+      session_path: schema.agentSessions.session_path,
+      created_at: schema.agentSessions.created_at,
+      updated_at: schema.agentSessions.updated_at,
+    })
+    .from(schema.agentSessions)
+    .where(whereCondition)
+    .orderBy(desc(schema.agentSessions.updated_at))
+    .limit(params.limit)
+    .offset(offset);
+
+  const [totalRow] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(schema.agentSessions)
+    .where(whereCondition);
+
+  const total = toNumber(totalRow?.count);
+
+  return {
+    data: sessions,
+    total,
+    page: params.page,
+    limit: params.limit,
+    hasMore: offset + params.limit < total,
+  };
+}
+
+export async function getAgentSessionDetail(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const db = useDB();
+  const session = await ensureSessionReadable(params.sessionId, params.repositoryId, params.actor);
+
+  const [participantCountRow] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(schema.agentSessionParticipants)
+    .where(eq(schema.agentSessionParticipants.session_id, session.id));
+
+  const [messageCountRow] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(schema.agentSessionMessages)
+    .where(eq(schema.agentSessionMessages.session_id, session.id));
+
+  let messageCount = toNumber(messageCountRow?.count);
+  const opencodeSessionId = String(session.opencode_session_id || "").trim();
+  if (opencodeSessionId) {
+    try {
+      const opencodeMessages = await listAgentSessionOpencodeMessages({
+        repositoryId: params.repositoryId,
+        sessionId: session.id,
+        opencodeSessionId,
+        limit: 5000,
+      });
+      messageCount = opencodeMessages.length;
+    } catch (error) {
+      // 远端消息读取失败时回退 DB 统计，保证详情页仍可用。
+      console.warn("[agent-session] get detail opencode message_count failed, fallback to db:", {
+        session_id: session.id,
+        opencode_session_id: opencodeSessionId,
+        message: (error as { message?: string })?.message || "unknown",
+      });
+    }
+  }
+
+  const myParticipant = await getParticipant(session.id, params.actor.userId);
+  const worktree = await getSessionWorktreeBySessionId({
+    repositoryId: params.repositoryId,
+    sessionId: session.id,
+  });
+  const [runtime] = session.runtime_id
+    ? await db
+        .select({
+          id: schema.agentRuntimes.id,
+          status: schema.agentRuntimes.status,
+          provider: schema.agentRuntimes.provider,
+          last_heartbeat_at: schema.agentRuntimes.last_heartbeat_at,
+          runtime_key: schema.agentRuntimes.runtime_key,
+        })
+        .from(schema.agentRuntimes)
+        .where(eq(schema.agentRuntimes.id, session.runtime_id))
+        .limit(1)
+    // 没有关联 runtime 的历史会话直接返回 null，避免无意义查询。
+    : [null];
+
+  return {
+    ...session,
+    participant_count: toNumber(participantCountRow?.count),
+    message_count: messageCount,
+    my_role: myParticipant?.role || (session.creator_id === params.actor.userId ? "owner" : null),
+    my_can_chat: myParticipant?.can_chat ?? session.creator_id === params.actor.userId,
+    runtime_status: runtime?.status || null,
+    runtime_provider: runtime?.provider || null,
+    runtime_last_heartbeat_at: runtime?.last_heartbeat_at || null,
+    runtime_key: runtime?.runtime_key || null,
+    worktree_status: worktree?.status || null,
+    worktree_path: worktree?.worktree_path || session.session_path || null,
+    worktree_last_error: worktree?.last_error || null,
+  };
+}
+
+export async function listAgentSessionParticipants(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const db = useDB();
+  const session = await ensureSessionReadable(params.sessionId, params.repositoryId, params.actor);
+
+  return db
+    .select({
+      id: schema.agentSessionParticipants.id,
+      session_id: schema.agentSessionParticipants.session_id,
+      user_id: schema.agentSessionParticipants.user_id,
+      role: schema.agentSessionParticipants.role,
+      can_chat: schema.agentSessionParticipants.can_chat,
+      invited_by: schema.agentSessionParticipants.invited_by,
+      joined_at: schema.agentSessionParticipants.joined_at,
+      gitea_username: schema.users.gitea_username,
+      avatar_url: schema.users.avatar_url,
+    })
+    .from(schema.agentSessionParticipants)
+    .innerJoin(schema.users, eq(schema.agentSessionParticipants.user_id, schema.users.id))
+    .where(eq(schema.agentSessionParticipants.session_id, session.id))
+    .orderBy(schema.agentSessionParticipants.joined_at);
+}
+
+export async function addAgentSessionParticipant(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+  userId: string;
+  role: "collaborator" | "viewer";
+  canChat: boolean;
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    // 仅 owner/admin 可管理成员，避免协作者横向扩权。
+    throw createError({ statusCode: 403, message: "Only session owner can invite participants" });
+  }
+
+  const [participant] = await db
+    .insert(schema.agentSessionParticipants)
+    .values({
+      session_id: session.id,
+      user_id: params.userId,
+      role: params.role,
+      can_chat: params.canChat,
+      invited_by: params.actor.userId,
+    })
+    .onConflictDoUpdate({
+      target: [
+        schema.agentSessionParticipants.session_id,
+        schema.agentSessionParticipants.user_id,
+      ],
+      set: {
+        role: params.role,
+        can_chat: params.canChat,
+        invited_by: params.actor.userId,
+        updated_at: new Date(),
+      },
+    })
+    .returning();
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "participant_added",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      user_id: params.userId,
+      role: params.role,
+      can_chat: params.canChat,
+    },
+  });
+
+  return participant;
+}
+
+export async function updateAgentSessionParticipant(params: {
+  repositoryId: string;
+  sessionId: string;
+  targetUserId: string;
+  actor: AgentSessionActor;
+  role?: "collaborator" | "viewer";
+  canChat?: boolean;
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    throw createError({ statusCode: 403, message: "Only session owner can manage participants" });
+  }
+
+  const patch: { role?: "collaborator" | "viewer"; can_chat?: boolean; updated_at: Date } = {
+    updated_at: new Date(),
+  };
+  // 仅对传入字段打 patch，未传字段保持原值。
+  if (params.role !== undefined) patch.role = params.role;
+  if (params.canChat !== undefined) patch.can_chat = params.canChat;
+
+  const [updated] = await db
+    .update(schema.agentSessionParticipants)
+    .set(patch)
+    .where(
+      and(
+        eq(schema.agentSessionParticipants.session_id, session.id),
+        eq(schema.agentSessionParticipants.user_id, params.targetUserId),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    throw createError({ statusCode: 404, message: "Participant not found" });
+  }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "participant_updated",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      user_id: params.targetUserId,
+      role: params.role,
+      can_chat: params.canChat,
+    },
+  });
+
+  return updated;
+}
+
+export async function listAgentSessionMessages(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+  page: number;
+  limit: number;
+}) {
+  const db = useDB();
+  const session = await ensureSessionReadable(params.sessionId, params.repositoryId, params.actor);
+  const offset = (params.page - 1) * params.limit;
+  const branchRef = resolveSessionBranchRef(session);
+
+  const opencodeSessionId = String(session.opencode_session_id || "").trim();
+  if (opencodeSessionId) {
+    try {
+      // 为了分页一致性，先按“当前页上界”读取足够条数，再切片返回当前页。
+      const readLimit = Math.max(params.limit, params.page * params.limit);
+      const opencodeMessages = await listAgentSessionOpencodeMessages({
+        repositoryId: params.repositoryId,
+        sessionId: session.id,
+        opencodeSessionId,
+        limit: readLimit,
+      });
+
+      const dbMessageRows = await db
+        .select({
+          id: schema.agentSessionMessages.id,
+          seq: schema.agentSessionMessages.seq,
+          pinned: schema.agentSessionMessages.pinned,
+          pinned_by: schema.agentSessionMessages.pinned_by,
+          pinned_at: schema.agentSessionMessages.pinned_at,
+          created_at: schema.agentSessionMessages.created_at,
+          updated_at: schema.agentSessionMessages.updated_at,
+        })
+        .from(schema.agentSessionMessages)
+        .where(
+          and(
+            eq(schema.agentSessionMessages.session_id, session.id),
+            lte(schema.agentSessionMessages.seq, readLimit),
+          ),
+        );
+      const dbMessageBySeq = new Map(dbMessageRows.map((row) => [row.seq, row]));
+
+      const pageMessages = opencodeMessages.slice(offset, offset + params.limit).map((message) => ({
+        id: dbMessageBySeq.get(message.seq)?.id || `opencode:${message.id}`,
+        session_id: session.id,
+        seq: message.seq,
+        actor_type: message.actor_type,
+        actor_id: message.actor_id,
+        message_type: message.message_type,
+        content: message.content,
+        metadata: withBranchRefMetadata(message.metadata, branchRef),
+        pinned: dbMessageBySeq.get(message.seq)?.pinned ?? false,
+        pinned_by: dbMessageBySeq.get(message.seq)?.pinned_by ?? null,
+        pinned_at: dbMessageBySeq.get(message.seq)?.pinned_at ?? null,
+        created_at: dbMessageBySeq.get(message.seq)?.created_at ?? message.created_at,
+        updated_at: dbMessageBySeq.get(message.seq)?.updated_at ?? message.updated_at,
+      }));
+
+      return {
+        data: pageMessages,
+        total: opencodeMessages.length,
+        page: params.page,
+        limit: params.limit,
+        hasMore: offset + params.limit < opencodeMessages.length,
+      };
+    } catch (error) {
+      // opencode 拉取失败时回退 DB，保障聊天页面可读。
+      console.warn("[agent-session] list opencode messages failed, fallback to db:", {
+        session_id: session.id,
+        opencode_session_id: opencodeSessionId,
+        message: (error as { message?: string })?.message || "unknown",
+      });
+    }
+  }
+
+  const messages = await db
+    .select()
+    .from(schema.agentSessionMessages)
+    .where(eq(schema.agentSessionMessages.session_id, session.id))
+    .orderBy(schema.agentSessionMessages.seq)
+    .limit(params.limit)
+    .offset(offset);
+
+  const [totalRow] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(schema.agentSessionMessages)
+    .where(eq(schema.agentSessionMessages.session_id, session.id));
+
+  const total = toNumber(totalRow?.count);
+
+  return {
+    data: messages.map((message) => ({
+      ...message,
+      metadata: withBranchRefMetadata(message.metadata, branchRef),
+    })),
+    total,
+    page: params.page,
+    limit: params.limit,
+    hasMore: offset + params.limit < total,
+  };
+}
+
+export async function listAgentSessionModels(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const session = await ensureSessionReadable(params.sessionId, params.repositoryId, params.actor);
+
+  return listAgentSessionOpencodeModels({
+    repositoryId: params.repositoryId,
+    sessionId: session.id,
+  });
+}
+
+export async function createAgentSessionMessage(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+  content: string;
+  metadata: Record<string, unknown>;
+}) {
+  const db = useDB();
+  const session = await ensureSessionChatAllowed(params.sessionId, params.repositoryId, params.actor);
+  const branchRef = String(params.metadata.branch_ref || "").trim()
+    || resolveSessionBranchRef(session)
+    || null;
+  // model/agent 支持多个兼容字段，兼容不同客户端入参命名。
+  const modelRef = String(
+    params.metadata.model
+    || params.metadata.model_name
+    || params.metadata.model_id
+    || "",
+  ).trim() || null;
+  const agentRef = String(
+    params.metadata.agent
+    || params.metadata.agent_id
+    || params.metadata.agent_name
+    || "",
+  ).trim() || null;
+
+  try {
+    const opencode = await promptAgentSessionOpencode({
+      repositoryId: params.repositoryId,
+      sessionId: session.id,
+      prompt: params.content,
+      opencodeSessionId: session.opencode_session_id,
+      sessionTitle: session.title,
+      model: modelRef,
+      agent: agentRef,
+    });
+
+    if (opencode.opencode_session_id !== session.opencode_session_id) {
+      // 首次发言可能创建新的 opencode session，需要回写会话表。
+      await db
+        .update(schema.agentSessions)
+        .set({
+          opencode_session_id: opencode.opencode_session_id,
+          updated_at: new Date(),
+        })
+        .where(eq(schema.agentSessions.id, session.id));
+    }
+
+    const nowIso = new Date().toISOString();
+    const responseMessage = {
+      id: `opencode:pending:${session.id}:${Date.now()}`,
+      session_id: session.id,
+      seq: 0,
+      actor_type: "user" as const,
+      actor_id: params.actor.userId,
+      message_type: "user_prompt" as const,
+      content: params.content,
+      metadata: {
+        ...params.metadata,
+        branch_ref: branchRef,
+        model: modelRef,
+        agent: agentRef,
+        source: "opencode_server",
+        opencode_session_id: opencode.opencode_session_id,
+        server_hostname: opencode.server_hostname,
+        server_port: opencode.server_port,
+        provisional: true,
+      },
+      pinned: false,
+      pinned_by: null,
+      pinned_at: null,
+      created_at: nowIso,
+      updated_at: nowIso,
+    };
+
+    await appendSessionEvent({
+      sessionId: session.id,
+      type: "message_created",
+      actorType: "user",
+      actorId: params.actor.userId,
+      payload: {
+        message_id: null,
+        seq: null,
+        message_type: responseMessage.message_type,
+        source: "opencode_server",
+        branch_ref: branchRef,
+      },
+    });
+
+    if (opencode.agent_reply.trim()) {
+      // 仅在返回非空回复时写入 agent 事件，避免空消息污染时间线。
+      await appendSessionEvent({
+        sessionId: session.id,
+        type: "message_created",
+        actorType: "agent",
+        actorId: "opencode",
+        payload: {
+          message_id: null,
+          seq: null,
+          message_type: "agent_reply",
+          source: "opencode_server",
+          branch_ref: branchRef,
+        },
+      });
+    }
+
+    return responseMessage;
+  } catch (error) {
+    await appendSessionEvent({
+      sessionId: session.id,
+      type: "opencode_prompt_failed",
+      actorType: "system",
+      actorId: "opencode",
+      payload: {
+        error: (error as { message?: string })?.message || "opencode prompt failed",
+      },
+    });
+    throw error;
+  }
+}
+
+export async function joinAgentSession(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.visibility === "private" && session.creator_id !== params.actor.userId) {
+    // private 会话非 owner/admin 必须先被邀请。
+    const participant = await getParticipant(session.id, params.actor.userId);
+    if (!participant) {
+      throw createError({ statusCode: 403, message: "Private session requires invitation" });
+    }
+  }
+
+  const role = session.creator_id === params.actor.userId ? "owner" : "collaborator";
+  // public 会话默认允许协作者发言；private 则需要 owner 手动授权 can_chat。
+  const canChat = session.creator_id === params.actor.userId ? true : session.visibility === "public";
+
+  const [joined] = await db
+    .insert(schema.agentSessionParticipants)
+    .values({
+      session_id: session.id,
+      user_id: params.actor.userId,
+      role,
+      can_chat: canChat,
+      invited_by: session.creator_id,
+      joined_at: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [
+        schema.agentSessionParticipants.session_id,
+        schema.agentSessionParticipants.user_id,
+      ],
+      set: {
+        joined_at: new Date(),
+        updated_at: new Date(),
+      },
+    })
+    .returning();
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "participant_joined",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      role,
+      can_chat: canChat,
+    },
+  });
+
+  return joined;
+}
+
+export async function leaveAgentSession(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id === params.actor.userId) {
+    // owner 离开会导致会话无管理者，因此显式禁止。
+    throw createError({ statusCode: 400, message: "Session owner cannot leave the session" });
+  }
+
+  const [removed] = await db
+    .delete(schema.agentSessionParticipants)
+    .where(
+      and(
+        eq(schema.agentSessionParticipants.session_id, session.id),
+        eq(schema.agentSessionParticipants.user_id, params.actor.userId),
+      ),
+    )
+    .returning({ id: schema.agentSessionParticipants.id });
+
+  if (!removed) {
+    throw createError({ statusCode: 404, message: "You are not a participant of this session" });
+  }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "participant_left",
+    actorType: "user",
+    actorId: params.actor.userId,
+  });
+
+  return { success: true };
+}
+
+export async function pinAgentSessionMessage(params: {
+  repositoryId: string;
+  sessionId: string;
+  messageId: string;
+  actor: AgentSessionActor;
+}) {
+  const db = useDB();
+  const session = await ensureSessionReadable(params.sessionId, params.repositoryId, params.actor);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    const participant = await getParticipant(session.id, params.actor.userId);
+    if (!participant || participant.role === "viewer") {
+      // viewer 仅可读，不允许进行 pin 等会话编辑动作。
+      throw createError({ statusCode: 403, message: "Only owner/collaborator can pin messages" });
+    }
+  }
+
+  let [message] = await db
+    .select({
+      id: schema.agentSessionMessages.id,
+      seq: schema.agentSessionMessages.seq,
+      actor_type: schema.agentSessionMessages.actor_type,
+      actor_id: schema.agentSessionMessages.actor_id,
+      message_type: schema.agentSessionMessages.message_type,
+      content: schema.agentSessionMessages.content,
+      metadata: schema.agentSessionMessages.metadata,
+    })
+    .from(schema.agentSessionMessages)
+    .where(
+      and(
+        eq(schema.agentSessionMessages.id, params.messageId),
+        eq(schema.agentSessionMessages.session_id, session.id),
+      ),
+    )
+    .limit(1);
+
+  if (!message) {
+    const opencodeSessionId = String(session.opencode_session_id || "").trim();
+    const opencodeMessageToken = params.messageId.startsWith("opencode:")
+      ? params.messageId.slice("opencode:".length).trim()
+      : "";
+    // 兼容前端“opencode:{id}”占位消息：尝试从 opencode 拉取并补写本地 DB。
+    if (opencodeSessionId && opencodeMessageToken) {
+      try {
+        const opencodeMessages = await listAgentSessionOpencodeMessages({
+          repositoryId: params.repositoryId,
+          sessionId: session.id,
+          opencodeSessionId,
+          limit: 5000,
+        });
+        const matched = opencodeMessages.find((item) => item.id === opencodeMessageToken);
+        if (matched) {
+          const [existingBySeq] = await db
+            .select({
+              id: schema.agentSessionMessages.id,
+              seq: schema.agentSessionMessages.seq,
+              actor_type: schema.agentSessionMessages.actor_type,
+              actor_id: schema.agentSessionMessages.actor_id,
+              message_type: schema.agentSessionMessages.message_type,
+              content: schema.agentSessionMessages.content,
+              metadata: schema.agentSessionMessages.metadata,
+            })
+            .from(schema.agentSessionMessages)
+            .where(
+              and(
+                eq(schema.agentSessionMessages.session_id, session.id),
+                eq(schema.agentSessionMessages.seq, matched.seq),
+              ),
+            )
+            .limit(1);
+
+          if (existingBySeq) {
+            message = existingBySeq;
+          } else {
+            const [inserted] = await db
+              .insert(schema.agentSessionMessages)
+              .values({
+                session_id: session.id,
+                seq: matched.seq,
+                actor_type: matched.actor_type,
+                actor_id: matched.actor_id.slice(0, 64),
+                message_type: matched.message_type,
+                content: matched.content,
+                metadata: {
+                  ...matched.metadata,
+                  source: "opencode_server",
+                  opencode_message_id: matched.id,
+                  branch_ref: resolveSessionBranchRef(session),
+                },
+              })
+              .onConflictDoNothing({
+                target: [
+                  schema.agentSessionMessages.session_id,
+                  schema.agentSessionMessages.seq,
+                ],
+              })
+              .returning({
+                id: schema.agentSessionMessages.id,
+                seq: schema.agentSessionMessages.seq,
+                actor_type: schema.agentSessionMessages.actor_type,
+                actor_id: schema.agentSessionMessages.actor_id,
+                message_type: schema.agentSessionMessages.message_type,
+                content: schema.agentSessionMessages.content,
+                metadata: schema.agentSessionMessages.metadata,
+              });
+
+            if (inserted) {
+              message = inserted;
+            } else {
+              // 处理并发插入：当前插入失败时再按 seq 回读一次。
+              const [reloaded] = await db
+                .select({
+                  id: schema.agentSessionMessages.id,
+                  seq: schema.agentSessionMessages.seq,
+                  actor_type: schema.agentSessionMessages.actor_type,
+                  actor_id: schema.agentSessionMessages.actor_id,
+                  message_type: schema.agentSessionMessages.message_type,
+                  content: schema.agentSessionMessages.content,
+                  metadata: schema.agentSessionMessages.metadata,
+                })
+                .from(schema.agentSessionMessages)
+                .where(
+                  and(
+                    eq(schema.agentSessionMessages.session_id, session.id),
+                    eq(schema.agentSessionMessages.seq, matched.seq),
+                  ),
+                )
+                .limit(1);
+              message = reloaded;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("[agent-session] pin opencode message resolve failed:", {
+          session_id: session.id,
+          opencode_session_id: opencodeSessionId,
+          message_id: params.messageId,
+          message: (error as { message?: string })?.message || "unknown",
+        });
+      }
+    }
+  }
+
+  if (!message) {
+    throw createError({ statusCode: 404, message: "Session message not found" });
+  }
+
+  const metadataObject = (message.metadata && typeof message.metadata === "object")
+    ? (message.metadata as Record<string, unknown>)
+    : {};
+
+  const [pinned] = await db
+    .update(schema.agentSessionMessages)
+    .set({
+      pinned: true,
+      pinned_by: params.actor.userId,
+      pinned_at: new Date(),
+      metadata: {
+        ...metadataObject,
+        pinned: true,
+      },
+      updated_at: new Date(),
+    })
+    .where(
+      and(
+        eq(schema.agentSessionMessages.id, message.id),
+        eq(schema.agentSessionMessages.session_id, session.id),
+      ),
+    )
+    .returning();
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "message_pinned",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      message_id: message.id,
+    },
+  });
+
+  return pinned;
+}
+
+export async function updateAgentSessionVisibility(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+  visibility: "public" | "private";
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    // 可见性影响会话曝光范围，限制为 owner/admin 修改。
+    throw createError({ statusCode: 403, message: "Only session owner can change visibility" });
+  }
+
+  const [updated] = await db
+    .update(schema.agentSessions)
+    .set({
+      visibility: params.visibility,
+      updated_at: new Date(),
+    })
+    .where(
+      and(
+        eq(schema.agentSessions.id, session.id),
+        eq(schema.agentSessions.repository_id, params.repositoryId),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    throw createError({ statusCode: 404, message: "Agent session not found" });
+  }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "visibility_changed",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      visibility: params.visibility,
+    },
+  });
+
+  return updated;
+}
+
+export async function stopAgentSession(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    // 停止会话属于破坏性动作，仅 owner/admin 允许。
+    throw createError({ statusCode: 403, message: "Only session owner can stop session" });
+  }
+  if (session.status === "stopped" || session.status === "completed") {
+    // 对终态会话保持幂等返回。
+    return session;
+  }
+
+  const [updated] = await db
+    .update(schema.agentSessions)
+    .set({
+      status: "stopped",
+      finished_at: new Date(),
+      updated_at: new Date(),
+    })
+    .where(
+      and(
+        eq(schema.agentSessions.id, session.id),
+        eq(schema.agentSessions.repository_id, params.repositoryId),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    throw createError({ statusCode: 404, message: "Agent session not found" });
+  }
+
+  let cleanupResult: Awaited<ReturnType<typeof cleanupSessionWorktree>> | null = null;
+  try {
+    cleanupResult = await cleanupSessionWorktree({
+      repositoryId: params.repositoryId,
+      sessionId: session.id,
+      actorId: params.actor.userId,
+    });
+  } catch (error) {
+    // 清理失败不阻断 stop 主流程，但记录事件便于后续人工处理。
+    await appendSessionEvent({
+      sessionId: session.id,
+      type: "worktree_cleanup_failed",
+      actorType: "system",
+      actorId: "runtime",
+      payload: {
+        error: (error as { message?: string })?.message || "cleanup failed",
+      },
+    });
+  }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "session_stopped",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      worktree_removed: cleanupResult?.removed || false,
+    },
+  });
+
+  return updated;
+}
+
+export async function controlAgentSessionOpencode(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+  action: AgentSessionOpencodeAction;
+}) {
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    // 控制底层进程属于高权限操作，仅 owner/admin 可执行。
+    throw createError({ statusCode: 403, message: "Only session owner can control opencode" });
+  }
+
+  const controlled = await controlAgentSessionOpencodeProcess({
+    repositoryId: params.repositoryId,
+    sessionId: session.id,
+    action: params.action,
+  });
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "opencode_controlled",
+    actorType: "user",
+    actorId: params.actor.userId,
+    payload: {
+      action: params.action,
+      status: controlled.status,
+      pid: controlled.pid,
+      command: controlled.command,
+      log_file: controlled.log_file,
+      session_path: controlled.session_path,
+      container_session_path: controlled.container_session_path,
+    },
+  });
+
+  return controlled;
+}
+
+export async function retryAgentSession(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    throw createError({ statusCode: 403, message: "Only session owner can retry session" });
+  }
+  if (session.status !== "failed" && session.status !== "stopped") {
+    // 仅失败或已停止的会话允许重试，避免覆盖运行中上下文。
+    throw createError({
+      statusCode: 400,
+      message: "Only failed or stopped sessions can be retried",
+    });
+  }
+
+  try {
+    await cleanupSessionWorktree({
+      repositoryId: params.repositoryId,
+      sessionId: session.id,
+      actorId: params.actor.userId,
+    });
+  } catch {
+    // 历史 worktree 清理失败不阻断重试，由后续 prepare 流程兜底处理。
+  }
+
+  const [updated] = await db
+    .update(schema.agentSessions)
+    .set({
+      status: "created",
+      started_at: null,
+      finished_at: null,
+      session_path: null,
+      updated_at: new Date(),
+    })
+    .where(
+      and(
+        eq(schema.agentSessions.id, session.id),
+        eq(schema.agentSessions.repository_id, params.repositoryId),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    throw createError({ statusCode: 404, message: "Agent session not found" });
+  }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "session_retried",
+    actorType: "user",
+    actorId: params.actor.userId,
+  });
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "session_preparing",
+    actorType: "system",
+    actorId: "runtime",
+  });
+
+  let prepared: Awaited<ReturnType<typeof prepareRepoSessionWorktree>>;
+  try {
+    prepared = await prepareRepoSessionWorktree({
+      repositoryId: params.repositoryId,
+      sessionId: session.id,
+      baseBranch: session.base_branch,
+      workingBranch: session.working_branch || undefined,
+      actorId: params.actor.userId,
+    });
+  } catch (error) {
+    await appendSessionEvent({
+      sessionId: session.id,
+      type: "worktree_prepare_failed",
+      actorType: "system",
+      actorId: "runtime",
+      payload: {
+        error: (error as { message?: string })?.message || "retry prepare failed",
+      },
+    });
+    throw error;
+  }
+
+  await appendSessionEvent({
+    sessionId: session.id,
+    type: "worktree_prepared",
+    actorType: "system",
+    actorId: "runtime",
+    payload: {
+      session_path: prepared.sessionPath,
+      base_branch: prepared.baseBranch,
+      working_branch: prepared.workingBranch,
+      mode: prepared.mode,
+    },
+  });
+
+  const [latest] = await db
+    .select()
+    .from(schema.agentSessions)
+    .where(eq(schema.agentSessions.id, session.id))
+    .limit(1);
+
+  return latest || updated;
+}
+
+export async function deleteAgentSession(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+}) {
+  const db = useDB();
+  const session = await getSessionById(params.sessionId, params.repositoryId);
+
+  if (!params.actor.isAdmin && session.creator_id !== params.actor.userId) {
+    // 删除会话会移除主记录，限制为 owner/admin。
+    throw createError({ statusCode: 403, message: "Only session owner can delete session" });
+  }
+
+  let cleanupResult: Awaited<ReturnType<typeof cleanupSessionWorktree>> | null = null;
+  try {
+    cleanupResult = await cleanupSessionWorktree({
+      repositoryId: params.repositoryId,
+      sessionId: session.id,
+      actorId: params.actor.userId,
+    });
+  } catch {
+    // 删除会话时，worktree 清理失败不阻断主删除流程。
+  }
+
+  const [deleted] = await db
+    .delete(schema.agentSessions)
+    .where(
+      and(
+        eq(schema.agentSessions.id, session.id),
+        eq(schema.agentSessions.repository_id, params.repositoryId),
+      ),
+    )
+    .returning({
+      id: schema.agentSessions.id,
+    });
+
+  if (!deleted) {
+    throw createError({ statusCode: 404, message: "Agent session not found" });
+  }
+
+  return {
+    deleted: true,
+    session_id: deleted.id,
+    worktree_removed: cleanupResult?.removed || false,
+  };
+}
+
+export async function listAgentSessionEvents(params: {
+  repositoryId: string;
+  sessionId: string;
+  actor: AgentSessionActor;
+  page: number;
+  limit: number;
+  afterSeq?: number;
+}) {
+  const db = useDB();
+  const session = await ensureSessionReadable(params.sessionId, params.repositoryId, params.actor);
+  const offset = (params.page - 1) * params.limit;
+
+  const conditions = [eq(schema.agentSessionEvents.session_id, session.id)];
+  if (params.afterSeq !== undefined) {
+    // 增量拉取：只返回 afterSeq 之后的事件，供前端轮询续传。
+    conditions.push(gt(schema.agentSessionEvents.seq, params.afterSeq));
+  }
+  const whereCondition = and(...conditions)!;
+
+  const events = await db
+    .select()
+    .from(schema.agentSessionEvents)
+    .where(whereCondition)
+    .orderBy(schema.agentSessionEvents.seq)
+    .limit(params.limit)
+    .offset(offset);
+
+  const [totalRow] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(schema.agentSessionEvents)
+    .where(whereCondition);
+
+  const total = toNumber(totalRow?.count);
+
+  return {
+    data: events,
+    total,
+    page: params.page,
+    limit: params.limit,
+    hasMore: offset + params.limit < total,
+  };
+}

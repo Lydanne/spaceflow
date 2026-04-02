@@ -139,3 +139,4 @@ dist
 # npm config (may contain auth tokens)
 .npmrc
 
+.pnpm-store

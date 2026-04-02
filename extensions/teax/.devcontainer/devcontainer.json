@@ -1,0 +1,59 @@
+{
+  "name": "teax-dev",
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.yml"
+  ],
+  "service": "app",
+  "workspaceFolder": "/workspace/extensions/teax",
+  "mounts": [
+    "source=${localWorkspaceFolder}/../..,target=/workspace,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.pnpm-store,target=/root/.pnpm-store,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.ssh,target=/tmp/host-ssh,type=bind,readonly"
+  ],
+  "shutdownAction": "stopCompose",
+  "runServices": [
+    "app",
+    "db",
+    "redis"
+  ],
+  "containerEnv": {
+    "PNPM_STORE_DIR": "/root/.pnpm-store",
+    "npm_config_store_dir": "/root/.pnpm-store"
+  },
+  "forwardPorts": [
+    3000,
+    5432,
+    6379
+  ],
+  "portsAttributes": {
+    "3000": {
+      "label": "Teax Dev Server",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL"
+    },
+    "6379": {
+      "label": "Redis"
+    }
+  },
+  "postCreateCommand": "bash -lc 'set -e; cd /workspace; corepack pnpm install --store-dir /root/.pnpm-store'",
+  "postStartCommand": "bash -lc 'set -e; if [ -d /tmp/host-ssh ]; then mkdir -p /root/.ssh; chmod 700 /root/.ssh; cp -a /tmp/host-ssh/. /root/.ssh/; chown -R root:root /root/.ssh; find /root/.ssh -type d -print0 | xargs -0 chmod 700; find /root/.ssh -type f -print0 | xargs -0 chmod 600; fi; cd /workspace/extensions/teax; if [ -f .env.example ] && [ ! -f .env ]; then cp .env.example .env; fi; cd /workspace; corepack pnpm --filter @spaceflow/teax db:push'",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "typescript.tsdk": "node_modules/typescript/lib"
+      },
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "vue.volar",
+        "dbaeumer.vscode-eslint",
+        "ckolkman.vscode-postgres",
+        "cweijan.vscode-redis-client"
+      ]
+    }
+  },
+  "remoteUser": "root"
+}
