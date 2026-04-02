@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.71.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.70.0...@spaceflow/review@0.71.0) (2026-04-02)
+
+### 新特性
+
+* **review:** 添加 skipDuplicateWorkflow 和 autoApprove 配置选项支持 ([3ede6e3](https://github.com/Lydanne/spaceflow/commit/3ede6e30d89ced5ef57e154e42f723da5e3c5d92))
+
+### 修复BUG
+
+* **review-summary:** 在用户名前添加 @ 符号以支持用户提及 ([a4aa03f](https://github.com/Lydanne/spaceflow/commit/a4aa03f377bb26e1fa7adc90568d89f2bb9936ce))
+* **review-summary:** 在用户名前添加 @ 符号以支持用户提及 ([fd83df4](https://github.com/Lydanne/spaceflow/commit/fd83df4a647e6c4d42617b44fdaf0ebbec7892e4))
+
+### 其他修改
+
+* **review-summary:** released version 0.38.0 [no ci] ([119c2a8](https://github.com/Lydanne/spaceflow/commit/119c2a8861a02e68a4e31135aa88799fe63d29ff))
+* **review-summary:** released version 0.39.0 [no ci] ([40fbd43](https://github.com/Lydanne/spaceflow/commit/40fbd435b3895b22b04dce7cce4c487f0edbdd2a))
+* **scripts:** released version 0.29.0 [no ci] ([496843a](https://github.com/Lydanne/spaceflow/commit/496843add224941b646837d8fc8ec03f790530fc))
+* **shell:** released version 0.29.0 [no ci] ([368f8c8](https://github.com/Lydanne/spaceflow/commit/368f8c83ae3e485df5bfd4128e46aef4a6689eb0))
+
 ## [0.70.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.69.0...@spaceflow/review@0.70.0) (2026-04-02)
 
 ### 新特性
