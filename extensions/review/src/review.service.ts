@@ -306,6 +306,9 @@ export class ReviewService {
       flush: options.flush ?? false,
       eventAction: options.eventAction,
       localMode,
+      skipDuplicateWorkflow:
+        options.skipDuplicateWorkflow ?? reviewConf.skipDuplicateWorkflow ?? false,
+      autoApprove: options.autoApprove ?? reviewConf.autoApprove ?? false,
     };
   }
 
