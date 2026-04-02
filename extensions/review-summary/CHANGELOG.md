@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.39.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.38.0...@spaceflow/review-summary@0.39.0) (2026-04-02)
+
+### 修复BUG
+
+* **review-summary:** 在用户名前添加 @ 符号以支持用户提及 ([a4aa03f](https://github.com/Lydanne/spaceflow/commit/a4aa03f377bb26e1fa7adc90568d89f2bb9936ce))
+
 ## [0.38.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.37.0...@spaceflow/review-summary@0.38.0) (2026-04-02)
 
 ### 新特性
