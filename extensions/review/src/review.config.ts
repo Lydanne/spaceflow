@@ -85,6 +85,12 @@ export interface ReviewOptions {
    * - false: 禁用检查（默认）
    */
   skipDuplicateWorkflow?: boolean;
+  /**
+   * 自动批准合并
+   * - true: 当所有问题都已解决时，自动提交 APPROVE review
+   * - false: 不自动批准（默认）
+   */
+  autoApprove?: boolean;
 }
 
 /** review 命令配置 schema（LLM 敏感配置由系统 llm.config.ts 管理） */
@@ -107,6 +113,7 @@ export const reviewSchema = () =>
     retryDelay: z.number().default(1000).optional(),
     invalidateChangedFiles: invalidateChangedFilesSchema.default("invalidate").optional(),
     skipDuplicateWorkflow: z.boolean().default(false).optional(),
+    autoApprove: z.boolean().default(false).optional(),
   });
 
 /** review 配置类型（从 schema 推导） */

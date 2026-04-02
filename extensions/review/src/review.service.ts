@@ -434,6 +434,7 @@ export class ReviewService {
       deletionOnly,
       localMode,
       skipDuplicateWorkflow,
+      autoApprove,
     } = context;
 
     // 直接审查文件模式：指定了 -f 文件且 base=head
@@ -897,6 +898,7 @@ export class ReviewService {
           issues: allIssues,
         },
         verbose,
+        autoApprove,
       );
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已提交`);
@@ -957,7 +959,7 @@ export class ReviewService {
    * 从现有的 AI review 评论中读取问题状态，同步已解决/无效状态，输出统计信息
    */
   protected async executeCollectOnly(context: ReviewContext): Promise<ReviewResult> {
-    const { owner, repo, prNumber, verbose, ci, dryRun } = context;
+    const { owner, repo, prNumber, verbose, ci, dryRun, autoApprove } = context;
 
     if (shouldLog(verbose, 1)) {
       console.log(`📊 仅收集 review 状态模式`);
@@ -1023,7 +1025,14 @@ export class ReviewService {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 更新 PR 评论...`);
       }
-      await this.postOrUpdateReviewComment(owner, repo, prNumber, existingResult, verbose);
+      await this.postOrUpdateReviewComment(
+        owner,
+        repo,
+        prNumber,
+        existingResult,
+        verbose,
+        autoApprove,
+      );
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已更新`);
       }
@@ -1140,17 +1149,18 @@ export class ReviewService {
     const fixed = validIssue.filter((i) => i.fixed).length;
     const resolved = validIssue.filter((i) => i.resolved).length;
     const invalid = total - validTotal;
-    const pending = validTotal - fixed;
+    const pending = validTotal - fixed - resolved;
     const fixRate = validTotal > 0 ? Math.round((fixed / validTotal) * 100 * 10) / 10 : 0;
     const resolveRate = validTotal > 0 ? Math.round((resolved / validTotal) * 100 * 10) / 10 : 0;
-    return { total, fixed, resolved, invalid, pending, fixRate, resolveRate };
+    return { total, validTotal, fixed, resolved, invalid, pending, fixRate, resolveRate };
   }
 
   /**
    * 仅执行删除代码分析模式
    */
   protected async executeDeletionOnly(context: ReviewContext): Promise<ReviewResult> {
-    const { owner, repo, prNumber, baseRef, headRef, dryRun, ci, verbose, llmMode } = context;
+    const { owner, repo, prNumber, baseRef, headRef, dryRun, ci, verbose, llmMode, autoApprove } =
+      context;
 
     if (shouldLog(verbose, 1)) {
       console.log(`🗑️  仅执行删除代码分析模式`);
@@ -1215,7 +1225,7 @@ export class ReviewService {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 提交 PR 评论...`);
       }
-      await this.postOrUpdateReviewComment(owner, repo, prNumber, result, verbose);
+      await this.postOrUpdateReviewComment(owner, repo, prNumber, result, verbose, autoApprove);
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已提交`);
       }
@@ -2104,6 +2114,7 @@ ${fileChanges || "无"}`;
     prNumber: number,
     result: ReviewResult,
     verbose?: VerboseLevel,
+    autoApprove?: boolean,
   ): Promise<void> {
     // 获取配置
     const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
@@ -2178,6 +2189,7 @@ ${fileChanges || "无"}`;
     }
 
     // 2. 发布本轮新发现的行级评论（使用 PR Review API，不删除旧的 review，保留历史）
+    // 如果启用 autoApprove 且所有问题已解决，使用 APPROVE event 合并发布
     let lineIssues: ReviewIssue[] = [];
     let comments: CreatePullReviewComment[] = [];
     if (reviewConf.lineComments) {
@@ -2192,23 +2204,47 @@ ${fileChanges || "无"}`;
         .map((issue) => this.issueToReviewComment(issue))
         .filter((comment): comment is CreatePullReviewComment => comment !== null);
     }
+
+    // 计算是否需要自动批准
+    // 条件：启用 autoApprove 且没有待处理问题（包括从未发现问题的情况）
+    const stats = this.calculateIssueStats(result.issues);
+    const shouldAutoApprove = autoApprove && stats.pending === 0;
+
     if (reviewConf.lineComments) {
-      const reviewBody = this.buildLineReviewBody(lineIssues, result.round, result.issues);
+      const lineReviewBody = this.buildLineReviewBody(lineIssues, result.round, result.issues);
+
+      // 如果需要自动批准，追加批准信息到 body
+      const finalReviewBody = shouldAutoApprove
+        ? lineReviewBody +
+          `\n\n---\n\n✅ **自动批准合并**\n\n${
+            stats.validTotal > 0
+              ? `所有问题都已解决 (${stats.fixed} 已修复, ${stats.resolved} 已解决)，`
+              : "代码审查通过，未发现问题，"
+          }自动批准此 PR。`
+        : lineReviewBody;
+
+      const reviewEvent = shouldAutoApprove ? REVIEW_STATE.APPROVE : REVIEW_STATE.COMMENT;
+
       if (comments.length > 0) {
         try {
           await this.gitProvider.createPullReview(owner, repo, prNumber, {
-            event: REVIEW_STATE.COMMENT,
-            body: reviewBody,
+            event: reviewEvent,
+            body: finalReviewBody,
             comments,
             commit_id: commitId,
           });
-          console.log(`✅ 已发布 ${comments.length} 条行级评论`);
+          if (shouldAutoApprove) {
+            console.log(`✅ 已自动批准 PR #${prNumber}（所有问题已解决）`);
+          } else {
+            console.log(`✅ 已发布 ${comments.length} 条行级评论`);
+          }
         } catch {
           // 批量失败时逐条发布，跳过无法定位的评论
           console.warn("⚠️ 批量发布行级评论失败，尝试逐条发布...");
           let successCount = 0;
           for (const comment of comments) {
             try {
+              // 逐条发布时只用 COMMENT event，避免重复 APPROVE
               await this.gitProvider.createPullReview(owner, repo, prNumber, {
                 event: REVIEW_STATE.COMMENT,
                 body: successCount === 0 ? reviewBody : undefined,
@@ -2222,6 +2258,23 @@ ${fileChanges || "无"}`;
           }
           if (successCount > 0) {
             console.log(`✅ 逐条发布成功 ${successCount}/${comments.length} 条行级评论`);
+            // 如果需要自动批准，单独发一个 APPROVE review
+            if (shouldAutoApprove) {
+              try {
+                await this.gitProvider.createPullReview(owner, repo, prNumber, {
+                  event: REVIEW_STATE.APPROVE,
+                  body: `✅ **自动批准合并**\n\n${
+                    stats.validTotal > 0
+                      ? `所有问题都已解决 (${stats.fixed} 已修复, ${stats.resolved} 已解决)，`
+                      : "代码审查通过，未发现问题，"
+                  }自动批准此 PR。`,
+                  commit_id: commitId,
+                });
+                console.log(`✅ 已自动批准 PR #${prNumber}（所有问题已解决）`);
+              } catch (error) {
+                console.warn("⚠️ 自动批准失败:", error);
+              }
+            }
           } else {
             console.warn("⚠️ 所有行级评论均无法定位，已跳过");
           }
@@ -2230,15 +2283,35 @@ ${fileChanges || "无"}`;
         // 本轮无新问题，仍发布 Round 状态（含上轮回顾）
         try {
           await this.gitProvider.createPullReview(owner, repo, prNumber, {
-            event: REVIEW_STATE.COMMENT,
-            body: reviewBody,
+            event: reviewEvent,
+            body: finalReviewBody,
             comments: [],
             commit_id: commitId,
           });
-          console.log(`✅ 已发布 Round ${result.round} 审查状态（无新问题）`);
+          if (shouldAutoApprove) {
+            console.log(`✅ 已自动批准 PR #${prNumber}（Round ${result.round}，所有问题已解决）`);
+          } else {
+            console.log(`✅ 已发布 Round ${result.round} 审查状态（无新问题）`);
+          }
         } catch (error) {
           console.warn("⚠️ 发布审查状态失败:", error);
         }
+      }
+    } else if (shouldAutoApprove) {
+      // 未启用 lineComments 但需要自动批准
+      try {
+        await this.gitProvider.createPullReview(owner, repo, prNumber, {
+          event: REVIEW_STATE.APPROVE,
+          body: `✅ **自动批准合并**\n\n${
+            stats.validTotal > 0
+              ? `所有问题都已解决 (${stats.fixed} 已修复, ${stats.resolved} 已解决)，`
+              : "代码审查通过，未发现问题，"
+          }自动批准此 PR。`,
+          commit_id: commitId,
+        });
+        console.log(`✅ 已自动批准 PR #${prNumber}（所有问题已解决）`);
+      } catch (error) {
+        console.warn("⚠️ 自动批准失败:", error);
       }
     }
   }

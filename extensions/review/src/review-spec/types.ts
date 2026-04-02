@@ -117,6 +117,8 @@ export interface DeletionImpactResult {
 export interface ReviewStats {
   /** 总问题数 */
   total: number;
+  /** 有效问题数（排除无效） */
+  validTotal: number;
   /** AI 验证已修复数 */
   fixed: number;
   /** 用户手动 resolve 数 */
