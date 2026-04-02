@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.70.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.69.0...@spaceflow/review@0.70.0) (2026-04-02)
+
+### 新特性
+
+* **review:** 新增自动批准功能，当所有问题解决时自动提交 APPROVE review ([4155342](https://github.com/Lydanne/spaceflow/commit/4155342511f76d6cd9001a14a144fce55a7a8946))
+* **review:** 添加 workflow 重复运行检测，防止同一 PR 并发审查 ([a3777af](https://github.com/Lydanne/spaceflow/commit/a3777affb10b6fb4f88a83660ce2a81f9f2d6498))
+
+### 其他修改
+
+* **core:** released version 0.27.0 [no ci] ([053d624](https://github.com/Lydanne/spaceflow/commit/053d624997b04e47537dac4ca0c7a99ed4a4cd36))
+* **publish:** released version 0.51.0 [no ci] ([1fbe22a](https://github.com/Lydanne/spaceflow/commit/1fbe22a538cdcb6264e3937c5706d75f67fa4f2a))
+* **review-summary:** released version 0.37.0 [no ci] ([455c581](https://github.com/Lydanne/spaceflow/commit/455c58140def453d95c8fc85b1ea8fde39037abc))
+
 ## [0.69.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.68.0...@spaceflow/review@0.69.0) (2026-03-04)
 
 ### 代码重构
