@@ -85,7 +85,7 @@ export class FeishuProvider implements IMessagingProvider {
     return verifyFeishuEventSignature(
       params.timestamp,
       params.nonce,
-      config.feishuEncryptKey,
+      config.feishu.encryptKey,
       params.body,
       params.signature,
     );

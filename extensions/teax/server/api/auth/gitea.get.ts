@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
   const state = generateState(redirect);
 
   const redirectUri = `${config.public.appUrl}/api/auth/callback/gitea`;
-  const authUrl = `${config.giteaUrl}/login/oauth/authorize?client_id=${config.giteaClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${state}`;
+  const authUrl = `${config.gitea.url}/login/oauth/authorize?client_id=${config.gitea.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${state}`;
 
   return sendRedirect(event, authUrl);
 });

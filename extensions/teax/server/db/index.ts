@@ -9,14 +9,14 @@ let _db: ReturnType<typeof drizzle> | null = null;
  * 优先级：NUXT_DATABASE_URL > 分离参数拼接
  */
 function resolveDatabaseUrl(config: ReturnType<typeof useRuntimeConfig>): string {
-  if (config.databaseUrl) {
-    return config.databaseUrl;
+  if (config.database.url) {
+    return config.database.url;
   }
-  const user = config.postgresUser || "postgres";
-  const password = config.postgresPassword || "postgres";
-  const host = config.postgresHost || "localhost";
-  const port = config.postgresPort || "5432";
-  const database = config.postgresDb || "teax";
+  const user = config.database.user || "postgres";
+  const password = config.database.password || "postgres";
+  const host = config.database.host || "localhost";
+  const port = config.database.port || "5432";
+  const database = config.database.db || "teax";
   return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
 }
 

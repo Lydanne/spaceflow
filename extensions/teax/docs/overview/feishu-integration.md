@@ -103,12 +103,12 @@ export async function sendFeishuCardMessage(
       content: JSON.stringify(card),
     },
   });
-  
+
   if (res.code !== 0) {
     console.error("Feishu send card message error:", res.code, res.msg);
     return {};
   }
-  
+
   return { message_id: res.data?.message_id };
 }
 ```
@@ -121,29 +121,31 @@ export async function sendFeishuCardMessage(
 
 ```bash
 # ─── 飞书应用凭证（必需） ─────────────────────────
-FEISHU_APP_ID=cli_xxxxxxxxxxxx
-FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxx
+NUXT_FEISHU_APP_ID=cli_xxxxxxxxxxxx
+NUXT_FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxx
 
 # ─── 飞书机器人安全验证（推荐） ───────────────────
 # 事件订阅加密密钥（Encrypt Key）
-FEISHU_ENCRYPT_KEY=your_encrypt_key
+NUXT_FEISHU_ENCRYPT_KEY=your_encrypt_key
 # 事件订阅验证令牌（Verification Token）
-FEISHU_VERIFICATION_TOKEN=your_verification_token
+NUXT_FEISHU_VERIFICATION_TOKEN=your_verification_token
 
 # ─── 飞书审批（可选） ─────────────────────────────
 # 审批定义 Code，在飞书管理后台创建审批流程后获取
-FEISHU_APPROVAL_CODE=your_approval_code
+NUXT_FEISHU_APPROVAL_CODE=your_approval_code
 ```
 
 对应 `nuxt.config.ts` 中的 `runtimeConfig`：
 
 ```ts
 runtimeConfig: {
-  feishuAppId: process.env.FEISHU_APP_ID || "",
-  feishuAppSecret: process.env.FEISHU_APP_SECRET || "",
-  feishuEncryptKey: process.env.FEISHU_ENCRYPT_KEY || "",
-  feishuVerificationToken: process.env.FEISHU_VERIFICATION_TOKEN || "",
-  feishuApprovalCode: process.env.FEISHU_APPROVAL_CODE || "",
+  feishu: {
+    appId: process.env.NUXT_FEISHU_APP_ID || "",
+    appSecret: process.env.NUXT_FEISHU_APP_SECRET || "",
+    encryptKey: process.env.NUXT_FEISHU_ENCRYPT_KEY || "",
+    verificationToken: process.env.NUXT_FEISHU_VERIFICATION_TOKEN || "",
+    approvalCode: process.env.NUXT_FEISHU_APPROVAL_CODE || "",
+  },
 }
 ```
 
@@ -153,23 +155,23 @@ runtimeConfig: {
 
 当前代码已支持飞书长连接模式（`server/plugins/feishu-longconnection.ts`）：
 
-- 启用条件：`FEISHU_APP_ID` 与 `FEISHU_APP_SECRET` 已配置，且未设置 `FEISHU_LONGCONNECTION_DISABLED=true`
+- 启用条件：`NUXT_FEISHU_APP_ID` 与 `NUXT_FEISHU_APP_SECRET` 已配置，且未设置 `NUXT_FEISHU_LONGCONNECTION_DISABLED=true`
 - 配置方式：在飞书开放平台中启用“长连接模式”，无需配置请求网址
 - 事件分发：消息、卡片交互、审批事件、菜单点击统一由 EventDispatcher 分发
 
 ### 相关环境变量
 
 ```bash
-FEISHU_APP_ID=cli_xxxxxxxxxxxx
-FEISHU_APP_SECRET=xxxxxxxxxxxxxxxx
-FEISHU_ENCRYPT_KEY=xxxxxxxxxxxxxxxx   # 可选，推荐
-FEISHU_LONGCONNECTION_DISABLED=false  # 可选，默认不禁用
+NUXT_FEISHU_APP_ID=cli_xxxxxxxxxxxx
+NUXT_FEISHU_APP_SECRET=xxxxxxxxxxxxxxxx
+NUXT_FEISHU_ENCRYPT_KEY=xxxxxxxxxxxxxxxx   # 可选，推荐
+NUXT_FEISHU_LONGCONNECTION_DISABLED=false  # 可选，默认不禁用
 ```
 
 ### 注意事项
 
 - 长连接适合开发与单实例部署；多实例场景建议评估事件消费一致性策略。
-- 生产环境若采用 webhook 模式，可设置 `FEISHU_LONGCONNECTION_DISABLED=true` 显式关闭长连接。
+- 生产环境若采用 webhook 模式，可设置 `NUXT_FEISHU_LONGCONNECTION_DISABLED=true` 显式关闭长连接。
 
 ---
 
@@ -290,7 +292,7 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 
 2. 飞书会发送 URL 验证请求（`type: url_verification`），Teax 自动响应 `challenge`
 
-3. 配置 `FEISHU_ENCRYPT_KEY` 和 `FEISHU_VERIFICATION_TOKEN` 以启用安全验证
+3. 配置 `NUXT_FEISHU_ENCRYPT_KEY` 和 `NUXT_FEISHU_VERIFICATION_TOKEN` 以启用安全验证
 
 ### 安全机制
 
@@ -456,10 +458,10 @@ Gitea Webhook ──▶ gitea.post.ts ──▶ notification.service.ts
 
 在管理后台（`/-/admin/settings`）查看飞书集成状态：
 
-- **应用凭证**：FEISHU_APP_ID / FEISHU_APP_SECRET 是否配置
+- **应用凭证**：NUXT_FEISHU_APP_ID / NUXT_FEISHU_APP_SECRET 是否配置
 - **Token 有效**：能否成功获取 tenant_access_token
-- **事件加密**：FEISHU_ENCRYPT_KEY 是否配置
-- **审批流程**：FEISHU_APPROVAL_CODE 是否配置
+- **事件加密**：NUXT_FEISHU_ENCRYPT_KEY 是否配置
+- **审批流程**：NUXT_FEISHU_APPROVAL_CODE 是否配置
 - **Webhook URL**：显示飞书事件回调地址，可一键复制
 
 **API**：`GET /api/admin/feishu-status`

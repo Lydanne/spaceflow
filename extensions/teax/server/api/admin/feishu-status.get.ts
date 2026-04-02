@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   await requireAdmin(event);
 
   const config = useRuntimeConfig();
-  const configured = !!(config.feishuAppId && config.feishuAppSecret);
+  const configured = !!(config.feishu.appId && config.feishu.appSecret);
 
   if (!configured) {
     return {
@@ -28,8 +28,8 @@ export default defineEventHandler(async (event) => {
     const client = getFeishuClient();
     await client.auth.tenantAccessToken.internal({
       data: {
-        app_id: config.feishuAppId,
-        app_secret: config.feishuAppSecret,
+        app_id: config.feishu.appId,
+        app_secret: config.feishu.appSecret,
       },
     });
     connected = true;
@@ -43,8 +43,8 @@ export default defineEventHandler(async (event) => {
       connected,
       error,
       features: {
-        encrypt: !!config.feishuEncryptKey,
-        approval: !!config.feishuApprovalCode,
+        encrypt: !!config.feishu.encryptKey,
+        approval: !!config.feishu.approvalCode,
       },
     },
   };

@@ -99,22 +99,17 @@ NUXT_PUBLIC_APP_NAME=Teax Dev
 NUXT_PUBLIC_APP_URL=http://localhost:3000
 
 # 数据库
-POSTGRES_DB=teax
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
+NUXT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teax
 
 # Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
+NUXT_REDIS_URL=redis://localhost:6379
 
 # Gitea OAuth（需要先在 Gitea 中创建 OAuth 应用）
-GITEA_URL=http://localhost:3001
-GITEA_CLIENT_ID=your-client-id
-GITEA_CLIENT_SECRET=your-client-secret
-GITEA_SERVICE_TOKEN=your-service-token
+NUXT_GITEA_URL=http://localhost:3001
+NUXT_GITEA_CLIENT_ID=your-client-id
+NUXT_GITEA_CLIENT_SECRET=your-client-secret
+NUXT_GITEA_SERVICE_TOKEN=your-service-token
+NUXT_GITEA_WEBHOOK_SECRET=your-webhook-secret
 
 # Session 密钥（至少 32 字符）
 NUXT_SESSION_PASSWORD=development-session-password-at-least-32-chars
@@ -141,7 +136,7 @@ NUXT_SESSION_PASSWORD=development-session-password-at-least-32-chars
 
 4. **保存凭证**
    - 复制 `Client ID` 和 `Client Secret`
-   - 填入 `.env` 文件的 `GITEA_CLIENT_ID` 和 `GITEA_CLIENT_SECRET`
+   - 填入 `.env` 文件的 `NUXT_GITEA_CLIENT_ID` 和 `NUXT_GITEA_CLIENT_SECRET`
 
 5. **创建服务令牌**
    - 在 Gitea 设置中进入"应用" → "访问令牌"
@@ -151,7 +146,7 @@ NUXT_SESSION_PASSWORD=development-session-password-at-least-32-chars
      - ✅ `repo` - 仓库访问
      - ✅ `admin:org` - 组织管理
      - ✅ `admin:repo_hook` - Webhook 管理
-   - 复制生成的令牌到 `.env` 的 `GITEA_SERVICE_TOKEN`
+   - 复制生成的令牌到 `.env` 的 `NUXT_GITEA_SERVICE_TOKEN`
 
 ### 步骤 6: 初始化数据库
 
@@ -317,13 +312,13 @@ Teax 使用权限组管理仓库访问：
 
 **A:** 检查以下几点：
 1. Gitea OAuth 应用的回调地址是否正确
-2. `.env` 中的 `GITEA_CLIENT_ID` 和 `GITEA_CLIENT_SECRET` 是否正确
+2. `.env` 中的 `NUXT_GITEA_CLIENT_ID` 和 `NUXT_GITEA_CLIENT_SECRET` 是否正确
 3. Gitea 实例是否可以访问 Teax（网络连通性）
 
 ### Q: 同步组织时报错
 
 **A:** 确认：
-1. `GITEA_SERVICE_TOKEN` 是否有效
+1. `NUXT_GITEA_SERVICE_TOKEN` 是否有效
 2. 令牌是否有 `admin:org` 权限
 3. 检查 Gitea API 是否可访问
 

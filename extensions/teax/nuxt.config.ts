@@ -10,57 +10,69 @@ export default defineNuxtConfig({
   css: ["~/assets/css/main.css"],
 
   // 运行时配置：空字符串由 NUXT_* 环境变量运行时注入，避免构建时泄露密钥
-  // 支持的环境变量格式：
-  //   - NUXT_DATABASE_URL 或 NUXT_POSTGRES_* 分离参数
-  //   - NUXT_REDIS_URL 或 NUXT_REDIS_* 分离参数
-  //   - 其他 NUXT_GITEA_*, NUXT_FEISHU_* 等
+  // 环境变量格式：NUXT_{分组}_{属性}，如 NUXT_DATABASE_URL, NUXT_GITEA_CLIENT_ID
   runtimeConfig: {
-    // 数据库与缓存
-    databaseUrl: "",
-    postgresDb: "",
-    postgresUser: "",
-    postgresPassword: "",
-    postgresHost: "",
-    postgresPort: "",
-    redisUrl: "",
-    redisHost: "",
-    redisPort: "",
-    redisPassword: "",
+    // 数据库
+    database: {
+      url: "",
+      db: "",
+      user: "",
+      password: "",
+      host: "",
+      port: "",
+    },
+    // Redis
+    redis: {
+      url: "",
+      host: "",
+      port: "",
+      password: "",
+    },
     // Gitea
-    giteaUrl: "",
-    giteaClientId: "",
-    giteaClientSecret: "",
-    giteaWebhookSecret: "",
-    giteaServiceToken: "",
+    gitea: {
+      url: "",
+      clientId: "",
+      clientSecret: "",
+      webhookSecret: "",
+      serviceToken: "",
+    },
     // 飞书
-    feishuAppId: "",
-    feishuAppSecret: "",
-    feishuEncryptKey: "",
-    feishuVerificationToken: "",
-    feishuApprovalCode: "",
+    feishu: {
+      appId: "",
+      appSecret: "",
+      encryptKey: "",
+      verificationToken: "",
+      approvalCode: "",
+    },
     // 安全
-    tokenEncryptSecret: "",
-    // Agents 元数据仓库与提交身份配置
-    agentMetaRepoUrl: "",
-    agentMetaRepoBranch: "main",
-    agentMetaRepoAuthType: "token",
-    agentMetaRepoToken: "",
-    agentBotUsername: "TeaxBot",
-    agentBotEmail: "teaxbot@local",
-    agentBotToken: "",
-    // Agent Runtime（P1）配置
-    agentRuntimeRoot: ".teax-agent-runtime",
-    agentRuntimeDockerBin: "docker",
-    agentRuntimeDockerBaseDockerfile: "docker/base/node24-vscode-browser.Dockerfile",
-    agentRuntimeDockerBaseBuildContext: ".",
-    agentRuntimeDockerBuildOnStart: true,
-    agentRuntimeDockerWorkspaceRoot: "/runtime",
-    agentRuntimeKeepWorktreeOnStop: false,
-    agentRuntimeOpencodeStartCommand: "",
+    security: {
+      tokenEncryptSecret: "",
+    },
+    // Agent 元数据仓库与提交身份配置
+    agent: {
+      metaRepoUrl: "",
+      metaRepoBranch: "main",
+      metaRepoAuthType: "token",
+      metaRepoToken: "",
+      botUsername: "TeaxBot",
+      botEmail: "teaxbot@local",
+      botToken: "",
+      // Runtime 配置
+      runtimeRoot: ".teax-agent-runtime",
+      runtimeDockerBin: "docker",
+      runtimeDockerBaseDockerfile: "docker/base/node24-vscode-browser.Dockerfile",
+      runtimeDockerBaseBuildContext: ".",
+      runtimeDockerBuildOnStart: true,
+      runtimeDockerWorkspaceRoot: "/runtime",
+      runtimeKeepWorktreeOnStop: false,
+      runtimeOpencodeStartCommand: "",
+    },
     // 调试
-    verboseDefault: "1",
-    cardKitDebug: false,
-    // Session
+    debug: {
+      verboseDefault: "1",
+      cardKitDebug: false,
+    },
+    // Session（nuxt-auth-utils 内置）
     session: {
       password: "",
     },

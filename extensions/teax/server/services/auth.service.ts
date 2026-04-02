@@ -57,12 +57,12 @@ export async function updateUserGiteaToken(userId: string, tokens: GiteaTokens) 
   const db = useDB();
   const config = useRuntimeConfig();
 
-  if (!config.tokenEncryptSecret) {
+  if (!config.security.tokenEncryptSecret) {
     throw new Error("TOKEN_ENCRYPT_SECRET is not configured");
   }
 
-  const encryptedAccessToken = encrypt(tokens.accessToken, config.tokenEncryptSecret);
-  const encryptedRefreshToken = encrypt(tokens.refreshToken, config.tokenEncryptSecret);
+  const encryptedAccessToken = encrypt(tokens.accessToken, config.security.tokenEncryptSecret);
+  const encryptedRefreshToken = encrypt(tokens.refreshToken, config.security.tokenEncryptSecret);
 
   const expiresAt = tokens.expiresIn
     ? new Date(Date.now() + tokens.expiresIn * 1000)
@@ -86,7 +86,7 @@ export async function getUserGiteaTokens(userId: string): Promise<{ accessToken:
   const db = useDB();
   const config = useRuntimeConfig();
 
-  if (!config.tokenEncryptSecret) {
+  if (!config.security.tokenEncryptSecret) {
     return null;
   }
 
@@ -104,8 +104,8 @@ export async function getUserGiteaTokens(userId: string): Promise<{ accessToken:
   }
 
   try {
-    const accessToken = decrypt(user.gitea_access_token, config.tokenEncryptSecret);
-    const refreshToken = decrypt(user.gitea_refresh_token, config.tokenEncryptSecret);
+    const accessToken = decrypt(user.gitea_access_token, config.security.tokenEncryptSecret);
+    const refreshToken = decrypt(user.gitea_refresh_token, config.security.tokenEncryptSecret);
     return { accessToken, refreshToken };
   } catch {
     return null;

@@ -12,11 +12,11 @@ export default defineEventHandler(async (event) => {
     signature
     && timestamp
     && nonce
-    && config.feishuEncryptKey
+    && config.feishu.encryptKey
     && !verifyFeishuEventSignature(
       timestamp,
       nonce,
-      config.feishuEncryptKey,
+      config.feishu.encryptKey,
       JSON.stringify(body),
       signature,
     )

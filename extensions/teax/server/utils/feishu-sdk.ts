@@ -10,13 +10,13 @@ export function getFeishuClient(): lark.Client {
 
   const config = useRuntimeConfig();
 
-  if (!config.feishuAppId || !config.feishuAppSecret) {
+  if (!config.feishu.appId || !config.feishu.appSecret) {
     throw new Error("Feishu App ID or App Secret not configured");
   }
 
   client = new lark.Client({
-    appId: config.feishuAppId,
-    appSecret: config.feishuAppSecret,
+    appId: config.feishu.appId,
+    appSecret: config.feishu.appSecret,
     appType: lark.AppType.SelfBuild,
     disableTokenCache: false,
   });
@@ -287,8 +287,8 @@ export async function exchangeFeishuCode(code: string): Promise<{
     body: JSON.stringify({
       grant_type: "authorization_code",
       code,
-      client_id: config.feishuAppId,
-      client_secret: config.feishuAppSecret,
+      client_id: config.feishu.appId,
+      client_secret: config.feishu.appSecret,
       redirect_uri: redirectUri,
     }),
   });
@@ -362,7 +362,7 @@ export function buildFeishuAuthUrl(state: string): string {
   const config = useRuntimeConfig();
   const redirectUri = `${config.public.appUrl}/api/auth/callback/feishu`;
   const params = new URLSearchParams({
-    app_id: config.feishuAppId,
+    app_id: config.feishu.appId,
     redirect_uri: redirectUri,
     state,
   });

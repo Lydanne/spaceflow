@@ -62,7 +62,7 @@ export default defineNitroPlugin(async () => {
 
   // ━━━ 同步运行时配置 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const config = useRuntimeConfig();
-  cardRouter.debug = parseBooleanFlag(config.cardKitDebug, false);
+  cardRouter.debug = parseBooleanFlag(config.debug.cardKitDebug, false);
 
   console.log(
     `[CardKit] Registered ${cardRouter.pageCount} pages, ${commands.length} commands`,

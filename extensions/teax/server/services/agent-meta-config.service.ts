@@ -19,8 +19,8 @@ export interface AgentMetaRepoResolvedConfig {
  */
 export function resolveAgentMetaRepoConfig(): AgentMetaRepoResolvedConfig {
   const config = useRuntimeConfig();
-  const rawMetaRepoToken = String(config.agentMetaRepoTokenRaw || "").trim();
-  const botToken = String(config.agentBotToken || "").trim();
+  const rawMetaRepoToken = String(config.agent.metaRepoToken || "").trim();
+  const botToken = String(config.agent.botToken || "").trim();
   // token 解析采用“显式优先”策略：若配置了 AGENT_META_REPO_TOKEN，则完全覆盖 bot token。
   const token = rawMetaRepoToken || botToken;
   const tokenSource
@@ -29,12 +29,12 @@ export function resolveAgentMetaRepoConfig(): AgentMetaRepoResolvedConfig {
       : (botToken ? "AGENT_BOT_TOKEN" : "none");
 
   return {
-    url: String(config.agentMetaRepoUrl || "").trim(),
-    branch: String(config.agentMetaRepoBranch || "main").trim() || "main",
+    url: String(config.agent.metaRepoUrl || "").trim(),
+    branch: String(config.agent.metaRepoBranch || "main").trim() || "main",
     authType: "token",
     token,
     tokenSource,
-    botUsername: String(config.agentBotUsername || "TeaxBot").trim() || "TeaxBot",
-    botEmail: String(config.agentBotEmail || "teaxbot@local").trim() || "teaxbot@local",
+    botUsername: String(config.agent.botUsername || "TeaxBot").trim() || "TeaxBot",
+    botEmail: String(config.agent.botEmail || "teaxbot@local").trim() || "teaxbot@local",
   };
 }

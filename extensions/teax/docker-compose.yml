@@ -2,13 +2,13 @@ services:
   db:
     image: postgres:16-alpine
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '${NUXT_DATABASE_PORT:-5432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-teax}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${NUXT_DATABASE_DB:-teax}
+      POSTGRES_USER: ${NUXT_DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${NUXT_DATABASE_PASSWORD:-postgres}
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
       interval: 5s
@@ -26,11 +26,11 @@ services:
         fi
         exec redis-server
     ports:
-      - '${REDIS_PORT:-6379}:6379'
+      - '${NUXT_REDIS_PORT:-6379}:6379'
     volumes:
       - redis_data:/data
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_PASSWORD: ${NUXT_REDIS_PASSWORD:-}
     healthcheck:
       test: ['CMD-SHELL', 'if [ -n "$$REDIS_PASSWORD" ]; then redis-cli -a "$$REDIS_PASSWORD" ping; else redis-cli ping; fi']
       interval: 5s

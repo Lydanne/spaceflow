@@ -24,7 +24,7 @@ async function pathExists(path: string): Promise<boolean> {
 function resolveRuntimeTeaxTargetDir(): string {
   const config = useRuntimeConfig();
   // runtime root 支持相对路径（相对项目根）与绝对路径两种配置方式。
-  const rawRoot = String(config.agentRuntimeRoot || ".teax-agent-runtime");
+  const rawRoot = String(config.agent.runtimeRoot || ".teax-agent-runtime");
   const runtimeRoot = isAbsolute(rawRoot) ? rawRoot : resolve(process.cwd(), rawRoot);
   return join(runtimeRoot, ".teax");
 }

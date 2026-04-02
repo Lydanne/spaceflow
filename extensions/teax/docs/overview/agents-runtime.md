@@ -40,16 +40,16 @@
 
 | 变量名 | 说明 |
 | --- | --- |
-| `AGENT_META_REPO_URL` | 兼容字段：本地配置来源标识（不再要求 push） |
-| `AGENT_META_REPO_BRANCH` | 兼容字段：配置分支标识（不再要求 push） |
-| `AGENT_META_REPO_TOKEN` | Git 访问 token（优先） |
-| `AGENT_BOT_TOKEN` | 回退 token（当 `AGENT_META_REPO_TOKEN` 未配置） |
-| `AGENT_BOT_USERNAME` / `AGENT_BOT_EMAIL` | git 凭据用户名和邮箱 |
+| `NUXT_AGENT_META_REPO_URL` | 兼容字段：本地配置来源标识（不再要求 push） |
+| `NUXT_AGENT_META_REPO_BRANCH` | 兼容字段：配置分支标识（不再要求 push） |
+| `NUXT_AGENT_META_REPO_TOKEN` | Git 访问 token（优先） |
+| `NUXT_AGENT_BOT_TOKEN` | 回退 token（当 `NUXT_AGENT_META_REPO_TOKEN` 未配置） |
+| `NUXT_AGENT_BOT_USERNAME` / `NUXT_AGENT_BOT_EMAIL` | git 凭据用户名和邮箱 |
 
 说明：
 
 - `.teax/` 在当前规范中是本地运行时目录，不再要求 push 到远程仓库。
-- Token 优先级：`AGENT_META_REPO_TOKEN > AGENT_BOT_TOKEN > GITEA_SERVICE_TOKEN(回退)`。
+- Token 优先级：`NUXT_AGENT_META_REPO_TOKEN > NUXT_AGENT_BOT_TOKEN > NUXT_GITEA_SERVICE_TOKEN(回退)`。
 
 ## 3. Runtime 行为
 

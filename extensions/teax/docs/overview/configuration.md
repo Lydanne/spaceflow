@@ -32,28 +32,28 @@ NUXT_PUBLIC_APP_URL=http://localhost:3000
 ### 数据库配置
 
 ```env
-# PostgreSQL 基础配置（推荐）
-POSTGRES_DB=teax
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
+# PostgreSQL 连接串（推荐）
+NUXT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teax
 
-# 可选：覆盖自动拼接的连接串
-# DATABASE_URL=postgresql://username:password@host:port/database
+# 或使用分离参数（可选）
+NUXT_DATABASE_DB=teax
+NUXT_DATABASE_USER=postgres
+NUXT_DATABASE_PASSWORD=postgres
+NUXT_DATABASE_HOST=localhost
+NUXT_DATABASE_PORT=5432
 ```
 
 **说明：**
-- 应用默认会根据 `POSTGRES_*` 自动拼接 `DATABASE_URL`
-- 若显式设置 `DATABASE_URL`，则优先使用该值
+- `NUXT_DATABASE_URL` 优先级最高，若设置则直接使用
+- 否则根据 `NUXT_DATABASE_*` 参数自动拼接连接串
 
 **可选连接串示例：**
 ```env
 # 生产环境（带 SSL）
-DATABASE_URL=postgresql://teax_user:strong_password@db.example.com:5432/teax_prod?sslmode=require
+NUXT_DATABASE_URL=postgresql://teax_user:strong_password@db.example.com:5432/teax_prod?sslmode=require
 
 # 使用连接池
-DATABASE_URL=postgresql://teax_user:password@localhost:5432/teax?pool_timeout=30&connection_limit=10
+NUXT_DATABASE_URL=postgresql://teax_user:password@localhost:5432/teax?pool_timeout=30&connection_limit=10
 ```
 
 **常用参数：**
@@ -64,29 +64,29 @@ DATABASE_URL=postgresql://teax_user:password@localhost:5432/teax?pool_timeout=30
 ### Redis 配置
 
 ```env
-# Redis 基础配置（推荐）
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
+# Redis 连接串（推荐）
+NUXT_REDIS_URL=redis://localhost:6379
 
-# 可选：覆盖自动拼接的连接串
-# REDIS_URL=redis://host:port
+# 或使用分离参数（可选）
+NUXT_REDIS_HOST=localhost
+NUXT_REDIS_PORT=6379
+NUXT_REDIS_PASSWORD=
 ```
 
 **说明：**
-- 应用默认会根据 `REDIS_*` 自动拼接 `REDIS_URL`
-- 若显式设置 `REDIS_URL`，则优先使用该值
+- `NUXT_REDIS_URL` 优先级最高，若设置则直接使用
+- 否则根据 `NUXT_REDIS_*` 参数自动拼接连接串
 
 **可选连接串示例：**
 ```env
 # 生产环境（带密码）
-REDIS_URL=redis://:strong_redis_password@redis.example.com:6379
+NUXT_REDIS_URL=redis://:strong_redis_password@redis.example.com:6379
 
 # 使用特定数据库
-REDIS_URL=redis://:password@localhost:6379/1
+NUXT_REDIS_URL=redis://:password@localhost:6379/1
 
 # Redis Sentinel
-REDIS_URL=redis-sentinel://sentinel1:26379,sentinel2:26379/mymaster
+NUXT_REDIS_URL=redis-sentinel://sentinel1:26379,sentinel2:26379/mymaster
 ```
 
 **用途：**
@@ -100,16 +100,19 @@ REDIS_URL=redis-sentinel://sentinel1:26379,sentinel2:26379/mymaster
 
 ```env
 # Gitea 实例地址
-GITEA_URL=https://gitea.example.com
+NUXT_GITEA_URL=https://gitea.example.com
 
 # OAuth 客户端 ID
-GITEA_CLIENT_ID=your-gitea-client-id
+NUXT_GITEA_CLIENT_ID=your-gitea-client-id
 
 # OAuth 客户端密钥
-GITEA_CLIENT_SECRET=your-gitea-client-secret
+NUXT_GITEA_CLIENT_SECRET=your-gitea-client-secret
 
 # Gitea 服务令牌（用于 API 调用）
-GITEA_SERVICE_TOKEN=your-gitea-service-token
+NUXT_GITEA_SERVICE_TOKEN=your-gitea-service-token
+
+# Gitea Webhook 密钥
+NUXT_GITEA_WEBHOOK_SECRET=your-gitea-webhook-secret
 ```
 
 ### 创建 OAuth 应用
@@ -149,7 +152,7 @@ Webhook 在以下时机**自动创建**：
 1. **创建项目时**
    - 在 Teax 中点击"新建项目"并选择 Gitea 仓库
    - 提交创建表单后，Teax 立即执行以下操作：
-     - 使用 `GITEA_SERVICE_TOKEN` 调用 Gitea API
+     - 使用 `NUXT_GITEA_SERVICE_TOKEN` 调用 Gitea API
      - 在选中的仓库中创建 Webhook
      - Webhook URL: `https://your-teax-domain.com/api/webhooks/gitea`
      - 自动生成随机的 Webhook 密钥（32字节）
@@ -158,7 +161,7 @@ Webhook 在以下时机**自动创建**：
 
 2. **创建流程**
    ```
-   用户点击"新建项目" 
+   用户点击"新建项目"
    → 选择 Gitea 仓库
    → Teax 验证仓库未被绑定
    → 调用 Gitea API 创建 Webhook
@@ -173,7 +176,7 @@ Webhook 在以下时机**自动删除**：
 1. **删除项目时**
    - 在 Teax 项目设置中点击"删除项目"
    - 确认删除后，Teax 执行以下操作：
-     - 使用 `GITEA_SERVICE_TOKEN` 调用 Gitea API
+     - 使用 `NUXT_GITEA_SERVICE_TOKEN` 调用 Gitea API
      - 删除仓库中的 Webhook（使用保存的 webhook_id）
      - 从 Teax 数据库中删除项目记录
      - 删除相关的通知规则和配置
@@ -192,7 +195,7 @@ Webhook 在以下时机**自动删除**：
 - ✅ **完全自动化** - 你不需要手动在 Gitea 中创建或删除 Webhook
 - ✅ **幂等性** - 如果 Webhook 创建失败，项目仍会创建，但不会收到事件通知
 - ✅ **清理保证** - 删除项目时会自动清理 Gitea 中的 Webhook，不会留下垃圾数据
-- ⚠️ **权限要求** - `GITEA_SERVICE_TOKEN` 必须有 `admin:repo_hook` 权限
+- ⚠️ **权限要求** - `NUXT_GITEA_SERVICE_TOKEN` 必须有 `admin:repo_hook` 权限
 
 2. **订阅的事件**
 
@@ -226,7 +229,7 @@ Webhook 在以下时机**自动删除**：
    - **生产环境强烈建议使用公网域名和 HTTPS**
 
 2. **服务令牌权限**
-   - `GITEA_SERVICE_TOKEN` 必须有 `admin:repo_hook` 权限
+   - `NUXT_GITEA_SERVICE_TOKEN` 必须有 `admin:repo_hook` 权限
    - 用于自动创建和管理 Webhook
 
 3. **Webhook 密钥验证**
@@ -258,7 +261,7 @@ Webhook 在以下时机**自动删除**：
 **Q: 创建项目后没有自动创建 Webhook？**
 
 A: 检查：
-- `GITEA_SERVICE_TOKEN` 是否配置正确
+- `NUXT_GITEA_SERVICE_TOKEN` 是否配置正确
 - 令牌是否有 `admin:repo_hook` 权限
 - Teax 日志中是否有创建 Webhook 的错误信息
 
@@ -285,19 +288,19 @@ A: 检查：
 
 ```env
 # 飞书应用 ID
-FEISHU_APP_ID=cli_xxxxxxxxxxxxxxxx
+NUXT_FEISHU_APP_ID=cli_xxxxxxxxxxxxxxxx
 
 # 飞书应用密钥
-FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NUXT_FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # 飞书加密密钥（用于 Webhook 事件解密）
-FEISHU_ENCRYPT_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NUXT_FEISHU_ENCRYPT_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # 飞书验证令牌（用于 Webhook URL 验证）
-FEISHU_VERIFICATION_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NUXT_FEISHU_VERIFICATION_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # 飞书审批定义 Code（可选，用于审批流程）
-FEISHU_APPROVAL_CODE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+NUXT_FEISHU_APPROVAL_CODE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
 ### 创建飞书应用
@@ -390,7 +393,7 @@ FEISHU_APPROVAL_CODE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
    - 创建自定义审批流程
 
 2. **配置审批表单**
-   
+
    添加以下字段：
    - `title` - 单行文本 - 审批标题
    - `description` - 多行文本 - 审批描述
@@ -399,13 +402,16 @@ FEISHU_APPROVAL_CODE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 3. **获取审批 Code**
    - 在审批定义页面复制 "审批定义 Code"
-   - 填入 `FEISHU_APPROVAL_CODE` 环境变量
+   - 填入 `NUXT_FEISHU_APPROVAL_CODE` 环境变量
 
 ## Session 配置
 
 ```env
 # Session 加密密钥（必需，至少 32 字符）
 NUXT_SESSION_PASSWORD=at-least-32-characters-long-secret-key!!
+
+# Token 加密密钥（用于加密存储的 OAuth token）
+NUXT_SECURITY_TOKEN_ENCRYPT_SECRET=your-token-encrypt-secret
 ```
 
 **重要说明：**
@@ -475,29 +481,24 @@ NUXT_PUBLIC_APP_NAME=Teax Dev
 NUXT_PUBLIC_APP_URL=http://localhost:3000
 
 # 数据库
-POSTGRES_DB=teax_dev
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
+NUXT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teax_dev
 
 # Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
+NUXT_REDIS_URL=redis://localhost:6379
 
 # Gitea
-GITEA_URL=http://localhost:3001
-GITEA_CLIENT_ID=dev-client-id
-GITEA_CLIENT_SECRET=dev-client-secret
-GITEA_SERVICE_TOKEN=dev-service-token
+NUXT_GITEA_URL=http://localhost:3001
+NUXT_GITEA_CLIENT_ID=dev-client-id
+NUXT_GITEA_CLIENT_SECRET=dev-client-secret
+NUXT_GITEA_SERVICE_TOKEN=dev-service-token
+NUXT_GITEA_WEBHOOK_SECRET=dev-webhook-secret
 
 # Session
 NUXT_SESSION_PASSWORD=development-session-password-32-chars-min
 
 # 飞书（可选）
-FEISHU_APP_ID=
-FEISHU_APP_SECRET=
+NUXT_FEISHU_APP_ID=
+NUXT_FEISHU_APP_SECRET=
 ```
 
 ### 生产环境 (.env.production)
@@ -508,45 +509,31 @@ NUXT_PUBLIC_APP_NAME=Teax
 NUXT_PUBLIC_APP_URL=https://teax.example.com
 
 # 数据库
-POSTGRES_DB=teax_prod
-POSTGRES_USER=teax_user
-POSTGRES_PASSWORD=STRONG_PASSWORD
-POSTGRES_HOST=db.example.com
-POSTGRES_PORT=5432
-# 可选：若需附加参数可直接覆盖
-# DATABASE_URL=postgresql://teax_user:STRONG_PASSWORD@db.example.com:5432/teax_prod?sslmode=require
+NUXT_DATABASE_URL=postgresql://teax_user:STRONG_PASSWORD@db.example.com:5432/teax_prod?sslmode=require
 
 # Redis（使用密码）
-REDIS_HOST=redis.example.com
-REDIS_PORT=6379
-REDIS_PASSWORD=STRONG_REDIS_PASSWORD
-# 可选：也可以直接覆盖
-# REDIS_URL=redis://:STRONG_REDIS_PASSWORD@redis.example.com:6379
+NUXT_REDIS_URL=redis://:STRONG_REDIS_PASSWORD@redis.example.com:6379
 
 # Gitea
-GITEA_URL=https://gitea.example.com
-GITEA_CLIENT_ID=prod-client-id
-GITEA_CLIENT_SECRET=prod-client-secret
-GITEA_SERVICE_TOKEN=prod-service-token
+NUXT_GITEA_URL=https://gitea.example.com
+NUXT_GITEA_CLIENT_ID=prod-client-id
+NUXT_GITEA_CLIENT_SECRET=prod-client-secret
+NUXT_GITEA_SERVICE_TOKEN=prod-service-token
+NUXT_GITEA_WEBHOOK_SECRET=prod-webhook-secret
 
 # Session（强密钥）
 NUXT_SESSION_PASSWORD=GENERATE_A_STRONG_RANDOM_KEY_AT_LEAST_32_CHARS
+NUXT_SECURITY_TOKEN_ENCRYPT_SECRET=GENERATE_ANOTHER_STRONG_KEY
 
 # 飞书
-FEISHU_APP_ID=cli_xxxxxxxxxxxxxxxx
-FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-FEISHU_ENCRYPT_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-FEISHU_VERIFICATION_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-FEISHU_APPROVAL_CODE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-
-# 性能优化
-DATABASE_POOL_SIZE=20
-REDIS_POOL_SIZE=20
+NUXT_FEISHU_APP_ID=cli_xxxxxxxxxxxxxxxx
+NUXT_FEISHU_APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NUXT_FEISHU_ENCRYPT_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NUXT_FEISHU_VERIFICATION_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NUXT_FEISHU_APPROVAL_CODE=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 # 安全
 NODE_ENV=production
-FORCE_HTTPS=true
-TRUSTED_PROXY_COUNT=1
 ```
 
 ## 配置验证
@@ -597,7 +584,7 @@ pnpm run feishu:test
 **错误：** `OAuth callback failed` 或 `Invalid client`
 
 **解决方案：**
-1. 检查 `GITEA_CLIENT_ID` 和 `GITEA_CLIENT_SECRET` 是否正确
+1. 检查 `NUXT_GITEA_CLIENT_ID` 和 `NUXT_GITEA_CLIENT_SECRET` 是否正确
 2. 检查回调 URL 是否匹配：`{NUXT_PUBLIC_APP_URL}/api/auth/callback/gitea`
 3. 检查 Gitea 是否可以访问 Teax
 4. 检查 Gitea OAuth 应用是否启用
@@ -607,7 +594,7 @@ pnpm run feishu:test
 **错误：** `Webhook verification failed` 或 `Decrypt failed`
 
 **解决方案：**
-1. 检查 `FEISHU_ENCRYPT_KEY` 和 `FEISHU_VERIFICATION_TOKEN` 是否正确
+1. 检查 `NUXT_FEISHU_ENCRYPT_KEY` 和 `NUXT_FEISHU_VERIFICATION_TOKEN` 是否正确
 2. 检查 Webhook URL 是否可以从公网访问
 3. 检查飞书应用是否已发布
 4. 查看飞书开放平台的事件推送日志

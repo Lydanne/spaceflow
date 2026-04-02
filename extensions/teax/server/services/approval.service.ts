@@ -54,10 +54,10 @@ export async function createApprovalRequest(params: CreateApprovalParams): Promi
 
   // 如果配置了飞书审批 code，提交到飞书
   let feishuInstanceCode: string | null = null;
-  if (config.feishuApprovalCode && params.requesterOpenId) {
+  if (config.feishu.approvalCode && params.requesterOpenId) {
     try {
       const instanceCode = await createFeishuApprovalInstance({
-        approval_code: config.feishuApprovalCode,
+        approval_code: config.feishu.approvalCode,
         open_id: params.requesterOpenId,
         form: [
           { id: "title", type: "input", value: params.title },

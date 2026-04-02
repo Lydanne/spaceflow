@@ -7,12 +7,12 @@ let _redis: Redis | null = null;
  * 优先级：NUXT_REDIS_URL > 分离参数拼接
  */
 function resolveRedisUrl(config: ReturnType<typeof useRuntimeConfig>): string {
-  if (config.redisUrl) {
-    return config.redisUrl;
+  if (config.redis.url) {
+    return config.redis.url;
   }
-  const host = config.redisHost || "localhost";
-  const port = config.redisPort || "6379";
-  const password = config.redisPassword || "";
+  const host = config.redis.host || "localhost";
+  const port = config.redis.port || "6379";
+  const password = config.redis.password || "";
   if (password) {
     return `redis://:${encodeURIComponent(password)}@${host}:${port}`;
   }

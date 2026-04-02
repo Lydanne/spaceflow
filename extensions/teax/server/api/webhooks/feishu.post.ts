@@ -107,26 +107,26 @@ export default defineEventHandler(async (event) => {
 
   // ─── v1 URL 验证（飞书配置事件回调时的验证请求） ──────────
   if (payload.type === "url_verification") {
-    if (config.feishuVerificationToken && payload.token !== config.feishuVerificationToken) {
+    if (config.feishu.verificationToken && payload.token !== config.feishu.verificationToken) {
       throw createError({ statusCode: 401, message: "Invalid verification token" });
     }
     return { challenge: payload.challenge };
   }
 
   // ─── v2 签名验证 ──────────────────────────────────────────
-  if (config.feishuEncryptKey) {
+  if (config.feishu.encryptKey) {
     const timestamp = getRequestHeader(event, "x-lark-request-timestamp") || "";
     const nonce = getRequestHeader(event, "x-lark-request-nonce") || "";
     const signature = getRequestHeader(event, "x-lark-signature") || "";
 
-    if (signature && !verifyFeishuEventSignature(timestamp, nonce, config.feishuEncryptKey, rawBody, signature)) {
+    if (signature && !verifyFeishuEventSignature(timestamp, nonce, config.feishu.encryptKey, rawBody, signature)) {
       throw createError({ statusCode: 401, message: "Invalid event signature" });
     }
   }
 
   // ─── verification token 校验 ─────────────────────────────
-  if (config.feishuVerificationToken && payload.header?.token) {
-    if (payload.header.token !== config.feishuVerificationToken) {
+  if (config.feishu.verificationToken && payload.header?.token) {
+    if (payload.header.token !== config.feishu.verificationToken) {
       throw createError({ statusCode: 401, message: "Invalid event token" });
     }
   }

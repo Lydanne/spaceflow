@@ -116,25 +116,26 @@ services:
     environment:
       # 数据库配置
       - DATABASE_URL=postgresql://teax:${DB_PASSWORD}@postgres:5432/teax
-      
+
       # Gitea 配置
-      - GITEA_URL=${GITEA_URL}
-      - GITEA_CLIENT_ID=${GITEA_CLIENT_ID}
-      - GITEA_CLIENT_SECRET=${GITEA_CLIENT_SECRET}
-      - GITEA_WEBHOOK_SECRET=${GITEA_WEBHOOK_SECRET}
-      
+      - NUXT_GITEA_URL=${NUXT_GITEA_URL}
+      - NUXT_GITEA_CLIENT_ID=${NUXT_GITEA_CLIENT_ID}
+      - NUXT_GITEA_CLIENT_SECRET=${NUXT_GITEA_CLIENT_SECRET}
+      - NUXT_GITEA_SERVICE_TOKEN=${NUXT_GITEA_SERVICE_TOKEN}
+      - NUXT_GITEA_WEBHOOK_SECRET=${NUXT_GITEA_WEBHOOK_SECRET}
+
       # 飞书配置
-      - FEISHU_APP_ID=${FEISHU_APP_ID}
-      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET}
-      - FEISHU_ENCRYPT_KEY=${FEISHU_ENCRYPT_KEY}
-      - FEISHU_VERIFICATION_TOKEN=${FEISHU_VERIFICATION_TOKEN}
-      - FEISHU_APPROVAL_CODE=${FEISHU_APPROVAL_CODE}
-      
+      - NUXT_FEISHU_APP_ID=${NUXT_FEISHU_APP_ID}
+      - NUXT_FEISHU_APP_SECRET=${NUXT_FEISHU_APP_SECRET}
+      - NUXT_FEISHU_ENCRYPT_KEY=${NUXT_FEISHU_ENCRYPT_KEY}
+      - NUXT_FEISHU_VERIFICATION_TOKEN=${NUXT_FEISHU_VERIFICATION_TOKEN}
+      - NUXT_FEISHU_APPROVAL_CODE=${NUXT_FEISHU_APPROVAL_CODE}
+
       # 应用配置
       - NODE_ENV=production
-      - SESSION_SECRET=${SESSION_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      
+      - NUXT_SESSION_PASSWORD=${NUXT_SESSION_PASSWORD}
+      - NUXT_SECURITY_TOKEN_ENCRYPT_SECRET=${NUXT_SECURITY_TOKEN_ENCRYPT_SECRET}
+
       # Docker 配置（用于工作区和 Agent）
       - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
@@ -152,9 +153,9 @@ services:
     container_name: teax-postgres
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=teax
-      - POSTGRES_USER=teax
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - NUXT_DATABASE_DB=teax
+      - NUXT_DATABASE_USER=teax
+      - NUXT_DATABASE_PASSWORD=${NUXT_DATABASE_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
@@ -170,7 +171,7 @@ services:
     image: redis:7-alpine
     container_name: teax-redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: redis-server --requirepass ${NUXT_REDIS_PASSWORD}
     volumes:
       - redis-data:/data
     networks:
@@ -213,46 +214,48 @@ networks:
 
 ```bash
 # 数据库配置
-DB_PASSWORD=your_secure_db_password
+NUXT_DATABASE_PASSWORD=your_secure_db_password
 
 # Gitea 配置
-GITEA_URL=https://gitea.example.com
-GITEA_CLIENT_ID=your_gitea_client_id
-GITEA_CLIENT_SECRET=your_gitea_client_secret
-GITEA_WEBHOOK_SECRET=your_webhook_secret
+NUXT_GITEA_URL=https://gitea.example.com
+NUXT_GITEA_CLIENT_ID=your_gitea_client_id
+NUXT_GITEA_CLIENT_SECRET=your_gitea_client_secret
+NUXT_GITEA_SERVICE_TOKEN=your_service_token
+NUXT_GITEA_WEBHOOK_SECRET=your_webhook_secret
 
 # 飞书配置
-FEISHU_APP_ID=cli_xxxxxxxxxxxxxxxx
-FEISHU_APP_SECRET=your_feishu_app_secret
-FEISHU_ENCRYPT_KEY=your_encrypt_key
-FEISHU_VERIFICATION_TOKEN=your_verification_token
-FEISHU_APPROVAL_CODE=your_approval_code
+NUXT_FEISHU_APP_ID=cli_xxxxxxxxxxxxxxxx
+NUXT_FEISHU_APP_SECRET=your_feishu_app_secret
+NUXT_FEISHU_ENCRYPT_KEY=your_encrypt_key
+NUXT_FEISHU_VERIFICATION_TOKEN=your_verification_token
+NUXT_FEISHU_APPROVAL_CODE=your_approval_code
 
 # 应用配置
-SESSION_SECRET=your_session_secret_min_32_chars
-ENCRYPTION_KEY=your_encryption_key_32_chars
+NUXT_SESSION_PASSWORD=your_session_secret_min_32_chars
+NUXT_SECURITY_TOKEN_ENCRYPT_SECRET=your_encryption_key_32_chars
 
 # Redis 配置
-REDIS_PASSWORD=your_redis_password
+NUXT_REDIS_PASSWORD=your_redis_password
 ```
 
 ### 环境变量说明
 
 | 变量名 | 说明 | 必需 |
 | ------ | ---- | ---- |
-| `DATABASE_URL` | PostgreSQL 连接字符串 | ✅ |
-| `GITEA_URL` | Gitea 实例地址 | ✅ |
-| `GITEA_CLIENT_ID` | Gitea OAuth 应用 ID | ✅ |
-| `GITEA_CLIENT_SECRET` | Gitea OAuth 应用密钥 | ✅ |
-| `GITEA_WEBHOOK_SECRET` | Gitea Webhook 签名密钥 | ✅ |
-| `FEISHU_APP_ID` | 飞书应用 ID | ❌ |
-| `FEISHU_APP_SECRET` | 飞书应用密钥 | ❌ |
-| `FEISHU_ENCRYPT_KEY` | 飞书消息加密 Key | ❌ |
-| `FEISHU_VERIFICATION_TOKEN` | 飞书事件验证 Token | ❌ |
-| `FEISHU_APPROVAL_CODE` | 飞书审批定义 Code | ❌ |
-| `SESSION_SECRET` | Session 加密密钥（≥32 字符） | ✅ |
-| `ENCRYPTION_KEY` | 数据加密密钥（32 字符） | ✅ |
-| `REDIS_PASSWORD` | Redis 密码 | ✅ |
+| `NUXT_DATABASE_URL` | PostgreSQL 连接字符串 | ✅ |
+| `NUXT_GITEA_URL` | Gitea 实例地址 | ✅ |
+| `NUXT_GITEA_CLIENT_ID` | Gitea OAuth 应用 ID | ✅ |
+| `NUXT_GITEA_CLIENT_SECRET` | Gitea OAuth 应用密钥 | ✅ |
+| `NUXT_GITEA_SERVICE_TOKEN` | Gitea 服务令牌 | ✅ |
+| `NUXT_GITEA_WEBHOOK_SECRET` | Gitea Webhook 签名密钥 | ✅ |
+| `NUXT_FEISHU_APP_ID` | 飞书应用 ID | ❌ |
+| `NUXT_FEISHU_APP_SECRET` | 飞书应用密钥 | ❌ |
+| `NUXT_FEISHU_ENCRYPT_KEY` | 飞书消息加密 Key | ❌ |
+| `NUXT_FEISHU_VERIFICATION_TOKEN` | 飞书事件验证 Token | ❌ |
+| `NUXT_FEISHU_APPROVAL_CODE` | 飞书审批定义 Code | ❌ |
+| `NUXT_SESSION_PASSWORD` | Session 加密密钥（≥32 字符） | ✅ |
+| `NUXT_SECURITY_TOKEN_ENCRYPT_SECRET` | 数据加密密钥（32 字符） | ✅ |
+| `NUXT_REDIS_PASSWORD` | Redis 密码 | ✅ |
 
 ## Nginx 配置
 
@@ -271,7 +274,7 @@ http {
     server {
         listen 80;
         server_name teax.example.com;
-        
+
         # 重定向到 HTTPS
         return 301 https://$server_name$request_uri;
     }
@@ -299,7 +302,7 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
-            
+
             # WebSocket 超时
             proxy_read_timeout 3600s;
             proxy_send_timeout 3600s;
@@ -315,7 +318,7 @@ http {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
-            
+
             # 长连接超时（Web IDE）
             proxy_read_timeout 86400s;
             proxy_send_timeout 86400s;

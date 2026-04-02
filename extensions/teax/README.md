@@ -94,35 +94,39 @@ NUXT_PUBLIC_APP_NAME=Teax
 NUXT_PUBLIC_APP_URL=http://localhost:3000
 
 # 数据库
-POSTGRES_DB=teax
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
+NUXT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teax
+NUXT_DATABASE_DB=teax
+NUXT_DATABASE_USER=postgres
+NUXT_DATABASE_PASSWORD=postgres
+NUXT_DATABASE_HOST=localhost
+NUXT_DATABASE_PORT=5432
 
 # Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
+NUXT_REDIS_URL=redis://localhost:6379
+NUXT_REDIS_HOST=localhost
+NUXT_REDIS_PORT=6379
+NUXT_REDIS_PASSWORD=
 
 # Gitea OAuth（必需）
-GITEA_URL=https://gitea.example.com
-GITEA_CLIENT_ID=your-gitea-client-id
-GITEA_CLIENT_SECRET=your-gitea-client-secret
-GITEA_SERVICE_TOKEN=your-gitea-service-token
+NUXT_GITEA_URL=https://gitea.example.com
+NUXT_GITEA_CLIENT_ID=your-gitea-client-id
+NUXT_GITEA_CLIENT_SECRET=your-gitea-client-secret
+NUXT_GITEA_SERVICE_TOKEN=your-gitea-service-token
+NUXT_GITEA_WEBHOOK_SECRET=your-gitea-webhook-secret
 
-# Session 密钥（至少 32 字符）
+# 安全
 NUXT_SESSION_PASSWORD=at-least-32-characters-long-secret-key!!
+NUXT_SECURITY_TOKEN_ENCRYPT_SECRET=your-token-encrypt-secret
 ```
 
 可选配置（飞书集成）：
 ```env
 # 飞书应用配置
-FEISHU_APP_ID=cli_xxx
-FEISHU_APP_SECRET=xxx
-FEISHU_ENCRYPT_KEY=xxx
-FEISHU_VERIFICATION_TOKEN=xxx
-FEISHU_APPROVAL_CODE=xxx
+NUXT_FEISHU_APP_ID=cli_xxx
+NUXT_FEISHU_APP_SECRET=xxx
+NUXT_FEISHU_ENCRYPT_KEY=xxx
+NUXT_FEISHU_VERIFICATION_TOKEN=xxx
+NUXT_FEISHU_APPROVAL_CODE=xxx
 ```
 
 > 详细配置说明请查看 [CONFIGURATION.md](./docs/CONFIGURATION.md)

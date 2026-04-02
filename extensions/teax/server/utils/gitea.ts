@@ -614,7 +614,7 @@ export class GiteaService {
 
 export function createGiteaService(accessToken: string): GiteaService {
   const config = useRuntimeConfig();
-  return new GiteaService(config.giteaUrl, accessToken);
+  return new GiteaService(config.gitea.url, accessToken);
 }
 
 export interface GiteaOAuthTokenResponse {
@@ -627,12 +627,12 @@ export interface GiteaOAuthTokenResponse {
 export async function exchangeGiteaCode(code: string): Promise<GiteaOAuthTokenResponse> {
   const config = useRuntimeConfig();
   const response = await $fetch<GiteaOAuthTokenResponse>(
-    `${config.giteaUrl}/login/oauth/access_token`,
+    `${config.gitea.url}/login/oauth/access_token`,
     {
       method: "POST",
       body: {
-        client_id: config.giteaClientId,
-        client_secret: config.giteaClientSecret,
+        client_id: config.gitea.clientId,
+        client_secret: config.gitea.clientSecret,
         code,
         grant_type: "authorization_code",
         redirect_uri: `${config.public.appUrl}/api/auth/callback/gitea`,
@@ -645,12 +645,12 @@ export async function exchangeGiteaCode(code: string): Promise<GiteaOAuthTokenRe
 export async function refreshGiteaToken(refreshToken: string): Promise<GiteaOAuthTokenResponse> {
   const config = useRuntimeConfig();
   const response = await $fetch<GiteaOAuthTokenResponse>(
-    `${config.giteaUrl}/login/oauth/access_token`,
+    `${config.gitea.url}/login/oauth/access_token`,
     {
       method: "POST",
       body: {
-        client_id: config.giteaClientId,
-        client_secret: config.giteaClientSecret,
+        client_id: config.gitea.clientId,
+        client_secret: config.gitea.clientSecret,
         grant_type: "refresh_token",
         refresh_token: refreshToken,
       },
@@ -800,13 +800,13 @@ export function useGiteaSdk(
   // 获取 service token
   function getServiceGiteaService(): GiteaService {
     const config = useRuntimeConfig();
-    if (!config.giteaServiceToken) {
+    if (!config.gitea.serviceToken) {
       throw createError({
         statusCode: 503,
         message: "GITEA_SERVICE_TOKEN is not configured.",
       });
     }
-    return createGiteaService(config.giteaServiceToken);
+    return createGiteaService(config.gitea.serviceToken);
   }
 
   return {

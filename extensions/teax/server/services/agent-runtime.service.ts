@@ -181,10 +181,10 @@ interface AgentRuntimeDockerMetadata {
  */
 function resolveRuntimeConfig(): RuntimeResolvedConfig {
   const config = useRuntimeConfig();
-  const rawRoot = String(config.agentRuntimeRoot || ".teax-agent-runtime");
+  const rawRoot = String(config.agent.runtimeRoot || ".teax-agent-runtime");
   const rootDir = isAbsolute(rawRoot) ? rawRoot : resolve(process.cwd(), rawRoot);
-  const rawBaseDockerfile = String(config.agentRuntimeDockerBaseDockerfile || "").trim();
-  const rawBaseBuildContext = String(config.agentRuntimeDockerBaseBuildContext || "").trim();
+  const rawBaseDockerfile = String(config.agent.runtimeDockerBaseDockerfile || "").trim();
+  const rawBaseBuildContext = String(config.agent.runtimeDockerBaseBuildContext || "").trim();
   const dockerBaseDockerfilePath = rawBaseDockerfile
     ? (isAbsolute(rawBaseDockerfile) ? rawBaseDockerfile : resolve(process.cwd(), rawBaseDockerfile))
     : "";
@@ -197,13 +197,13 @@ function resolveRuntimeConfig(): RuntimeResolvedConfig {
   return {
     rootDir,
     sessionsRootDir: join(rootDir, "sessions"),
-    dockerBin: String(config.agentRuntimeDockerBin || "docker"),
+    dockerBin: String(config.agent.runtimeDockerBin || "docker"),
     dockerBaseDockerfilePath,
     dockerBaseBuildContext,
-    dockerBuildOnStart: config.agentRuntimeDockerBuildOnStart !== false,
-    dockerWorkspaceRoot: String(config.agentRuntimeDockerWorkspaceRoot || "/runtime"),
-    keepWorktreeOnStop: config.agentRuntimeKeepWorktreeOnStop === true,
-    opencodeStartCommand: String(config.agentRuntimeOpencodeStartCommand || "").trim(),
+    dockerBuildOnStart: config.agent.runtimeDockerBuildOnStart !== false,
+    dockerWorkspaceRoot: String(config.agent.runtimeDockerWorkspaceRoot || "/runtime"),
+    keepWorktreeOnStop: config.agent.runtimeKeepWorktreeOnStop === true,
+    opencodeStartCommand: String(config.agent.runtimeOpencodeStartCommand || "").trim(),
   };
 }
 
@@ -490,8 +490,8 @@ async function resolveRuntimeGitAuth(): Promise<RuntimeGitAuth | null> {
   }
 
   const runtimeConfig = useRuntimeConfig();
-  const serviceToken = String(runtimeConfig.giteaServiceToken || "").trim();
-  const giteaUrl = String(runtimeConfig.giteaUrl || "").trim().replace(/\/+$/, "");
+  const serviceToken = String(runtimeConfig.gitea.serviceToken || "").trim();
+  const giteaUrl = String(runtimeConfig.gitea.url || "").trim().replace(/\/+$/, "");
   if (!serviceToken || !giteaUrl) {
     return null;
   }

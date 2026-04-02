@@ -53,9 +53,9 @@ function withTrailingEol(value: string): string {
 export function resolveAgentRuntimeGlobalsPaths(): AgentRuntimeGlobalsPaths {
   const config = useRuntimeConfig();
   // 与 runtime 主配置一致：支持绝对路径与相对项目根路径。
-  const rawRoot = String(config.agentRuntimeRoot || ".teax-agent-runtime");
+  const rawRoot = String(config.agent.runtimeRoot || ".teax-agent-runtime");
   const rootDir = isAbsolute(rawRoot) ? rawRoot : resolve(process.cwd(), rawRoot);
-  const dockerWorkspaceRoot = String(config.agentRuntimeDockerWorkspaceRoot || "/runtime").trim() || "/runtime";
+  const dockerWorkspaceRoot = String(config.agent.runtimeDockerWorkspaceRoot || "/runtime").trim() || "/runtime";
   const teaxDir = join(rootDir, ".teax");
   const globalsDir = join(teaxDir, "globals");
   const opencodeDir = join(globalsDir, "opencode");

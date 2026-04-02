@@ -8,14 +8,16 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-teax}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      NUXT_DATABASE_URL: postgresql://${NUXT_DATABASE_USER:-postgres}:${NUXT_DATABASE_PASSWORD:-postgres}@db:5432/${NUXT_DATABASE_DB:-teax}
+      NUXT_DATABASE_DB: ${NUXT_DATABASE_DB:-teax}
+      NUXT_DATABASE_USER: ${NUXT_DATABASE_USER:-postgres}
+      NUXT_DATABASE_PASSWORD: ${NUXT_DATABASE_PASSWORD:-postgres}
+      NUXT_DATABASE_HOST: db
+      NUXT_DATABASE_PORT: 5432
+      NUXT_REDIS_URL: redis://redis:6379
+      NUXT_REDIS_HOST: redis
+      NUXT_REDIS_PORT: 6379
+      NUXT_REDIS_PASSWORD: ${NUXT_REDIS_PASSWORD:-}
       TEAX_IN_DEVCONTAINER: "1"
       NUXT_PUBLIC_APP_URL: http://localhost:3000
     depends_on:

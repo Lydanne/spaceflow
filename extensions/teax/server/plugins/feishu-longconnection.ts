@@ -13,7 +13,7 @@ export default defineNitroPlugin(async () => {
   const config = useRuntimeConfig();
 
   // 检查配置
-  if (!config.feishuAppId || !config.feishuAppSecret) {
+  if (!config.feishu.appId || !config.feishu.appSecret) {
     console.warn(
       "[feishu-ws] Missing app credentials, long connection disabled",
     );
@@ -31,8 +31,8 @@ export default defineNitroPlugin(async () => {
   try {
     // 创建 WebSocket 客户端
     wsClient = new lark.WSClient({
-      appId: config.feishuAppId,
-      appSecret: config.feishuAppSecret,
+      appId: config.feishu.appId,
+      appSecret: config.feishu.appSecret,
       loggerLevel: lark.LoggerLevel.info,
     });
 
@@ -40,7 +40,7 @@ export default defineNitroPlugin(async () => {
     await wsClient.start({
       eventDispatcher: new lark.EventDispatcher({
         // 加密密钥(可选)
-        encryptKey: config.feishuEncryptKey || undefined,
+        encryptKey: config.feishu.encryptKey || undefined,
       }).register({
         // 消息接收事件
         "im.message.receive_v1": async (
