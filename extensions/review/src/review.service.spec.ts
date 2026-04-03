@@ -1242,6 +1242,7 @@ describe("ReviewService", () => {
       const stats = (service as any).calculateIssueStats([]);
       expect(stats).toEqual({
         total: 0,
+        validTotal: 0,
         fixed: 0,
         resolved: 0,
         invalid: 0,
@@ -1266,7 +1267,20 @@ describe("ReviewService", () => {
       expect(stats.resolved).toBe(1);
       expect(stats.invalid).toBe(1);
       expect(stats.pending).toBe(2);
-      expect(stats.fixRate).toBe(33.3);
+      expect(stats.fixRate).toBe(40);
+    });
+
+    it("should not double-count issues with both fixed and resolved", () => {
+      const issues = [
+        { fixed: "2024-01-01", resolved: "2024-01-02" },
+        { resolved: "2024-01-03" },
+        {},
+      ];
+      const stats = (service as any).calculateIssueStats(issues);
+      expect(stats.total).toBe(3);
+      expect(stats.fixed).toBe(1);
+      expect(stats.resolved).toBe(1);
+      expect(stats.pending).toBe(1);
     });
   });
 

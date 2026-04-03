@@ -1185,7 +1185,7 @@ export class ReviewService {
     const validIssue = issues.filter((i) => i.valid !== "false");
     const validTotal = validIssue.length;
     const fixed = validIssue.filter((i) => i.fixed).length;
-    const resolved = validIssue.filter((i) => i.resolved).length;
+    const resolved = validIssue.filter((i) => i.resolved && !i.fixed).length;
     const invalid = total - validTotal;
     const pending = validTotal - fixed - resolved;
     const fixRate = validTotal > 0 ? Math.round((fixed / validTotal) * 100 * 10) / 10 : 0;
