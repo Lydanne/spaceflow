@@ -712,7 +712,7 @@ export class ReviewService {
         context.generateDescription && llmMode
           ? await this.generatePrDescription(commits, changedFiles, llmMode, undefined, verbose)
           : await this.buildFallbackDescription(commits, changedFiles);
-      return {
+      const result: ReviewResult = {
         success: true,
         title: prInfo.title,
         description: prInfo.description,
@@ -720,6 +720,19 @@ export class ReviewService {
         summary,
         round: 1,
       };
+
+      // CI 模式下也需要发送 review 评论
+      if (ci && prNumber && !dryRun) {
+        if (shouldLog(verbose, 1)) {
+          console.log(`💬 提交 PR 评论...`);
+        }
+        await this.postOrUpdateReviewComment(owner, repo, prNumber, result, verbose, autoApprove);
+        if (shouldLog(verbose, 1)) {
+          console.log(`✅ 评论已提交`);
+        }
+      }
+
+      return result;
     }
 
     const headSha = pr?.head?.sha || headRef || "HEAD";
