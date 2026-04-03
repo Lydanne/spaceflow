@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.75.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.74.0...@spaceflow/review@0.75.0) (2026-04-03)
+
+### 修复BUG
+
+* **gitea:** 修正 PR review 事件类型映射 ([0b86fac](https://github.com/Lydanne/spaceflow/commit/0b86facc6df50eb1fd278d72090c329b5a5aaccf))
+
+### 其他修改
+
+* **core:** released version 0.29.0 [no ci] ([26c7af1](https://github.com/Lydanne/spaceflow/commit/26c7af16384cdfb30aa82d2a84385989e5b1cce8))
+* **publish:** released version 0.53.0 [no ci] ([72a98c0](https://github.com/Lydanne/spaceflow/commit/72a98c0d2dfd87c9319c1c73e0f8754b320013cd))
+* **review-summary:** released version 0.43.0 [no ci] ([02d8232](https://github.com/Lydanne/spaceflow/commit/02d8232e28b8c1f0f1a53ffc8b43638ab9a0b3ba))
+
 ## [0.74.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.73.0...@spaceflow/review@0.74.0) (2026-04-03)
 
 ### 修复BUG
