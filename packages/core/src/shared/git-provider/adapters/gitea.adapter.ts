@@ -66,7 +66,9 @@ export class GiteaAdapter implements GitProvider {
     });
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Gitea API error: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(
+        `Gitea API error: ${response.status} ${response.statusText} - ${method} ${path} - ${errorText}`,
+      );
     }
     if (response.status === 204) {
       return {} as T;
@@ -80,7 +82,9 @@ export class GiteaAdapter implements GitProvider {
     });
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Gitea API error: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(
+        `Gitea API error: ${response.status} ${response.statusText} - GET ${url} - ${errorText}`,
+      );
     }
     return response.text();
   }

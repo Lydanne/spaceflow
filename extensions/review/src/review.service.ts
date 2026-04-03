@@ -540,6 +540,7 @@ export class ReviewService {
 
       // 检查是否有其他同名 review workflow 正在运行中（防止同一 PR 重复审查）
       // 需要显式启用 skipDuplicateWorkflow 配置
+      // 注意：Gitea Actions API 要求用户是 repo owner，否则会返回 403
       if (skipDuplicateWorkflow && ci && pr?.head?.sha) {
         const headSha = pr.head.sha;
         // 获取当前 PR 编号（从 CI 环境变量）
@@ -549,32 +550,43 @@ export class ReviewService {
         const prMatch = ref.match(/refs\/pull\/(\d+)/);
         const currentPrNumber = prMatch ? parseInt(prMatch[1], 10) : prNumber;
 
-        const runningWorkflows = await this.gitProvider.listWorkflowRuns(owner, repo, {
-          status: "in_progress",
-        });
-        // 获取当前 workflow 名称和 run ID
-        const currentWorkflowName = process.env.GITHUB_WORKFLOW || process.env.GITEA_WORKFLOW;
-        const currentRunId = process.env.GITHUB_RUN_ID || process.env.GITEA_RUN_ID;
-        // 只检查同 PR 同名的其他 workflow run（排除当前 run）
-        const duplicateReviewRuns = runningWorkflows.filter(
-          (w) =>
-            w.sha === headSha &&
-            w.name === currentWorkflowName &&
-            (!currentRunId || String(w.id) !== currentRunId),
-        );
-        if (duplicateReviewRuns.length > 0) {
+        try {
+          const runningWorkflows = await this.gitProvider.listWorkflowRuns(owner, repo, {
+            status: "in_progress",
+          });
+          // 获取当前 workflow 名称和 run ID
+          const currentWorkflowName = process.env.GITHUB_WORKFLOW || process.env.GITEA_WORKFLOW;
+          const currentRunId = process.env.GITHUB_RUN_ID || process.env.GITEA_RUN_ID;
+          // 只检查同 PR 同名的其他 workflow run（排除当前 run）
+          const duplicateReviewRuns = runningWorkflows.filter(
+            (w) =>
+              w.sha === headSha &&
+              w.name === currentWorkflowName &&
+              (!currentRunId || String(w.id) !== currentRunId),
+          );
+          if (duplicateReviewRuns.length > 0) {
+            if (shouldLog(verbose, 1)) {
+              console.log(
+                `⏭️ 跳过审查: 当前 PR #${currentPrNumber} 有 ${duplicateReviewRuns.length} 个同名 workflow 正在运行中`,
+              );
+            }
+            return {
+              success: true,
+              description: `跳过审查: PR #${currentPrNumber} 有 ${duplicateReviewRuns.length} 个同名 workflow 正在运行中，等待完成后重新审查`,
+              issues: [],
+              summary: [],
+              round: 1,
+            };
+          }
+        } catch (error) {
+          // Gitea Actions API 可能返回 403（需要 repo owner 权限）
+          // 捕获错误后跳过重复检查，继续执行审查
           if (shouldLog(verbose, 1)) {
-            console.log(
-              `⏭️ 跳过审查: 当前 PR #${currentPrNumber} 有 ${duplicateReviewRuns.length} 个同名 workflow 正在运行中`,
+            console.warn(
+              `⚠️ 无法检查重复 workflow（可能缺少 repo owner 权限），跳过此检查:`,
+              error instanceof Error ? error.message : error,
             );
           }
-          return {
-            success: true,
-            description: `跳过审查: PR #${currentPrNumber} 有 ${duplicateReviewRuns.length} 个同名 workflow 正在运行中，等待完成后重新审查`,
-            issues: [],
-            summary: [],
-            round: 1,
-          };
         }
       }
     } else if (effectiveBaseRef && effectiveHeadRef) {
