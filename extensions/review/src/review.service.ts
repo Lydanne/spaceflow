@@ -699,6 +699,14 @@ export class ReviewService {
       if (shouldLog(verbose, 1)) {
         console.log("✅ 没有需要审查的文件或规则");
       }
+
+      // 获取上一次的审查结果以计算正确的轮次
+      let existingResult: ReviewResult | null = null;
+      if (ci && prNumber) {
+        existingResult = await this.getExistingReviewResult(owner, repo, prNumber);
+      }
+      const currentRound = (existingResult?.round ?? 0) + 1;
+
       // 即使没有适用的规则，也为每个变更文件生成摘要
       const summary: FileSummary[] = changedFiles
         .filter((f) => f.filename && f.status !== "deleted")
@@ -718,7 +726,7 @@ export class ReviewService {
         description: prInfo.description,
         issues: [],
         summary,
-        round: 1,
+        round: currentRound,
       };
 
       // CI 模式下也需要发送 review 评论
