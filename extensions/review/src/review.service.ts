@@ -10,7 +10,7 @@ import {
 } from "@spaceflow/core";
 import type { IConfigReader } from "@spaceflow/core";
 import { type ReviewConfig } from "./review.config";
-import { ReviewSpecService, ReviewIssue, ReviewResult, FileSummary } from "./review-spec";
+import { ReviewSpecService, ReviewResult, FileSummary } from "./review-spec";
 import { MarkdownFormatter, ReviewReportService } from "./review-report";
 import micromatch from "micromatch";
 import { ReviewOptions } from "./review.config";
@@ -20,16 +20,8 @@ import { execSync } from "child_process";
 import { ReviewContextBuilder, type ReviewContext } from "./review-context";
 import { ReviewIssueFilter } from "./review-issue-filter";
 import { ReviewLlmProcessor } from "./review-llm";
-import { ReviewPrComment } from "./review-pr-comment";
 import { PullRequestModel } from "./pull-request-model";
-import {
-  extractIssueKeyFromBody as extractIssueKeyFromBodyFn,
-  isAiGeneratedComment as isAiGeneratedCommentFn,
-  generateIssueKey as generateIssueKeyFn,
-  deleteExistingAiReviews as deleteExistingAiReviewsFn,
-  syncRepliesToIssues as syncRepliesToIssuesFn,
-  calculateIssueStats as calculateIssueStatsFn,
-} from "./review-pr-comment-utils";
+import { ReviewResultModel, type ReviewResultModelDeps } from "./review-result-model";
 
 export type { ReviewContext } from "./review-context";
 export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./review-llm";
@@ -38,7 +30,7 @@ export class ReviewService {
   protected readonly contextBuilder: ReviewContextBuilder;
   protected readonly issueFilter: ReviewIssueFilter;
   protected readonly llmProcessor: ReviewLlmProcessor;
-  protected readonly prComment: ReviewPrComment;
+  protected readonly resultModelDeps: ReviewResultModelDeps;
 
   constructor(
     protected readonly gitProvider: GitProviderService,
@@ -59,12 +51,12 @@ export class ReviewService {
       gitSdk,
     );
     this.llmProcessor = new ReviewLlmProcessor(llmProxyService, reviewSpecService);
-    this.prComment = new ReviewPrComment(
+    this.resultModelDeps = {
       gitProvider,
       config,
       reviewSpecService,
       reviewReportService,
-    );
+    };
   }
 
   async getContextFromEnv(options: ReviewOptions): Promise<ReviewContext> {
@@ -84,55 +76,147 @@ export class ReviewService {
    * @returns 审查结果，包含发现的问题列表和统计信息
    */
   async execute(context: ReviewContext): Promise<ReviewResult> {
+    const { specSources, verbose, llmMode, deletionOnly } = context;
+
+    if (shouldLog(verbose, 1)) {
+      console.log(`🔍 Review 启动`);
+      console.log(`   DRY-RUN mode: ${context.dryRun ? "enabled" : "disabled"}`);
+      console.log(`   CI mode: ${context.ci ? "enabled" : "disabled"}`);
+      if (context.localMode) console.log(`   Local mode: ${context.localMode}`);
+      console.log(`   Verbose: ${verbose}`);
+    }
+
+    // 早期分流
+    if (deletionOnly) return this.executeDeletionOnly(context);
+    if (context.eventAction === "closed" || context.flush) return this.executeCollectOnly(context);
+
+    // 1. 解析输入数据（本地/PR/分支模式 + 前置过滤）
+    const source = await this.resolveSourceData(context);
+    if (source.earlyReturn) return source.earlyReturn;
+
+    const { prModel, commits, changedFiles, headSha, isDirectFileMode } = source;
+
+    // 2. 规则匹配
+    const specs = await this.issueFilter.loadSpecs(specSources, verbose);
+    const applicableSpecs = this.reviewSpecService.filterApplicableSpecs(specs, changedFiles);
+    if (shouldLog(verbose, 1)) {
+      console.log(`   适用的规则文件: ${applicableSpecs.length}`);
+    }
+    if (applicableSpecs.length === 0 || changedFiles.length === 0) {
+      return this.handleNoApplicableSpecs(context, applicableSpecs, changedFiles, commits);
+    }
+
+    // 3. 获取文件内容 + LLM 审查
+    const fileContents = await this.getFileContents(
+      context.owner,
+      context.repo,
+      changedFiles,
+      commits,
+      headSha,
+      context.prNumber,
+      verbose,
+      source.isLocalMode,
+    );
+    if (!llmMode) throw new Error("必须指定 LLM 类型");
+
+    // 获取上一次的审查结果（用于提示词优化和轮次推进）
+    let existingResultModel: ReviewResultModel | null = null;
+    if (context.ci && prModel) {
+      existingResultModel = await ReviewResultModel.loadFromPr(prModel, this.resultModelDeps);
+      if (existingResultModel && shouldLog(verbose, 1)) {
+        console.log(`📋 获取到上一次审查结果，包含 ${existingResultModel.issues.length} 个问题`);
+      }
+    }
+    if (shouldLog(verbose, 1)) {
+      console.log(`🔄 当前审查轮次: ${(existingResultModel?.round ?? 0) + 1}`);
+    }
+
+    const reviewPrompt = await this.buildReviewPrompt(
+      specs,
+      changedFiles,
+      fileContents,
+      commits,
+      existingResultModel?.result ?? null,
+    );
+    const result = await this.runLLMReview(llmMode, reviewPrompt, {
+      verbose,
+      concurrency: context.concurrency,
+      timeout: context.timeout,
+      retries: context.retries,
+      retryDelay: context.retryDelay,
+    });
+
+    // 填充 PR 功能描述和标题
+    const prInfo = context.generateDescription
+      ? await this.generatePrDescription(commits, changedFiles, llmMode, fileContents, verbose)
+      : await this.buildBasicDescription(commits, changedFiles);
+    result.title = prInfo.title;
+    result.description = prInfo.description;
+    if (shouldLog(verbose, 1)) {
+      console.log(`📝 LLM 审查完成，发现 ${result.issues.length} 个问题`);
+    }
+
+    // 4. 过滤新 issues
+    result.issues = await this.fillIssueCode(result.issues, fileContents);
+    result.issues = this.filterNewIssues(result.issues, specs, applicableSpecs, {
+      commits,
+      fileContents,
+      changedFiles,
+      isDirectFileMode,
+      context,
+    });
+    if (shouldLog(verbose, 1)) {
+      console.log(`📝 最终发现 ${result.issues.length} 个问题`);
+    }
+
+    // 5. 构建最终的 ReviewResultModel
+    const finalModel = await this.buildFinalModel(
+      context,
+      result,
+      { prModel, commits, headSha, specs, fileContents },
+      existingResultModel,
+    );
+
+    // 6. 保存 + 输出
+    await this.saveAndOutput(context, finalModel, commits);
+    return finalModel.result;
+  }
+
+  // ─── 提取的子方法 ──────────────────────────────────────
+
+  /**
+   * 解析输入数据：根据模式（本地/PR/分支比较）获取 commits、changedFiles 等。
+   * 包含前置过滤（merge commit、files、commits、includes）。
+   * 如果需要提前返回（如同分支、重复 workflow），通过 earlyReturn 字段传递。
+   */
+  protected async resolveSourceData(context: ReviewContext): Promise<{
+    prModel?: PullRequestModel;
+    commits: PullRequestCommit[];
+    changedFiles: ChangedFile[];
+    headSha: string;
+    isLocalMode: boolean;
+    isDirectFileMode: boolean;
+    earlyReturn?: ReviewResult;
+  }> {
     const {
       owner,
       repo,
       prNumber,
       baseRef,
       headRef,
-      specSources,
-      dryRun,
-      ci,
       verbose,
+      ci,
       includes,
-      llmMode,
       files,
       commits: filterCommits,
-      deletionOnly,
       localMode,
       skipDuplicateWorkflow,
-      autoApprove,
     } = context;
 
-    // 直接审查文件模式：指定了 -f 文件且 base=head
-    const isDirectFileMode = files && files.length > 0 && baseRef === headRef;
-    // 本地模式：审查未提交的代码（可能回退到分支比较）
+    const isDirectFileMode = !!(files && files.length > 0 && baseRef === headRef);
     let isLocalMode = !!localMode;
-    // 用于回退时动态计算的 base/head
     let effectiveBaseRef = baseRef;
     let effectiveHeadRef = headRef;
-
-    if (shouldLog(verbose, 1)) {
-      console.log(`🔍 Review 启动`);
-      console.log(`   DRY-RUN mode: ${dryRun ? "enabled" : "disabled"}`);
-      console.log(`   CI mode: ${ci ? "enabled" : "disabled"}`);
-      if (isLocalMode) {
-        console.log(`   Local mode: ${localMode}`);
-      }
-      console.log(`   Verbose: ${verbose}`);
-    }
-
-    // 如果是 deletionOnly 模式，直接执行删除代码分析
-    if (deletionOnly) {
-      return this.executeDeletionOnly(context);
-    }
-
-    // 如果是 closed 事件或 flush 模式，仅收集 review 状态
-    if (context.eventAction === "closed" || context.flush) {
-      return this.executeCollectOnly(context);
-    }
-
-    const specs = await this.issueFilter.loadSpecs(specSources, verbose);
 
     let prModel: PullRequestModel | undefined;
     let commits: PullRequestCommit[] = [];
@@ -163,11 +247,12 @@ export class ReviewService {
         if (effectiveBaseRef === effectiveHeadRef) {
           console.log(`ℹ️  当前分支 ${effectiveHeadRef} 与默认分支相同，没有可审查的代码变更`);
           return {
-            success: true,
-            description: "",
-            issues: [],
-            summary: [],
-            round: 1,
+            commits: [],
+            changedFiles: [],
+            headSha: "HEAD",
+            isLocalMode: false,
+            isDirectFileMode: false,
+            earlyReturn: { success: true, description: "", issues: [], summary: [], round: 1 },
           };
         }
       } else {
@@ -203,20 +288,28 @@ export class ReviewService {
         console.log(`   Changed files: ${changedFiles.length}`);
       }
 
-      // 检查是否有其他同名 review workflow 正在运行中（防止同一 PR 重复审查）
+      // 检查是否有其他同名 review workflow 正在运行中
       if (skipDuplicateWorkflow && ci && prInfo?.head?.sha) {
         const skipResult = await this.checkDuplicateWorkflow(prModel, prInfo.head.sha, verbose);
-        if (skipResult) return skipResult;
+        if (skipResult) {
+          return {
+            prModel,
+            commits,
+            changedFiles,
+            headSha: prInfo.head.sha,
+            isLocalMode,
+            isDirectFileMode,
+            earlyReturn: skipResult,
+          };
+        }
       }
     } else if (effectiveBaseRef && effectiveHeadRef) {
-      // 如果指定了 -f 文件且 base=head（无差异模式），直接审查指定文件
       if (files && files.length > 0 && effectiveBaseRef === effectiveHeadRef) {
         if (shouldLog(verbose, 1)) {
           console.log(`📥 直接审查指定文件模式 (${files.length} 个文件)`);
         }
         changedFiles = files.map((f) => ({ filename: f, status: "modified" as const }));
       } else if (changedFiles.length === 0) {
-        // 仅当 changedFiles 为空时才获取（避免与回退逻辑重复）
         if (shouldLog(verbose, 1)) {
           console.log(
             `📥 获取 ${effectiveBaseRef}...${effectiveHeadRef} 的差异 (owner: ${owner}, repo: ${repo})`,
@@ -235,44 +328,44 @@ export class ReviewService {
         }
       }
     } else if (!isLocalMode) {
-      // 非本地模式且无有效的 base/head
       if (shouldLog(verbose, 1)) {
         console.log(`❌ 错误: 缺少 prNumber 或 baseRef/headRef`, { prNumber, baseRef, headRef });
       }
       throw new Error("必须指定 PR 编号或者 base/head 分支");
     }
 
+    // ── 前置过滤 ──────────────────────────────────────────
+
     // 0. 过滤掉 merge commit
     {
-      const beforeMergeFilterCount = commits.length;
+      const before = commits.length;
       commits = commits.filter((c) => {
         const message = c.commit?.message || "";
         return !message.startsWith("Merge ");
       });
-      if (beforeMergeFilterCount !== commits.length && shouldLog(verbose, 1)) {
-        console.log(`   跳过 Merge Commits: ${beforeMergeFilterCount} -> ${commits.length} 个`);
+      if (before !== commits.length && shouldLog(verbose, 1)) {
+        console.log(`   跳过 Merge Commits: ${before} -> ${commits.length} 个`);
       }
     }
 
     // 1. 按指定的 files 过滤
     if (files && files.length > 0) {
-      const beforeFilesCount = changedFiles.length;
+      const before = changedFiles.length;
       changedFiles = changedFiles.filter((f) => files.includes(f.filename || ""));
       if (shouldLog(verbose, 1)) {
-        console.log(`   Files 过滤文件: ${beforeFilesCount} -> ${changedFiles.length} 个文件`);
+        console.log(`   Files 过滤文件: ${before} -> ${changedFiles.length} 个文件`);
       }
     }
 
     // 2. 按指定的 commits 过滤
     if (filterCommits && filterCommits.length > 0) {
-      const beforeCommitsCount = commits.length;
+      const beforeCommits = commits.length;
       commits = commits.filter((c) => filterCommits.some((fc) => fc && c.sha?.startsWith(fc)));
       if (shouldLog(verbose, 1)) {
-        console.log(`   Commits 过滤: ${beforeCommitsCount} -> ${commits.length} 个`);
+        console.log(`   Commits 过滤: ${beforeCommits} -> ${commits.length} 个`);
       }
 
-      // 同时也过滤变更文件，仅保留属于这些 commit 的文件
-      const beforeFilesCount = changedFiles.length;
+      const beforeFiles = changedFiles.length;
       const commitFilenames = new Set<string>();
       for (const commit of commits) {
         if (!commit.sha) continue;
@@ -281,21 +374,21 @@ export class ReviewService {
       }
       changedFiles = changedFiles.filter((f) => commitFilenames.has(f.filename || ""));
       if (shouldLog(verbose, 1)) {
-        console.log(`   按 Commits 过滤文件: ${beforeFilesCount} -> ${changedFiles.length} 个文件`);
+        console.log(`   按 Commits 过滤文件: ${beforeFiles} -> ${changedFiles.length} 个文件`);
       }
     }
 
     // 3. 使用 includes 过滤文件和 commits
     if (includes && includes.length > 0) {
-      const beforeFilesCount = changedFiles.length;
+      const beforeFiles = changedFiles.length;
       const filenames = changedFiles.map((file) => file.filename || "");
       const matchedFilenames = micromatch(filenames, includes);
       changedFiles = changedFiles.filter((file) => matchedFilenames.includes(file.filename || ""));
       if (shouldLog(verbose, 1)) {
-        console.log(`   Includes 过滤文件: ${beforeFilesCount} -> ${changedFiles.length} 个文件`);
+        console.log(`   Includes 过滤文件: ${beforeFiles} -> ${changedFiles.length} 个文件`);
       }
 
-      const beforeCommitsCount = commits.length;
+      const beforeCommits = commits.length;
       const filteredCommits: PullRequestCommit[] = [];
       for (const commit of commits) {
         if (!commit.sha) continue;
@@ -306,111 +399,46 @@ export class ReviewService {
       }
       commits = filteredCommits;
       if (shouldLog(verbose, 1)) {
-        console.log(`   Includes 过滤 Commits: ${beforeCommitsCount} -> ${commits.length} 个`);
+        console.log(`   Includes 过滤 Commits: ${beforeCommits} -> ${commits.length} 个`);
       }
-    }
-
-    // 只按扩展名过滤规则，includes 和 override 在 LLM 审查后处理
-    const applicableSpecs = this.reviewSpecService.filterApplicableSpecs(specs, changedFiles);
-    if (shouldLog(verbose, 1)) {
-      console.log(`   适用的规则文件: ${applicableSpecs.length}`);
-    }
-
-    if (applicableSpecs.length === 0 || changedFiles.length === 0) {
-      return this.handleNoApplicableSpecs(
-        context,
-        applicableSpecs,
-        changedFiles,
-        commits,
-        ci,
-        prNumber,
-        dryRun,
-        verbose,
-        llmMode,
-        autoApprove,
-      );
     }
 
     const headSha = prModel ? await prModel.getHeadSha() : headRef || "HEAD";
-    const fileContents = await this.getFileContents(
-      owner,
-      repo,
-      changedFiles,
-      commits,
-      headSha,
-      prNumber,
-      verbose,
-      isLocalMode,
-    );
-    if (!llmMode) {
-      throw new Error("必须指定 LLM 类型");
-    }
+    return { prModel, commits, changedFiles, headSha, isLocalMode, isDirectFileMode };
+  }
 
-    // 获取上一次的审查结果（用于提示词优化）
-    let existingResult: ReviewResult | null = null;
-    if (ci && prModel) {
-      existingResult = await this.getExistingReviewResult(prModel);
-      if (existingResult && shouldLog(verbose, 1)) {
-        console.log(`📋 获取到上一次审查结果，包含 ${existingResult.issues.length} 个问题`);
-      }
-    }
-    // 计算当前轮次：基于已有结果的轮次 + 1
-    const currentRound = (existingResult?.round ?? 0) + 1;
+  /**
+   * LLM 审查后的 issue 过滤管道：
+   * includes → 规则存在性 → overrides → 变更行过滤 → 格式化
+   */
+  protected filterNewIssues(
+    issues: ReviewResult["issues"],
+    specs: any[],
+    applicableSpecs: any[],
+    opts: {
+      commits: PullRequestCommit[];
+      fileContents: any;
+      changedFiles: ChangedFile[];
+      isDirectFileMode: boolean;
+      context: ReviewContext;
+    },
+  ): ReviewResult["issues"] {
+    const { commits, fileContents, changedFiles, isDirectFileMode, context } = opts;
+    const { verbose } = context;
+
+    let filtered = this.reviewSpecService.filterIssuesByIncludes(issues, applicableSpecs);
     if (shouldLog(verbose, 1)) {
-      console.log(`🔄 当前审查轮次: ${currentRound}`);
+      console.log(`   应用 includes 过滤后: ${filtered.length} 个问题`);
     }
 
-    const reviewPrompt = await this.buildReviewPrompt(
-      specs,
-      changedFiles,
-      fileContents,
-      commits,
-      existingResult,
-    );
-    const result = await this.runLLMReview(llmMode, reviewPrompt, {
-      verbose,
-      concurrency: context.concurrency,
-      timeout: context.timeout,
-      retries: context.retries,
-      retryDelay: context.retryDelay,
-    });
-    // 填充 PR 功能描述和标题
-    const prInfo = context.generateDescription
-      ? await this.generatePrDescription(commits, changedFiles, llmMode, fileContents, verbose)
-      : await this.buildBasicDescription(commits, changedFiles);
-    result.title = prInfo.title;
-    result.description = prInfo.description;
-    // 更新 round 并为新 issues 赋值 round
-    result.round = currentRound;
-    result.issues = result.issues.map((issue) => ({ ...issue, round: currentRound }));
-
+    filtered = this.reviewSpecService.filterIssuesByRuleExistence(filtered, specs);
     if (shouldLog(verbose, 1)) {
-      console.log(`📝 LLM 审查完成，发现 ${result.issues.length} 个问题`);
+      console.log(`   应用规则存在性过滤后: ${filtered.length} 个问题`);
     }
 
-    result.issues = await this.fillIssueCode(result.issues, fileContents);
+    filtered = this.reviewSpecService.filterIssuesByOverrides(filtered, applicableSpecs, verbose);
 
-    // 在 LLM 审查后应用 includes 和 override 过滤
-    let filteredIssues = this.reviewSpecService.filterIssuesByIncludes(
-      result.issues,
-      applicableSpecs,
-    );
-    if (shouldLog(verbose, 1)) {
-      console.log(`   应用 includes 过滤后: ${filteredIssues.length} 个问题`);
-    }
-
-    filteredIssues = this.reviewSpecService.filterIssuesByRuleExistence(filteredIssues, specs);
-    if (shouldLog(verbose, 1)) {
-      console.log(`   应用规则存在性过滤后: ${filteredIssues.length} 个问题`);
-    }
-
-    filteredIssues = this.reviewSpecService.filterIssuesByOverrides(
-      filteredIssues,
-      applicableSpecs,
-      verbose,
-    );
-
-    // 过滤掉不属于本次 PR commits 的问题
+    // 变更行过滤
     if (shouldLog(verbose, 3)) {
       console.log(`   🔍 变更行过滤条件检查:`);
       console.log(
@@ -419,16 +447,11 @@ export class ReviewService {
     }
     if (!context.showAll && !isDirectFileMode && commits.length > 0) {
       if (shouldLog(verbose, 2)) {
-        console.log(`   🔍 开始变更行过滤，当前 ${filteredIssues.length} 个问题`);
+        console.log(`   🔍 开始变更行过滤，当前 ${filtered.length} 个问题`);
       }
-      filteredIssues = this.filterIssuesByValidCommits(
-        filteredIssues,
-        commits,
-        fileContents,
-        verbose,
-      );
+      filtered = this.filterIssuesByValidCommits(filtered, commits, fileContents, verbose);
       if (shouldLog(verbose, 2)) {
-        console.log(`   🔍 变更行过滤完成，剩余 ${filteredIssues.length} 个问题`);
+        console.log(`   🔍 变更行过滤完成，剩余 ${filtered.length} 个问题`);
       }
     } else if (shouldLog(verbose, 1)) {
       console.log(
@@ -436,101 +459,132 @@ export class ReviewService {
       );
     }
 
-    filteredIssues = this.reviewSpecService.formatIssues(filteredIssues, {
-      specs,
-      changedFiles,
-    });
+    filtered = this.reviewSpecService.formatIssues(filtered, { specs, changedFiles });
     if (shouldLog(verbose, 1)) {
-      console.log(`   应用格式化后: ${filteredIssues.length} 个问题`);
+      console.log(`   应用格式化后: ${filtered.length} 个问题`);
     }
 
-    result.issues = filteredIssues;
-    if (shouldLog(verbose, 1)) {
-      console.log(`📝 最终发现 ${result.issues.length} 个问题`);
-    }
+    return filtered;
+  }
 
-    let existingIssues: ReviewIssue[] = [];
-    let allIssues = result.issues;
+  /**
+   * 构建最终的 ReviewResultModel：处理历史 issue 合并或首次创建
+   */
+  protected async buildFinalModel(
+    context: ReviewContext,
+    result: ReviewResult,
+    source: {
+      prModel?: PullRequestModel;
+      commits: PullRequestCommit[];
+      headSha: string;
+      specs: any[];
+      fileContents: any;
+    },
+    existingResultModel: ReviewResultModel | null,
+  ): Promise<ReviewResultModel> {
+    const { prModel, commits, headSha, specs, fileContents } = source;
+    const { verbose, ci } = context;
 
-    if (ci && prModel && existingResult) {
-      existingIssues = existingResult.issues ?? [];
-      if (existingIssues.length > 0) {
-        if (shouldLog(verbose, 1)) {
-          console.log(`📋 已有评论中存在 ${existingIssues.length} 个问题`);
-        }
-
-        // 先同步最新的 resolved 状态
-        await this.syncResolvedComments(prModel, existingResult);
-
-        // 如果文件有变更，将该文件的历史问题标记为无效
-        const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
-        if (
-          reviewConf.invalidateChangedFiles !== "off" &&
-          reviewConf.invalidateChangedFiles !== "keep"
-        ) {
-          existingIssues = await this.invalidateIssuesForChangedFiles(
-            existingIssues,
-            headSha,
-            prModel,
-            verbose,
-          );
-        }
-
-        // 验证历史问题是否已修复
-        if (context.verifyFixes) {
-          existingIssues = await this.issueFilter.verifyAndUpdateIssues(
-            context,
-            existingIssues,
-            commits,
-            {
-              specs,
-              fileContents,
-            },
-            prModel,
-          );
-        } else {
-          if (shouldLog(verbose, 1)) {
-            console.log(`   ⏭️  跳过历史问题验证 (verifyFixes=false)`);
-          }
-        }
-
-        const { filteredIssues: newIssues, skippedCount } = this.filterDuplicateIssues(
-          result.issues,
-          existingIssues,
-        );
-        if (skippedCount > 0 && shouldLog(verbose, 1)) {
-          console.log(`   跳过 ${skippedCount} 个重复问题，新增 ${newIssues.length} 个问题`);
-        }
-        result.issues = newIssues;
-        allIssues = [...existingIssues, ...newIssues];
+    if (ci && prModel && existingResultModel && existingResultModel.issues.length > 0) {
+      if (shouldLog(verbose, 1)) {
+        console.log(`📋 已有评论中存在 ${existingResultModel.issues.length} 个问题`);
       }
+
+      // 预处理历史 issues：同步 resolved 状态
+      await existingResultModel.syncResolved();
+
+      // 如果文件有变更，将该文件的历史问题标记为无效
+      const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
+      if (
+        reviewConf.invalidateChangedFiles !== "off" &&
+        reviewConf.invalidateChangedFiles !== "keep"
+      ) {
+        await existingResultModel.invalidateChangedFiles(headSha, verbose);
+      }
+
+      // 验证历史问题是否已修复
+      if (context.verifyFixes) {
+        existingResultModel.issues = await this.issueFilter.verifyAndUpdateIssues(
+          context,
+          existingResultModel.issues,
+          commits,
+          { specs, fileContents },
+          prModel,
+        );
+      } else {
+        if (shouldLog(verbose, 1)) {
+          console.log(`   ⏭️  跳过历史问题验证 (verifyFixes=false)`);
+        }
+      }
+
+      // 去重
+      const { filteredIssues: newIssues, skippedCount } = this.filterDuplicateIssues(
+        result.issues,
+        existingResultModel.issues,
+      );
+      if (skippedCount > 0 && shouldLog(verbose, 1)) {
+        console.log(`   跳过 ${skippedCount} 个重复问题，新增 ${newIssues.length} 个问题`);
+      }
+      result.issues = newIssues;
+
+      // 基于上一轮创建新一轮（自动 round 递增 + issues 合并）
+      return existingResultModel.nextRound(result);
     }
 
-    // 统一填充所有问题的 author 信息（仅在有 commits 时）
+    // 首次审查或无历史结果
+    result.round = 1;
+    result.issues = result.issues.map((issue) => ({ ...issue, round: 1 }));
+    return prModel
+      ? ReviewResultModel.create(prModel, result, this.resultModelDeps)
+      : ReviewResultModel.createLocal(result, this.resultModelDeps);
+  }
+
+  /**
+   * 统一的保存 + 输出逻辑
+   */
+  protected async saveAndOutput(
+    context: ReviewContext,
+    finalModel: ReviewResultModel,
+    commits: PullRequestCommit[],
+  ): Promise<void> {
+    const {
+      owner,
+      repo,
+      prNumber,
+      baseRef,
+      headRef,
+      verbose,
+      ci,
+      dryRun,
+      llmMode,
+      includes,
+      autoApprove,
+    } = context;
+    const prModel = finalModel.pr.number > 0 ? finalModel.pr : undefined;
+
+    // 填充 author 信息
     if (commits.length > 0) {
-      allIssues = await this.fillIssueAuthors(allIssues, commits, owner, repo, verbose);
+      finalModel.issues = await this.fillIssueAuthors(
+        finalModel.issues,
+        commits,
+        owner,
+        repo,
+        verbose,
+      );
     }
 
-    // 第一次提交报告：审查问题完成
+    // 第一次提交报告
     if (prModel && !dryRun) {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 提交 PR 评论 (代码审查完成)...`);
       }
-
-      await this.postOrUpdateReviewComment(
-        prModel,
-        {
-          ...result,
-          issues: allIssues,
-        },
-        { verbose, autoApprove, skipSync: true },
-      );
+      await finalModel.save({ verbose, autoApprove, skipSync: true });
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已提交`);
       }
     }
 
-    // 如果启用了删除代码影响分析
+    // 删除代码影响分析
     if (context.analyzeDeletions && llmMode) {
       const deletionImpact = await this.deletionImpactService.analyzeDeletionImpact(
         {
@@ -545,36 +599,26 @@ export class ReviewService {
         llmMode,
         verbose,
       );
-      result.deletionImpact = deletionImpact;
+      finalModel.update({ deletionImpact });
 
-      // 第二次更新报告：删除代码分析完成
       if (prModel && !dryRun) {
         if (shouldLog(verbose, 1)) {
           console.log(`💬 更新 PR 评论 (删除代码分析完成)...`);
         }
-        await this.postOrUpdateReviewComment(
-          prModel,
-          {
-            ...result,
-            issues: allIssues,
-          },
-          { verbose, skipSync: true },
-        );
+        await finalModel.save({ verbose, skipSync: true });
         if (shouldLog(verbose, 1)) {
           console.log(`✅ 评论已更新`);
         }
       }
     }
 
-    const reviewComment = this.prComment.formatReviewComment(
-      { ...result, issues: allIssues },
-      { prNumber, outputFormat: context.outputFormat, ci },
-    );
-
-    // 终端输出（根据 outputFormat 或智能选择）
+    // 终端输出
+    const reviewComment = finalModel.formatComment({
+      prNumber,
+      outputFormat: context.outputFormat,
+      ci,
+    });
     console.log(MarkdownFormatter.clearReviewData(reviewComment, "<hidden>"));
-
-    return result;
   }
 
   /**
@@ -594,8 +638,8 @@ export class ReviewService {
     const prModel = new PullRequestModel(this.gitProvider, owner, repo, prNumber);
 
     // 1. 从现有的 AI review 评论中读取问题
-    const existingResult = await this.getExistingReviewResult(prModel);
-    if (!existingResult) {
+    const resultModel = await ReviewResultModel.loadFromPr(prModel, this.resultModelDeps);
+    if (!resultModel) {
       console.log(`ℹ️  PR #${prNumber} 没有找到 AI review 评论`);
       return {
         success: true,
@@ -607,13 +651,13 @@ export class ReviewService {
     }
 
     if (shouldLog(verbose, 1)) {
-      console.log(`📋 找到 ${existingResult.issues.length} 个历史问题`);
+      console.log(`📋 找到 ${resultModel.issues.length} 个历史问题`);
     }
 
     // 2. 获取 commits 并填充 author 信息
     const commits = await prModel.getCommits();
-    existingResult.issues = await this.fillIssueAuthors(
-      existingResult.issues,
+    resultModel.issues = await this.fillIssueAuthors(
+      resultModel.issues,
       commits,
       owner,
       repo,
@@ -621,16 +665,16 @@ export class ReviewService {
     );
 
     // 3. 同步已解决的评论状态
-    await this.syncResolvedComments(prModel, existingResult);
+    await resultModel.syncResolved();
 
     // 4. 同步评论 reactions（👍/👎/☹️）
-    await this.syncReactionsToIssues(prModel, existingResult, verbose);
+    await resultModel.syncReactions(verbose);
 
     // 5. LLM 验证历史问题是否已修复
     try {
-      existingResult.issues = await this.issueFilter.verifyAndUpdateIssues(
+      resultModel.issues = await this.issueFilter.verifyAndUpdateIssues(
         context,
-        existingResult.issues,
+        resultModel.issues,
         commits,
         undefined,
         prModel,
@@ -640,8 +684,7 @@ export class ReviewService {
     }
 
     // 6. 统计问题状态并设置到 result
-    const stats = this.calculateIssueStats(existingResult.issues);
-    existingResult.stats = stats;
+    const stats = resultModel.updateStats();
 
     // 7. 输出统计信息
     console.log(this.reviewReportService.formatStatsTerminal(stats, prNumber));
@@ -651,16 +694,13 @@ export class ReviewService {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 更新 PR 评论...`);
       }
-      await this.postOrUpdateReviewComment(prModel, existingResult, {
-        verbose,
-        autoApprove,
-      });
+      await resultModel.save({ verbose, autoApprove });
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已更新`);
       }
     }
 
-    return existingResult;
+    return resultModel.result;
   }
 
   /**
@@ -725,7 +765,10 @@ export class ReviewService {
       round: 1,
     };
 
-    const reviewComment = this.formatReviewComment(result, {
+    const resultModel = prModel
+      ? ReviewResultModel.create(prModel, result, this.resultModelDeps)
+      : ReviewResultModel.createLocal(result, this.resultModelDeps);
+    const reviewComment = resultModel.formatComment({
       prNumber,
       outputFormat: context.outputFormat,
       ci,
@@ -735,7 +778,7 @@ export class ReviewService {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 提交 PR 评论...`);
       }
-      await this.postOrUpdateReviewComment(prModel, result, { verbose, autoApprove });
+      await resultModel.save({ verbose, autoApprove });
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已提交`);
       }
@@ -755,25 +798,21 @@ export class ReviewService {
     applicableSpecs: any[],
     changedFiles: ChangedFile[],
     commits: PullRequestCommit[],
-    ci: boolean,
-    prNumber: number | undefined,
-    dryRun: boolean,
-    verbose: VerboseLevel | undefined,
-    llmMode: LLMMode | undefined,
-    autoApprove: boolean | undefined,
   ): Promise<ReviewResult> {
+    const { ci, prNumber, verbose, dryRun, llmMode, autoApprove } = context;
+
     if (shouldLog(verbose, 1)) {
       console.log("✅ 没有需要审查的文件或规则");
     }
 
     // 获取上一次的审查结果以计算正确的轮次
-    let existingResult: ReviewResult | null = null;
+    let existingResultModel: ReviewResultModel | null = null;
     let prModel: PullRequestModel | undefined;
     if (ci && prNumber) {
       prModel = new PullRequestModel(this.gitProvider, context.owner, context.repo, prNumber);
-      existingResult = await this.getExistingReviewResult(prModel);
+      existingResultModel = await ReviewResultModel.loadFromPr(prModel, this.resultModelDeps);
     }
-    const currentRound = (existingResult?.round ?? 0) + 1;
+    const currentRound = (existingResultModel?.round ?? 0) + 1;
 
     // 即使没有适用的规则，也为每个变更文件生成摘要
     const summary: FileSummary[] = changedFiles
@@ -802,10 +841,8 @@ export class ReviewService {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 提交 PR 评论...`);
       }
-      await this.postOrUpdateReviewComment(prModel, result, {
-        verbose,
-        autoApprove,
-      });
+      const resultModel = ReviewResultModel.create(prModel, result, this.resultModelDeps);
+      await resultModel.save({ verbose, autoApprove });
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已提交`);
       }
@@ -877,12 +914,6 @@ export class ReviewService {
     return this.issueFilter.getFilesForCommit(...args);
   }
 
-  protected async invalidateIssuesForChangedFiles(
-    ...args: Parameters<ReviewIssueFilter["invalidateIssuesForChangedFiles"]>
-  ) {
-    return this.issueFilter.invalidateIssuesForChangedFiles(...args);
-  }
-
   protected async getChangedFilesBetweenRefs(
     ...args: Parameters<ReviewIssueFilter["getChangedFilesBetweenRefs"]>
   ) {
@@ -893,16 +924,6 @@ export class ReviewService {
     ...args: Parameters<ReviewIssueFilter["getCommitsBetweenRefs"]>
   ) {
     return this.issueFilter.getCommitsBetweenRefs(...args);
-  }
-
-  protected async buildLineCommitMap(...args: Parameters<ReviewIssueFilter["buildLineCommitMap"]>) {
-    return this.issueFilter.buildLineCommitMap(...args);
-  }
-
-  protected updateIssueLineNumbers(
-    ...args: Parameters<ReviewIssueFilter["updateIssueLineNumbers"]>
-  ) {
-    return this.issueFilter.updateIssueLineNumbers(...args);
   }
 
   protected filterIssuesByValidCommits(
@@ -919,30 +940,12 @@ export class ReviewService {
     return this.issueFilter.fillIssueCode(...args);
   }
 
-  protected async getExistingReviewResult(pr: PullRequestModel) {
-    return this.issueFilter.getExistingReviewResult(pr, (body) =>
-      this.reviewReportService.parseMarkdown(body),
-    );
-  }
-
   protected async runLLMReview(...args: Parameters<ReviewLlmProcessor["runLLMReview"]>) {
     return this.llmProcessor.runLLMReview(...args);
   }
 
-  protected filterSpecsForFile(...args: Parameters<ReviewLlmProcessor["filterSpecsForFile"]>) {
-    return this.llmProcessor.filterSpecsForFile(...args);
-  }
-
-  protected buildSystemPrompt(...args: Parameters<ReviewLlmProcessor["buildSystemPrompt"]>) {
-    return this.llmProcessor.buildSystemPrompt(...args);
-  }
-
   protected async buildReviewPrompt(...args: Parameters<ReviewLlmProcessor["buildReviewPrompt"]>) {
     return this.llmProcessor.buildReviewPrompt(...args);
-  }
-
-  protected normalizeIssues(...args: Parameters<ReviewLlmProcessor["normalizeIssues"]>) {
-    return this.llmProcessor.normalizeIssues(...args);
   }
 
   protected async generatePrDescription(
@@ -955,98 +958,6 @@ export class ReviewService {
     ...args: Parameters<ReviewLlmProcessor["buildBasicDescription"]>
   ) {
     return this.llmProcessor.buildBasicDescription(...args);
-  }
-
-  protected async reviewSingleFile(...args: Parameters<ReviewLlmProcessor["reviewSingleFile"]>) {
-    return this.llmProcessor.reviewSingleFile(...args);
-  }
-
-  protected async getFileDirectoryInfo(
-    ...args: Parameters<ReviewLlmProcessor["getFileDirectoryInfo"]>
-  ) {
-    return this.llmProcessor.getFileDirectoryInfo(...args);
-  }
-
-  protected formatReviewComment(...args: Parameters<ReviewPrComment["formatReviewComment"]>) {
-    return this.prComment.formatReviewComment(...args);
-  }
-
-  protected async postOrUpdateReviewComment(
-    ...args: Parameters<ReviewPrComment["postOrUpdateReviewComment"]>
-  ) {
-    return this.prComment.postOrUpdateReviewComment(...args);
-  }
-
-  protected async syncResolvedComments(
-    ...args: Parameters<ReviewPrComment["syncResolvedComments"]>
-  ) {
-    return this.prComment.syncResolvedComments(...args);
-  }
-
-  protected async syncReactionsToIssues(
-    ...args: Parameters<ReviewPrComment["syncReactionsToIssues"]>
-  ) {
-    return this.prComment.syncReactionsToIssues(...args);
-  }
-
-  protected lineMatchesPosition(...args: Parameters<ReviewPrComment["lineMatchesPosition"]>) {
-    return this.prComment.lineMatchesPosition(...args);
-  }
-
-  protected issueToReviewComment(...args: Parameters<ReviewPrComment["issueToReviewComment"]>) {
-    return this.prComment.issueToReviewComment(...args);
-  }
-
-  protected parseExistingReviewResult(
-    ...args: Parameters<ReviewPrComment["parseExistingReviewResult"]>
-  ) {
-    return this.prComment.parseExistingReviewResult(...args);
-  }
-
-  protected async generatePrTitle(...args: Parameters<ReviewLlmProcessor["generatePrTitle"]>) {
-    return this.llmProcessor.generatePrTitle(...args);
-  }
-
-  protected getFallbackTitle(...args: Parameters<ReviewLlmProcessor["getFallbackTitle"]>) {
-    return this.llmProcessor.getFallbackTitle(...args);
-  }
-
-  protected async callLLM(...args: Parameters<ReviewLlmProcessor["callLLM"]>) {
-    return this.llmProcessor.callLLM(...args);
-  }
-
-  protected calculateIssueStats(issues: ReviewIssue[]) {
-    return calculateIssueStatsFn(issues);
-  }
-
-  protected buildLineReviewBody(...args: Parameters<ReviewPrComment["buildLineReviewBody"]>) {
-    return this.prComment.buildLineReviewBody(...args);
-  }
-
-  protected async findExistingAiComments(pr: PullRequestModel, verbose?: VerboseLevel) {
-    return this.prComment.findExistingAiComments(pr, verbose);
-  }
-
-  protected async deleteExistingAiReviews(pr: PullRequestModel) {
-    return deleteExistingAiReviewsFn(pr);
-  }
-
-  protected extractIssueKeyFromBody(body: string) {
-    return extractIssueKeyFromBodyFn(body);
-  }
-
-  protected isAiGeneratedComment(body: string) {
-    return isAiGeneratedCommentFn(body);
-  }
-
-  protected generateIssueKey(issue: any) {
-    return generateIssueKeyFn(issue);
-  }
-
-  protected async syncRepliesToIssues(reviewComments: any[], result: any) {
-    return syncRepliesToIssuesFn(reviewComments, result, (line: string, pos?: number) =>
-      this.prComment.lineMatchesPosition(line, pos),
-    );
   }
 
   protected normalizeFilePaths(...args: Parameters<ReviewContextBuilder["normalizeFilePaths"]>) {

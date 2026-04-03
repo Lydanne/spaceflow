@@ -2,6 +2,8 @@ import "./locales";
 export * from "./review-spec";
 export * from "./review-report";
 export { PullRequestModel } from "./pull-request-model";
+export { ReviewResultModel } from "./review-result-model";
+export type { ReviewResultModelDeps, ReviewResultSaveOptions } from "./review-result-model";
 import { defineExtension, t } from "@spaceflow/core";
 import type {
   GitProviderService,

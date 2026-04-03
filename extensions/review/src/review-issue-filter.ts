@@ -16,12 +16,11 @@ import {
   ReviewSpecService,
   ReviewSpec,
   ReviewIssue,
-  ReviewResult,
   FileContentsMap,
   FileContentLine,
 } from "./review-spec";
 import { IssueVerifyService } from "./issue-verify.service";
-import { generateIssueKey, REVIEW_COMMENT_MARKER } from "./review-pr-comment-utils";
+import { generateIssueKey } from "./review-pr-comment-utils";
 import type { ReviewContext } from "./review-context";
 
 export class ReviewIssueFilter {
@@ -302,78 +301,6 @@ export class ReviewIssueFilter {
   }
 
   /**
-   * 将有变更文件的历史 issue 标记为无效
-   * 简化策略：如果文件在最新 commit 中有变更，则将该文件的所有历史问题标记为无效
-   */
-  async invalidateIssuesForChangedFiles(
-    issues: ReviewIssue[],
-    headSha: string | undefined,
-    pr: PullRequestModel,
-    verbose?: VerboseLevel,
-  ): Promise<ReviewIssue[]> {
-    if (!headSha) {
-      if (shouldLog(verbose, 1)) {
-        console.log(`   ⚠️ 无法获取 PR head SHA，跳过变更文件检查`);
-      }
-      return issues;
-    }
-
-    if (shouldLog(verbose, 1)) {
-      console.log(`   📊 获取最新 commit 变更文件: ${headSha.slice(0, 7)}`);
-    }
-
-    try {
-      // 使用 Git Provider API 获取最新一次 commit 的 diff
-      const diffText = await pr.getCommitDiff(headSha);
-      const diffFiles = parseDiffText(diffText);
-
-      if (diffFiles.length === 0) {
-        if (shouldLog(verbose, 1)) {
-          console.log(`   ⏭️ 最新 commit 无文件变更`);
-        }
-        return issues;
-      }
-
-      // 构建变更文件集合
-      const changedFileSet = new Set(diffFiles.map((f) => f.filename));
-      if (shouldLog(verbose, 2)) {
-        console.log(`   [invalidateIssues] 变更文件: ${[...changedFileSet].join(", ")}`);
-      }
-
-      // 将变更文件的历史 issue 标记为无效
-      let invalidatedCount = 0;
-      const updatedIssues = issues.map((issue) => {
-        // 如果 issue 已修复、已解决或已无效，不需要处理
-        if (issue.fixed || issue.resolved || issue.valid === "false") {
-          return issue;
-        }
-
-        // 如果 issue 所在文件有变更，标记为无效
-        if (changedFileSet.has(issue.file)) {
-          invalidatedCount++;
-          if (shouldLog(verbose, 1)) {
-            console.log(`   🗑️ Issue ${issue.file}:${issue.line} 所在文件有变更，标记为无效`);
-          }
-          return { ...issue, valid: "false", originalLine: issue.originalLine ?? issue.line };
-        }
-
-        return issue;
-      });
-
-      if (invalidatedCount > 0 && shouldLog(verbose, 1)) {
-        console.log(`   📊 共标记 ${invalidatedCount} 个历史问题为无效（文件有变更）`);
-      }
-
-      return updatedIssues;
-    } catch (error) {
-      if (shouldLog(verbose, 1)) {
-        console.warn(`   ⚠️ 获取最新 commit 变更文件失败: ${error}`);
-      }
-      return issues;
-    }
-  }
-
-  /**
    * 根据代码变更更新历史 issue 的行号
    * 当代码发生变化时，之前发现的 issue 行号可能已经不准确
    * 此方法通过分析 diff 来计算新的行号
@@ -537,24 +464,6 @@ export class ReviewIssueFilter {
     );
     const skippedCount = newIssues.length - filteredIssues.length;
     return { filteredIssues, skippedCount };
-  }
-
-  async getExistingReviewResult(
-    pr: PullRequestModel,
-    parseMarkdown: (body: string) => { result: ReviewResult } | null,
-  ): Promise<ReviewResult | null> {
-    try {
-      // 从 Issue Comment 获取已有的审查结果
-      const comments = await pr.getComments();
-      const existingComment = comments.findLast((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
-      if (existingComment?.body) {
-        const parsed = parseMarkdown(existingComment.body);
-        return parsed?.result ?? null;
-      }
-    } catch (error) {
-      console.warn("⚠️ 获取已有评论失败:", error);
-    }
-    return null;
   }
 
   generateIssueKey(issue: ReviewIssue): string {
