@@ -16,12 +16,11 @@ import {
   ReviewSpec,
   ReviewIssue,
   ReviewResult,
-  ReviewStats,
   FileContentsMap,
   FileContentLine,
 } from "./review-spec";
 import { IssueVerifyService } from "./issue-verify.service";
-import { calculateIssueStats, generateIssueKey } from "./review-pr-comment-utils";
+import { generateIssueKey } from "./review-pr-comment-utils";
 import { REVIEW_COMMENT_MARKER } from "./review-pr-comment";
 import type { ReviewContext } from "./review-context";
 
@@ -130,13 +129,6 @@ export class ReviewIssueFilter {
       verbose,
       context.verifyConcurrency,
     );
-  }
-
-  /**
-   * 计算问题状态统计
-   */
-  calculateIssueStats(issues: ReviewIssue[]): ReviewStats {
-    return calculateIssueStats(issues);
   }
 
   async getChangedFilesBetweenRefs(
@@ -557,7 +549,7 @@ export class ReviewIssueFilter {
     try {
       // 从 Issue Comment 获取已有的审查结果
       const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
-      const existingComment = comments.find((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
+      const existingComment = comments.findLast((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
       if (existingComment?.body) {
         const parsed = parseMarkdown(existingComment.body);
         return parsed?.result ?? null;

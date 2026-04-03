@@ -23,6 +23,12 @@ const REVIEW_LINE_COMMENTS_MARKER = "<!-- spaceflow-review-lines -->";
 
 export { REVIEW_COMMENT_MARKER, REVIEW_LINE_COMMENTS_MARKER };
 
+export interface PostReviewCommentOptions {
+  verbose?: VerboseLevel;
+  autoApprove?: boolean;
+  skipSync?: boolean;
+}
+
 export class ReviewPrComment {
   constructor(
     protected readonly gitProvider: GitProviderService,
@@ -56,10 +62,9 @@ export class ReviewPrComment {
     repo: string,
     prNumber: number,
     result: ReviewResult,
-    verbose?: VerboseLevel,
-    autoApprove?: boolean,
-    skipSync?: boolean,
+    options?: PostReviewCommentOptions,
   ): Promise<void> {
+    const { verbose, autoApprove, skipSync } = options ?? {};
     // 获取配置
     const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
 

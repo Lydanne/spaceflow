@@ -28,6 +28,7 @@ import {
   generateIssueKey as generateIssueKeyFn,
   deleteExistingAiReviews as deleteExistingAiReviewsFn,
   syncRepliesToIssues as syncRepliesToIssuesFn,
+  calculateIssueStats as calculateIssueStatsFn,
 } from "./review-pr-comment-utils";
 
 export type { ReviewContext } from "./review-context";
@@ -529,9 +530,7 @@ export class ReviewService {
           ...result,
           issues: allIssues,
         },
-        verbose,
-        autoApprove,
-        true, // skipSync: execute 已在前面显式同步过 resolved/reactions 状态
+        { verbose, autoApprove, skipSync: true },
       );
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已提交`);
@@ -568,9 +567,7 @@ export class ReviewService {
             ...result,
             issues: allIssues,
           },
-          verbose,
-          undefined,
-          true, // skipSync: 同一次 execute 流程，无需重复同步
+          { verbose, skipSync: true },
         );
         if (shouldLog(verbose, 1)) {
           console.log(`✅ 评论已更新`);
@@ -659,14 +656,10 @@ export class ReviewService {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 更新 PR 评论...`);
       }
-      await this.postOrUpdateReviewComment(
-        owner,
-        repo,
-        prNumber,
-        existingResult,
+      await this.postOrUpdateReviewComment(owner, repo, prNumber, existingResult, {
         verbose,
         autoApprove,
-      );
+      });
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已更新`);
       }
@@ -745,7 +738,7 @@ export class ReviewService {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 提交 PR 评论...`);
       }
-      await this.postOrUpdateReviewComment(owner, repo, prNumber, result, verbose, autoApprove);
+      await this.postOrUpdateReviewComment(owner, repo, prNumber, result, { verbose, autoApprove });
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已提交`);
       }
@@ -810,14 +803,10 @@ export class ReviewService {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 提交 PR 评论...`);
       }
-      await this.postOrUpdateReviewComment(
-        context.owner,
-        context.repo,
-        prNumber,
-        result,
+      await this.postOrUpdateReviewComment(context.owner, context.repo, prNumber, result, {
         verbose,
         autoApprove,
-      );
+      });
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已提交`);
       }
@@ -1029,8 +1018,8 @@ export class ReviewService {
     return this.llmProcessor.callLLM(...args);
   }
 
-  protected calculateIssueStats(...args: Parameters<ReviewIssueFilter["calculateIssueStats"]>) {
-    return this.issueFilter.calculateIssueStats(...args);
+  protected calculateIssueStats(issues: ReviewIssue[]) {
+    return calculateIssueStatsFn(issues);
   }
 
   protected buildLineReviewBody(...args: Parameters<ReviewPrComment["buildLineReviewBody"]>) {
@@ -1098,10 +1087,15 @@ export class ReviewService {
   /**
    * 确保 Claude CLI 已安装
    */
-  protected async ensureClaudeCli(): Promise<void> {
+  protected async ensureClaudeCli(ci?: boolean): Promise<void> {
     try {
       execSync("claude --version", { stdio: "ignore" });
     } catch {
+      if (ci) {
+        throw new Error(
+          "Claude CLI 未安装。CI 环境请在 workflow 中预装: npm install -g @anthropic-ai/claude-code",
+        );
+      }
       console.log("🔧 Claude CLI 未安装，正在安装...");
       try {
         execSync("npm install -g @anthropic-ai/claude-code", {

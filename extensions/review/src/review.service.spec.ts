@@ -3598,7 +3598,7 @@ describe("ReviewService", () => {
     });
   });
 
-  describe("ReviewService.deleteExistingAiReviews", () => {
+  describe("ReviewService.filterIssuesByValidCommits", () => {
     beforeEach(() => {
       mockReviewSpecService.parseLineRange = vi.fn().mockImplementation((lineStr: string) => {
         const lines: number[] = [];

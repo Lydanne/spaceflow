@@ -345,6 +345,7 @@ ${previousReviewSection}`;
       timeout,
       retries,
       retryDelay,
+      stopOnError: retries > 0,
       onTaskStart: (taskId) => {
         console.log(`🚀 开始审查: ${taskId}`);
       },
