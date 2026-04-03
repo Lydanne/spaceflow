@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.45.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.44.0...@spaceflow/review-summary@0.45.0) (2026-04-03)
+
+### 修复BUG
+
+* **review:** 优化 merge commit 过滤逻辑 ([7c5bed6](https://github.com/Lydanne/spaceflow/commit/7c5bed66c193fa0368f5e32741995f4252576517))
+
+### 其他修改
+
+* **review:** released version 0.76.0 [no ci] ([e2fa897](https://github.com/Lydanne/spaceflow/commit/e2fa8974268d98765410afa9fad7d15e0bdb82ad))
+
 ## [0.44.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.43.0...@spaceflow/review-summary@0.44.0) (2026-04-03)
 
 ### 修复BUG
