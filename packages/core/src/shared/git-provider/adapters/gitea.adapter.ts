@@ -458,17 +458,32 @@ export class GiteaAdapter implements GitProvider {
 
   // ============ PR Review 操作 ============
 
+  // Gitea ReviewStateType 映射（Gitea 使用 "APPROVED" 而非 "APPROVE"）
+  private mapReviewEvent(event?: string): string {
+    const eventMap: Record<string, string> = {
+      APPROVE: "APPROVED",
+      REQUEST_CHANGES: "REQUEST_CHANGES",
+      COMMENT: "COMMENT",
+      PENDING: "",
+    };
+    return event ? eventMap[event] || event : "COMMENT";
+  }
+
   async createPullReview(
     owner: string,
     repo: string,
     index: number,
     options: CreatePullReviewOption,
   ): Promise<PullReview> {
-    return this.request<PullReview>(
-      "POST",
-      `/repos/${owner}/${repo}/pulls/${index}/reviews`,
-      options,
-    );
+    const body: Record<string, unknown> = {
+      event: this.mapReviewEvent(options.event),
+      body: options.body,
+      commit_id: options.commit_id,
+    };
+    if (options.comments?.length) {
+      body.comments = options.comments;
+    }
+    return this.request<PullReview>("POST", `/repos/${owner}/${repo}/pulls/${index}/reviews`, body);
   }
 
   async listPullReviews(owner: string, repo: string, index: number): Promise<PullReview[]> {
