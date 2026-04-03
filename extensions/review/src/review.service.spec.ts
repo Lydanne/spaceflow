@@ -563,7 +563,7 @@ describe("ReviewService", () => {
   describe("ReviewService.runLLMReview", () => {
     it("should call callLLM when llmMode is claude", async () => {
       const callLLMSpy = vi
-        .spyOn(service as any, "callLLM")
+        .spyOn((service as any).llmProcessor, "callLLM")
         .mockResolvedValue({ issues: [], summary: [] });
 
       const mockPrompt: ReviewPrompt = {
@@ -577,7 +577,7 @@ describe("ReviewService", () => {
 
     it("should call callLLM when llmMode is openai", async () => {
       const callLLMSpy = vi
-        .spyOn(service as any, "callLLM")
+        .spyOn((service as any).llmProcessor, "callLLM")
         .mockResolvedValue({ issues: [], summary: [] });
 
       const mockPrompt: ReviewPrompt = {
@@ -1649,6 +1649,26 @@ describe("ReviewService", () => {
   });
 
   describe("ReviewService.fillIssueCode", () => {
+    beforeEach(() => {
+      mockReviewSpecService.parseLineRange = vi.fn().mockImplementation((lineStr: string) => {
+        const lines: number[] = [];
+        const rangeMatch = lineStr.match(/^(\d+)-(\d+)$/);
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = parseInt(rangeMatch[2], 10);
+          for (let i = start; i <= end; i++) {
+            lines.push(i);
+          }
+        } else {
+          const line = parseInt(lineStr, 10);
+          if (!isNaN(line)) {
+            lines.push(line);
+          }
+        }
+        return lines;
+      });
+    });
+
     it("should fill code from file contents", async () => {
       const issues = [{ file: "test.ts", line: "2" }];
       const fileContents = new Map([
@@ -2161,7 +2181,7 @@ describe("ReviewService", () => {
 
     it("should auto-detect prNumber from event in CI mode", async () => {
       configService.get.mockReturnValue({ repository: "owner/repo", refName: "main" });
-      vi.spyOn(service as any, "getPrNumberFromEvent").mockResolvedValue(42);
+      vi.spyOn((service as any).contextBuilder, "getPrNumberFromEvent").mockResolvedValue(42);
       gitProvider.getPullRequest.mockResolvedValue({ title: "feat: test" } as any);
       const options = { dryRun: false, ci: true, verbose: 1 };
       const context = await service.getContextFromEnv(options as any);
@@ -2210,7 +2230,7 @@ describe("ReviewService", () => {
       configService.get.mockReturnValue({ repository: "owner/repo", refName: "main" });
       mockGitSdkService.getCurrentBranch.mockReturnValue("feature");
       mockGitSdkService.getDefaultBranch.mockReturnValue("main");
-      const options = { dryRun: false, ci: false, verbose: 1 };
+      const options = { dryRun: false, ci: false, verbose: 1, local: false };
       const context = await service.getContextFromEnv(options as any);
       expect(context.headRef).toBe("feature");
       expect(context.baseRef).toBe("main");
@@ -2220,7 +2240,7 @@ describe("ReviewService", () => {
       configService.get.mockReturnValue({ repository: "owner/repo", refName: "main" });
       mockGitSdkService.getCurrentBranch.mockReturnValue("feature");
       mockGitSdkService.getDefaultBranch.mockReturnValue("main");
-      const options = { dryRun: false, ci: false };
+      const options = { dryRun: false, ci: false, local: false };
       const context = await service.getContextFromEnv(options as any);
       expect(context.headRef).toBe("feature");
       expect(context.baseRef).toBe("main");
@@ -2295,7 +2315,7 @@ describe("ReviewService", () => {
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
-    it("should mark issue as invalid on thumbs down from reviewer", async () => {
+    it("should revert resolved status on thumbs down from reviewer", async () => {
       mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
       gitProvider.listPullReviews.mockResolvedValue([
         { id: 1, body: "<!-- spaceflow-review-lines --> content", user: { login: "bot" } },
@@ -2312,9 +2332,20 @@ describe("ReviewService", () => {
       gitProvider.getPullReviewCommentReactions.mockResolvedValue([
         { content: "-1", user: { login: "reviewer1" } },
       ] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", valid: "true" }] };
+      const result = {
+        issues: [
+          {
+            file: "test.ts",
+            line: "10",
+            valid: "true",
+            resolved: "2024-01-01",
+            resolvedBy: "someone",
+          } as any,
+        ],
+      };
       await (service as any).syncReactionsToIssues("o", "r", 1, result);
-      expect(result.issues[0].valid).toBe("false");
+      expect(result.issues[0].resolved).toBeUndefined();
+      expect(result.issues[0].resolvedBy).toBeUndefined();
     });
 
     it("should add requested_reviewers to reviewers set", async () => {
@@ -2332,9 +2363,20 @@ describe("ReviewService", () => {
       gitProvider.getPullReviewCommentReactions.mockResolvedValue([
         { content: "-1", user: { login: "req-reviewer" } },
       ] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", valid: "true" }] };
+      const result = {
+        issues: [
+          {
+            file: "test.ts",
+            line: "10",
+            valid: "true",
+            fixed: "2024-01-01",
+            fixedBy: "someone",
+          } as any,
+        ],
+      };
       await (service as any).syncReactionsToIssues("o", "r", 1, result);
-      expect(result.issues[0].valid).toBe("false");
+      expect(result.issues[0].fixed).toBeUndefined();
+      expect(result.issues[0].fixedBy).toBeUndefined();
     });
 
     it("should skip comments without id", async () => {
@@ -3376,7 +3418,7 @@ describe("ReviewService", () => {
     });
 
     it("should handle API error gracefully", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       gitProvider.getCommitDiff = vi.fn().mockRejectedValue(new Error("fail")) as any;
       const issues = [{ file: "test.ts", line: "1" }];
       const result = await (service as any).invalidateIssuesForChangedFiles(

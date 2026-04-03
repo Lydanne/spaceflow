@@ -3,150 +3,41 @@ import {
   PullRequest,
   PullRequestCommit,
   ChangedFile,
-  CreatePullReviewComment,
-  REVIEW_STATE,
-  type CiConfig,
   type LLMMode,
   LlmProxyService,
-  logStreamEvent,
-  createStreamLoggerState,
   type VerboseLevel,
   shouldLog,
-  normalizeVerbose,
-  type LlmJsonPutSchema,
-  LlmJsonPut,
-  parallel,
   GitSdkService,
-  parseChangedLinesFromPatch,
-  parseDiffText,
-  parseHunksFromPatch,
-  calculateNewLineNumber,
 } from "@spaceflow/core";
-import type { IConfigReader, LocalReviewMode } from "@spaceflow/core";
-import { type AnalyzeDeletionsMode, type ReviewConfig } from "./review.config";
-import {
-  ReviewSpecService,
-  ReviewSpec,
-  ReviewIssue,
-  ReviewResult,
-  ReviewStats,
-  FileSummary,
-  FileContentsMap,
-  FileContentLine,
-  type UserInfo,
-} from "./review-spec";
-import { MarkdownFormatter, ReviewReportService, type ReportFormat } from "./review-report";
-import { execSync } from "child_process";
-import { readFile, readdir } from "fs/promises";
-import { join, dirname, extname, relative, isAbsolute } from "path";
+import type { IConfigReader } from "@spaceflow/core";
+import { type ReviewConfig } from "./review.config";
+import { ReviewSpecService, ReviewIssue, ReviewResult, FileSummary } from "./review-spec";
+import { MarkdownFormatter, ReviewReportService } from "./review-report";
 import micromatch from "micromatch";
 import { ReviewOptions } from "./review.config";
 import { IssueVerifyService } from "./issue-verify.service";
 import { DeletionImpactService } from "./deletion-impact.service";
-import { parseTitleOptions } from "./parse-title-options";
-import { homedir } from "os";
+import { execSync } from "child_process";
+import { ReviewContextBuilder, type ReviewContext } from "./review-context";
+import { ReviewIssueFilter } from "./review-issue-filter";
+import { ReviewLlmProcessor } from "./review-llm";
+import { ReviewPrComment } from "./review-pr-comment";
+import {
+  extractIssueKeyFromBody as extractIssueKeyFromBodyFn,
+  isAiGeneratedComment as isAiGeneratedCommentFn,
+  generateIssueKey as generateIssueKeyFn,
+  deleteExistingAiReviews as deleteExistingAiReviewsFn,
+  syncRepliesToIssues as syncRepliesToIssuesFn,
+} from "./review-pr-comment-utils";
 
-export interface ReviewContext extends ReviewOptions {
-  owner: string;
-  repo: string;
-  prNumber?: number;
-  baseRef?: string;
-  headRef?: string;
-  specSources: string[];
-  verbose?: VerboseLevel;
-  includes?: string[];
-  files?: string[];
-  commits?: string[];
-  concurrency?: number;
-  timeout?: number;
-  retries?: number;
-  retryDelay?: number;
-  /** 仅执行删除代码分析，跳过常规代码审查 */
-  deletionOnly?: boolean;
-  /** 删除代码分析模式：openai 使用标准模式，claude-agent 使用 Agent 模式 */
-  deletionAnalysisMode?: LLMMode;
-  /** 输出格式：markdown, terminal, json。不指定则智能选择 */
-  outputFormat?: ReportFormat;
-  /** 是否使用 AI 生成 PR 功能描述 */
-  generateDescription?: boolean;
-  /** 显示所有问题，不过滤非变更行的问题 */
-  showAll?: boolean;
-  /** PR 事件类型（opened, synchronize, closed 等） */
-  eventAction?: string;
-  /**
-   * 本地代码审查模式（已解析）
-   * - 'uncommitted': 审查所有未提交的代码（暂存区 + 工作区）
-   * - 'staged': 仅审查暂存区的代码
-   * - false: 禁用本地模式
-   */
-  localMode?: LocalReviewMode;
-}
-
-export interface FileReviewPrompt {
-  filename: string;
-  systemPrompt: string;
-  userPrompt: string;
-}
-
-export interface ReviewPrompt {
-  filePrompts: FileReviewPrompt[];
-}
-
-export interface LLMReviewOptions {
-  verbose?: VerboseLevel;
-  concurrency?: number;
-  timeout?: number;
-  retries?: number;
-  retryDelay?: number;
-}
-
-const REVIEW_COMMENT_MARKER = "<!-- spaceflow-review -->";
-const REVIEW_LINE_COMMENTS_MARKER = "<!-- spaceflow-review-lines -->";
-
-const REVIEW_SCHEMA: LlmJsonPutSchema = {
-  type: "object",
-  properties: {
-    issues: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          file: { type: "string", description: "发生问题的文件路径" },
-          line: {
-            type: "string",
-            description:
-              "问题所在的行号，只支持单行或多行 (如 123 或 123-125)，不允许使用 `,` 分隔多个行号",
-          },
-          ruleId: { type: "string", description: "违反的规则 ID（如 JsTs.FileName.UpperCamel）" },
-          specFile: {
-            type: "string",
-            description: "规则来源的规范文件名（如 js&ts.file-name.md）",
-          },
-          reason: { type: "string", description: "问题的简要概括" },
-          suggestion: {
-            type: "string",
-            description:
-              "修改后的完整代码片段。要求以代码为主体，并在代码中使用详细的中文注释解释逻辑改进点。不要包含 Markdown 反引号。",
-          },
-          commit: { type: "string", description: "相关的 7 位 commit SHA" },
-          severity: {
-            type: "string",
-            description: "问题严重程度，根据规则文档中的 severity 标记确定",
-            enum: ["error", "warn"],
-          },
-        },
-        required: ["file", "line", "ruleId", "specFile", "reason"],
-        additionalProperties: false,
-      },
-    },
-    summary: { type: "string", description: "本次代码审查的整体总结" },
-  },
-  required: ["issues", "summary"],
-  additionalProperties: false,
-};
+export type { ReviewContext } from "./review-context";
+export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./review-context";
 
 export class ReviewService {
-  protected readonly llmJsonPut: LlmJsonPut<ReviewResult>;
+  protected readonly contextBuilder: ReviewContextBuilder;
+  protected readonly issueFilter: ReviewIssueFilter;
+  protected readonly llmProcessor: ReviewLlmProcessor;
+  protected readonly prComment: ReviewPrComment;
 
   constructor(
     protected readonly gitProvider: GitProviderService,
@@ -158,253 +49,25 @@ export class ReviewService {
     protected readonly deletionImpactService: DeletionImpactService,
     protected readonly gitSdk: GitSdkService,
   ) {
-    this.llmJsonPut = new LlmJsonPut(REVIEW_SCHEMA, {
-      llmRequest: async (prompt) => {
-        const response = await this.llmProxyService.chat(
-          [
-            { role: "system", content: prompt.systemPrompt },
-            { role: "user", content: prompt.userPrompt },
-          ],
-          { adapter: "openai" },
-        );
-        if (!response.content) {
-          throw new Error("LLM 返回了空内容");
-        }
-        return response.content;
-      },
-    });
+    this.contextBuilder = new ReviewContextBuilder(gitProvider, config, gitSdk);
+    this.issueFilter = new ReviewIssueFilter(
+      gitProvider,
+      config,
+      reviewSpecService,
+      issueVerifyService,
+      gitSdk,
+    );
+    this.llmProcessor = new ReviewLlmProcessor(llmProxyService, reviewSpecService);
+    this.prComment = new ReviewPrComment(
+      gitProvider,
+      config,
+      reviewSpecService,
+      reviewReportService,
+    );
   }
 
   async getContextFromEnv(options: ReviewOptions): Promise<ReviewContext> {
-    const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
-    const ciConf = this.config.get<CiConfig>("ci");
-    const repository = ciConf?.repository;
-
-    if (options.ci) {
-      this.gitProvider.validateConfig();
-    }
-
-    let repoPath = repository;
-    if (!repoPath) {
-      // 非 CI 模式下，从 git remote 获取仓库信息
-      const remoteUrl = this.gitSdk.getRemoteUrl();
-      if (remoteUrl) {
-        const parsed = this.gitSdk.parseRepositoryFromRemoteUrl(remoteUrl);
-        if (parsed) {
-          repoPath = `${parsed.owner}/${parsed.repo}`;
-          if (shouldLog(options.verbose, 1)) {
-            console.log(`📦 从 git remote 获取仓库: ${repoPath}`);
-          }
-        }
-      }
-    }
-
-    if (!repoPath) {
-      throw new Error("缺少配置 ci.repository");
-    }
-
-    const parts = repoPath.split("/");
-    if (parts.length < 2) {
-      throw new Error("ci.repository 格式不正确");
-    }
-
-    const owner = parts[0];
-    const repo = parts[1];
-
-    let prNumber = options.prNumber;
-
-    if (!prNumber && options.ci) {
-      prNumber = await this.getPrNumberFromEvent();
-    }
-
-    // 从 PR 标题解析命令参数（命令行参数优先，标题参数作为补充）
-    let titleOptions: ReturnType<typeof parseTitleOptions> = {};
-    if (prNumber && options.ci) {
-      try {
-        const pr = await this.gitProvider.getPullRequest(owner, repo, prNumber);
-        if (pr?.title) {
-          titleOptions = parseTitleOptions(pr.title);
-          if (Object.keys(titleOptions).length > 0 && shouldLog(options.verbose, 1)) {
-            console.log(`📋 从 PR 标题解析到参数:`, titleOptions);
-          }
-        }
-      } catch (error) {
-        if (shouldLog(options.verbose, 1)) {
-          console.warn(`⚠️ 获取 PR 标题失败:`, error);
-        }
-      }
-    }
-
-    const specSources = [
-      join(homedir(), ".spaceflow", "deps"),
-      join(process.cwd(), ".spaceflow", "deps"),
-    ];
-    if (options.references?.length) {
-      specSources.push(...options.references);
-    }
-    if (reviewConf.references?.length) {
-      specSources.push(...reviewConf.references);
-    }
-
-    // 解析本地模式：非 CI、非 PR、无 base/head 时默认启用 uncommitted 模式
-    const localMode = this.resolveLocalMode(options, {
-      ci: options.ci,
-      hasPrNumber: !!prNumber,
-      hasBaseHead: !!(options.base || options.head),
-    });
-
-    // 当没有 PR 且没有指定 base/head 且不是本地模式时，自动获取默认值
-    let baseRef = options.base;
-    let headRef = options.head;
-    if (!prNumber && !baseRef && !headRef && !localMode) {
-      headRef = this.gitSdk.getCurrentBranch() ?? "HEAD";
-      baseRef = this.gitSdk.getDefaultBranch();
-      if (shouldLog(options.verbose, 1)) {
-        console.log(`📌 自动检测分支: base=${baseRef}, head=${headRef}`);
-      }
-    }
-
-    // 合并参数优先级：命令行 > PR 标题 > 配置文件 > 默认值
-    return {
-      owner,
-      repo,
-      prNumber,
-      baseRef,
-      headRef,
-      specSources,
-      dryRun: options.dryRun || titleOptions.dryRun || false,
-      ci: options.ci ?? false,
-      verbose: normalizeVerbose(options.verbose ?? titleOptions.verbose),
-      includes: options.includes ?? titleOptions.includes ?? reviewConf.includes,
-      llmMode: options.llmMode ?? titleOptions.llmMode ?? reviewConf.llmMode,
-      files: this.normalizeFilePaths(options.files),
-      commits: options.commits,
-      verifyFixes:
-        options.verifyFixes ?? titleOptions.verifyFixes ?? reviewConf.verifyFixes ?? true,
-      verifyConcurrency: options.verifyConcurrency ?? reviewConf.verifyFixesConcurrency ?? 10,
-      analyzeDeletions: this.resolveAnalyzeDeletions(
-        options.analyzeDeletions ??
-          options.deletionOnly ??
-          titleOptions.analyzeDeletions ??
-          titleOptions.deletionOnly ??
-          reviewConf.analyzeDeletions ??
-          false,
-        { ci: options.ci, hasPrNumber: !!prNumber },
-      ),
-      deletionOnly: options.deletionOnly || titleOptions.deletionOnly || false,
-      deletionAnalysisMode:
-        options.deletionAnalysisMode ??
-        titleOptions.deletionAnalysisMode ??
-        reviewConf.deletionAnalysisMode ??
-        "openai",
-      concurrency: options.concurrency ?? reviewConf.concurrency ?? 5,
-      timeout: options.timeout ?? reviewConf.timeout,
-      retries: options.retries ?? reviewConf.retries ?? 0,
-      retryDelay: options.retryDelay ?? reviewConf.retryDelay ?? 1000,
-      generateDescription: options.generateDescription ?? reviewConf.generateDescription ?? false,
-      showAll: options.showAll ?? false,
-      flush: options.flush ?? false,
-      eventAction: options.eventAction,
-      localMode,
-      skipDuplicateWorkflow:
-        options.skipDuplicateWorkflow ?? reviewConf.skipDuplicateWorkflow ?? false,
-      autoApprove: options.autoApprove ?? reviewConf.autoApprove ?? false,
-    };
-  }
-
-  /**
-   * 解析本地代码审查模式
-   * - 显式指定 --local [mode] 时使用指定值
-   * - 显式指定 --no-local 时禁用
-   * - 非 CI、非 PR、无 base/head 时默认启用 uncommitted 模式
-   */
-  protected resolveLocalMode(
-    options: ReviewOptions,
-    env: { ci: boolean; hasPrNumber: boolean; hasBaseHead: boolean },
-  ): "uncommitted" | "staged" | false {
-    // 显式指定了 --no-local
-    if (options.local === false) {
-      return false;
-    }
-    // 显式指定了 --local [mode]
-    if (options.local === "staged" || options.local === "uncommitted") {
-      return options.local;
-    }
-    // CI 或 PR 模式下不启用本地模式
-    if (env.ci || env.hasPrNumber) {
-      return false;
-    }
-    // 指定了 base/head 时不启用本地模式
-    if (env.hasBaseHead) {
-      return false;
-    }
-    // 默认启用 uncommitted 模式
-    return "uncommitted";
-  }
-
-  /**
-   * 将文件路径规范化为相对于仓库根目录的路径
-   * 支持绝对路径和相对路径输入
-   */
-  protected normalizeFilePaths(files?: string[]): string[] | undefined {
-    if (!files || files.length === 0) return files;
-
-    const cwd = process.cwd();
-    return files.map((file) => {
-      if (isAbsolute(file)) {
-        // 绝对路径转换为相对路径
-        return relative(cwd, file);
-      }
-      return file;
-    });
-  }
-
-  /**
-   * 根据 AnalyzeDeletionsMode 和当前环境解析是否启用删除代码分析
-   * @param mode 配置的模式值
-   * @param env 当前环境信息
-   * @returns 是否启用删除代码分析
-   */
-  protected resolveAnalyzeDeletions(
-    mode: AnalyzeDeletionsMode,
-    env: { ci: boolean; hasPrNumber: boolean },
-  ): boolean {
-    if (typeof mode === "boolean") {
-      return mode;
-    }
-    switch (mode) {
-      case "ci":
-        return env.ci;
-      case "pr":
-        return env.hasPrNumber;
-      case "terminal":
-        return !env.ci;
-      default:
-        return false;
-    }
-  }
-
-  /**
-   * 从 CI 事件文件中解析 PR 编号
-   * 在 CI 环境中，GitHub/Gitea Actions 会将事件信息写入 GITHUB_EVENT_PATH / GITEA_EVENT_PATH 指向的文件
-   * @returns PR 编号，如果无法解析则返回 undefined
-   */
-  protected async getPrNumberFromEvent(): Promise<number | undefined> {
-    const eventPath = process.env.GITHUB_EVENT_PATH || process.env.GITEA_EVENT_PATH;
-    if (!eventPath) {
-      return undefined;
-    }
-
-    try {
-      const eventContent = await readFile(eventPath, "utf-8");
-      const event = JSON.parse(eventContent);
-      // 支持多种事件类型：
-      // - pull_request 事件: event.pull_request.number 或 event.number
-      // - issue_comment 事件: event.issue.number
-      return event.pull_request?.number || event.issue?.number || event.number;
-    } catch {
-      return undefined;
-    }
+    return this.contextBuilder.getContextFromEnv(options);
   }
 
   /**
@@ -468,7 +131,7 @@ export class ReviewService {
       return this.executeCollectOnly(context);
     }
 
-    const specs = await this.loadSpecs(specSources, verbose);
+    const specs = await this.issueFilter.loadSpecs(specSources, verbose);
 
     let pr: PullRequest | undefined;
     let commits: PullRequestCommit[] = [];
@@ -539,55 +202,15 @@ export class ReviewService {
       }
 
       // 检查是否有其他同名 review workflow 正在运行中（防止同一 PR 重复审查）
-      // 需要显式启用 skipDuplicateWorkflow 配置
-      // 注意：Gitea Actions API 要求用户是 repo owner，否则会返回 403
       if (skipDuplicateWorkflow && ci && pr?.head?.sha) {
-        const headSha = pr.head.sha;
-        // 获取当前 PR 编号（从 CI 环境变量）
-        // GitHub: GITHUB_REF = refs/pull/123/merge
-        // Gitea: GITEA_REF = refs/pull/123/head
-        const ref = process.env.GITHUB_REF || process.env.GITEA_REF || "";
-        const prMatch = ref.match(/refs\/pull\/(\d+)/);
-        const currentPrNumber = prMatch ? parseInt(prMatch[1], 10) : prNumber;
-
-        try {
-          const runningWorkflows = await this.gitProvider.listWorkflowRuns(owner, repo, {
-            status: "in_progress",
-          });
-          // 获取当前 workflow 名称和 run ID
-          const currentWorkflowName = process.env.GITHUB_WORKFLOW || process.env.GITEA_WORKFLOW;
-          const currentRunId = process.env.GITHUB_RUN_ID || process.env.GITEA_RUN_ID;
-          // 只检查同 PR 同名的其他 workflow run（排除当前 run）
-          const duplicateReviewRuns = runningWorkflows.filter(
-            (w) =>
-              w.sha === headSha &&
-              w.name === currentWorkflowName &&
-              (!currentRunId || String(w.id) !== currentRunId),
-          );
-          if (duplicateReviewRuns.length > 0) {
-            if (shouldLog(verbose, 1)) {
-              console.log(
-                `⏭️ 跳过审查: 当前 PR #${currentPrNumber} 有 ${duplicateReviewRuns.length} 个同名 workflow 正在运行中`,
-              );
-            }
-            return {
-              success: true,
-              description: `跳过审查: PR #${currentPrNumber} 有 ${duplicateReviewRuns.length} 个同名 workflow 正在运行中，等待完成后重新审查`,
-              issues: [],
-              summary: [],
-              round: 1,
-            };
-          }
-        } catch (error) {
-          // Gitea Actions API 可能返回 403（需要 repo owner 权限）
-          // 捕获错误后跳过重复检查，继续执行审查
-          if (shouldLog(verbose, 1)) {
-            console.warn(
-              `⚠️ 无法检查重复 workflow（可能缺少 repo owner 权限），跳过此检查:`,
-              error instanceof Error ? error.message : error,
-            );
-          }
-        }
+        const skipResult = await this.checkDuplicateWorkflow(
+          owner,
+          repo,
+          prNumber,
+          pr.head.sha,
+          verbose,
+        );
+        if (skipResult) return skipResult;
       }
     } else if (effectiveBaseRef && effectiveHeadRef) {
       // 如果指定了 -f 文件且 base=head（无差异模式），直接审查指定文件
@@ -623,7 +246,7 @@ export class ReviewService {
       throw new Error("必须指定 PR 编号或者 base/head 分支");
     }
 
-    // 0. 过滤掉 merge commit（消息以 "Merge branch" 或 "Merge pull request" 开头的 commit）
+    // 0. 过滤掉 merge commit
     {
       const beforeMergeFilterCount = commits.length;
       commits = commits.filter((c) => {
@@ -698,51 +321,18 @@ export class ReviewService {
     }
 
     if (applicableSpecs.length === 0 || changedFiles.length === 0) {
-      if (shouldLog(verbose, 1)) {
-        console.log("✅ 没有需要审查的文件或规则");
-      }
-
-      // 获取上一次的审查结果以计算正确的轮次
-      let existingResult: ReviewResult | null = null;
-      if (ci && prNumber) {
-        existingResult = await this.getExistingReviewResult(owner, repo, prNumber);
-      }
-      const currentRound = (existingResult?.round ?? 0) + 1;
-
-      // 即使没有适用的规则，也为每个变更文件生成摘要
-      const summary: FileSummary[] = changedFiles
-        .filter((f) => f.filename && f.status !== "deleted")
-        .map((f) => ({
-          file: f.filename!,
-          resolved: 0,
-          unresolved: 0,
-          summary: applicableSpecs.length === 0 ? "无适用的审查规则" : "已跳过",
-        }));
-      const prInfo =
-        context.generateDescription && llmMode
-          ? await this.generatePrDescription(commits, changedFiles, llmMode, undefined, verbose)
-          : await this.buildFallbackDescription(commits, changedFiles);
-      const result: ReviewResult = {
-        success: true,
-        title: prInfo.title,
-        description: prInfo.description,
-        issues: [],
-        summary,
-        round: currentRound,
-      };
-
-      // CI 模式下也需要发送 review 评论
-      if (ci && prNumber && !dryRun) {
-        if (shouldLog(verbose, 1)) {
-          console.log(`💬 提交 PR 评论...`);
-        }
-        await this.postOrUpdateReviewComment(owner, repo, prNumber, result, verbose, autoApprove);
-        if (shouldLog(verbose, 1)) {
-          console.log(`✅ 评论已提交`);
-        }
-      }
-
-      return result;
+      return this.handleNoApplicableSpecs(
+        context,
+        applicableSpecs,
+        changedFiles,
+        commits,
+        ci,
+        prNumber,
+        dryRun,
+        verbose,
+        llmMode,
+        autoApprove,
+      );
     }
 
     const headSha = pr?.head?.sha || headRef || "HEAD";
@@ -824,7 +414,7 @@ export class ReviewService {
       verbose,
     );
 
-    // 过滤掉不属于本次 PR commits 的问题（merge commits 已在步骤 0 中移除）
+    // 过滤掉不属于本次 PR commits 的问题
     if (shouldLog(verbose, 3)) {
       console.log(`   🔍 变更行过滤条件检查:`);
       console.log(
@@ -873,11 +463,10 @@ export class ReviewService {
           console.log(`📋 已有评论中存在 ${existingIssues.length} 个问题`);
         }
 
-        // 先同步最新的 resolved 状态，确保后续 invalidate/verify 能正确跳过已解决的问题
+        // 先同步最新的 resolved 状态
         await this.syncResolvedComments(owner, repo, prNumber, existingResult);
 
         // 如果文件有变更，将该文件的历史问题标记为无效
-        // 简化策略：避免复杂的行号更新逻辑
         const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
         if (
           reviewConf.invalidateChangedFiles !== "off" &&
@@ -894,10 +483,15 @@ export class ReviewService {
 
         // 验证历史问题是否已修复
         if (context.verifyFixes) {
-          existingIssues = await this.verifyAndUpdateIssues(context, existingIssues, commits, {
-            specs,
-            fileContents,
-          });
+          existingIssues = await this.issueFilter.verifyAndUpdateIssues(
+            context,
+            existingIssues,
+            commits,
+            {
+              specs,
+              fileContents,
+            },
+          );
         } else {
           if (shouldLog(verbose, 1)) {
             console.log(`   ⏭️  跳过历史问题验证 (verifyFixes=false)`);
@@ -981,7 +575,7 @@ export class ReviewService {
       }
     }
 
-    const reviewComment = this.formatReviewComment(
+    const reviewComment = this.prComment.formatReviewComment(
       { ...result, issues: allIssues },
       { prNumber, outputFormat: context.outputFormat, ci },
     );
@@ -994,7 +588,6 @@ export class ReviewService {
 
   /**
    * 仅收集 review 状态模式（用于 PR 关闭或 --flush 指令）
-   * 从现有的 AI review 评论中读取问题状态，同步已解决/无效状态，输出统计信息
    */
   protected async executeCollectOnly(context: ReviewContext): Promise<ReviewResult> {
     const { owner, repo, prNumber, verbose, ci, dryRun, autoApprove } = context;
@@ -1042,7 +635,7 @@ export class ReviewService {
 
     // 5. LLM 验证历史问题是否已修复
     try {
-      existingResult.issues = await this.verifyAndUpdateIssues(
+      existingResult.issues = await this.issueFilter.verifyAndUpdateIssues(
         context,
         existingResult.issues,
         commits,
@@ -1077,120 +670,6 @@ export class ReviewService {
     }
 
     return existingResult;
-  }
-
-  /**
-   * 加载并去重审查规则
-   */
-  protected async loadSpecs(specSources: string[], verbose?: VerboseLevel): Promise<ReviewSpec[]> {
-    if (shouldLog(verbose, 1)) {
-      console.log(`📂 解析规则来源: ${specSources.length} 个`);
-    }
-    const specDirs = await this.reviewSpecService.resolveSpecSources(specSources);
-    if (shouldLog(verbose, 2)) {
-      console.log(`   解析到 ${specDirs.length} 个规则目录`, specDirs);
-    }
-
-    let specs: ReviewSpec[] = [];
-    for (const specDir of specDirs) {
-      const dirSpecs = await this.reviewSpecService.loadReviewSpecs(specDir);
-      specs.push(...dirSpecs);
-    }
-    if (shouldLog(verbose, 1)) {
-      console.log(`   找到 ${specs.length} 个规则文件`);
-    }
-
-    const beforeDedup = specs.reduce((sum, s) => sum + s.rules.length, 0);
-    specs = this.reviewSpecService.deduplicateSpecs(specs);
-    const afterDedup = specs.reduce((sum, s) => sum + s.rules.length, 0);
-    if (beforeDedup !== afterDedup && shouldLog(verbose, 1)) {
-      console.log(`   去重规则: ${beforeDedup} -> ${afterDedup} 条`);
-    }
-
-    return specs;
-  }
-
-  /**
-   * LLM 验证历史问题是否已修复
-   * 如果传入 preloaded（specs/fileContents），直接使用；否则从 PR 获取
-   */
-  protected async verifyAndUpdateIssues(
-    context: ReviewContext,
-    issues: ReviewIssue[],
-    commits: PullRequestCommit[],
-    preloaded?: { specs: ReviewSpec[]; fileContents: FileContentsMap },
-  ): Promise<ReviewIssue[]> {
-    const { owner, repo, prNumber, llmMode, specSources, verbose } = context;
-    const unfixedIssues = issues.filter((i) => i.valid !== "false" && !i.fixed);
-
-    if (unfixedIssues.length === 0) {
-      return issues;
-    }
-
-    if (!llmMode) {
-      if (shouldLog(verbose, 1)) {
-        console.log(`   ⏭️  跳过 LLM 验证（缺少 llmMode）`);
-      }
-      return issues;
-    }
-
-    if (!preloaded && (!specSources?.length || !prNumber)) {
-      if (shouldLog(verbose, 1)) {
-        console.log(`   ⏭️  跳过 LLM 验证（缺少 specSources 或 prNumber）`);
-      }
-      return issues;
-    }
-
-    if (shouldLog(verbose, 1)) {
-      console.log(`\n🔍 开始 LLM 验证 ${unfixedIssues.length} 个未修复问题...`);
-    }
-
-    let specs: ReviewSpec[];
-    let fileContents: FileContentsMap;
-
-    if (preloaded) {
-      specs = preloaded.specs;
-      fileContents = preloaded.fileContents;
-    } else {
-      const pr = await this.gitProvider.getPullRequest(owner, repo, prNumber!);
-      const changedFiles = await this.gitProvider.getPullRequestFiles(owner, repo, prNumber!);
-      const headSha = pr?.head?.sha || "HEAD";
-      specs = await this.loadSpecs(specSources, verbose);
-      fileContents = await this.getFileContents(
-        owner,
-        repo,
-        changedFiles,
-        commits,
-        headSha,
-        prNumber!,
-        verbose,
-      );
-    }
-
-    return await this.issueVerifyService.verifyIssueFixes(
-      issues,
-      fileContents,
-      specs,
-      llmMode,
-      verbose,
-      context.verifyConcurrency,
-    );
-  }
-
-  /**
-   * 计算问题状态统计
-   */
-  protected calculateIssueStats(issues: ReviewIssue[]): ReviewStats {
-    const total = issues.length;
-    const validIssue = issues.filter((i) => i.valid !== "false");
-    const validTotal = validIssue.length;
-    const fixed = validIssue.filter((i) => i.fixed).length;
-    const resolved = validIssue.filter((i) => i.resolved && !i.fixed).length;
-    const invalid = total - validTotal;
-    const pending = validTotal - fixed - resolved;
-    const fixRate = validTotal > 0 ? Math.round((fixed / validTotal) * 100 * 10) / 10 : 0;
-    const resolveRate = validTotal > 0 ? Math.round((resolved / validTotal) * 100 * 10) / 10 : 0;
-    return { total, validTotal, fixed, resolved, invalid, pending, fixRate, resolveRate };
   }
 
   /**
@@ -1269,1894 +748,356 @@ export class ReviewService {
       }
     }
 
-    // 终端输出（根据 outputFormat 或智能选择）
-
+    // 终端输出
     console.log(MarkdownFormatter.clearReviewData(reviewComment, "<hidden>"));
 
     return result;
   }
 
-  protected async getChangedFilesBetweenRefs(
-    _owner: string,
-    _repo: string,
-    baseRef: string,
-    headRef: string,
-  ): Promise<ChangedFile[]> {
-    // 使用 getDiffBetweenRefs 获取包含 patch 的文件列表
-    // 这样可以正确解析变更行号，用于过滤非变更行的问题
-    const diffFiles = await this.gitSdk.getDiffBetweenRefs(baseRef, headRef);
-    const statusFiles = await this.gitSdk.getChangedFilesBetweenRefs(baseRef, headRef);
-
-    // 合并 status 和 patch 信息
-    const statusMap = new Map(statusFiles.map((f) => [f.filename, f.status]));
-    return diffFiles.map((f) => ({
-      filename: f.filename,
-      status: statusMap.get(f.filename) || "modified",
-      patch: f.patch,
-    }));
-  }
-
-  protected async getCommitsBetweenRefs(
-    baseRef: string,
-    headRef: string,
-  ): Promise<PullRequestCommit[]> {
-    const gitCommits = await this.gitSdk.getCommitsBetweenRefs(baseRef, headRef);
-    return gitCommits.map((c) => ({
-      sha: c.sha,
-      commit: {
-        message: c.message,
-        author: c.author,
-      },
-    }));
-  }
-
-  protected async getFilesForCommit(
-    owner: string,
-    repo: string,
-    sha: string,
-    prNumber?: number,
-  ): Promise<string[]> {
-    if (prNumber) {
-      const commit = await this.gitProvider.getCommit(owner, repo, sha);
-      return commit.files?.map((f) => f.filename || "").filter(Boolean) || [];
-    } else {
-      return this.gitSdk.getFilesForCommit(sha);
-    }
-  }
-
   /**
-   * 获取文件内容并构建行号到 commit hash 的映射
-   * 返回 Map<filename, Array<[commitHash, lineCode]>>
+   * 处理无适用规则或无变更文件的情况
    */
-  protected async getFileContents(
-    owner: string,
-    repo: string,
+  private async handleNoApplicableSpecs(
+    context: ReviewContext,
+    applicableSpecs: any[],
     changedFiles: ChangedFile[],
     commits: PullRequestCommit[],
-    ref: string,
-    prNumber?: number,
-    verbose?: VerboseLevel,
-    isLocalMode?: boolean,
-  ): Promise<FileContentsMap> {
-    const contents: FileContentsMap = new Map();
-    const latestCommitHash = commits[commits.length - 1]?.sha?.slice(0, 7) || "+local+";
-
-    // 优先使用 changedFiles 中的 patch 字段（来自 PR 的整体 diff base...head）
-    // 这样行号是相对于最终文件的，而不是每个 commit 的父 commit
-    // buildLineCommitMap 遍历每个 commit 的 diff，行号可能与最终文件不一致
-    if (shouldLog(verbose, 1)) {
-      console.log(`📊 正在构建行号到变更的映射...`);
-    }
-
-    for (const file of changedFiles) {
-      if (file.filename && file.status !== "deleted") {
-        try {
-          let rawContent: string;
-          if (isLocalMode) {
-            // 本地模式：读取工作区文件的当前内容
-            rawContent = this.gitSdk.getWorkingFileContent(file.filename);
-          } else if (prNumber) {
-            rawContent = await this.gitProvider.getFileContent(owner, repo, file.filename, ref);
-          } else {
-            rawContent = await this.gitSdk.getFileContent(ref, file.filename);
-          }
-          const lines = rawContent.split("\n");
-
-          // 优先使用 file.patch（PR 整体 diff），这是相对于最终文件的行号
-          let changedLines = parseChangedLinesFromPatch(file.patch);
-
-          // 如果 changedLines 为空，需要判断是否应该将所有行标记为变更
-          // 情况1: 文件是新增的（status 为 added/A）
-          // 情况2: patch 为空但文件有 additions（部分 Git Provider API 可能不返回完整 patch）
-          const isNewFile =
-            file.status === "added" ||
-            file.status === "A" ||
-            (file.additions && file.additions > 0 && file.deletions === 0 && !file.patch);
-          if (changedLines.size === 0 && isNewFile) {
-            changedLines = new Set(lines.map((_, i) => i + 1));
-            if (shouldLog(verbose, 2)) {
-              console.log(
-                `   ℹ️ ${file.filename}: 新增文件无 patch，将所有 ${lines.length} 行标记为变更`,
-              );
-            }
-          }
-
-          if (shouldLog(verbose, 3)) {
-            console.log(`   📄 ${file.filename}: ${lines.length} 行, ${changedLines.size} 行变更`);
-            console.log(`      latestCommitHash: ${latestCommitHash}`);
-            if (changedLines.size > 0 && changedLines.size <= 20) {
-              console.log(
-                `      变更行号: ${Array.from(changedLines)
-                  .sort((a, b) => a - b)
-                  .join(", ")}`,
-              );
-            } else if (changedLines.size > 20) {
-              console.log(`      变更行号: (共 ${changedLines.size} 行，省略详情)`);
-            }
-            if (!file.patch) {
-              console.log(
-                `      ⚠️ 该文件没有 patch 信息 (status=${file.status}, additions=${file.additions}, deletions=${file.deletions})`,
-              );
-            } else {
-              console.log(
-                `      patch 前 200 字符: ${file.patch.slice(0, 200).replace(/\n/g, "\\n")}`,
-              );
-            }
-          }
-
-          const contentLines: FileContentLine[] = lines.map((line, index) => {
-            const lineNum = index + 1;
-            // 如果该行在 PR 的整体 diff 中被标记为变更，则使用最新 commit hash
-            const hash = changedLines.has(lineNum) ? latestCommitHash : "-------";
-            return [hash, line];
-          });
-          contents.set(file.filename, contentLines);
-        } catch {
-          console.warn(`警告: 无法获取文件内容: ${file.filename}`);
-        }
-      }
-    }
-
-    if (shouldLog(verbose, 1)) {
-      console.log(`📊 映射构建完成，共 ${contents.size} 个文件`);
-    }
-    return contents;
-  }
-
-  protected async runLLMReview(
-    llmMode: LLMMode,
-    reviewPrompt: ReviewPrompt,
-    options: LLMReviewOptions = {},
+    ci: boolean,
+    prNumber: number | undefined,
+    dryRun: boolean,
+    verbose: VerboseLevel | undefined,
+    llmMode: LLMMode | undefined,
+    autoApprove: boolean | undefined,
   ): Promise<ReviewResult> {
-    console.log(`🤖 调用 ${llmMode} 进行代码审查...`);
-
-    try {
-      const result = await this.callLLM(llmMode, reviewPrompt, options);
-      if (!result) {
-        throw new Error("AI 未返回有效结果");
-      }
-      return {
-        success: true,
-        description: "", // 由 execute 方法填充
-        issues: result.issues || [],
-        summary: result.summary || [],
-        round: 1, // 由 execute 方法根据 existingResult 更新
-      };
-    } catch (error) {
-      if (error instanceof Error) {
-        console.error("LLM 调用失败:", error.message);
-        if (error.stack) {
-          console.error("堆栈信息:\n" + error.stack);
-        }
-      } else {
-        console.error("LLM 调用失败:", error);
-      }
-      return {
-        success: false,
-        description: "",
-        issues: [],
-        summary: [],
-        round: 1,
-      };
-    }
-  }
-
-  /**
-   * 根据文件过滤 specs，只返回与该文件匹配的规则
-   * - 如果 spec 有 includes 配置，只有当文件名匹配 includes 模式时才包含该 spec
-   * - 如果 spec 没有 includes 配置，则按扩展名匹配
-   */
-  protected filterSpecsForFile(specs: ReviewSpec[], filename: string): ReviewSpec[] {
-    const ext = extname(filename).slice(1).toLowerCase();
-    if (!ext) return [];
-
-    return specs.filter((spec) => {
-      // 先检查扩展名是否匹配
-      if (!spec.extensions.includes(ext)) {
-        return false;
-      }
-
-      // 如果有 includes 配置，检查文件名是否匹配 includes 模式
-      if (spec.includes.length > 0) {
-        return micromatch.isMatch(filename, spec.includes, { matchBase: true });
-      }
-
-      // 没有 includes 配置，扩展名匹配即可
-      return true;
-    });
-  }
-
-  /**
-   * 构建 systemPrompt
-   */
-  protected buildSystemPrompt(specsSection: string): string {
-    return `你是一个专业的代码审查专家，负责根据团队的编码规范对代码进行严格审查。
-
-## 审查规范
-
-${specsSection}
-
-## 审查要求
-
-1. **严格遵循规范**：只按照上述审查规范进行审查，不要添加规范之外的要求
-2. **精准定位问题**：每个问题必须指明具体的行号，行号从文件内容中的 "行号|" 格式获取
-3. **避免重复报告**：如果提示词中包含"上一次审查结果"，请不要重复报告已存在的问题
-4. **提供可行建议**：对于每个问题，提供具体的修改建议代码
-
-## 注意事项
-
-- 变更文件内容已在上下文中提供，无需调用读取工具
-- 你可以读取项目中的其他文件以了解上下文
-- 不要调用编辑工具修改文件，你的职责是审查而非修改
-- 文件内容格式为 "CommitHash 行号| 代码"，输出的 line 字段应对应原始行号
-
-## 输出要求
-
-- 发现问题时：在 issues 数组中列出所有问题，每个问题包含 file、line、ruleId、specFile、reason、suggestion、severity
-- 无论是否发现问题：都必须在 summary 中提供该文件的审查总结，简要说明审查结果`;
-  }
-
-  protected async buildReviewPrompt(
-    specs: ReviewSpec[],
-    changedFiles: ChangedFile[],
-    fileContents: FileContentsMap,
-    commits: PullRequestCommit[],
-    existingResult?: ReviewResult | null,
-  ): Promise<ReviewPrompt> {
-    const fileDataList = changedFiles
-      .filter((f) => f.status !== "deleted" && f.filename)
-      .map((file) => {
-        const filename = file.filename!;
-        const contentLines = fileContents.get(filename);
-        if (!contentLines) {
-          return {
-            filename,
-            file,
-            linesWithNumbers: "(无法获取内容)",
-            commitsSection: "- 无相关 commits",
-          };
-        }
-        const padWidth = String(contentLines.length).length;
-        const linesWithNumbers = contentLines
-          .map(([hash, line], index) => {
-            const lineNum = index + 1;
-            return `${hash} ${String(lineNum).padStart(padWidth)}| ${line}`;
-          })
-          .join("\n");
-        // 从 contentLines 中收集该文件相关的 commit hashes
-        const fileCommitHashes = new Set<string>();
-        for (const [hash] of contentLines) {
-          if (hash !== "-------") {
-            fileCommitHashes.add(hash);
-          }
-        }
-        const relatedCommits = commits.filter((c) => {
-          const shortHash = c.sha?.slice(0, 7) || "";
-          return fileCommitHashes.has(shortHash);
-        });
-        const commitsSection =
-          relatedCommits.length > 0
-            ? relatedCommits
-                .map((c) => `- \`${c.sha?.slice(0, 7)}\` ${c.commit?.message?.split("\n")[0]}`)
-                .join("\n")
-            : "- 无相关 commits";
-        return { filename, file, linesWithNumbers, commitsSection };
-      });
-
-    const filePrompts: FileReviewPrompt[] = await Promise.all(
-      fileDataList.map(async ({ filename, file, linesWithNumbers, commitsSection }) => {
-        const fileDirectoryInfo = await this.getFileDirectoryInfo(filename);
-
-        // 获取该文件上一次的审查结果
-        const existingFileSummary = existingResult?.summary?.find((s) => s.file === filename);
-        const existingFileIssues = existingResult?.issues?.filter((i) => i.file === filename) ?? [];
-
-        let previousReviewSection = "";
-        if (existingFileSummary || existingFileIssues.length > 0) {
-          const parts: string[] = [];
-          if (existingFileSummary?.summary) {
-            parts.push(`**总结**:\n`);
-            parts.push(`${existingFileSummary.summary}\n`);
-          }
-          if (existingFileIssues.length > 0) {
-            parts.push(`**已发现的问题** (${existingFileIssues.length} 个):\n`);
-            for (const issue of existingFileIssues) {
-              const status = issue.fixed
-                ? "✅ 已修复"
-                : issue.valid === "false"
-                  ? "❌ 无效"
-                  : "⚠️ 待处理";
-              parts.push(`- [${status}] 行 ${issue.line}: ${issue.reason} (规则: ${issue.ruleId})`);
-            }
-            parts.push("");
-            // parts.push("请注意：不要重复报告上述已发现的问题，除非代码有新的变更导致问题复现。\n");
-          }
-          previousReviewSection = parts.join("\n");
-        }
-
-        const userPrompt = `## ${filename} (${file.status})
-
-### 文件内容
-
-\`\`\`
-${linesWithNumbers}
-\`\`\`
-
-### 该文件的相关 Commits
-
-${commitsSection}
-
-### 该文件所在的目录树
-
-${fileDirectoryInfo}
-
-### 上一次审查结果
-
-${previousReviewSection}`;
-
-        // 根据文件过滤 specs，只注入与当前文件匹配的规则
-        const fileSpecs = this.filterSpecsForFile(specs, filename);
-        const specsSection = this.reviewSpecService.buildSpecsSection(fileSpecs);
-        const systemPrompt = this.buildSystemPrompt(specsSection);
-
-        return { filename, systemPrompt, userPrompt };
-      }),
-    );
-
-    return { filePrompts };
-  }
-
-  protected async fillIssueCode(
-    issues: ReviewIssue[],
-    fileContents: FileContentsMap,
-  ): Promise<ReviewIssue[]> {
-    return issues.map((issue) => {
-      const contentLines = fileContents.get(issue.file);
-      if (!contentLines) {
-        return issue;
-      }
-      const lineRange = issue.line.split("-").map((n) => parseInt(n, 10));
-      const startLine = lineRange[0];
-      const endLine = lineRange.length > 1 ? lineRange[1] : startLine;
-      if (isNaN(startLine) || startLine < 1 || startLine > contentLines.length) {
-        return issue;
-      }
-      const codeLines = contentLines
-        .slice(startLine - 1, Math.min(endLine, contentLines.length))
-        .map(([, line]) => line);
-      const code = codeLines.join("\n").trim();
-      return { ...issue, code };
-    });
-  }
-
-  /**
-   * 根据 commit 填充 issue 的 author 信息
-   * 如果没有找到对应的 author，使用最后一次提交的人作为默认值
-   */
-  protected async fillIssueAuthors(
-    issues: ReviewIssue[],
-    commits: PullRequestCommit[],
-    _owner: string,
-    _repo: string,
-    verbose?: VerboseLevel,
-  ): Promise<ReviewIssue[]> {
-    if (shouldLog(verbose, 2)) {
-      console.log(`[fillIssueAuthors] issues=${issues.length}, commits=${commits.length}`);
+    if (shouldLog(verbose, 1)) {
+      console.log("✅ 没有需要审查的文件或规则");
     }
 
-    // 收集需要查找的 Git 作者信息（email 或 name）
-    const gitAuthorsToSearch = new Set<string>();
-    for (const commit of commits) {
-      const platformUser = commit.author || commit.committer;
-      if (!platformUser?.login) {
-        const gitAuthor = commit.commit?.author;
-        if (gitAuthor?.email) gitAuthorsToSearch.add(gitAuthor.email);
-        if (gitAuthor?.name) gitAuthorsToSearch.add(gitAuthor.name);
-      }
+    // 获取上一次的审查结果以计算正确的轮次
+    let existingResult: ReviewResult | null = null;
+    if (ci && prNumber) {
+      existingResult = await this.getExistingReviewResult(context.owner, context.repo, prNumber);
     }
+    const currentRound = (existingResult?.round ?? 0) + 1;
 
-    // 通过 Git Provider API 查找用户，建立 email/name -> UserInfo 的映射
-    const gitAuthorToUserMap = new Map<string, UserInfo>();
-    for (const query of gitAuthorsToSearch) {
-      try {
-        const users = await this.gitProvider.searchUsers(query, 1);
-        if (users.length > 0 && users[0].login) {
-          const user: UserInfo = { id: String(users[0].id), login: users[0].login };
-          gitAuthorToUserMap.set(query, user);
-          if (shouldLog(verbose, 2)) {
-            console.log(`[fillIssueAuthors] found user: ${query} -> ${user.login}`);
-          }
-        }
-      } catch {
-        // 忽略搜索失败
-      }
-    }
-
-    // 构建 commit hash 到 author 的映射
-    const commitAuthorMap = new Map<string, UserInfo>();
-    for (const commit of commits) {
-      // API 返回的 author/committer 可能为 null（未关联平台用户）
-      const platformUser = commit.author || commit.committer;
-      const gitAuthor = commit.commit?.author;
-      if (shouldLog(verbose, 2)) {
-        console.log(
-          `[fillIssueAuthors] commit: sha=${commit.sha?.slice(0, 7)}, platformUser=${platformUser?.login}, gitAuthor=${gitAuthor?.name}`,
-        );
-      }
-      if (commit.sha) {
-        const shortHash = commit.sha.slice(0, 7);
-        if (platformUser?.login) {
-          commitAuthorMap.set(shortHash, {
-            id: String(platformUser.id),
-            login: platformUser.login,
-          });
-        } else if (gitAuthor) {
-          // 尝试从平台用户映射中查找
-          const foundUser =
-            (gitAuthor.email && gitAuthorToUserMap.get(gitAuthor.email)) ||
-            (gitAuthor.name && gitAuthorToUserMap.get(gitAuthor.name));
-          if (foundUser) {
-            commitAuthorMap.set(shortHash, foundUser);
-          } else if (gitAuthor.name) {
-            // 使用 Git 原始作者信息（name 作为 login）
-            commitAuthorMap.set(shortHash, { id: "0", login: gitAuthor.name });
-          }
-        }
-      }
-    }
-    if (shouldLog(verbose, 2)) {
-      console.log(`[fillIssueAuthors] commitAuthorMap size: ${commitAuthorMap.size}`);
-    }
-
-    // 获取最后一次提交的 author 作为默认值
-    const lastCommit = commits[commits.length - 1];
-    const lastPlatformUser = lastCommit?.author || lastCommit?.committer;
-    const lastGitAuthor = lastCommit?.commit?.author;
-    let defaultAuthor: UserInfo | undefined;
-    if (lastPlatformUser?.login) {
-      defaultAuthor = { id: String(lastPlatformUser.id), login: lastPlatformUser.login };
-    } else if (lastGitAuthor) {
-      // 尝试从平台用户映射中查找
-      const foundUser =
-        (lastGitAuthor.email && gitAuthorToUserMap.get(lastGitAuthor.email)) ||
-        (lastGitAuthor.name && gitAuthorToUserMap.get(lastGitAuthor.name));
-      defaultAuthor =
-        foundUser || (lastGitAuthor.name ? { id: "0", login: lastGitAuthor.name } : undefined);
-    }
-    if (shouldLog(verbose, 2)) {
-      console.log(`[fillIssueAuthors] defaultAuthor: ${JSON.stringify(defaultAuthor)}`);
-    }
-    // 为每个 issue 填充 author
-    return issues.map((issue) => {
-      // 如果 issue 已有 author，保留原值
-      if (issue.author) {
-        if (shouldLog(verbose, 2)) {
-          console.log(`[fillIssueAuthors] issue already has author: ${issue.author.login}`);
-        }
-        return issue;
-      }
-      // issue.commit 可能是 7 位短 hash
-      const shortHash = issue.commit?.slice(0, 7);
-      const author =
-        shortHash && !shortHash.includes("---") ? commitAuthorMap.get(shortHash) : undefined;
-      if (shouldLog(verbose, 2)) {
-        console.log(
-          `[fillIssueAuthors] issue: file=${issue.file}, commit=${issue.commit}, shortHash=${shortHash}, foundAuthor=${author?.login}, finalAuthor=${(author || defaultAuthor)?.login}`,
-        );
-      }
-      // 优先使用 commit 对应的 author，否则使用默认 author
-      return { ...issue, author: author || defaultAuthor };
-    });
-  }
-
-  protected async getFileDirectoryInfo(filename: string): Promise<string> {
-    const dir = dirname(filename);
-    const currentFileName = filename.split("/").pop();
-
-    if (dir === "." || dir === "") {
-      return "（根目录）";
-    }
-
-    try {
-      const entries = await readdir(dir, { withFileTypes: true });
-
-      const sortedEntries = entries.sort((a, b) => {
-        if (a.isDirectory() && !b.isDirectory()) return -1;
-        if (!a.isDirectory() && b.isDirectory()) return 1;
-        return a.name.localeCompare(b.name);
-      });
-
-      const lines: string[] = [`📁 ${dir}/`];
-
-      for (let i = 0; i < sortedEntries.length; i++) {
-        const entry = sortedEntries[i];
-        const isLast = i === sortedEntries.length - 1;
-        const isCurrent = entry.name === currentFileName;
-        const branch = isLast ? "└── " : "├── ";
-        const icon = entry.isDirectory() ? "📂" : "📄";
-        const marker = isCurrent ? " ← 当前文件" : "";
-
-        lines.push(`${branch}${icon} ${entry.name}${marker}`);
-      }
-
-      return lines.join("\n");
-    } catch {
-      return `📁 ${dir}/`;
-    }
-  }
-
-  protected async callLLM(
-    llmMode: LLMMode,
-    reviewPrompt: ReviewPrompt,
-    options: LLMReviewOptions = {},
-  ): Promise<{ issues: ReviewIssue[]; summary: FileSummary[] } | null> {
-    const { verbose, concurrency = 5, timeout, retries = 0, retryDelay = 1000 } = options;
-    const fileCount = reviewPrompt.filePrompts.length;
-    console.log(
-      `📂 开始并行审查 ${fileCount} 个文件 (并发: ${concurrency}, 重试: ${retries}, 超时: ${timeout ?? "无"}ms)`,
-    );
-
-    const executor = parallel({
-      concurrency,
-      timeout,
-      retries,
-      retryDelay,
-      onTaskStart: (taskId) => {
-        console.log(`🚀 开始审查: ${taskId}`);
-      },
-      onTaskComplete: (taskId, success) => {
-        console.log(`${success ? "✅" : "❌"} 完成审查: ${taskId}`);
-      },
-      onRetry: (taskId, attempt, error) => {
-        console.log(`🔄 重试 ${taskId} (第 ${attempt} 次): ${error.message}`);
-      },
-    });
-
-    const results = await executor.map(
-      reviewPrompt.filePrompts,
-      (filePrompt) => this.reviewSingleFile(llmMode, filePrompt, verbose),
-      (filePrompt) => filePrompt.filename,
-    );
-
-    const allIssues: ReviewIssue[] = [];
-    const fileSummaries: FileSummary[] = [];
-
-    for (const result of results) {
-      if (result.success && result.result) {
-        allIssues.push(...result.result.issues);
-        fileSummaries.push(result.result.summary);
-      } else {
-        fileSummaries.push({
-          file: result.id,
-          resolved: 0,
-          unresolved: 0,
-          summary: `❌ 审查失败: ${result.error?.message ?? "未知错误"}`,
-        });
-      }
-    }
-
-    const successCount = results.filter((r) => r.success).length;
-    console.log(`🔍 审查完成: ${successCount}/${fileCount} 个文件成功`);
-
-    return {
-      issues: this.normalizeIssues(allIssues),
-      summary: fileSummaries,
-    };
-  }
-
-  protected async reviewSingleFile(
-    llmMode: LLMMode,
-    filePrompt: FileReviewPrompt,
-    verbose?: VerboseLevel,
-  ): Promise<{ issues: ReviewIssue[]; summary: FileSummary }> {
-    if (shouldLog(verbose, 3)) {
-      console.log(
-        `\nsystemPrompt:\n----------------\n${filePrompt.systemPrompt}\n----------------`,
-      );
-      console.log(`\nuserPrompt:\n----------------\n${filePrompt.userPrompt}\n----------------`);
-    }
-
-    const stream = this.llmProxyService.chatStream(
-      [
-        { role: "system", content: filePrompt.systemPrompt },
-        { role: "user", content: filePrompt.userPrompt },
-      ],
-      {
-        adapter: llmMode,
-        jsonSchema: this.llmJsonPut,
-        verbose,
-        allowedTools: [
-          "Read",
-          "Glob",
-          "Grep",
-          "WebSearch",
-          "TodoWrite",
-          "TodoRead",
-          "Task",
-          "Skill",
-        ],
-      },
-    );
-
-    const streamLoggerState = createStreamLoggerState();
-    let fileResult: { issues?: ReviewIssue[]; summary?: string } | undefined;
-
-    for await (const event of stream) {
-      if (shouldLog(verbose, 2)) {
-        logStreamEvent(event, streamLoggerState);
-      }
-
-      if (event.type === "result") {
-        fileResult = event.response.structuredOutput as
-          | { issues?: ReviewIssue[]; summary?: string }
-          | undefined;
-      } else if (event.type === "error") {
-        throw new Error(event.message);
-      }
-    }
-
-    // 在获取到问题时立即记录发现时间
-    const now = new Date().toISOString();
-    const issues = (fileResult?.issues ?? []).map((issue) => ({
-      ...issue,
-      date: issue.date ?? now,
-    }));
-
-    return {
-      issues,
-      summary: {
-        file: filePrompt.filename,
+    // 即使没有适用的规则，也为每个变更文件生成摘要
+    const summary: FileSummary[] = changedFiles
+      .filter((f) => f.filename && f.status !== "deleted")
+      .map((f) => ({
+        file: f.filename!,
         resolved: 0,
         unresolved: 0,
-        summary: fileResult?.summary ?? "",
-      },
-    };
-  }
-
-  /**
-   * 规范化 issues，拆分包含逗号的行号为多个独立 issue，并添加发现时间
-   * 例如 "114, 122" 会被拆分成两个 issue，分别是 "114" 和 "122"
-   */
-  protected normalizeIssues(issues: ReviewIssue[]): ReviewIssue[] {
-    const now = new Date().toISOString();
-    return issues.flatMap((issue) => {
-      // 确保 line 是字符串（LLM 可能返回数字）
-      const lineStr = String(issue.line ?? "");
-      const baseIssue = { ...issue, line: lineStr, date: issue.date ?? now };
-
-      if (!lineStr.includes(",")) {
-        return baseIssue;
-      }
-
-      const lines = lineStr.split(",");
-
-      return lines.map((linePart, index) => ({
-        ...baseIssue,
-        line: linePart.trim(),
-        suggestion: index === 0 ? issue.suggestion : `参考 ${issue.file}:${lines[0]}`,
+        summary: applicableSpecs.length === 0 ? "无适用的审查规则" : "已跳过",
       }));
-    });
-  }
+    const prInfo =
+      context.generateDescription && llmMode
+        ? await this.generatePrDescription(commits, changedFiles, llmMode, undefined, verbose)
+        : await this.buildFallbackDescription(commits, changedFiles);
+    const result: ReviewResult = {
+      success: true,
+      title: prInfo.title,
+      description: prInfo.description,
+      issues: [],
+      summary,
+      round: currentRound,
+    };
 
-  /**
-   * 使用 AI 根据 commits、变更文件和代码内容总结 PR 实现的功能
-   * @returns 包含 title 和 description 的对象
-   */
-  protected async generatePrDescription(
-    commits: PullRequestCommit[],
-    changedFiles: ChangedFile[],
-    llmMode: LLMMode,
-    fileContents?: FileContentsMap,
-    verbose?: VerboseLevel,
-  ): Promise<{ title: string; description: string }> {
-    const commitMessages = commits
-      .map((c) => `- ${c.sha?.slice(0, 7)}: ${c.commit?.message?.split("\n")[0]}`)
-      .join("\n");
-    const fileChanges = changedFiles
-      .slice(0, 30)
-      .map((f) => `- ${f.filename} (${f.status})`)
-      .join("\n");
-    // 构建代码变更内容（只包含变更行，限制总长度）
-    let codeChangesSection = "";
-    if (fileContents && fileContents.size > 0) {
-      const codeSnippets: string[] = [];
-      let totalLength = 0;
-      const maxTotalLength = 8000; // 限制代码总长度
-      for (const [filename, lines] of fileContents) {
-        if (totalLength >= maxTotalLength) break;
-        // 只提取有变更的行（commitHash 不是 "-------"）
-        const changedLines = lines
-          .map(([hash, code], idx) => (hash !== "-------" ? `${idx + 1}: ${code}` : null))
-          .filter(Boolean);
-        if (changedLines.length > 0) {
-          const snippet = `### ${filename}\n\`\`\`\n${changedLines.slice(0, 50).join("\n")}\n\`\`\``;
-          if (totalLength + snippet.length <= maxTotalLength) {
-            codeSnippets.push(snippet);
-            totalLength += snippet.length;
-          }
-        }
-      }
-      if (codeSnippets.length > 0) {
-        codeChangesSection = `\n\n## 代码变更内容\n${codeSnippets.join("\n\n")}`;
-      }
-    }
-    const prompt = `请根据以下 PR 的 commit 记录、文件变更和代码内容，用简洁的中文总结这个 PR 实现了什么功能。
-要求：
-1. 第一行输出 PR 标题，格式必须是: Feat xxx 或 Fix xxx 或 Refactor xxx（根据变更类型选择，整体不超过 50 个字符）
-2. 空一行后输出详细描述
-3. 描述应该简明扼要，突出核心功能点
-4. 使用 Markdown 格式
-5. 不要逐条列出 commit，而是归纳总结
-6. 重点分析代码变更的实际功能
-
-## Commit 记录 (${commits.length} 个)
-${commitMessages || "无"}
-
-## 文件变更 (${changedFiles.length} 个文件)
-${fileChanges || "无"}
-${changedFiles.length > 30 ? `\n... 等 ${changedFiles.length - 30} 个文件` : ""}${codeChangesSection}`;
-    try {
-      const stream = this.llmProxyService.chatStream([{ role: "user", content: prompt }], {
-        adapter: llmMode,
-      });
-      let content = "";
-      for await (const event of stream) {
-        if (event.type === "text") {
-          content += event.content;
-        } else if (event.type === "error") {
-          throw new Error(event.message);
-        }
-      }
-      // 解析标题和描述：第一行是标题，其余是描述
-      const lines = content.trim().split("\n");
-      const title = lines[0]?.replace(/^#+\s*/, "").trim() || "PR 更新";
-      const description = lines.slice(1).join("\n").trim();
-      return { title, description };
-    } catch (error) {
+    // CI 模式下也需要发送 review 评论
+    if (ci && prNumber && !dryRun) {
       if (shouldLog(verbose, 1)) {
-        console.warn("⚠️ AI 总结 PR 功能失败，使用默认描述:", error);
+        console.log(`💬 提交 PR 评论...`);
       }
-      return this.buildFallbackDescription(commits, changedFiles);
-    }
-  }
-
-  /**
-   * 使用 LLM 生成 PR 标题
-   */
-  protected async generatePrTitle(
-    commits: PullRequestCommit[],
-    changedFiles: ChangedFile[],
-  ): Promise<string> {
-    const commitMessages = commits
-      .slice(0, 10)
-      .map((c) => c.commit?.message?.split("\n")[0])
-      .filter(Boolean)
-      .join("\n");
-    const fileChanges = changedFiles
-      .slice(0, 20)
-      .map((f) => `${f.filename} (${f.status})`)
-      .join("\n");
-    const prompt = `请根据以下 commit 记录和文件变更，生成一个简短的 PR 标题。
-要求：
-1. 格式必须是: Feat: xxx 或 Fix: xxx 或 Refactor: xxx
-2. 根据变更内容选择合适的前缀（新功能用 Feat，修复用 Fix，重构用 Refactor）
-3. xxx 部分用简短的中文描述（整体不超过 50 个字符）
-4. 只输出标题，不要加任何解释
-
-Commit 记录:
-${commitMessages || "无"}
-
-文件变更:
-${fileChanges || "无"}`;
-    try {
-      const stream = this.llmProxyService.chatStream([{ role: "user", content: prompt }], {
-        adapter: "openai",
-      });
-      let title = "";
-      for await (const event of stream) {
-        if (event.type === "text") {
-          title += event.content;
-        } else if (event.type === "error") {
-          throw new Error(event.message);
-        }
-      }
-      return title.trim().slice(0, 50) || this.getFallbackTitle(commits);
-    } catch {
-      return this.getFallbackTitle(commits);
-    }
-  }
-
-  /**
-   * 获取降级标题（从第一个 commit 消息）
-   */
-  protected getFallbackTitle(commits: PullRequestCommit[]): string {
-    const firstCommitMsg = commits[0]?.commit?.message?.split("\n")[0] || "PR 更新";
-    return firstCommitMsg.slice(0, 50);
-  }
-
-  /**
-   * 构建降级描述（当 AI 总结失败时使用）
-   */
-  protected async buildFallbackDescription(
-    commits: PullRequestCommit[],
-    changedFiles: ChangedFile[],
-  ): Promise<{ title: string; description: string }> {
-    const parts: string[] = [];
-    // 使用 LLM 生成标题
-    const title = await this.generatePrTitle(commits, changedFiles);
-    if (commits.length > 0) {
-      const messages = commits
-        .slice(0, 5)
-        .map((c) => `- ${c.commit?.message?.split("\n")[0]}`)
-        .filter(Boolean);
-      if (messages.length > 0) {
-        parts.push(`**提交记录**: ${messages.join("; ")}`);
-      }
-    }
-    if (changedFiles.length > 0) {
-      const added = changedFiles.filter((f) => f.status === "added").length;
-      const modified = changedFiles.filter((f) => f.status === "modified").length;
-      const deleted = changedFiles.filter((f) => f.status === "deleted").length;
-      const stats: string[] = [];
-      if (added > 0) stats.push(`新增 ${added}`);
-      if (modified > 0) stats.push(`修改 ${modified}`);
-      if (deleted > 0) stats.push(`删除 ${deleted}`);
-      parts.push(`**文件变更**: ${changedFiles.length} 个文件 (${stats.join(", ")})`);
-    }
-    return { title, description: parts.join("\n") };
-  }
-
-  protected formatReviewComment(
-    result: ReviewResult,
-    options: { prNumber?: number; outputFormat?: ReportFormat; ci?: boolean } = {},
-  ): string {
-    const { prNumber, outputFormat, ci } = options;
-    // 智能选择格式：如果未指定，PR 模式用 markdown，终端用 terminal
-    const format: ReportFormat = outputFormat || (ci && prNumber ? "markdown" : "terminal");
-
-    if (format === "markdown") {
-      return this.reviewReportService.formatMarkdown(result, {
+      await this.postOrUpdateReviewComment(
+        context.owner,
+        context.repo,
         prNumber,
-        includeReanalysisCheckbox: true,
-        includeJsonData: true,
-        reviewCommentMarker: REVIEW_COMMENT_MARKER,
-      });
+        result,
+        verbose,
+        autoApprove,
+      );
+      if (shouldLog(verbose, 1)) {
+        console.log(`✅ 评论已提交`);
+      }
     }
 
-    return this.reviewReportService.format(result, format);
+    return result;
   }
 
-  protected async postOrUpdateReviewComment(
+  /**
+   * 检查是否有其他同名 review workflow 正在运行中
+   */
+  private async checkDuplicateWorkflow(
     owner: string,
     repo: string,
     prNumber: number,
-    result: ReviewResult,
+    headSha: string,
     verbose?: VerboseLevel,
-    autoApprove?: boolean,
-  ): Promise<void> {
-    // 获取配置
-    const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
+  ): Promise<ReviewResult | null> {
+    const ref = process.env.GITHUB_REF || process.env.GITEA_REF || "";
+    const prMatch = ref.match(/refs\/pull\/(\d+)/);
+    const currentPrNumber = prMatch ? parseInt(prMatch[1], 10) : prNumber;
 
-    // 如果配置启用且有 AI 生成的标题，只在第一轮审查时更新 PR 标题
-    if (reviewConf.autoUpdatePrTitle && result.title && result.round === 1) {
-      try {
-        await this.gitProvider.editPullRequest(owner, repo, prNumber, { title: result.title });
-        console.log(`📝 已更新 PR 标题: ${result.title}`);
-      } catch (error) {
-        console.warn("⚠️ 更新 PR 标题失败:", error);
-      }
-    }
-
-    // 获取已解决的评论，同步 resolve 状态（在更新 review 之前）
-    await this.syncResolvedComments(owner, repo, prNumber, result);
-
-    // 获取评论的 reactions，同步状态（☹️ 标记无效，👎 标记未解决）
-    await this.syncReactionsToIssues(owner, repo, prNumber, result, verbose);
-
-    // 查找已有的 AI 评论（Issue Comment），可能存在多个重复评论
-    if (shouldLog(verbose, 2)) {
-      console.log(`[postOrUpdateReviewComment] owner=${owner}, repo=${repo}, prNumber=${prNumber}`);
-    }
-    const existingComments = await this.findExistingAiComments(owner, repo, prNumber, verbose);
-    if (shouldLog(verbose, 2)) {
-      console.log(
-        `[postOrUpdateReviewComment] found ${existingComments.length} existing AI comments`,
+    try {
+      const runningWorkflows = await this.gitProvider.listWorkflowRuns(owner, repo, {
+        status: "in_progress",
+      });
+      const currentWorkflowName = process.env.GITHUB_WORKFLOW || process.env.GITEA_WORKFLOW;
+      const currentRunId = process.env.GITHUB_RUN_ID || process.env.GITEA_RUN_ID;
+      const duplicateReviewRuns = runningWorkflows.filter(
+        (w) =>
+          w.sha === headSha &&
+          w.name === currentWorkflowName &&
+          (!currentRunId || String(w.id) !== currentRunId),
       );
-    }
-
-    // 调试：检查 issues 是否有 author
-    if (shouldLog(verbose, 3)) {
-      for (const issue of result.issues.slice(0, 3)) {
-        console.log(
-          `[postOrUpdateReviewComment] issue: file=${issue.file}, commit=${issue.commit}, author=${issue.author?.login}`,
+      if (duplicateReviewRuns.length > 0) {
+        if (shouldLog(verbose, 1)) {
+          console.log(
+            `⏭️ 跳过审查: 当前 PR #${currentPrNumber} 有 ${duplicateReviewRuns.length} 个同名 workflow 正在运行中`,
+          );
+        }
+        return {
+          success: true,
+          description: `跳过审查: PR #${currentPrNumber} 有 ${duplicateReviewRuns.length} 个同名 workflow 正在运行中，等待完成后重新审查`,
+          issues: [],
+          summary: [],
+          round: 1,
+        };
+      }
+    } catch (error) {
+      if (shouldLog(verbose, 1)) {
+        console.warn(
+          `⚠️ 无法检查重复 workflow（可能缺少 repo owner 权限），跳过此检查:`,
+          error instanceof Error ? error.message : error,
         );
       }
     }
-
-    const reviewBody = this.formatReviewComment(result, {
-      prNumber,
-      outputFormat: "markdown",
-      ci: true,
-    });
-
-    // 获取 PR 信息以获取 head commit SHA
-    const pr = await this.gitProvider.getPullRequest(owner, repo, prNumber);
-    const commitId = pr.head?.sha;
-
-    // 1. 发布或更新主评论（使用 Issue Comment API，支持删除和更新）
-    try {
-      if (existingComments.length > 0) {
-        // 更新第一个 AI 评论
-        await this.gitProvider.updateIssueComment(owner, repo, existingComments[0].id, reviewBody);
-        console.log(`✅ 已更新 AI Review 评论`);
-        // 删除多余的重复 AI 评论
-        for (const duplicate of existingComments.slice(1)) {
-          try {
-            await this.gitProvider.deleteIssueComment(owner, repo, duplicate.id);
-            console.log(`🗑️ 已删除重复的 AI Review 评论 (id: ${duplicate.id})`);
-          } catch {
-            console.warn(`⚠️ 删除重复评论失败 (id: ${duplicate.id})`);
-          }
-        }
-      } else {
-        await this.gitProvider.createIssueComment(owner, repo, prNumber, { body: reviewBody });
-        console.log(`✅ 已发布 AI Review 评论`);
-      }
-    } catch (error) {
-      console.warn("⚠️ 发布/更新 AI Review 评论失败:", error);
-    }
-
-    // 2. 发布本轮新发现的行级评论（使用 PR Review API，不删除旧的 review，保留历史）
-    // 如果启用 autoApprove 且所有问题已解决，使用 APPROVE event 合并发布
-    let lineIssues: ReviewIssue[] = [];
-    let comments: CreatePullReviewComment[] = [];
-    if (reviewConf.lineComments) {
-      lineIssues = result.issues.filter(
-        (issue) =>
-          issue.round === result.round &&
-          !issue.fixed &&
-          !issue.resolved &&
-          issue.valid !== "false",
-      );
-      comments = lineIssues
-        .map((issue) => this.issueToReviewComment(issue))
-        .filter((comment): comment is CreatePullReviewComment => comment !== null);
-    }
-
-    // 计算是否需要自动批准
-    // 条件：启用 autoApprove 且没有待处理问题（包括从未发现问题的情况）
-    const stats = this.calculateIssueStats(result.issues);
-    const shouldAutoApprove = autoApprove && stats.pending === 0;
-
-    if (reviewConf.lineComments) {
-      const lineReviewBody = this.buildLineReviewBody(lineIssues, result.round, result.issues);
-
-      // 如果需要自动批准，追加批准信息到 body
-      const finalReviewBody = shouldAutoApprove
-        ? lineReviewBody +
-          `\n\n---\n\n✅ **自动批准合并**\n\n${
-            stats.validTotal > 0
-              ? `所有问题都已解决 (${stats.fixed} 已修复, ${stats.resolved} 已解决)，`
-              : "代码审查通过，未发现问题，"
-          }自动批准此 PR。`
-        : lineReviewBody;
-
-      const reviewEvent = shouldAutoApprove ? REVIEW_STATE.APPROVE : REVIEW_STATE.COMMENT;
-
-      if (comments.length > 0) {
-        try {
-          await this.gitProvider.createPullReview(owner, repo, prNumber, {
-            event: reviewEvent,
-            body: finalReviewBody,
-            comments,
-            commit_id: commitId,
-          });
-          if (shouldAutoApprove) {
-            console.log(`✅ 已自动批准 PR #${prNumber}（所有问题已解决）`);
-          } else {
-            console.log(`✅ 已发布 ${comments.length} 条行级评论`);
-          }
-        } catch {
-          // 批量失败时逐条发布，跳过无法定位的评论
-          console.warn("⚠️ 批量发布行级评论失败，尝试逐条发布...");
-          let successCount = 0;
-          for (const comment of comments) {
-            try {
-              // 逐条发布时只用 COMMENT event，避免重复 APPROVE
-              await this.gitProvider.createPullReview(owner, repo, prNumber, {
-                event: REVIEW_STATE.COMMENT,
-                body: successCount === 0 ? reviewBody : undefined,
-                comments: [comment],
-                commit_id: commitId,
-              });
-              successCount++;
-            } catch {
-              console.warn(`⚠️ 跳过无法定位的评论: ${comment.path}:${comment.new_position}`);
-            }
-          }
-          if (successCount > 0) {
-            console.log(`✅ 逐条发布成功 ${successCount}/${comments.length} 条行级评论`);
-            // 如果需要自动批准，单独发一个 APPROVE review
-            if (shouldAutoApprove) {
-              try {
-                await this.gitProvider.createPullReview(owner, repo, prNumber, {
-                  event: REVIEW_STATE.APPROVE,
-                  body: `✅ **自动批准合并**\n\n${
-                    stats.validTotal > 0
-                      ? `所有问题都已解决 (${stats.fixed} 已修复, ${stats.resolved} 已解决)，`
-                      : "代码审查通过，未发现问题，"
-                  }自动批准此 PR。`,
-                  commit_id: commitId,
-                });
-                console.log(`✅ 已自动批准 PR #${prNumber}（所有问题已解决）`);
-              } catch (error) {
-                console.warn("⚠️ 自动批准失败:", error);
-              }
-            }
-          } else {
-            console.warn("⚠️ 所有行级评论均无法定位，已跳过");
-          }
-        }
-      } else {
-        // 本轮无新问题，仍发布 Round 状态（含上轮回顾）
-        try {
-          await this.gitProvider.createPullReview(owner, repo, prNumber, {
-            event: reviewEvent,
-            body: finalReviewBody,
-            comments: [],
-            commit_id: commitId,
-          });
-          if (shouldAutoApprove) {
-            console.log(`✅ 已自动批准 PR #${prNumber}（Round ${result.round}，所有问题已解决）`);
-          } else {
-            console.log(`✅ 已发布 Round ${result.round} 审查状态（无新问题）`);
-          }
-        } catch (error) {
-          console.warn("⚠️ 发布审查状态失败:", error);
-        }
-      }
-    } else if (shouldAutoApprove) {
-      // 未启用 lineComments 但需要自动批准
-      try {
-        await this.gitProvider.createPullReview(owner, repo, prNumber, {
-          event: REVIEW_STATE.APPROVE,
-          body: `✅ **自动批准合并**\n\n${
-            stats.validTotal > 0
-              ? `所有问题都已解决 (${stats.fixed} 已修复, ${stats.resolved} 已解决)，`
-              : "代码审查通过，未发现问题，"
-          }自动批准此 PR。`,
-          commit_id: commitId,
-        });
-        console.log(`✅ 已自动批准 PR #${prNumber}（所有问题已解决）`);
-      } catch (error) {
-        console.warn("⚠️ 自动批准失败:", error);
-      }
-    }
+    return null;
   }
 
   /**
-   * 查找已有的所有 AI 评论（Issue Comment）
-   * 返回所有包含 REVIEW_COMMENT_MARKER 的评论，用于更新第一个并清理重复项
+   * 确保 Claude CLI 已安装
    */
+  // --- Delegation methods for backward compatibility with tests ---
+
+  protected async fillIssueAuthors(...args: Parameters<ReviewContextBuilder["fillIssueAuthors"]>) {
+    return this.contextBuilder.fillIssueAuthors(...args);
+  }
+
+  protected async getFileContents(...args: Parameters<ReviewIssueFilter["getFileContents"]>) {
+    return this.issueFilter.getFileContents(...args);
+  }
+
+  protected async getFilesForCommit(...args: Parameters<ReviewIssueFilter["getFilesForCommit"]>) {
+    return this.issueFilter.getFilesForCommit(...args);
+  }
+
+  protected async invalidateIssuesForChangedFiles(
+    ...args: Parameters<ReviewIssueFilter["invalidateIssuesForChangedFiles"]>
+  ) {
+    return this.issueFilter.invalidateIssuesForChangedFiles(...args);
+  }
+
+  protected async getChangedFilesBetweenRefs(
+    ...args: Parameters<ReviewIssueFilter["getChangedFilesBetweenRefs"]>
+  ) {
+    return this.issueFilter.getChangedFilesBetweenRefs(...args);
+  }
+
+  protected async getCommitsBetweenRefs(
+    ...args: Parameters<ReviewIssueFilter["getCommitsBetweenRefs"]>
+  ) {
+    return this.issueFilter.getCommitsBetweenRefs(...args);
+  }
+
+  protected async buildLineCommitMap(...args: Parameters<ReviewIssueFilter["buildLineCommitMap"]>) {
+    return this.issueFilter.buildLineCommitMap(...args);
+  }
+
+  protected updateIssueLineNumbers(
+    ...args: Parameters<ReviewIssueFilter["updateIssueLineNumbers"]>
+  ) {
+    return this.issueFilter.updateIssueLineNumbers(...args);
+  }
+
+  protected filterIssuesByValidCommits(
+    ...args: Parameters<ReviewIssueFilter["filterIssuesByValidCommits"]>
+  ) {
+    return this.issueFilter.filterIssuesByValidCommits(...args);
+  }
+
+  protected filterDuplicateIssues(...args: Parameters<ReviewIssueFilter["filterDuplicateIssues"]>) {
+    return this.issueFilter.filterDuplicateIssues(...args);
+  }
+
+  protected async fillIssueCode(...args: Parameters<ReviewIssueFilter["fillIssueCode"]>) {
+    return this.issueFilter.fillIssueCode(...args);
+  }
+
+  protected async getExistingReviewResult(owner: string, repo: string, prNumber: number) {
+    return this.issueFilter.getExistingReviewResult(owner, repo, prNumber, (body) =>
+      this.reviewReportService.parseMarkdown(body),
+    );
+  }
+
+  protected async runLLMReview(...args: Parameters<ReviewLlmProcessor["runLLMReview"]>) {
+    return this.llmProcessor.runLLMReview(...args);
+  }
+
+  protected filterSpecsForFile(...args: Parameters<ReviewLlmProcessor["filterSpecsForFile"]>) {
+    return this.llmProcessor.filterSpecsForFile(...args);
+  }
+
+  protected buildSystemPrompt(...args: Parameters<ReviewLlmProcessor["buildSystemPrompt"]>) {
+    return this.llmProcessor.buildSystemPrompt(...args);
+  }
+
+  protected async buildReviewPrompt(...args: Parameters<ReviewLlmProcessor["buildReviewPrompt"]>) {
+    return this.llmProcessor.buildReviewPrompt(...args);
+  }
+
+  protected normalizeIssues(...args: Parameters<ReviewLlmProcessor["normalizeIssues"]>) {
+    return this.llmProcessor.normalizeIssues(...args);
+  }
+
+  protected async generatePrDescription(
+    ...args: Parameters<ReviewLlmProcessor["generatePrDescription"]>
+  ) {
+    return this.llmProcessor.generatePrDescription(...args);
+  }
+
+  protected async buildFallbackDescription(
+    ...args: Parameters<ReviewLlmProcessor["buildFallbackDescription"]>
+  ) {
+    return this.llmProcessor.buildFallbackDescription(...args);
+  }
+
+  protected async reviewSingleFile(...args: Parameters<ReviewLlmProcessor["reviewSingleFile"]>) {
+    return this.llmProcessor.reviewSingleFile(...args);
+  }
+
+  protected async getFileDirectoryInfo(
+    ...args: Parameters<ReviewLlmProcessor["getFileDirectoryInfo"]>
+  ) {
+    return this.llmProcessor.getFileDirectoryInfo(...args);
+  }
+
+  protected formatReviewComment(...args: Parameters<ReviewPrComment["formatReviewComment"]>) {
+    return this.prComment.formatReviewComment(...args);
+  }
+
+  protected async postOrUpdateReviewComment(
+    ...args: Parameters<ReviewPrComment["postOrUpdateReviewComment"]>
+  ) {
+    return this.prComment.postOrUpdateReviewComment(...args);
+  }
+
+  protected async syncResolvedComments(
+    ...args: Parameters<ReviewPrComment["syncResolvedComments"]>
+  ) {
+    return this.prComment.syncResolvedComments(...args);
+  }
+
+  protected async syncReactionsToIssues(
+    ...args: Parameters<ReviewPrComment["syncReactionsToIssues"]>
+  ) {
+    return this.prComment.syncReactionsToIssues(...args);
+  }
+
+  protected lineMatchesPosition(...args: Parameters<ReviewPrComment["lineMatchesPosition"]>) {
+    return this.prComment.lineMatchesPosition(...args);
+  }
+
+  protected issueToReviewComment(...args: Parameters<ReviewPrComment["issueToReviewComment"]>) {
+    return this.prComment.issueToReviewComment(...args);
+  }
+
+  protected parseExistingReviewResult(
+    ...args: Parameters<ReviewPrComment["parseExistingReviewResult"]>
+  ) {
+    return this.prComment.parseExistingReviewResult(...args);
+  }
+
+  protected async generatePrTitle(...args: Parameters<ReviewLlmProcessor["generatePrTitle"]>) {
+    return this.llmProcessor.generatePrTitle(...args);
+  }
+
+  protected getFallbackTitle(...args: Parameters<ReviewLlmProcessor["getFallbackTitle"]>) {
+    return this.llmProcessor.getFallbackTitle(...args);
+  }
+
+  protected async callLLM(...args: Parameters<ReviewLlmProcessor["callLLM"]>) {
+    return this.llmProcessor.callLLM(...args);
+  }
+
+  protected calculateIssueStats(...args: Parameters<ReviewIssueFilter["calculateIssueStats"]>) {
+    return this.issueFilter.calculateIssueStats(...args);
+  }
+
+  protected buildLineReviewBody(...args: Parameters<ReviewPrComment["buildLineReviewBody"]>) {
+    return this.prComment.buildLineReviewBody(...args);
+  }
+
   protected async findExistingAiComments(
     owner: string,
     repo: string,
     prNumber: number,
     verbose?: VerboseLevel,
-  ): Promise<{ id: number }[]> {
-    try {
-      const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
-      if (shouldLog(verbose, 2)) {
-        console.log(
-          `[findExistingAiComments] listIssueComments returned ${Array.isArray(comments) ? comments.length : typeof comments} comments`,
-        );
-        if (Array.isArray(comments)) {
-          for (const c of comments.slice(0, 5)) {
-            console.log(
-              `[findExistingAiComments] comment id=${c.id}, body starts with: ${c.body?.slice(0, 80) ?? "(no body)"}`,
-            );
-          }
-        }
-      }
-      return comments
-        .filter((c) => c.body?.includes(REVIEW_COMMENT_MARKER) && c.id)
-        .map((c) => ({ id: c.id! }));
-    } catch (error) {
-      console.warn("[findExistingAiComments] error:", error);
-      return [];
-    }
+  ) {
+    return this.prComment.findExistingAiComments(owner, repo, prNumber, verbose);
   }
 
-  /**
-   * 从 PR 的所有 resolved review threads 中同步 resolved 状态到 result.issues
-   * 用户手动点击 resolve 的记录写入 resolved/resolvedBy 字段（区别于 AI 验证的 fixed/fixedBy）
-   * 优先通过评论 body 中的 issue key 精确匹配，回退到 path+line 匹配
-   */
-  protected async syncResolvedComments(
-    owner: string,
-    repo: string,
-    prNumber: number,
-    result: ReviewResult,
-  ): Promise<void> {
-    try {
-      const resolvedThreads = await this.gitProvider.listResolvedThreads(owner, repo, prNumber);
-      if (resolvedThreads.length === 0) {
-        return;
-      }
-      // 构建 issue key → issue 的映射，用于精确匹配
-      const issueByKey = new Map<string, ReviewResult["issues"][0]>();
-      for (const issue of result.issues) {
-        issueByKey.set(this.generateIssueKey(issue), issue);
-      }
-      const now = new Date().toISOString();
-      for (const thread of resolvedThreads) {
-        if (!thread.path) continue;
-        // 优先通过 issue key 精确匹配
-        let matchedIssue: ReviewResult["issues"][0] | undefined;
-        if (thread.body) {
-          const issueKey = this.extractIssueKeyFromBody(thread.body);
-          if (issueKey) {
-            matchedIssue = issueByKey.get(issueKey);
-          }
-        }
-        // 回退：path:line 匹配
-        if (!matchedIssue) {
-          matchedIssue = result.issues.find(
-            (issue) =>
-              issue.file === thread.path && this.lineMatchesPosition(issue.line, thread.line),
-          );
-        }
-        if (matchedIssue && !matchedIssue.resolved) {
-          matchedIssue.resolved = now;
-          if (thread.resolvedBy) {
-            matchedIssue.resolvedBy = {
-              id: thread.resolvedBy.id?.toString(),
-              login: thread.resolvedBy.login,
-            };
-          }
-          console.log(
-            `🟢 问题已标记为已解决: ${matchedIssue.file}:${matchedIssue.line}` +
-              (thread.resolvedBy?.login ? ` (by @${thread.resolvedBy.login})` : ""),
-          );
-        }
-      }
-    } catch (error) {
-      console.warn("⚠️ 同步已解决评论失败:", error);
-    }
+  protected async deleteExistingAiReviews(owner: string, repo: string, prNumber: number) {
+    return deleteExistingAiReviewsFn(this.gitProvider, owner, repo, prNumber);
   }
 
-  /**
-   * 检查 issue 的行号是否匹配评论的 position
-   */
-  protected lineMatchesPosition(issueLine: string, position?: number): boolean {
-    if (!position) return false;
-    const lines = this.reviewSpecService.parseLineRange(issueLine);
-    if (lines.length === 0) return false;
-    const startLine = lines[0];
-    const endLine = lines[lines.length - 1];
-    return position >= startLine && position <= endLine;
+  protected extractIssueKeyFromBody(body: string) {
+    return extractIssueKeyFromBodyFn(body);
   }
 
-  /**
-   * 从旧的 AI review 评论中获取 reactions 和回复，同步到 result.issues
-   * - 存储所有 reactions 到 issue.reactions 字段
-   * - 存储评论回复到 issue.replies 字段
-   * - 如果评论有 ☹️ (confused) reaction，将对应的问题标记为无效
-   * - 如果评论有 👎 (-1) reaction，将对应的问题标记为未解决
-   */
-  protected async syncReactionsToIssues(
-    owner: string,
-    repo: string,
-    prNumber: number,
-    result: ReviewResult,
-    verbose?: VerboseLevel,
-  ): Promise<void> {
-    try {
-      const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
-      const aiReview = reviews.find((r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER));
-      if (!aiReview?.id) {
-        if (shouldLog(verbose, 2)) {
-          console.log(`[syncReactionsToIssues] No AI review found`);
-        }
-        return;
-      }
-
-      // 收集所有评审人
-      const reviewers = new Set<string>();
-
-      // 1. 从已提交的 review 中获取评审人（排除 AI bot）
-      for (const review of reviews) {
-        if (review.user?.login && !review.body?.includes(REVIEW_LINE_COMMENTS_MARKER)) {
-          reviewers.add(review.user.login);
-        }
-      }
-      if (shouldLog(verbose, 2)) {
-        console.log(
-          `[syncReactionsToIssues] reviewers from reviews: ${Array.from(reviewers).join(", ")}`,
-        );
-      }
-
-      // 2. 从 PR 指定的评审人中获取（包括团队成员）
-      try {
-        const pr = await this.gitProvider.getPullRequest(owner, repo, prNumber);
-        // 添加指定的个人评审人
-        for (const reviewer of pr.requested_reviewers || []) {
-          if (reviewer.login) {
-            reviewers.add(reviewer.login);
-          }
-        }
-        if (shouldLog(verbose, 2)) {
-          console.log(
-            `[syncReactionsToIssues] requested_reviewers: ${(pr.requested_reviewers || []).map((r) => r.login).join(", ")}`,
-          );
-          console.log(
-            `[syncReactionsToIssues] requested_reviewers_teams: ${JSON.stringify(pr.requested_reviewers_teams || [])}`,
-          );
-        }
-        // 添加指定的团队成员（需要通过 API 获取团队成员列表）
-        for (const team of pr.requested_reviewers_teams || []) {
-          if (team.id) {
-            try {
-              const members = await this.gitProvider.getTeamMembers(team.id);
-              if (shouldLog(verbose, 2)) {
-                console.log(
-                  `[syncReactionsToIssues] team ${team.name}(${team.id}) members: ${members.map((m) => m.login).join(", ")}`,
-                );
-              }
-              for (const member of members) {
-                if (member.login) {
-                  reviewers.add(member.login);
-                }
-              }
-            } catch (e) {
-              if (shouldLog(verbose, 2)) {
-                console.log(`[syncReactionsToIssues] failed to get team ${team.id} members: ${e}`);
-              }
-            }
-          }
-        }
-      } catch {
-        // 获取 PR 信息失败，继续使用已有的评审人列表
-      }
-      if (shouldLog(verbose, 2)) {
-        console.log(`[syncReactionsToIssues] final reviewers: ${Array.from(reviewers).join(", ")}`);
-      }
-
-      // 获取该 review 的所有行级评论
-      const reviewComments = await this.gitProvider.listPullReviewComments(
-        owner,
-        repo,
-        prNumber,
-        aiReview.id,
-      );
-      // 构建评论 ID 到 issue 的映射，用于后续匹配回复
-      const commentIdToIssue = new Map<number, (typeof result.issues)[0]>();
-      // 遍历每个评论，获取其 reactions
-      for (const comment of reviewComments) {
-        if (!comment.id) continue;
-        // 找到对应的 issue
-        const matchedIssue = result.issues.find(
-          (issue) =>
-            issue.file === comment.path && this.lineMatchesPosition(issue.line, comment.position),
-        );
-        if (matchedIssue) {
-          commentIdToIssue.set(comment.id, matchedIssue);
-        }
-        try {
-          const reactions = await this.gitProvider.getPullReviewCommentReactions(
-            owner,
-            repo,
-            comment.id,
-          );
-          if (reactions.length === 0 || !matchedIssue) continue;
-          // 按 content 分组，收集每种 reaction 的用户列表
-          const reactionMap = new Map<string, string[]>();
-          for (const r of reactions) {
-            if (!r.content) continue;
-            const users = reactionMap.get(r.content) || [];
-            if (r.user?.login) {
-              users.push(r.user.login);
-            }
-            reactionMap.set(r.content, users);
-          }
-          // 存储到 issue.reactions
-          matchedIssue.reactions = Array.from(reactionMap.entries()).map(([content, users]) => ({
-            content,
-            users,
-          }));
-          // 检查是否有评审人的 ☹️ (confused) reaction，标记为无效
-          const confusedUsers = reactionMap.get("confused") || [];
-          const reviewerConfused = confusedUsers.filter((u) => reviewers.has(u));
-          if (reviewerConfused.length > 0 && matchedIssue.valid !== "false") {
-            matchedIssue.valid = "false";
-            console.log(
-              `☹️ 问题已标记为无效: ${matchedIssue.file}:${matchedIssue.line} (by 评审人: ${reviewerConfused.join(", ")})`,
-            );
-          }
-          // 检查是否有评审人的 👎 (-1) reaction，标记为未解决
-          const thumbsDownUsers = reactionMap.get("-1") || [];
-          const reviewerThumbsDown = thumbsDownUsers.filter((u) => reviewers.has(u));
-          if (reviewerThumbsDown.length > 0 && (matchedIssue.resolved || matchedIssue.fixed)) {
-            matchedIssue.resolved = undefined;
-            matchedIssue.resolvedBy = undefined;
-            matchedIssue.fixed = undefined;
-            matchedIssue.fixedBy = undefined;
-            console.log(
-              `👎 问题已标记为未解决: ${matchedIssue.file}:${matchedIssue.line} (by 评审人: ${reviewerThumbsDown.join(", ")})`,
-            );
-          }
-        } catch {
-          // 单个评论获取 reactions 失败，继续处理其他评论
-        }
-      }
-      // 获取 PR 上的所有 Issue Comments（包含对 review 评论的回复）
-      await this.syncRepliesToIssues(owner, repo, prNumber, reviewComments, result);
-    } catch (error) {
-      console.warn("⚠️ 同步评论 reactions 失败:", error);
-    }
+  protected isAiGeneratedComment(body: string) {
+    return isAiGeneratedCommentFn(body);
   }
 
-  /**
-   * 从评论 body 中提取 issue key（AI 行级评论末尾的 HTML 注释标记）
-   * 格式：`<!-- issue-key: file:line:ruleId -->`
-   * 返回 null 表示非 AI 评论（即用户真实回复）
-   */
-  protected extractIssueKeyFromBody(body: string): string | null {
-    const match = body.match(/<!-- issue-key: (.+?) -->/);
-    return match ? match[1] : null;
+  protected generateIssueKey(issue: any) {
+    return generateIssueKeyFn(issue);
   }
 
-  /**
-   * 判断评论是否为 AI 生成的评论（非用户真实回复）
-   * 除 issue-key 标记外，还通过结构化格式特征识别
-   */
-  protected isAiGeneratedComment(body: string): boolean {
-    if (!body) return false;
-    // 含 issue-key 标记
-    if (body.includes("<!-- issue-key:")) return true;
-    // 含 AI 评论的结构化格式特征（同时包含「规则」和「文件」字段）
-    if (body.includes("- **规则**:") && body.includes("- **文件**:")) return true;
-    return false;
-  }
-
-  /**
-   * 同步评论回复到对应的 issues
-   * review 评论回复是通过同一个 review 下的后续评论实现的
-   *
-   * 通过 AI 评论 body 中嵌入的 issue key（`<!-- issue-key: file:line:ruleId -->`）精确匹配 issue：
-   * - 含 issue key 的评论是 AI 自身评论，过滤掉不作为回复
-   * - 不含 issue key 但匹配 AI 格式特征的评论也视为 AI 评论，过滤掉
-   * - 其余评论是用户真实回复，归到其前面最近的 AI 评论对应的 issue
-   */
   protected async syncRepliesToIssues(
-    _owner: string,
-    _repo: string,
-    _prNumber: number,
-    reviewComments: {
-      id?: number;
-      path?: string;
-      position?: number;
-      body?: string;
-      user?: { id?: number; login?: string };
-      created_at?: string;
-    }[],
-    result: ReviewResult,
-  ): Promise<void> {
-    try {
-      // 构建 issue key → issue 的映射，用于快速查找
-      const issueByKey = new Map<string, ReviewResult["issues"][0]>();
-      for (const issue of result.issues) {
-        issueByKey.set(this.generateIssueKey(issue), issue);
-      }
-      // 按文件路径和行号分组评论
-      const commentsByLocation = new Map<string, typeof reviewComments>();
-      for (const comment of reviewComments) {
-        if (!comment.path || !comment.position) continue;
-        const key = `${comment.path}:${comment.position}`;
-        const comments = commentsByLocation.get(key) || [];
-        comments.push(comment);
-        commentsByLocation.set(key, comments);
-      }
-      // 遍历每个位置的评论
-      for (const [, comments] of commentsByLocation) {
-        if (comments.length <= 1) continue;
-        // 按创建时间排序
-        comments.sort((a, b) => {
-          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return timeA - timeB;
-        });
-        // 遍历评论，用 issue key 精确匹配
-        let lastIssueKey: string | null = null;
-        for (const comment of comments) {
-          const commentBody = comment.body || "";
-          const issueKey = this.extractIssueKeyFromBody(commentBody);
-          if (issueKey) {
-            // AI 自身评论（含 issue-key），记录 issue key 但不作为回复
-            lastIssueKey = issueKey;
-            continue;
-          }
-          // 跳过不含 issue-key 但匹配 AI 格式特征的评论（如其他轮次的 bot 评论）
-          if (this.isAiGeneratedComment(commentBody)) {
-            continue;
-          }
-          // 用户真实回复，通过前面最近的 AI 评论的 issue key 精确匹配
-          let matchedIssue = lastIssueKey ? (issueByKey.get(lastIssueKey) ?? null) : null;
-          // 回退：如果 issue key 匹配失败，使用 path:position 匹配
-          if (!matchedIssue) {
-            matchedIssue =
-              result.issues.find(
-                (issue) =>
-                  issue.file === comment.path &&
-                  this.lineMatchesPosition(issue.line, comment.position),
-              ) ?? null;
-          }
-          if (!matchedIssue) continue;
-          // 追加回复（而非覆盖，同一 issue 可能有多条用户回复）
-          if (!matchedIssue.replies) {
-            matchedIssue.replies = [];
-          }
-          matchedIssue.replies.push({
-            user: {
-              id: comment.user?.id?.toString(),
-              login: comment.user?.login || "unknown",
-            },
-            body: comment.body || "",
-            createdAt: comment.created_at || "",
-          });
-        }
-      }
-    } catch (error) {
-      console.warn("⚠️ 同步评论回复失败:", error);
-    }
-  }
-
-  /**
-   * 删除已有的 AI review（通过 marker 识别）
-   * - 删除行级评论的 PR Review（带 REVIEW_LINE_COMMENTS_MARKER）
-   * - 删除主评论的 Issue Comment（带 REVIEW_COMMENT_MARKER）
-   */
-  protected async deleteExistingAiReviews(
     owner: string,
     repo: string,
     prNumber: number,
-  ): Promise<void> {
-    let deletedCount = 0;
-    // 删除行级评论的 PR Review
-    try {
-      const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
-      const aiReviews = reviews.filter(
-        (r) =>
-          r.body?.includes(REVIEW_LINE_COMMENTS_MARKER) || r.body?.includes(REVIEW_COMMENT_MARKER),
-      );
-      for (const review of aiReviews) {
-        if (review.id) {
-          try {
-            await this.gitProvider.deletePullReview(owner, repo, prNumber, review.id);
-            deletedCount++;
-          } catch {
-            // 已提交的 review 无法删除，忽略
-          }
-        }
-      }
-    } catch (error) {
-      console.warn("⚠️ 列出 PR reviews 失败:", error);
-    }
-    // 删除主评论的 Issue Comment
-    try {
-      const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
-      const aiComments = comments.filter((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
-      for (const comment of aiComments) {
-        if (comment.id) {
-          try {
-            await this.gitProvider.deleteIssueComment(owner, repo, comment.id);
-            deletedCount++;
-          } catch (error) {
-            console.warn(`⚠️ 删除评论 ${comment.id} 失败:`, error);
-          }
-        }
-      }
-    } catch (error) {
-      console.warn("⚠️ 列出 issue comments 失败:", error);
-    }
-    if (deletedCount > 0) {
-      console.log(`🗑️ 已删除 ${deletedCount} 个旧的 AI review`);
-    }
-  }
-
-  /**
-   * 构建行级评论 Review 的 body（marker + 本轮统计 + 上轮回顾）
-   */
-  protected buildLineReviewBody(
-    issues: ReviewIssue[],
-    round: number,
-    allIssues: ReviewIssue[],
-  ): string {
-    // 只统计待处理的问题（未修复且未解决）
-    const pendingIssues = issues.filter((i) => !i.fixed && !i.resolved && i.valid !== "false");
-    const pendingErrors = pendingIssues.filter((i) => i.severity === "error").length;
-    const pendingWarns = pendingIssues.filter((i) => i.severity === "warn").length;
-    const fileCount = new Set(issues.map((i) => i.file)).size;
-
-    const totalPending = pendingErrors + pendingWarns;
-    const badges: string[] = [];
-    if (totalPending > 0) badges.push(`⚠️ ${totalPending}`);
-    if (pendingErrors > 0) badges.push(`🔴 ${pendingErrors}`);
-    if (pendingWarns > 0) badges.push(`🟡 ${pendingWarns}`);
-
-    const parts: string[] = [REVIEW_LINE_COMMENTS_MARKER];
-    parts.push(`### 🚀 Spaceflow Review · Round ${round}`);
-    if (issues.length === 0) {
-      parts.push(`> ✅ 未发现新问题`);
-    } else {
-      parts.push(
-        `> **${issues.length}** 个新问题 · **${fileCount}** 个文件${badges.length > 0 ? " · " + badges.join(" ") : ""}`,
-      );
-    }
-
-    // 上轮回顾
-    if (round > 1) {
-      const prevIssues = allIssues.filter((i) => i.round === round - 1);
-      if (prevIssues.length > 0) {
-        const prevFixed = prevIssues.filter((i) => i.fixed).length;
-        const prevResolved = prevIssues.filter((i) => i.resolved && !i.fixed).length;
-        const prevInvalid = prevIssues.filter(
-          (i) => i.valid === "false" && !i.fixed && !i.resolved,
-        ).length;
-        const prevPending = prevIssues.length - prevFixed - prevResolved - prevInvalid;
-        parts.push("");
-        parts.push(
-          `<details><summary>📊 Round ${round - 1} 回顾 (${prevIssues.length} 个问题)</summary>\n`,
-        );
-        parts.push(`| 状态 | 数量 |`);
-        parts.push(`|------|------|`);
-        if (prevFixed > 0) parts.push(`| 🟢 已修复 | ${prevFixed} |`);
-        if (prevResolved > 0) parts.push(`| ⚪ 已解决 | ${prevResolved} |`);
-        if (prevInvalid > 0) parts.push(`| ❌ 无效 | ${prevInvalid} |`);
-        if (prevPending > 0) parts.push(`| ⚠️ 待处理 | ${prevPending} |`);
-        parts.push(`\n</details>`);
-      }
-    }
-
-    return parts.join("\n");
-  }
-
-  /**
-   * 将单个 ReviewIssue 转换为 CreatePullReviewComment
-   */
-  protected issueToReviewComment(issue: ReviewIssue): CreatePullReviewComment | null {
-    const lineNums = this.reviewSpecService.parseLineRange(issue.line);
-    if (lineNums.length === 0) {
-      return null;
-    }
-    const lineNum = lineNums[0];
-    // 构建评论内容，参照 markdown.formatter.ts 的格式
-    const severityEmoji =
-      issue.severity === "error" ? "🔴" : issue.severity === "warn" ? "🟡" : "⚪";
-    const lines: string[] = [];
-    lines.push(`${severityEmoji} **${issue.reason}**`);
-    lines.push(`- **文件**: \`${issue.file}:${issue.line}\``);
-    lines.push(`- **规则**: \`${issue.ruleId}\` (来自 \`${issue.specFile}\`)`);
-    if (issue.commit) {
-      lines.push(`- **Commit**: ${issue.commit}`);
-    }
-    lines.push(`- **开发人员**: ${issue.author ? "@" + issue.author.login : "未知"}`);
-    lines.push(`<!-- issue-key: ${this.generateIssueKey(issue)} -->`);
-    if (issue.suggestion) {
-      const ext = extname(issue.file).slice(1) || "";
-      const cleanSuggestion = issue.suggestion.replace(/```/g, "//").trim();
-      lines.push(`- **建议**:`);
-      lines.push(`\`\`\`${ext}`);
-      lines.push(cleanSuggestion);
-      lines.push("```");
-    }
-    return {
-      path: issue.file,
-      body: lines.join("\n"),
-      new_position: lineNum,
-      old_position: 0,
-    };
-  }
-
-  protected generateIssueKey(issue: ReviewIssue): string {
-    return `${issue.file}:${issue.line}:${issue.ruleId}`;
-  }
-
-  protected parseExistingReviewResult(commentBody: string): ReviewResult | null {
-    const parsed = this.reviewReportService.parseMarkdown(commentBody);
-    if (!parsed) {
-      return null;
-    }
-    return parsed.result;
-  }
-
-  /**
-   * 将有变更文件的历史 issue 标记为无效
-   * 简化策略：如果文件在最新 commit 中有变更，则将该文件的所有历史问题标记为无效
-   * @param issues 历史 issue 列表
-   * @param headSha 当前 PR head 的 SHA
-   * @param owner 仓库所有者
-   * @param repo 仓库名
-   * @param verbose 日志级别
-   * @returns 更新后的 issue 列表
-   */
-  protected async invalidateIssuesForChangedFiles(
-    issues: ReviewIssue[],
-    headSha: string | undefined,
-    owner: string,
-    repo: string,
-    verbose?: VerboseLevel,
-  ): Promise<ReviewIssue[]> {
-    if (!headSha) {
-      if (shouldLog(verbose, 1)) {
-        console.log(`   ⚠️ 无法获取 PR head SHA，跳过变更文件检查`);
-      }
-      return issues;
-    }
-
-    if (shouldLog(verbose, 1)) {
-      console.log(`   📊 获取最新 commit 变更文件: ${headSha.slice(0, 7)}`);
-    }
-
-    try {
-      // 使用 Git Provider API 获取最新一次 commit 的 diff
-      const diffText = await this.gitProvider.getCommitDiff(owner, repo, headSha);
-      const diffFiles = parseDiffText(diffText);
-
-      if (diffFiles.length === 0) {
-        if (shouldLog(verbose, 1)) {
-          console.log(`   ⏭️ 最新 commit 无文件变更`);
-        }
-        return issues;
-      }
-
-      // 构建变更文件集合
-      const changedFileSet = new Set(diffFiles.map((f) => f.filename));
-      if (shouldLog(verbose, 2)) {
-        console.log(`   [invalidateIssues] 变更文件: ${[...changedFileSet].join(", ")}`);
-      }
-
-      // 将变更文件的历史 issue 标记为无效
-      let invalidatedCount = 0;
-      const updatedIssues = issues.map((issue) => {
-        // 如果 issue 已修复、已解决或已无效，不需要处理
-        if (issue.fixed || issue.resolved || issue.valid === "false") {
-          return issue;
-        }
-
-        // 如果 issue 所在文件有变更，标记为无效
-        if (changedFileSet.has(issue.file)) {
-          invalidatedCount++;
-          if (shouldLog(verbose, 1)) {
-            console.log(`   🗑️ Issue ${issue.file}:${issue.line} 所在文件有变更，标记为无效`);
-          }
-          return { ...issue, valid: "false", originalLine: issue.originalLine ?? issue.line };
-        }
-
-        return issue;
-      });
-
-      if (invalidatedCount > 0 && shouldLog(verbose, 1)) {
-        console.log(`   📊 共标记 ${invalidatedCount} 个历史问题为无效（文件有变更）`);
-      }
-
-      return updatedIssues;
-    } catch (error) {
-      if (shouldLog(verbose, 1)) {
-        console.log(`   ⚠️ 获取最新 commit 变更文件失败: ${error}`);
-      }
-      return issues;
-    }
-  }
-
-  /**
-   * 根据代码变更更新历史 issue 的行号
-   * 当代码发生变化时，之前发现的 issue 行号可能已经不准确
-   * 此方法通过分析 diff 来计算新的行号
-   * @param issues 历史 issue 列表
-   * @param filePatchMap 文件名到 patch 的映射
-   * @param verbose 日志级别
-   * @returns 更新后的 issue 列表
-   */
-  protected updateIssueLineNumbers(
-    issues: ReviewIssue[],
-    filePatchMap: Map<string, string>,
-    verbose?: VerboseLevel,
-  ): ReviewIssue[] {
-    let updatedCount = 0;
-    let invalidatedCount = 0;
-    const updatedIssues = issues.map((issue) => {
-      // 如果 issue 已修复、已解决或无效，不需要更新行号
-      if (issue.fixed || issue.resolved || issue.valid === "false") {
-        return issue;
-      }
-
-      const patch = filePatchMap.get(issue.file);
-      if (!patch) {
-        // 文件没有变更，行号不变
-        return issue;
-      }
-
-      const lines = this.reviewSpecService.parseLineRange(issue.line);
-      if (lines.length === 0) {
-        return issue;
-      }
-
-      const startLine = lines[0];
-      const endLine = lines[lines.length - 1];
-      const hunks = parseHunksFromPatch(patch);
-
-      // 计算新的起始行号
-      const newStartLine = calculateNewLineNumber(startLine, hunks);
-      if (newStartLine === null) {
-        // 起始行被删除，直接标记为无效问题
-        invalidatedCount++;
-        if (shouldLog(verbose, 1)) {
-          console.log(`📍 Issue ${issue.file}:${issue.line} 对应的代码已被删除，标记为无效`);
-        }
-        return { ...issue, valid: "false", originalLine: issue.originalLine ?? issue.line };
-      }
-
-      // 如果是范围行号，计算新的结束行号
-      let newLine: string;
-      if (startLine === endLine) {
-        newLine = String(newStartLine);
-      } else {
-        const newEndLine = calculateNewLineNumber(endLine, hunks);
-        if (newEndLine === null || newEndLine === newStartLine) {
-          // 结束行被删除或范围缩小为单行，使用起始行
-          newLine = String(newStartLine);
-        } else {
-          newLine = `${newStartLine}-${newEndLine}`;
-        }
-      }
-
-      // 如果行号发生变化，更新 issue
-      if (newLine !== issue.line) {
-        updatedCount++;
-        if (shouldLog(verbose, 1)) {
-          console.log(`📍 Issue 行号更新: ${issue.file}:${issue.line} -> ${issue.file}:${newLine}`);
-        }
-        return { ...issue, line: newLine, originalLine: issue.originalLine ?? issue.line };
-      }
-
-      return issue;
-    });
-
-    if ((updatedCount > 0 || invalidatedCount > 0) && shouldLog(verbose, 1)) {
-      const parts: string[] = [];
-      if (updatedCount > 0) parts.push(`更新 ${updatedCount} 个行号`);
-      if (invalidatedCount > 0) parts.push(`标记 ${invalidatedCount} 个无效`);
-      console.log(`📊 Issue 行号处理: ${parts.join("，")}`);
-    }
-
-    return updatedIssues;
-  }
-
-  /**
-   * 过滤掉不属于本次 PR commits 的问题（排除 merge commit 引入的代码）
-   * 根据 fileContents 中问题行的实际 commit hash 进行验证，而不是依赖 LLM 填写的 commit
-   */
-  protected filterIssuesByValidCommits(
-    issues: ReviewIssue[],
-    commits: PullRequestCommit[],
-    fileContents: FileContentsMap,
-    verbose?: VerboseLevel,
-  ): ReviewIssue[] {
-    const validCommitHashes = new Set(commits.map((c) => c.sha?.slice(0, 7)).filter(Boolean));
-
-    if (shouldLog(verbose, 3)) {
-      console.log(`   🔍 有效 commit hashes: ${Array.from(validCommitHashes).join(", ")}`);
-    }
-
-    const beforeCount = issues.length;
-    const filtered = issues.filter((issue) => {
-      const contentLines = fileContents.get(issue.file);
-      if (!contentLines) {
-        // 文件不在 fileContents 中，保留 issue
-        if (shouldLog(verbose, 3)) {
-          console.log(`   ✅ Issue ${issue.file}:${issue.line} - 文件不在 fileContents 中，保留`);
-        }
-        return true;
-      }
-
-      const lineNums = this.reviewSpecService.parseLineRange(issue.line);
-      if (lineNums.length === 0) {
-        if (shouldLog(verbose, 3)) {
-          console.log(`   ✅ Issue ${issue.file}:${issue.line} - 无法解析行号，保留`);
-        }
-        return true;
-      }
-
-      // 检查问题行范围内是否有任意一行属于本次 PR 的有效 commits
-      for (const lineNum of lineNums) {
-        const lineData = contentLines[lineNum - 1];
-        if (lineData) {
-          const [actualHash] = lineData;
-          if (actualHash !== "-------" && validCommitHashes.has(actualHash)) {
-            if (shouldLog(verbose, 3)) {
-              console.log(
-                `   ✅ Issue ${issue.file}:${issue.line} - 行 ${lineNum} hash=${actualHash} 匹配，保留`,
-              );
-            }
-            return true;
-          }
-        }
-      }
-
-      // 问题行都不属于本次 PR 的有效 commits
-      if (shouldLog(verbose, 2)) {
-        console.log(`   Issue ${issue.file}:${issue.line} 不在本次 PR 变更行范围内，跳过`);
-      }
-      if (shouldLog(verbose, 3)) {
-        const hashes = lineNums.map((ln) => {
-          const ld = contentLines[ln - 1];
-          return ld ? `${ln}:${ld[0]}` : `${ln}:N/A`;
-        });
-        console.log(`   ❌ Issue ${issue.file}:${issue.line} - 行号 hash: ${hashes.join(", ")}`);
-      }
-      return false;
-    });
-    if (beforeCount !== filtered.length && shouldLog(verbose, 1)) {
-      console.log(`   过滤非本次 PR commits 问题后: ${beforeCount} -> ${filtered.length} 个问题`);
-    }
-    return filtered;
-  }
-
-  protected filterDuplicateIssues(
-    newIssues: ReviewIssue[],
-    existingIssues: ReviewIssue[],
-  ): { filteredIssues: ReviewIssue[]; skippedCount: number } {
-    // 所有历史问题（无论 valid 状态）都阻止新问题重复添加
-    // valid='false' 的问题已被评审人标记为无效，不应再次报告
-    // valid='true' 的问题已存在，无需重复
-    // fixed 的问题已解决，无需重复
-    const existingKeys = new Set(existingIssues.map((issue) => this.generateIssueKey(issue)));
-    const filteredIssues = newIssues.filter(
-      (issue) => !existingKeys.has(this.generateIssueKey(issue)),
+    reviewComments: any[],
+    result: any,
+  ) {
+    return syncRepliesToIssuesFn(
+      owner,
+      repo,
+      prNumber,
+      reviewComments,
+      result,
+      (line: string, pos?: number) => this.prComment.lineMatchesPosition(line, pos),
     );
-    const skippedCount = newIssues.length - filteredIssues.length;
-    return { filteredIssues, skippedCount };
   }
 
-  protected async getExistingReviewResult(
-    owner: string,
-    repo: string,
-    prNumber: number,
-  ): Promise<ReviewResult | null> {
-    try {
-      // 从 Issue Comment 获取已有的审查结果
-      const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
-      const existingComment = comments.find((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
-      if (existingComment?.body) {
-        return this.parseExistingReviewResult(existingComment.body);
-      }
-    } catch (error) {
-      console.warn("⚠️ 获取已有评论失败:", error);
-    }
-    return null;
+  protected normalizeFilePaths(...args: Parameters<ReviewContextBuilder["normalizeFilePaths"]>) {
+    return this.contextBuilder.normalizeFilePaths(...args);
   }
 
+  protected resolveAnalyzeDeletions(
+    ...args: Parameters<ReviewContextBuilder["resolveAnalyzeDeletions"]>
+  ) {
+    return this.contextBuilder.resolveAnalyzeDeletions(...args);
+  }
+
+  protected async getPrNumberFromEvent(
+    ...args: Parameters<ReviewContextBuilder["getPrNumberFromEvent"]>
+  ) {
+    return this.contextBuilder.getPrNumberFromEvent(...args);
+  }
+
+  /**
+   * 确保 Claude CLI 已安装
+   */
   protected async ensureClaudeCli(): Promise<void> {
     try {
       execSync("claude --version", { stdio: "ignore" });
@@ -3173,56 +1114,5 @@ ${fileChanges || "无"}`;
         );
       }
     }
-  }
-
-  /**
-   * 构建文件行号到 commit hash 的映射
-   * 遍历每个 commit，获取其修改的文件和行号
-   * 优先使用 API，失败时回退到 git 命令
-   */
-  protected async buildLineCommitMap(
-    owner: string,
-    repo: string,
-    commits: PullRequestCommit[],
-    verbose?: VerboseLevel,
-  ): Promise<Map<string, Map<number, string>>> {
-    // Map<filename, Map<lineNumber, commitHash>>
-    const fileLineMap = new Map<string, Map<number, string>>();
-
-    // 按时间顺序遍历 commits（早的在前），后面的 commit 会覆盖前面的
-    for (const commit of commits) {
-      if (!commit.sha) continue;
-
-      const shortHash = commit.sha.slice(0, 7);
-      let files: Array<{ filename: string; patch: string }> = [];
-
-      // 优先使用 getCommitDiff API 获取 diff 文本
-      try {
-        const diffText = await this.gitProvider.getCommitDiff(owner, repo, commit.sha);
-        files = parseDiffText(diffText);
-      } catch {
-        // API 失败，回退到 git 命令
-        files = this.gitSdk.getCommitDiff(commit.sha);
-      }
-      if (shouldLog(verbose, 2)) console.log(`   commit ${shortHash}: ${files.length} 个文件变更`);
-
-      for (const file of files) {
-        // 解析这个 commit 修改的行号
-        const changedLines = parseChangedLinesFromPatch(file.patch);
-
-        // 获取或创建文件的行号映射
-        if (!fileLineMap.has(file.filename)) {
-          fileLineMap.set(file.filename, new Map());
-        }
-        const lineMap = fileLineMap.get(file.filename)!;
-
-        // 记录每行对应的 commit hash
-        for (const lineNum of changedLines) {
-          lineMap.set(lineNum, shortHash);
-        }
-      }
-    }
-
-    return fileLineMap;
   }
 }
