@@ -12,7 +12,6 @@ import {
   EditPullRequestOption,
   Reaction,
   ResolvedThread,
-  User,
 } from "@spaceflow/core";
 
 /**
@@ -60,19 +59,15 @@ export class PullRequestModel {
         this.number,
       );
     }
-    return this._commits;
+    return [...this._commits];
   }
 
   /** 获取 PR 的变更文件列表（懒加载 + 缓存） */
   async getFiles(): Promise<ChangedFile[]> {
     if (!this._files) {
-      this._files = await this.gitProvider.getPullRequestFiles(
-        this.owner,
-        this.repo,
-        this.number,
-      );
+      this._files = await this.gitProvider.getPullRequestFiles(this.owner, this.repo, this.number);
     }
-    return this._files;
+    return [...this._files];
   }
 
   /** 获取 PR 的 diff 文本（懒加载 + 缓存） */
@@ -102,13 +97,9 @@ export class PullRequestModel {
   /** 列出 PR 的所有 Issue Comments（懒加载 + 缓存） */
   async getComments(): Promise<IssueComment[]> {
     if (!this._comments) {
-      this._comments = await this.gitProvider.listIssueComments(
-        this.owner,
-        this.repo,
-        this.number,
-      );
+      this._comments = await this.gitProvider.listIssueComments(this.owner, this.repo, this.number);
     }
-    return this._comments;
+    return [...this._comments];
   }
 
   /** 创建 Issue Comment */
@@ -148,7 +139,7 @@ export class PullRequestModel {
     if (!this._reviews) {
       this._reviews = await this.gitProvider.listPullReviews(this.owner, this.repo, this.number);
     }
-    return this._reviews;
+    return [...this._reviews];
   }
 
   /** 创建 PR Review */
@@ -201,16 +192,6 @@ export class PullRequestModel {
   /** 获取单个 commit 的 diff */
   async getCommitDiff(sha: string): Promise<string> {
     return this.gitProvider.getCommitDiff(this.owner, this.repo, sha);
-  }
-
-  /** 搜索用户 */
-  async searchUsers(query: string, limit?: number): Promise<User[]> {
-    return this.gitProvider.searchUsers(query, limit);
-  }
-
-  /** 获取团队成员列表 */
-  async getTeamMembers(teamId: number): Promise<User[]> {
-    return this.gitProvider.getTeamMembers(teamId);
   }
 
   /** 列出 workflow runs */

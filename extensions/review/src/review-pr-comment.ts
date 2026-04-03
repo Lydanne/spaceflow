@@ -1,4 +1,5 @@
 import {
+  GitProviderService,
   CreatePullReviewComment,
   REVIEW_STATE,
   type VerboseLevel,
@@ -29,6 +30,7 @@ export interface PostReviewCommentOptions {
 
 export class ReviewPrComment {
   constructor(
+    protected readonly gitProvider: GitProviderService,
     protected readonly config: IConfigReader,
     protected readonly reviewSpecService: ReviewSpecService,
     protected readonly reviewReportService: ReviewReportService,
@@ -419,7 +421,7 @@ export class ReviewPrComment {
         for (const team of prInfo.requested_reviewers_teams || []) {
           if (team.id) {
             try {
-              const members = await pr.getTeamMembers(team.id);
+              const members = await this.gitProvider.getTeamMembers(team.id);
               if (shouldLog(verbose, 2)) {
                 console.log(
                   `[syncReactionsToIssues] team ${team.name}(${team.id}) members: ${members.map((m) => m.login).join(", ")}`,

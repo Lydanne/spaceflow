@@ -59,7 +59,12 @@ export class ReviewService {
       gitSdk,
     );
     this.llmProcessor = new ReviewLlmProcessor(llmProxyService, reviewSpecService);
-    this.prComment = new ReviewPrComment(config, reviewSpecService, reviewReportService);
+    this.prComment = new ReviewPrComment(
+      gitProvider,
+      config,
+      reviewSpecService,
+      reviewReportService,
+    );
   }
 
   async getContextFromEnv(options: ReviewOptions): Promise<ReviewContext> {
