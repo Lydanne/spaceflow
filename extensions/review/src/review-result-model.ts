@@ -130,6 +130,13 @@ export class ReviewResultModel {
   // ─── 轮次推进 ─────────────────────────────────────────────
 
   /**
+   * 构建 Round 标题字符串，供 buildLineReviewBody 和 cleanupDuplicateRoundReviews 共用。
+   */
+  static buildRoundTitle(round: number): string {
+    return `### 🚀 Spaceflow Review · Round ${round}`;
+  }
+
+  /**
    * 基于当前模型创建下一轮审查模型。
    * - 自动递增 round
    * - 为 newIssues 打上 round 标签
@@ -475,6 +482,11 @@ export class ReviewResultModel {
       await this.syncReactions(verbose);
     }
 
+    // 并发合并：写入前重新读取 PR 最新评论，检查是否有并发 workflow 先写入了同 round 数据
+    // 场景：用户快速提交 commit A 和 B → 两个 review workflow 并发运行 → 都基于旧数据计算出 Round N
+    // 先完成的已写入 Round N，后完成的需要合并而非覆盖
+    await this.mergeWithLatest(verbose);
+
     // 查找已有的 AI 评论（Issue Comment），可能存在多个重复评论
     if (shouldLog(verbose, 2)) {
       console.log(
@@ -529,8 +541,11 @@ export class ReviewResultModel {
       console.warn("⚠️ 发布/更新 AI Review 评论失败:", error);
     }
 
-    // 2. 发布本轮新发现的行级评论（使用 PR Review API，不删除旧的 review，保留历史）
+    // 2. 发布本轮新发现的行级评论（使用 PR Review API）
+    // 保留旧轮次的 review 历史，但清理同轮次的旧 AI review（重复触发场景）
     // 如果启用 autoApprove 且所有问题已解决，使用 APPROVE event 合并发布
+    await this.cleanupDuplicateRoundReviews(this._result.round, verbose);
+
     let lineIssues: ReviewIssue[] = [];
     let comments: CreatePullReviewComment[] = [];
     if (reviewConf.lineComments) {
@@ -750,6 +765,132 @@ export class ReviewResultModel {
   // ─── 内部方法 ───────────────────────────────────────────
 
   /**
+   * 写入前并发合并：重新从 PR 读取最新评论，检查是否有并发 workflow 先写入了同 round 数据。
+   * 如果有，将当前结果的同 round issues 与已有的合并去重，保证 PR 上只有一份 Round N 数据。
+   *
+   * 场景：用户快速提交 commit A、B → 两个 workflow 并发 → 都基于旧 Round N-1 算出 Round N
+   * → 先完成的写入 Round N → 后完成的需要读取最新、合并后替换。
+   *
+   * ⚠️ 限制：这是 best-effort 合并，存在 TOCTOU 竞态。如果两个 workflow 几乎同时到达
+   * mergeWithLatest()，它们都会读到相同的旧状态并各自写入，导致后写者覆盖先写者的主评论、
+   * 以及产生两个 PR Review。cleanupDuplicateRoundReviews 可以缓解重复 review 问题，
+   * 但主评论仍以最后写入者为准。在没有服务端锁或乐观并发控制（如 ETag/If-Match）的前提下，
+   * 这是当前能做到的最佳方案。
+   */
+  private async mergeWithLatest(verbose?: VerboseLevel): Promise<void> {
+    try {
+      // invalidate 缓存，确保读到最新数据
+      this.pr.invalidate("comments");
+      const latestModel = await ReviewResultModel.loadFromPr(this.pr, this.deps);
+      if (!latestModel) return;
+
+      const myRound = this._result.round;
+      const latestRound = latestModel.round;
+
+      // 场景 1: latestRound < myRound — 没有并发写入，无需合并
+      if (latestRound < myRound) return;
+
+      // 场景 2: latestRound === myRound — 并发 workflow 先写入了同 round
+      // 将 latest 的同 round issues 与当前的合并去重
+      if (latestRound === myRound) {
+        const latestRoundIssues = latestModel.issues.filter((i) => i.round === myRound);
+        if (latestRoundIssues.length === 0) return;
+
+        const myRoundIssues = this._result.issues.filter((i) => i.round === myRound);
+        const myHistoryIssues = this._result.issues.filter((i) => i.round !== myRound);
+
+        // 以 latest 的同 round issues 为基础，追加当前独有的 issues（去重）
+        const existingKeys = new Set(latestRoundIssues.map((i) => generateIssueKey(i)));
+        const uniqueNewIssues = myRoundIssues.filter((i) => !existingKeys.has(generateIssueKey(i)));
+
+        const mergedRoundIssues = [...latestRoundIssues, ...uniqueNewIssues];
+        this._result = {
+          ...this._result,
+          issues: [...myHistoryIssues, ...mergedRoundIssues],
+          // 合并 latest 的 deletionImpact（并发的那个 workflow 可能已完成删除分析）
+          deletionImpact: this._result.deletionImpact ?? latestModel.result.deletionImpact,
+        };
+
+        if (shouldLog(verbose, 1)) {
+          console.log(
+            `🔀 检测到并发 Round ${myRound}，合并 ${latestRoundIssues.length} 个已有 + ${uniqueNewIssues.length} 个新增问题`,
+          );
+        }
+        return;
+      }
+
+      // 场景 3: latestRound > myRound — 并发 workflow 已推进到更高轮次
+      // 当前结果作为 latestRound 的补充合并进去
+      // 注意：有意使用 latestModel 的元信息（title/description/headSha 等）覆盖当前结果，
+      // 因为 latestModel 基于更新的 commit 生成，其元信息更准确。
+      if (latestRound > myRound) {
+        const myRoundIssues = this._result.issues.filter((i) => i.round === myRound);
+        // 将当前 round 的 issues 标记为 latestRound
+        const retaggedIssues = myRoundIssues.map((i) => ({ ...i, round: latestRound }));
+
+        // 与 latest 的同 round issues 去重
+        const latestKeys = new Set(latestModel.issues.map((i) => generateIssueKey(i)));
+        const uniqueIssues = retaggedIssues.filter((i) => !latestKeys.has(generateIssueKey(i)));
+
+        this._result = {
+          ...latestModel.result,
+          issues: [...latestModel.issues, ...uniqueIssues],
+          // 保留当前的 deletionImpact 等元信息（如果有）
+          deletionImpact: this._result.deletionImpact ?? latestModel.result.deletionImpact,
+        };
+
+        if (shouldLog(verbose, 1)) {
+          console.log(
+            `🔀 检测到并发更高轮次 Round ${latestRound}（当前 Round ${myRound}），合并 ${uniqueIssues.length} 个新增问题`,
+          );
+        }
+      }
+    } catch (error) {
+      // 合并失败不阻塞写入，使用当前数据继续
+      if (shouldLog(verbose, 2)) {
+        console.warn("⚠️ 并发合并检查失败:", error);
+      }
+    }
+  }
+
+  /**
+   * 清理同轮次的旧 AI review（PR Review），避免重复触发时产生重复的 Round 评论。
+   * 保留旧轮次的 review 历史（如 Round 1 的评论在 Round 2 时保留）。
+   * 只删除包含 REVIEW_LINE_COMMENTS_MARKER 且 Round 号匹配当前轮次的 review。
+   */
+  private async cleanupDuplicateRoundReviews(
+    currentRound: number,
+    verbose?: VerboseLevel,
+  ): Promise<void> {
+    try {
+      const reviews = await this.pr.getReviews();
+      const roundPattern = ReviewResultModel.buildRoundTitle(currentRound);
+      const duplicateReviews = reviews.filter(
+        (r) =>
+          r.body?.includes(REVIEW_LINE_COMMENTS_MARKER) && r.body?.includes(roundPattern) && r.id,
+      );
+      for (const review of duplicateReviews) {
+        try {
+          await this.pr.deleteReview(review.id!);
+          if (shouldLog(verbose, 1)) {
+            console.log(`🗑️ 已删除同轮次的旧 AI review (id: ${review.id}, Round ${currentRound})`);
+          }
+        } catch {
+          // 已提交的 review 无法删除，忽略
+        }
+      }
+      // invalidate reviews 缓存以便后续操作获取最新状态
+      if (duplicateReviews.length > 0) {
+        this.pr.invalidate("reviews");
+      }
+    } catch (error) {
+      if (shouldLog(verbose, 2)) {
+        console.warn("⚠️ 清理同轮次旧 review 失败:", error);
+      }
+    }
+  }
+
+  /**
    * 查找已有的所有 AI 评论（Issue Comment）。
    * 返回所有包含 REVIEW_COMMENT_MARKER 的评论，用于更新第一个并清理重复项。
    */
@@ -843,7 +984,7 @@ export class ReviewResultModel {
     if (pendingWarns > 0) badges.push(`🟡 ${pendingWarns}`);
 
     const parts: string[] = [REVIEW_LINE_COMMENTS_MARKER];
-    parts.push(`### 🚀 Spaceflow Review · Round ${round}`);
+    parts.push(ReviewResultModel.buildRoundTitle(round));
     if (issues.length === 0) {
       parts.push(`> ✅ 未发现新问题`);
     } else {

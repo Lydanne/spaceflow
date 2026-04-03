@@ -517,7 +517,7 @@ export class ReviewService {
         }
       }
 
-      // 去重
+      // 去重：与所有历史 issues 去重
       const { filteredIssues: newIssues, skippedCount } = this.filterDuplicateIssues(
         result.issues,
         existingResultModel.issues,
@@ -526,13 +526,15 @@ export class ReviewService {
         console.log(`   跳过 ${skippedCount} 个重复问题，新增 ${newIssues.length} 个问题`);
       }
       result.issues = newIssues;
+      result.headSha = headSha;
 
-      // 基于上一轮创建新一轮（自动 round 递增 + issues 合并）
+      // 自动 round 递增 + issues 合并
       return existingResultModel.nextRound(result);
     }
 
     // 首次审查或无历史结果
     result.round = 1;
+    result.headSha = headSha;
     result.issues = result.issues.map((issue) => ({ ...issue, round: 1 }));
     return prModel
       ? ReviewResultModel.create(prModel, result, this.resultModelDeps)
@@ -573,18 +575,7 @@ export class ReviewService {
       );
     }
 
-    // 第一次提交报告
-    if (prModel && !dryRun) {
-      if (shouldLog(verbose, 1)) {
-        console.log(`💬 提交 PR 评论 (代码审查完成)...`);
-      }
-      await finalModel.save({ verbose, autoApprove, skipSync: true });
-      if (shouldLog(verbose, 1)) {
-        console.log(`✅ 评论已提交`);
-      }
-    }
-
-    // 删除代码影响分析
+    // 删除代码影响分析（在 save 之前完成，避免多次 save 产生重复的 Round 评论）
     if (context.analyzeDeletions && llmMode) {
       const deletionImpact = await this.deletionImpactService.analyzeDeletionImpact(
         {
@@ -600,15 +591,16 @@ export class ReviewService {
         verbose,
       );
       finalModel.update({ deletionImpact });
+    }
 
-      if (prModel && !dryRun) {
-        if (shouldLog(verbose, 1)) {
-          console.log(`💬 更新 PR 评论 (删除代码分析完成)...`);
-        }
-        await finalModel.save({ verbose, skipSync: true });
-        if (shouldLog(verbose, 1)) {
-          console.log(`✅ 评论已更新`);
-        }
+    // 统一提交报告（只调用一次 save，避免重复创建 PR Review）
+    if (prModel && !dryRun) {
+      if (shouldLog(verbose, 1)) {
+        console.log(`💬 提交 PR 评论...`);
+      }
+      await finalModel.save({ verbose, autoApprove, skipSync: true });
+      if (shouldLog(verbose, 1)) {
+        console.log(`✅ 评论已提交`);
       }
     }
 
