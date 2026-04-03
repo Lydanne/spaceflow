@@ -32,7 +32,7 @@ import {
 } from "./review-pr-comment-utils";
 
 export type { ReviewContext } from "./review-context";
-export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./review-context";
+export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./review-llm";
 
 export class ReviewService {
   protected readonly contextBuilder: ReviewContextBuilder;

@@ -20,8 +20,7 @@ import {
   FileContentLine,
 } from "./review-spec";
 import { IssueVerifyService } from "./issue-verify.service";
-import { generateIssueKey } from "./review-pr-comment-utils";
-import { REVIEW_COMMENT_MARKER } from "./review-pr-comment";
+import { generateIssueKey, REVIEW_COMMENT_MARKER } from "./review-pr-comment-utils";
 import type { ReviewContext } from "./review-context";
 
 export class ReviewIssueFilter {

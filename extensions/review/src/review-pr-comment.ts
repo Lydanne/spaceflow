@@ -15,12 +15,10 @@ import {
   generateIssueKey,
   syncRepliesToIssues,
   calculateIssueStats,
+  REVIEW_COMMENT_MARKER,
+  REVIEW_LINE_COMMENTS_MARKER,
 } from "./review-pr-comment-utils";
 export { deleteExistingAiReviews, isAiGeneratedComment } from "./review-pr-comment-utils";
-
-const REVIEW_COMMENT_MARKER = "<!-- spaceflow-review -->";
-const REVIEW_LINE_COMMENTS_MARKER = "<!-- spaceflow-review-lines -->";
-
 export { REVIEW_COMMENT_MARKER, REVIEW_LINE_COMMENTS_MARKER };
 
 export interface PostReviewCommentOptions {

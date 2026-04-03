@@ -19,10 +19,27 @@ import {
   FileSummary,
   FileContentsMap,
 } from "./review-spec";
-import type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./review-context";
 import { readdir } from "fs/promises";
 import { dirname, extname } from "path";
 import micromatch from "micromatch";
+
+export interface FileReviewPrompt {
+  filename: string;
+  systemPrompt: string;
+  userPrompt: string;
+}
+
+export interface ReviewPrompt {
+  filePrompts: FileReviewPrompt[];
+}
+
+export interface LLMReviewOptions {
+  verbose?: VerboseLevel;
+  concurrency?: number;
+  timeout?: number;
+  retries?: number;
+  retryDelay?: number;
+}
 
 const REVIEW_SCHEMA: LlmJsonPutSchema = {
   type: "object",

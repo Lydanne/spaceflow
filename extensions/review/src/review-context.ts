@@ -55,24 +55,6 @@ export interface ReviewContext extends ReviewOptions {
   localMode?: LocalReviewMode;
 }
 
-export interface FileReviewPrompt {
-  filename: string;
-  systemPrompt: string;
-  userPrompt: string;
-}
-
-export interface ReviewPrompt {
-  filePrompts: FileReviewPrompt[];
-}
-
-export interface LLMReviewOptions {
-  verbose?: VerboseLevel;
-  concurrency?: number;
-  timeout?: number;
-  retries?: number;
-  retryDelay?: number;
-}
-
 export class ReviewContextBuilder {
   constructor(
     protected readonly gitProvider: GitProviderService,

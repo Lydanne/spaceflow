@@ -1,8 +1,8 @@
 import { GitProviderService } from "@spaceflow/core";
 import { ReviewIssue, ReviewResult, ReviewStats } from "./review-spec";
 
-const REVIEW_COMMENT_MARKER = "<!-- spaceflow-review -->";
-const REVIEW_LINE_COMMENTS_MARKER = "<!-- spaceflow-review-lines -->";
+export const REVIEW_COMMENT_MARKER = "<!-- spaceflow-review -->";
+export const REVIEW_LINE_COMMENTS_MARKER = "<!-- spaceflow-review-lines -->";
 
 /**
  * 从评论 body 中提取 issue key（AI 行级评论末尾的 HTML 注释标记）
