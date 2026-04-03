@@ -14,6 +14,7 @@ import {
   extractIssueKeyFromBody,
   generateIssueKey,
   syncRepliesToIssues,
+  calculateIssueStats,
 } from "./review-pr-comment-utils";
 export { deleteExistingAiReviews, isAiGeneratedComment } from "./review-pr-comment-utils";
 
@@ -57,6 +58,7 @@ export class ReviewPrComment {
     result: ReviewResult,
     verbose?: VerboseLevel,
     autoApprove?: boolean,
+    skipSync?: boolean,
   ): Promise<void> {
     // 获取配置
     const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
@@ -72,10 +74,11 @@ export class ReviewPrComment {
     }
 
     // 获取已解决的评论，同步 resolve 状态（在更新 review 之前）
-    await this.syncResolvedComments(owner, repo, prNumber, result);
-
-    // 获取评论的 reactions，同步状态（☹️ 标记无效，👎 标记未解决）
-    await this.syncReactionsToIssues(owner, repo, prNumber, result, verbose);
+    // 如果调用方已经同步过，skipSync=true 跳过冗余的 API 调用
+    if (!skipSync) {
+      await this.syncResolvedComments(owner, repo, prNumber, result);
+      await this.syncReactionsToIssues(owner, repo, prNumber, result, verbose);
+    }
 
     // 查找已有的 AI 评论（Issue Comment），可能存在多个重复评论
     if (shouldLog(verbose, 2)) {
@@ -633,18 +636,9 @@ export class ReviewPrComment {
   }
 
   /**
-   * 计算问题状态统计（与 ReviewIssueFilter 中相同逻辑，这里为 postOrUpdateReviewComment 内部使用）
+   * 计算问题状态统计
    */
   protected calculateIssueStats(issues: ReviewIssue[]): ReviewStats {
-    const total = issues.length;
-    const validIssue = issues.filter((i) => i.valid !== "false");
-    const validTotal = validIssue.length;
-    const fixed = validIssue.filter((i) => i.fixed).length;
-    const resolved = validIssue.filter((i) => i.resolved && !i.fixed).length;
-    const invalid = total - validTotal;
-    const pending = validTotal - fixed - resolved;
-    const fixRate = validTotal > 0 ? Math.round((fixed / validTotal) * 100 * 10) / 10 : 0;
-    const resolveRate = validTotal > 0 ? Math.round((resolved / validTotal) * 100 * 10) / 10 : 0;
-    return { total, validTotal, fixed, resolved, invalid, pending, fixRate, resolveRate };
+    return calculateIssueStats(issues);
   }
 }

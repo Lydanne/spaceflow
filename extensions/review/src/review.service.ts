@@ -381,7 +381,7 @@ export class ReviewService {
     // 填充 PR 功能描述和标题
     const prInfo = context.generateDescription
       ? await this.generatePrDescription(commits, changedFiles, llmMode, fileContents, verbose)
-      : await this.buildFallbackDescription(commits, changedFiles);
+      : await this.buildBasicDescription(commits, changedFiles);
     result.title = prInfo.title;
     result.description = prInfo.description;
     // 更新 round 并为新 issues 赋值 round
@@ -531,6 +531,7 @@ export class ReviewService {
         },
         verbose,
         autoApprove,
+        true, // skipSync: execute 已在前面显式同步过 resolved/reactions 状态
       );
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已提交`);
@@ -568,6 +569,8 @@ export class ReviewService {
             issues: allIssues,
           },
           verbose,
+          undefined,
+          true, // skipSync: 同一次 execute 流程，无需重复同步
         );
         if (shouldLog(verbose, 1)) {
           console.log(`✅ 评论已更新`);
@@ -721,7 +724,7 @@ export class ReviewService {
 
     const prInfo = context.generateDescription
       ? await this.generatePrDescription(commits, changedFiles, llmMode, undefined, verbose)
-      : await this.buildFallbackDescription(commits, changedFiles);
+      : await this.buildBasicDescription(commits, changedFiles);
     const result: ReviewResult = {
       success: true,
       title: prInfo.title,
@@ -792,7 +795,7 @@ export class ReviewService {
     const prInfo =
       context.generateDescription && llmMode
         ? await this.generatePrDescription(commits, changedFiles, llmMode, undefined, verbose)
-        : await this.buildFallbackDescription(commits, changedFiles);
+        : await this.buildBasicDescription(commits, changedFiles);
     const result: ReviewResult = {
       success: true,
       title: prInfo.title,
@@ -874,9 +877,6 @@ export class ReviewService {
     return null;
   }
 
-  /**
-   * 确保 Claude CLI 已安装
-   */
   // --- Delegation methods for backward compatibility with tests ---
 
   protected async fillIssueAuthors(...args: Parameters<ReviewContextBuilder["fillIssueAuthors"]>) {
@@ -965,10 +965,10 @@ export class ReviewService {
     return this.llmProcessor.generatePrDescription(...args);
   }
 
-  protected async buildFallbackDescription(
-    ...args: Parameters<ReviewLlmProcessor["buildFallbackDescription"]>
+  protected async buildBasicDescription(
+    ...args: Parameters<ReviewLlmProcessor["buildBasicDescription"]>
   ) {
-    return this.llmProcessor.buildFallbackDescription(...args);
+    return this.llmProcessor.buildBasicDescription(...args);
   }
 
   protected async reviewSingleFile(...args: Parameters<ReviewLlmProcessor["reviewSingleFile"]>) {

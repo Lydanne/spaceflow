@@ -3218,7 +3218,7 @@ describe("ReviewService", () => {
     });
   });
 
-  describe("ReviewService.buildFallbackDescription", () => {
+  describe("ReviewService.buildBasicDescription", () => {
     it("should build description from commits and files", async () => {
       const llmProxy = (service as any).llmProxyService;
       const mockStream = (async function* () {
@@ -3231,7 +3231,7 @@ describe("ReviewService", () => {
         { filename: "b.ts", status: "modified" },
         { filename: "c.ts", status: "deleted" },
       ];
-      const result = await (service as any).buildFallbackDescription(commits, changedFiles);
+      const result = await (service as any).buildBasicDescription(commits, changedFiles);
       expect(result.description).toContain("提交记录");
       expect(result.description).toContain("文件变更");
       expect(result.description).toContain("新增 1");
@@ -3245,7 +3245,7 @@ describe("ReviewService", () => {
         yield { type: "text", content: "Feat: empty" };
       })();
       llmProxy.chatStream.mockReturnValue(mockStream);
-      const result = await (service as any).buildFallbackDescription([], []);
+      const result = await (service as any).buildBasicDescription([], []);
       expect(result.title).toBeDefined();
     });
   });

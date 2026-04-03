@@ -560,7 +560,7 @@ ${changedFiles.length > 30 ? `\n... 等 ${changedFiles.length - 30} 个文件` :
       if (shouldLog(verbose, 1)) {
         console.warn("⚠️ AI 总结 PR 功能失败，使用默认描述:", error);
       }
-      return this.buildFallbackDescription(commits, changedFiles);
+      return this.buildBasicDescription(commits, changedFiles);
     }
   }
 
@@ -619,9 +619,9 @@ ${fileChanges || "无"}`;
   }
 
   /**
-   * 构建降级描述（当 AI 总结失败时使用）
+   * 构建基础描述（不做完整的 AI 功能总结，但仍用 LLM 辅助生成标题）
    */
-  async buildFallbackDescription(
+  async buildBasicDescription(
     commits: PullRequestCommit[],
     changedFiles: ChangedFile[],
   ): Promise<{ title: string; description: string }> {

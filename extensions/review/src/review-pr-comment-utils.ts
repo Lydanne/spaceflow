@@ -1,5 +1,5 @@
 import { GitProviderService } from "@spaceflow/core";
-import { ReviewIssue, ReviewResult } from "./review-spec";
+import { ReviewIssue, ReviewResult, ReviewStats } from "./review-spec";
 
 const REVIEW_COMMENT_MARKER = "<!-- spaceflow-review -->";
 const REVIEW_LINE_COMMENTS_MARKER = "<!-- spaceflow-review-lines -->";
@@ -175,4 +175,20 @@ export async function deleteExistingAiReviews(
   if (deletedCount > 0) {
     console.log(`🗑️ 已删除 ${deletedCount} 个旧的 AI review`);
   }
+}
+
+/**
+ * 计算问题状态统计
+ */
+export function calculateIssueStats(issues: ReviewIssue[]): ReviewStats {
+  const total = issues.length;
+  const validIssue = issues.filter((i) => i.valid !== "false");
+  const validTotal = validIssue.length;
+  const fixed = validIssue.filter((i) => i.fixed).length;
+  const resolved = validIssue.filter((i) => i.resolved && !i.fixed).length;
+  const invalid = total - validTotal;
+  const pending = validTotal - fixed - resolved;
+  const fixRate = validTotal > 0 ? Math.round((fixed / validTotal) * 100 * 10) / 10 : 0;
+  const resolveRate = validTotal > 0 ? Math.round((resolved / validTotal) * 100 * 10) / 10 : 0;
+  return { total, validTotal, fixed, resolved, invalid, pending, fixRate, resolveRate };
 }

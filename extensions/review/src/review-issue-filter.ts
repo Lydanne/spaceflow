@@ -21,6 +21,8 @@ import {
   FileContentLine,
 } from "./review-spec";
 import { IssueVerifyService } from "./issue-verify.service";
+import { calculateIssueStats, generateIssueKey } from "./review-pr-comment-utils";
+import { REVIEW_COMMENT_MARKER } from "./review-pr-comment";
 import type { ReviewContext } from "./review-context";
 
 export class ReviewIssueFilter {
@@ -134,16 +136,7 @@ export class ReviewIssueFilter {
    * 计算问题状态统计
    */
   calculateIssueStats(issues: ReviewIssue[]): ReviewStats {
-    const total = issues.length;
-    const validIssue = issues.filter((i) => i.valid !== "false");
-    const validTotal = validIssue.length;
-    const fixed = validIssue.filter((i) => i.fixed).length;
-    const resolved = validIssue.filter((i) => i.resolved && !i.fixed).length;
-    const invalid = total - validTotal;
-    const pending = validTotal - fixed - resolved;
-    const fixRate = validTotal > 0 ? Math.round((fixed / validTotal) * 100 * 10) / 10 : 0;
-    const resolveRate = validTotal > 0 ? Math.round((resolved / validTotal) * 100 * 10) / 10 : 0;
-    return { total, validTotal, fixed, resolved, invalid, pending, fixRate, resolveRate };
+    return calculateIssueStats(issues);
   }
 
   async getChangedFilesBetweenRefs(
@@ -278,8 +271,8 @@ export class ReviewIssueFilter {
             return [hash, line];
           });
           contents.set(file.filename, contentLines);
-        } catch {
-          console.warn(`警告: 无法获取文件内容: ${file.filename}`);
+        } catch (error) {
+          console.warn(`警告: 无法获取文件内容: ${file.filename}`, error);
         }
       }
     }
@@ -564,7 +557,7 @@ export class ReviewIssueFilter {
     try {
       // 从 Issue Comment 获取已有的审查结果
       const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
-      const existingComment = comments.find((c) => c.body?.includes("<!-- spaceflow-review -->"));
+      const existingComment = comments.find((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
       if (existingComment?.body) {
         const parsed = parseMarkdown(existingComment.body);
         return parsed?.result ?? null;
@@ -576,7 +569,7 @@ export class ReviewIssueFilter {
   }
 
   generateIssueKey(issue: ReviewIssue): string {
-    return `${issue.file}:${issue.line}:${issue.ruleId}`;
+    return generateIssueKey(issue);
   }
 
   /**
