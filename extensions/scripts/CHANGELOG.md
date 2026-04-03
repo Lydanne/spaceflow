@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.30.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@0.29.0...@spaceflow/scripts@0.30.0) (2026-04-03)
+
+### 新特性
+
+* **review:** 添加 skipDuplicateWorkflow 和 autoApprove 配置选项支持 ([3ede6e3](https://github.com/Lydanne/spaceflow/commit/3ede6e30d89ced5ef57e154e42f723da5e3c5d92))
+
+### 修复BUG
+
+* **review-summary:** 在用户名前添加 @ 符号以支持用户提及 ([a4aa03f](https://github.com/Lydanne/spaceflow/commit/a4aa03f377bb26e1fa7adc90568d89f2bb9936ce))
+* **review-summary:** 在用户名前添加 @ 符号以支持用户提及 ([fd83df4](https://github.com/Lydanne/spaceflow/commit/fd83df4a647e6c4d42617b44fdaf0ebbec7892e4))
+* **review:** 为 skipDuplicateWorkflow 添加错误处理以应对权限不足问题 ([6d0292d](https://github.com/Lydanne/spaceflow/commit/6d0292d20b6eba790f594c555ceb18b75ebfe253))
+
+### 其他修改
+
+* **core:** released version 0.28.0 [no ci] ([6baebaa](https://github.com/Lydanne/spaceflow/commit/6baebaa4cd777b6f8babcb5d8a2f25c426f8da05))
+* **publish:** released version 0.52.0 [no ci] ([bcbc2a9](https://github.com/Lydanne/spaceflow/commit/bcbc2a97e5bdedfd728330a33f19ec9172d80f40))
+* **review-summary:** released version 0.38.0 [no ci] ([119c2a8](https://github.com/Lydanne/spaceflow/commit/119c2a8861a02e68a4e31135aa88799fe63d29ff))
+* **review-summary:** released version 0.39.0 [no ci] ([40fbd43](https://github.com/Lydanne/spaceflow/commit/40fbd435b3895b22b04dce7cce4c487f0edbdd2a))
+* **review-summary:** released version 0.40.0 [no ci] ([9c5c262](https://github.com/Lydanne/spaceflow/commit/9c5c26256984c9349def2801af6e77b7013e703f))
+* **review:** released version 0.71.0 [no ci] ([bcfe523](https://github.com/Lydanne/spaceflow/commit/bcfe5232a66c809e461e8e58d823e9a17aa184ea))
+* **review:** released version 0.72.0 [no ci] ([966d138](https://github.com/Lydanne/spaceflow/commit/966d13801344ffd104a7f0664b894faff47dd4a3))
+* **shell:** released version 0.29.0 [no ci] ([368f8c8](https://github.com/Lydanne/spaceflow/commit/368f8c83ae3e485df5bfd4128e46aef4a6689eb0))
+
 ## [0.29.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@0.28.0...@spaceflow/scripts@0.29.0) (2026-04-02)
 
 ### 新特性
