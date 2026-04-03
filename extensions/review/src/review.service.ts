@@ -623,14 +623,16 @@ export class ReviewService {
       throw new Error("必须指定 PR 编号或者 base/head 分支");
     }
 
-    // 0. 过滤掉 merge commit（消息以 "Merge branch" 开头的 commit）
-    const beforeMergeFilterCount = commits.length;
-    commits = commits.filter((c) => {
-      const message = c.commit?.message || "";
-      return !message.startsWith("Merge branch ");
-    });
-    if (beforeMergeFilterCount !== commits.length && shouldLog(verbose, 1)) {
-      console.log(`   跳过 Merge Commits: ${beforeMergeFilterCount} -> ${commits.length} 个`);
+    // 0. 过滤掉 merge commit（消息以 "Merge branch" 或 "Merge pull request" 开头的 commit）
+    {
+      const beforeMergeFilterCount = commits.length;
+      commits = commits.filter((c) => {
+        const message = c.commit?.message || "";
+        return !message.startsWith("Merge ");
+      });
+      if (beforeMergeFilterCount !== commits.length && shouldLog(verbose, 1)) {
+        console.log(`   跳过 Merge Commits: ${beforeMergeFilterCount} -> ${commits.length} 个`);
+      }
     }
 
     // 1. 按指定的 files 过滤
@@ -822,7 +824,7 @@ export class ReviewService {
       verbose,
     );
 
-    // 过滤掉不属于本次 PR commits 的问题（排除 merge commit 引入的代码）
+    // 过滤掉不属于本次 PR commits 的问题（merge commits 已在步骤 0 中移除）
     if (shouldLog(verbose, 3)) {
       console.log(`   🔍 变更行过滤条件检查:`);
       console.log(
