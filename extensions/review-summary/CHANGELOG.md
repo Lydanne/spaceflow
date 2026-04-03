@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.42.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.41.0...@spaceflow/review-summary@0.42.0) (2026-04-03)
+
+### 修复BUG
+
+* **review:** 在 CI 模式下为 PR 提交 review 评论 ([39a9911](https://github.com/Lydanne/spaceflow/commit/39a9911ee356e54bd4a5b219905226b9f9b6322b))
+
+### 其他修改
+
+* **review:** released version 0.73.0 [no ci] ([b20c43f](https://github.com/Lydanne/spaceflow/commit/b20c43f18b7be383a49e616b15e43798bbe8693f))
+
 ## [0.41.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.40.0...@spaceflow/review-summary@0.41.0) (2026-04-03)
 
 ### 修复BUG
