@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.72.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.71.0...@spaceflow/review@0.72.0) (2026-04-03)
+
+### 修复BUG
+
+* **review:** 为 skipDuplicateWorkflow 添加错误处理以应对权限不足问题 ([6d0292d](https://github.com/Lydanne/spaceflow/commit/6d0292d20b6eba790f594c555ceb18b75ebfe253))
+
+### 其他修改
+
+* **core:** released version 0.28.0 [no ci] ([6baebaa](https://github.com/Lydanne/spaceflow/commit/6baebaa4cd777b6f8babcb5d8a2f25c426f8da05))
+* **publish:** released version 0.52.0 [no ci] ([bcbc2a9](https://github.com/Lydanne/spaceflow/commit/bcbc2a97e5bdedfd728330a33f19ec9172d80f40))
+* **review-summary:** released version 0.40.0 [no ci] ([9c5c262](https://github.com/Lydanne/spaceflow/commit/9c5c26256984c9349def2801af6e77b7013e703f))
+
 ## [0.71.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.70.0...@spaceflow/review@0.71.0) (2026-04-02)
 
 ### 新特性
