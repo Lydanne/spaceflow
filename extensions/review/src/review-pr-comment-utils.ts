@@ -1,5 +1,5 @@
-import { GitProviderService } from "@spaceflow/core";
 import { ReviewIssue, ReviewResult, ReviewStats } from "./review-spec";
+import { PullRequestModel } from "./pull-request-model";
 
 export const REVIEW_COMMENT_MARKER = "<!-- spaceflow-review -->";
 export const REVIEW_LINE_COMMENTS_MARKER = "<!-- spaceflow-review-lines -->";
@@ -41,9 +41,6 @@ export function generateIssueKey(issue: ReviewIssue): string {
  * - 其余评论是用户真实回复，归到其前面最近的 AI 评论对应的 issue
  */
 export async function syncRepliesToIssues(
-  _owner: string,
-  _repo: string,
-  _prNumber: number,
   reviewComments: {
     id?: number;
     path?: string;
@@ -128,16 +125,11 @@ export async function syncRepliesToIssues(
  * - 删除行级评论的 PR Review（带 REVIEW_LINE_COMMENTS_MARKER）
  * - 删除主评论的 Issue Comment（带 REVIEW_COMMENT_MARKER）
  */
-export async function deleteExistingAiReviews(
-  gitProvider: GitProviderService,
-  owner: string,
-  repo: string,
-  prNumber: number,
-): Promise<void> {
+export async function deleteExistingAiReviews(pr: PullRequestModel): Promise<void> {
   let deletedCount = 0;
   // 删除行级评论的 PR Review
   try {
-    const reviews = await gitProvider.listPullReviews(owner, repo, prNumber);
+    const reviews = await pr.getReviews();
     const aiReviews = reviews.filter(
       (r) =>
         r.body?.includes(REVIEW_LINE_COMMENTS_MARKER) || r.body?.includes(REVIEW_COMMENT_MARKER),
@@ -145,7 +137,7 @@ export async function deleteExistingAiReviews(
     for (const review of aiReviews) {
       if (review.id) {
         try {
-          await gitProvider.deletePullReview(owner, repo, prNumber, review.id);
+          await pr.deleteReview(review.id);
           deletedCount++;
         } catch {
           // 已提交的 review 无法删除，忽略
@@ -157,12 +149,12 @@ export async function deleteExistingAiReviews(
   }
   // 删除主评论的 Issue Comment
   try {
-    const comments = await gitProvider.listIssueComments(owner, repo, prNumber);
+    const comments = await pr.getComments();
     const aiComments = comments.filter((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
     for (const comment of aiComments) {
       if (comment.id) {
         try {
-          await gitProvider.deleteIssueComment(owner, repo, comment.id);
+          await pr.deleteComment(comment.id);
           deletedCount++;
         } catch (error) {
           console.warn(`⚠️ 删除评论 ${comment.id} 失败:`, error);

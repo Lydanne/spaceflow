@@ -1,11 +1,11 @@
 import {
-  GitProviderService,
   CreatePullReviewComment,
   REVIEW_STATE,
   type VerboseLevel,
   shouldLog,
 } from "@spaceflow/core";
 import type { IConfigReader } from "@spaceflow/core";
+import { PullRequestModel } from "./pull-request-model";
 import { type ReviewConfig } from "./review.config";
 import { ReviewSpecService, ReviewIssue, ReviewResult, ReviewStats } from "./review-spec";
 import { ReviewReportService, type ReportFormat } from "./review-report";
@@ -29,7 +29,6 @@ export interface PostReviewCommentOptions {
 
 export class ReviewPrComment {
   constructor(
-    protected readonly gitProvider: GitProviderService,
     protected readonly config: IConfigReader,
     protected readonly reviewSpecService: ReviewSpecService,
     protected readonly reviewReportService: ReviewReportService,
@@ -56,9 +55,7 @@ export class ReviewPrComment {
   }
 
   async postOrUpdateReviewComment(
-    owner: string,
-    repo: string,
-    prNumber: number,
+    pr: PullRequestModel,
     result: ReviewResult,
     options?: PostReviewCommentOptions,
   ): Promise<void> {
@@ -69,7 +66,7 @@ export class ReviewPrComment {
     // 如果配置启用且有 AI 生成的标题，只在第一轮审查时更新 PR 标题
     if (reviewConf.autoUpdatePrTitle && result.title && result.round === 1) {
       try {
-        await this.gitProvider.editPullRequest(owner, repo, prNumber, { title: result.title });
+        await pr.edit({ title: result.title });
         console.log(`📝 已更新 PR 标题: ${result.title}`);
       } catch (error) {
         console.warn("⚠️ 更新 PR 标题失败:", error);
@@ -79,15 +76,17 @@ export class ReviewPrComment {
     // 获取已解决的评论，同步 resolve 状态（在更新 review 之前）
     // 如果调用方已经同步过，skipSync=true 跳过冗余的 API 调用
     if (!skipSync) {
-      await this.syncResolvedComments(owner, repo, prNumber, result);
-      await this.syncReactionsToIssues(owner, repo, prNumber, result, verbose);
+      await this.syncResolvedComments(pr, result);
+      await this.syncReactionsToIssues(pr, result, verbose);
     }
 
     // 查找已有的 AI 评论（Issue Comment），可能存在多个重复评论
     if (shouldLog(verbose, 2)) {
-      console.log(`[postOrUpdateReviewComment] owner=${owner}, repo=${repo}, prNumber=${prNumber}`);
+      console.log(
+        `[postOrUpdateReviewComment] owner=${pr.owner}, repo=${pr.repo}, prNumber=${pr.number}`,
+      );
     }
-    const existingComments = await this.findExistingAiComments(owner, repo, prNumber, verbose);
+    const existingComments = await this.findExistingAiComments(pr, verbose);
     if (shouldLog(verbose, 2)) {
       console.log(
         `[postOrUpdateReviewComment] found ${existingComments.length} existing AI comments`,
@@ -104,32 +103,31 @@ export class ReviewPrComment {
     }
 
     const reviewBody = this.formatReviewComment(result, {
-      prNumber,
+      prNumber: pr.number,
       outputFormat: "markdown",
       ci: true,
     });
 
     // 获取 PR 信息以获取 head commit SHA
-    const pr = await this.gitProvider.getPullRequest(owner, repo, prNumber);
-    const commitId = pr.head?.sha;
+    const commitId = await pr.getHeadSha();
 
     // 1. 发布或更新主评论（使用 Issue Comment API，支持删除和更新）
     try {
       if (existingComments.length > 0) {
         // 更新第一个 AI 评论
-        await this.gitProvider.updateIssueComment(owner, repo, existingComments[0].id, reviewBody);
+        await pr.updateComment(existingComments[0].id, reviewBody);
         console.log(`✅ 已更新 AI Review 评论`);
         // 删除多余的重复 AI 评论
         for (const duplicate of existingComments.slice(1)) {
           try {
-            await this.gitProvider.deleteIssueComment(owner, repo, duplicate.id);
+            await pr.deleteComment(duplicate.id);
             console.log(`🗑️ 已删除重复的 AI Review 评论 (id: ${duplicate.id})`);
           } catch {
             console.warn(`⚠️ 删除重复评论失败 (id: ${duplicate.id})`);
           }
         }
       } else {
-        await this.gitProvider.createIssueComment(owner, repo, prNumber, { body: reviewBody });
+        await pr.createComment({ body: reviewBody });
         console.log(`✅ 已发布 AI Review 评论`);
       }
     } catch (error) {
@@ -175,14 +173,14 @@ export class ReviewPrComment {
 
       if (comments.length > 0) {
         try {
-          await this.gitProvider.createPullReview(owner, repo, prNumber, {
+          await pr.createReview({
             event: reviewEvent,
             body: finalReviewBody,
             comments,
             commit_id: commitId,
           });
           if (shouldAutoApprove) {
-            console.log(`✅ 已自动批准 PR #${prNumber}（所有问题已解决）`);
+            console.log(`✅ 已自动批准 PR #${pr.number}（所有问题已解决）`);
           } else {
             console.log(`✅ 已发布 ${comments.length} 条行级评论`);
           }
@@ -193,7 +191,7 @@ export class ReviewPrComment {
           for (const comment of comments) {
             try {
               // 逐条发布时只用 COMMENT event，避免重复 APPROVE
-              await this.gitProvider.createPullReview(owner, repo, prNumber, {
+              await pr.createReview({
                 event: REVIEW_STATE.COMMENT,
                 body: successCount === 0 ? lineReviewBody : undefined,
                 comments: [comment],
@@ -212,7 +210,7 @@ export class ReviewPrComment {
             // 如果需要自动批准，单独发一个 APPROVE review
             if (shouldAutoApprove) {
               try {
-                await this.gitProvider.createPullReview(owner, repo, prNumber, {
+                await pr.createReview({
                   event: REVIEW_STATE.APPROVE,
                   body: `✅ **自动批准合并**\n\n${
                     stats.validTotal > 0
@@ -221,7 +219,7 @@ export class ReviewPrComment {
                   }自动批准此 PR。`,
                   commit_id: commitId,
                 });
-                console.log(`✅ 已自动批准 PR #${prNumber}（所有问题已解决）`);
+                console.log(`✅ 已自动批准 PR #${pr.number}（所有问题已解决）`);
               } catch (error) {
                 console.warn("⚠️ 自动批准失败:", error);
               }
@@ -233,14 +231,14 @@ export class ReviewPrComment {
       } else {
         // 本轮无新问题，仍发布 Round 状态（含上轮回顾）
         try {
-          await this.gitProvider.createPullReview(owner, repo, prNumber, {
+          await pr.createReview({
             event: reviewEvent,
             body: finalReviewBody,
             comments: [],
             commit_id: commitId,
           });
           if (shouldAutoApprove) {
-            console.log(`✅ 已自动批准 PR #${prNumber}（Round ${result.round}，所有问题已解决）`);
+            console.log(`✅ 已自动批准 PR #${pr.number}（Round ${result.round}，所有问题已解决）`);
           } else {
             console.log(`✅ 已发布 Round ${result.round} 审查状态（无新问题）`);
           }
@@ -251,7 +249,7 @@ export class ReviewPrComment {
     } else if (shouldAutoApprove) {
       // 未启用 lineComments 但需要自动批准
       try {
-        await this.gitProvider.createPullReview(owner, repo, prNumber, {
+        await pr.createReview({
           event: REVIEW_STATE.APPROVE,
           body: `✅ **自动批准合并**\n\n${
             stats.validTotal > 0
@@ -260,7 +258,7 @@ export class ReviewPrComment {
           }自动批准此 PR。`,
           commit_id: commitId,
         });
-        console.log(`✅ 已自动批准 PR #${prNumber}（所有问题已解决）`);
+        console.log(`✅ 已自动批准 PR #${pr.number}（所有问题已解决）`);
       } catch (error) {
         console.warn("⚠️ 自动批准失败:", error);
       }
@@ -272,13 +270,11 @@ export class ReviewPrComment {
    * 返回所有包含 REVIEW_COMMENT_MARKER 的评论，用于更新第一个并清理重复项
    */
   async findExistingAiComments(
-    owner: string,
-    repo: string,
-    prNumber: number,
+    pr: PullRequestModel,
     verbose?: VerboseLevel,
   ): Promise<{ id: number }[]> {
     try {
-      const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
+      const comments = await pr.getComments();
       if (shouldLog(verbose, 2)) {
         console.log(
           `[findExistingAiComments] listIssueComments returned ${Array.isArray(comments) ? comments.length : typeof comments} comments`,
@@ -305,14 +301,9 @@ export class ReviewPrComment {
    * 用户手动点击 resolve 的记录写入 resolved/resolvedBy 字段（区别于 AI 验证的 fixed/fixedBy）
    * 优先通过评论 body 中的 issue key 精确匹配，回退到 path+line 匹配
    */
-  async syncResolvedComments(
-    owner: string,
-    repo: string,
-    prNumber: number,
-    result: ReviewResult,
-  ): Promise<void> {
+  async syncResolvedComments(pr: PullRequestModel, result: ReviewResult): Promise<void> {
     try {
-      const resolvedThreads = await this.gitProvider.listResolvedThreads(owner, repo, prNumber);
+      const resolvedThreads = await pr.getResolvedThreads();
       if (resolvedThreads.length === 0) {
         return;
       }
@@ -378,14 +369,12 @@ export class ReviewPrComment {
    * - 如果评论有 👎 (-1) reaction，将对应的问题标记为未解决
    */
   async syncReactionsToIssues(
-    owner: string,
-    repo: string,
-    prNumber: number,
+    pr: PullRequestModel,
     result: ReviewResult,
     verbose?: VerboseLevel,
   ): Promise<void> {
     try {
-      const reviews = await this.gitProvider.listPullReviews(owner, repo, prNumber);
+      const reviews = await pr.getReviews();
       const aiReview = reviews.find((r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER));
       if (!aiReview?.id) {
         if (shouldLog(verbose, 2)) {
@@ -411,26 +400,26 @@ export class ReviewPrComment {
 
       // 2. 从 PR 指定的评审人中获取（包括团队成员）
       try {
-        const pr = await this.gitProvider.getPullRequest(owner, repo, prNumber);
+        const prInfo = await pr.getInfo();
         // 添加指定的个人评审人
-        for (const reviewer of pr.requested_reviewers || []) {
+        for (const reviewer of prInfo.requested_reviewers || []) {
           if (reviewer.login) {
             reviewers.add(reviewer.login);
           }
         }
         if (shouldLog(verbose, 2)) {
           console.log(
-            `[syncReactionsToIssues] requested_reviewers: ${(pr.requested_reviewers || []).map((r) => r.login).join(", ")}`,
+            `[syncReactionsToIssues] requested_reviewers: ${(prInfo.requested_reviewers || []).map((r) => r.login).join(", ")}`,
           );
           console.log(
-            `[syncReactionsToIssues] requested_reviewers_teams: ${JSON.stringify(pr.requested_reviewers_teams || [])}`,
+            `[syncReactionsToIssues] requested_reviewers_teams: ${JSON.stringify(prInfo.requested_reviewers_teams || [])}`,
           );
         }
         // 添加指定的团队成员（需要通过 API 获取团队成员列表）
-        for (const team of pr.requested_reviewers_teams || []) {
+        for (const team of prInfo.requested_reviewers_teams || []) {
           if (team.id) {
             try {
-              const members = await this.gitProvider.getTeamMembers(team.id);
+              const members = await pr.getTeamMembers(team.id);
               if (shouldLog(verbose, 2)) {
                 console.log(
                   `[syncReactionsToIssues] team ${team.name}(${team.id}) members: ${members.map((m) => m.login).join(", ")}`,
@@ -459,12 +448,7 @@ export class ReviewPrComment {
       }
 
       // 获取该 review 的所有行级评论
-      const reviewComments = await this.gitProvider.listPullReviewComments(
-        owner,
-        repo,
-        prNumber,
-        aiReview.id,
-      );
+      const reviewComments = await pr.getReviewComments(aiReview.id);
       // 构建评论 ID 到 issue 的映射，用于后续匹配回复
       const commentIdToIssue = new Map<number, (typeof result.issues)[0]>();
       // 遍历每个评论，获取其 reactions
@@ -479,11 +463,7 @@ export class ReviewPrComment {
           commentIdToIssue.set(comment.id, matchedIssue);
         }
         try {
-          const reactions = await this.gitProvider.getPullReviewCommentReactions(
-            owner,
-            repo,
-            comment.id,
-          );
+          const reactions = await pr.getReviewCommentReactions(comment.id);
           if (reactions.length === 0 || !matchedIssue) continue;
           // 按 content 分组，收集每种 reaction 的用户列表
           const reactionMap = new Map<string, string[]>();
@@ -532,7 +512,7 @@ export class ReviewPrComment {
         }
       }
       // 获取 PR 上的所有 Issue Comments（包含对 review 评论的回复）
-      await syncRepliesToIssues(owner, repo, prNumber, reviewComments, result, (line, pos) =>
+      await syncRepliesToIssues(reviewComments, result, (line, pos) =>
         this.lineMatchesPosition(line, pos),
       );
     } catch (error) {

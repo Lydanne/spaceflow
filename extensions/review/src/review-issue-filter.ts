@@ -11,6 +11,7 @@ import {
   calculateNewLineNumber,
 } from "@spaceflow/core";
 import type { IConfigReader } from "@spaceflow/core";
+import { PullRequestModel } from "./pull-request-model";
 import {
   ReviewSpecService,
   ReviewSpec,
@@ -72,8 +73,9 @@ export class ReviewIssueFilter {
     issues: ReviewIssue[],
     commits: PullRequestCommit[],
     preloaded?: { specs: ReviewSpec[]; fileContents: FileContentsMap },
+    pr?: PullRequestModel,
   ): Promise<ReviewIssue[]> {
-    const { owner, repo, prNumber, llmMode, specSources, verbose } = context;
+    const { llmMode, specSources, verbose } = context;
     const unfixedIssues = issues.filter((i) => i.valid !== "false" && !i.fixed);
 
     if (unfixedIssues.length === 0) {
@@ -87,9 +89,9 @@ export class ReviewIssueFilter {
       return issues;
     }
 
-    if (!preloaded && (!specSources?.length || !prNumber)) {
+    if (!preloaded && (!specSources?.length || !pr)) {
       if (shouldLog(verbose, 1)) {
-        console.log(`   ⏭️  跳过 LLM 验证（缺少 specSources 或 prNumber）`);
+        console.log(`   ⏭️  跳过 LLM 验证（缺少 specSources 或 pr）`);
       }
       return issues;
     }
@@ -105,17 +107,16 @@ export class ReviewIssueFilter {
       specs = preloaded.specs;
       fileContents = preloaded.fileContents;
     } else {
-      const pr = await this.gitProvider.getPullRequest(owner, repo, prNumber!);
-      const changedFiles = await this.gitProvider.getPullRequestFiles(owner, repo, prNumber!);
-      const headSha = pr?.head?.sha || "HEAD";
+      const changedFiles = await pr!.getFiles();
+      const headSha = await pr!.getHeadSha();
       specs = await this.loadSpecs(specSources, verbose);
       fileContents = await this.getFileContents(
-        owner,
-        repo,
+        pr!.owner,
+        pr!.repo,
         changedFiles,
         commits,
         headSha,
-        prNumber!,
+        pr!.number,
         verbose,
       );
     }
@@ -307,8 +308,7 @@ export class ReviewIssueFilter {
   async invalidateIssuesForChangedFiles(
     issues: ReviewIssue[],
     headSha: string | undefined,
-    owner: string,
-    repo: string,
+    pr: PullRequestModel,
     verbose?: VerboseLevel,
   ): Promise<ReviewIssue[]> {
     if (!headSha) {
@@ -324,7 +324,7 @@ export class ReviewIssueFilter {
 
     try {
       // 使用 Git Provider API 获取最新一次 commit 的 diff
-      const diffText = await this.gitProvider.getCommitDiff(owner, repo, headSha);
+      const diffText = await pr.getCommitDiff(headSha);
       const diffFiles = parseDiffText(diffText);
 
       if (diffFiles.length === 0) {
@@ -540,14 +540,12 @@ export class ReviewIssueFilter {
   }
 
   async getExistingReviewResult(
-    owner: string,
-    repo: string,
-    prNumber: number,
+    pr: PullRequestModel,
     parseMarkdown: (body: string) => { result: ReviewResult } | null,
   ): Promise<ReviewResult | null> {
     try {
       // 从 Issue Comment 获取已有的审查结果
-      const comments = await this.gitProvider.listIssueComments(owner, repo, prNumber);
+      const comments = await pr.getComments();
       const existingComment = comments.findLast((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
       if (existingComment?.body) {
         const parsed = parseMarkdown(existingComment.body);

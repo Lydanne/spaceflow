@@ -3,6 +3,7 @@ import { parseChangedLinesFromPatch } from "@spaceflow/core";
 import { readFile } from "fs/promises";
 import { ReviewService, ReviewContext, ReviewPrompt } from "./review.service";
 import type { ReviewOptions } from "./review.config";
+import { PullRequestModel } from "./pull-request-model";
 
 vi.mock("c12");
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
@@ -49,6 +50,10 @@ describe("ReviewService", () => {
   let mockDeletionImpactService: any;
   let mockGitSdkService: any;
   let mockLlmProxyService: any;
+
+  /** 用 gitProvider mock 构造一个真实 PullRequestModel，透传调用 */
+  const createMockPr = (owner = "o", repo = "r", prNumber = 1) =>
+    new PullRequestModel(gitProvider as any, owner, repo, prNumber);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1507,7 +1512,7 @@ describe("ReviewService", () => {
   describe("ReviewService.getExistingReviewResult", () => {
     it("should return null when no AI review exists", async () => {
       gitProvider.listIssueComments.mockResolvedValue([{ body: "normal comment" }] as any);
-      const result = await (service as any).getExistingReviewResult("o", "r", 1);
+      const result = await (service as any).getExistingReviewResult(createMockPr());
       expect(result).toBeNull();
     });
 
@@ -1518,13 +1523,13 @@ describe("ReviewService", () => {
       gitProvider.listIssueComments.mockResolvedValue([
         { body: "<!-- spaceflow-review --> review content" },
       ] as any);
-      const result = await (service as any).getExistingReviewResult("o", "r", 1);
+      const result = await (service as any).getExistingReviewResult(createMockPr());
       expect(result).toEqual(mockResult);
     });
 
     it("should return null on error", async () => {
       gitProvider.listIssueComments.mockRejectedValue(new Error("API error"));
-      const result = await (service as any).getExistingReviewResult("o", "r", 1);
+      const result = await (service as any).getExistingReviewResult(createMockPr());
       expect(result).toBeNull();
     });
   });
@@ -1537,7 +1542,7 @@ describe("ReviewService", () => {
       ] as any);
       gitProvider.listIssueComments.mockResolvedValue([] as any);
       gitProvider.deletePullReview.mockResolvedValue(undefined as any);
-      await (service as any).deleteExistingAiReviews("o", "r", 1);
+      await (service as any).deleteExistingAiReviews(createMockPr());
       expect(gitProvider.deletePullReview).toHaveBeenCalledWith("o", "r", 1, 1);
       expect(gitProvider.deletePullReview).toHaveBeenCalledTimes(1);
     });
@@ -1549,7 +1554,7 @@ describe("ReviewService", () => {
         { id: 11, body: "normal comment" },
       ] as any);
       gitProvider.deleteIssueComment.mockResolvedValue(undefined as any);
-      await (service as any).deleteExistingAiReviews("o", "r", 1);
+      await (service as any).deleteExistingAiReviews(createMockPr());
       expect(gitProvider.deleteIssueComment).toHaveBeenCalledWith("o", "r", 10);
       expect(gitProvider.deleteIssueComment).toHaveBeenCalledTimes(1);
     });
@@ -1558,7 +1563,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviews.mockRejectedValue(new Error("fail"));
       gitProvider.listIssueComments.mockResolvedValue([] as any);
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      await (service as any).deleteExistingAiReviews("o", "r", 1);
+      await (service as any).deleteExistingAiReviews(createMockPr());
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
@@ -1567,7 +1572,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviews.mockResolvedValue([] as any);
       gitProvider.listIssueComments.mockRejectedValue(new Error("fail"));
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      await (service as any).deleteExistingAiReviews("o", "r", 1);
+      await (service as any).deleteExistingAiReviews(createMockPr());
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
@@ -1580,7 +1585,7 @@ describe("ReviewService", () => {
       ] as any);
       gitProvider.deleteIssueComment.mockRejectedValue(new Error("delete failed"));
 
-      await (service as any).deleteExistingAiReviews("o", "r", 1);
+      await (service as any).deleteExistingAiReviews(createMockPr());
       expect(consoleSpy).toHaveBeenCalledWith("⚠️ 删除评论 10 失败:", expect.any(Error));
       consoleSpy.mockRestore();
     });
@@ -1592,8 +1597,7 @@ describe("ReviewService", () => {
       const result = await (service as any).invalidateIssuesForChangedFiles(
         issues,
         undefined,
-        "o",
-        "r",
+        createMockPr(),
       );
       expect(result).toBe(issues);
     });
@@ -1612,8 +1616,7 @@ describe("ReviewService", () => {
       const result = await (service as any).invalidateIssuesForChangedFiles(
         issues,
         "abc123",
-        "o",
-        "r",
+        createMockPr(),
       );
       expect(result).toHaveLength(3);
       expect(result[0].valid).toBe("false");
@@ -1627,8 +1630,7 @@ describe("ReviewService", () => {
       const result = await (service as any).invalidateIssuesForChangedFiles(
         issues,
         "abc123",
-        "o",
-        "r",
+        createMockPr(),
       );
       expect(result).toBe(issues);
     });
@@ -1640,8 +1642,7 @@ describe("ReviewService", () => {
       const result = await (service as any).invalidateIssuesForChangedFiles(
         issues,
         "abc123",
-        "o",
-        "r",
+        createMockPr(),
       );
       expect(result).toBe(issues);
       consoleSpy.mockRestore();
@@ -1835,7 +1836,7 @@ describe("ReviewService", () => {
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc123" } } as any);
       gitProvider.createIssueComment.mockResolvedValue({} as any);
       const result = { issues: [], summary: [], round: 1 };
-      await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
+      await (service as any).postOrUpdateReviewComment(createMockPr(), result);
       expect(gitProvider.createIssueComment).toHaveBeenCalled();
     });
 
@@ -1848,7 +1849,7 @@ describe("ReviewService", () => {
       gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc123" } } as any);
       gitProvider.createIssueComment.mockResolvedValue({} as any);
       const result = { issues: [], summary: [], round: 1, title: "New Title" };
-      await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
+      await (service as any).postOrUpdateReviewComment(createMockPr(), result);
       expect(gitProvider.editPullRequest).toHaveBeenCalledWith("o", "r", 1, { title: "New Title" });
     });
 
@@ -1861,7 +1862,7 @@ describe("ReviewService", () => {
       gitProvider.createIssueComment.mockRejectedValue(new Error("fail") as any);
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const result = { issues: [], summary: [], round: 1 };
-      await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
+      await (service as any).postOrUpdateReviewComment(createMockPr(), result);
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
@@ -1890,7 +1891,7 @@ describe("ReviewService", () => {
         summary: [],
         round: 1,
       };
-      await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
+      await (service as any).postOrUpdateReviewComment(createMockPr(), result);
       expect(gitProvider.createPullReview.mock.calls.length).toBeGreaterThan(0);
       const callArgs = gitProvider.createPullReview.mock.calls[0];
       expect(callArgs[3].comments.length).toBeGreaterThan(0);
@@ -1904,7 +1905,7 @@ describe("ReviewService", () => {
         { path: "test.ts", line: 10, resolvedBy: { login: "user1" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
+      await (service as any).syncResolvedComments(createMockPr(), result);
       expect((result.issues[0] as any).resolved).toBeDefined();
       expect((result.issues[0] as any).resolvedBy).toEqual({ id: undefined, login: "user1" });
     });
@@ -1922,7 +1923,7 @@ describe("ReviewService", () => {
       const result = {
         issues: [{ file: "test.ts", line: "10", ruleId: "RuleA" }],
       };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
+      await (service as any).syncResolvedComments(createMockPr(), result);
       expect((result.issues[0] as any).resolved).toBeDefined();
       expect((result.issues[0] as any).resolvedBy).toEqual({ id: undefined, login: "user1" });
     });
@@ -1943,7 +1944,7 @@ describe("ReviewService", () => {
           { file: "test.ts", line: "10", ruleId: "RuleB" } as any,
         ],
       };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
+      await (service as any).syncResolvedComments(createMockPr(), result);
       expect(result.issues[0].resolved).toBeUndefined(); // RuleA 未解决
       expect(result.issues[0].resolvedBy).toBeUndefined();
       expect(result.issues[1].resolved).toBeDefined(); // RuleB 已解决
@@ -1953,7 +1954,7 @@ describe("ReviewService", () => {
     it("should skip when no resolved threads", async () => {
       gitProvider.listResolvedThreads.mockResolvedValue([] as any);
       const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
+      await (service as any).syncResolvedComments(createMockPr(), result);
       expect((result.issues[0] as any).resolved).toBeUndefined();
     });
 
@@ -1962,7 +1963,7 @@ describe("ReviewService", () => {
         { path: undefined, line: 10, resolvedBy: { login: "user1" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
+      await (service as any).syncResolvedComments(createMockPr(), result);
       expect((result.issues[0] as any).resolved).toBeUndefined();
     });
 
@@ -1970,7 +1971,7 @@ describe("ReviewService", () => {
       gitProvider.listResolvedThreads.mockRejectedValue(new Error("fail"));
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const result = { issues: [] };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
+      await (service as any).syncResolvedComments(createMockPr(), result);
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
@@ -2303,7 +2304,7 @@ describe("ReviewService", () => {
     it("should skip when no AI review found", async () => {
       gitProvider.listPullReviews.mockResolvedValue([{ body: "normal" }] as any);
       const result = { issues: [] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
+      await (service as any).syncReactionsToIssues(createMockPr(), result);
       expect(result.issues).toEqual([]);
     });
 
@@ -2311,7 +2312,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviews.mockRejectedValue(new Error("fail"));
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const result = { issues: [] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
+      await (service as any).syncReactionsToIssues(createMockPr(), result);
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
@@ -2343,7 +2344,7 @@ describe("ReviewService", () => {
           } as any,
         ],
       };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
+      await (service as any).syncReactionsToIssues(createMockPr(), result);
       expect(result.issues[0].resolved).toBeUndefined();
       expect(result.issues[0].resolvedBy).toBeUndefined();
     });
@@ -2374,7 +2375,7 @@ describe("ReviewService", () => {
           } as any,
         ],
       };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
+      await (service as any).syncReactionsToIssues(createMockPr(), result);
       expect(result.issues[0].fixed).toBeUndefined();
       expect(result.issues[0].fixedBy).toBeUndefined();
     });
@@ -2392,7 +2393,7 @@ describe("ReviewService", () => {
         { path: "test.ts", position: 10 },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", reactions: [] }] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
+      await (service as any).syncReactionsToIssues(createMockPr(), result);
       expect(result.issues[0].reactions).toHaveLength(0);
     });
 
@@ -2410,7 +2411,7 @@ describe("ReviewService", () => {
       ] as any);
       gitProvider.getPullReviewCommentReactions.mockResolvedValue([] as any);
       const result = { issues: [{ file: "test.ts", line: "10", reactions: [] }] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
+      await (service as any).syncReactionsToIssues(createMockPr(), result);
       expect(result.issues[0].reactions).toHaveLength(0);
     });
 
@@ -2432,7 +2433,7 @@ describe("ReviewService", () => {
         { content: "heart", user: { login: "user1" } },
       ] as any);
       const result = { issues: [{ file: "test.ts", line: "10", reactions: [] }] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
+      await (service as any).syncReactionsToIssues(createMockPr(), result);
       expect(result.issues[0].reactions).toHaveLength(2);
     });
 
@@ -2683,7 +2684,7 @@ describe("ReviewService", () => {
       const result = {
         issues: [{ file: "test.ts", line: "10", ruleId: "JsTs.Base.Rule1", replies: [] }],
       };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
+      await (service as any).syncRepliesToIssues(reviewComments, result);
       expect(result.issues[0].replies).toHaveLength(1);
       expect(result.issues[0].replies[0].body).toBe("reply from user");
       expect(result.issues[0].replies[0].user.login).toBe("dev");
@@ -2723,7 +2724,7 @@ describe("ReviewService", () => {
           { file: "test.ts", line: "10", ruleId: "JsTs.Base.RuleB" } as any,
         ],
       };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
+      await (service as any).syncRepliesToIssues(reviewComments, result);
       expect(result.issues[0].replies).toBeUndefined(); // RuleA 无回复
       expect(result.issues[1].replies).toHaveLength(1);
       expect(result.issues[1].replies[0].body).toBe("针对问题B的回复");
@@ -2732,7 +2733,7 @@ describe("ReviewService", () => {
     it("should skip comments without path or position", async () => {
       const reviewComments = [{ id: 1, body: "no path" }];
       const result = { issues: [] };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
+      await (service as any).syncRepliesToIssues(reviewComments, result);
       expect(result.issues).toEqual([]);
     });
 
@@ -2746,7 +2747,7 @@ describe("ReviewService", () => {
         { id: 2, path: "test.ts", position: 10, body: "b", created_at: "2024-01-02" },
       ];
       const result = { issues: [{ file: "test.ts", line: "10", replies: [] }] };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
+      await (service as any).syncRepliesToIssues(reviewComments, result);
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
@@ -2774,7 +2775,7 @@ describe("ReviewService", () => {
       const result = {
         issues: [{ file: "test.ts", line: "10", ruleId: "SomeRule" } as any],
       };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
+      await (service as any).syncRepliesToIssues(reviewComments, result);
       // 两条都不含 issue key，都会通过 fallback path:position 匹配
       expect(result.issues[0].replies).toHaveLength(2);
     });
@@ -2810,7 +2811,7 @@ describe("ReviewService", () => {
       const result = {
         issues: [{ file: "test.ts", line: "10", ruleId: "JsTs.Base.ComplexFunc" } as any],
       };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
+      await (service as any).syncRepliesToIssues(reviewComments, result);
       // bot 的结构化评论应被过滤，只保留用户的真实回复
       expect(result.issues[0].replies).toHaveLength(1);
       expect(result.issues[0].replies[0].body).toBe("已修复，谢谢");
@@ -3341,8 +3342,7 @@ describe("ReviewService", () => {
       const result = await (service as any).invalidateIssuesForChangedFiles(
         issues,
         undefined,
-        "o",
-        "r",
+        createMockPr(),
       );
       expect(result).toBe(issues);
     });
@@ -3350,7 +3350,7 @@ describe("ReviewService", () => {
     it("should log warning when no headSha", async () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const issues = [{ file: "test.ts" }];
-      await (service as any).invalidateIssuesForChangedFiles(issues, undefined, "o", "r", 1);
+      await (service as any).invalidateIssuesForChangedFiles(issues, undefined, createMockPr(), 1);
       expect(consoleSpy).toHaveBeenCalledWith("   ⚠️ 无法获取 PR head SHA，跳过变更文件检查");
       consoleSpy.mockRestore();
     });
@@ -3369,8 +3369,7 @@ describe("ReviewService", () => {
       const result = await (service as any).invalidateIssuesForChangedFiles(
         issues,
         "abc123",
-        "o",
-        "r",
+        createMockPr(),
         1,
       );
       expect(result).toHaveLength(3);
@@ -3387,7 +3386,7 @@ describe("ReviewService", () => {
           "diff --git a/changed.ts b/changed.ts\n--- a/changed.ts\n+++ b/changed.ts\n@@ -1,1 +1,2 @@\n line1\n+new",
         ) as any;
       const issues = [{ file: "changed.ts", line: "1", ruleId: "R1" }];
-      await (service as any).invalidateIssuesForChangedFiles(issues, "abc123", "o", "r", 1);
+      await (service as any).invalidateIssuesForChangedFiles(issues, "abc123", createMockPr(), 1);
       expect(consoleSpy).toHaveBeenCalledWith(
         "   🗑️ Issue changed.ts:1 所在文件有变更，标记为无效",
       );
@@ -3401,8 +3400,7 @@ describe("ReviewService", () => {
       const result = await (service as any).invalidateIssuesForChangedFiles(
         issues,
         "abc123",
-        "o",
-        "r",
+        createMockPr(),
         1,
       );
       expect(result).toBe(issues);
@@ -3412,7 +3410,7 @@ describe("ReviewService", () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       gitProvider.getCommitDiff = vi.fn().mockResolvedValue("") as any;
       const issues = [{ file: "test.ts", line: "1" }];
-      await (service as any).invalidateIssuesForChangedFiles(issues, "abc123", "o", "r", 1);
+      await (service as any).invalidateIssuesForChangedFiles(issues, "abc123", createMockPr(), 1);
       expect(consoleSpy).toHaveBeenCalledWith("   ⏭️ 最新 commit 无文件变更");
       consoleSpy.mockRestore();
     });
@@ -3424,8 +3422,7 @@ describe("ReviewService", () => {
       const result = await (service as any).invalidateIssuesForChangedFiles(
         issues,
         "abc123",
-        "o",
-        "r",
+        createMockPr(),
         1,
       );
       expect(result).toBe(issues);
@@ -3509,7 +3506,7 @@ describe("ReviewService", () => {
       ] as any;
       gitProvider.listIssueComments.mockResolvedValue(mockComments);
 
-      await (service as any).findExistingAiComments("o", "r", 1, 2);
+      await (service as any).findExistingAiComments(createMockPr(), 2);
       expect(consoleSpy).toHaveBeenCalledWith(
         "[findExistingAiComments] listIssueComments returned 2 comments",
       );
@@ -3523,7 +3520,7 @@ describe("ReviewService", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       gitProvider.listIssueComments.mockRejectedValue(new Error("API error"));
 
-      const result = await (service as any).findExistingAiComments("o", "r", 1);
+      const result = await (service as any).findExistingAiComments(createMockPr());
       expect(result).toEqual([]);
       expect(consoleSpy).toHaveBeenCalledWith("[findExistingAiComments] error:", expect.any(Error));
       consoleSpy.mockRestore();
@@ -3535,7 +3532,7 @@ describe("ReviewService", () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       gitProvider.listPullReviews.mockResolvedValue([] as any);
 
-      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
+      await (service as any).syncReactionsToIssues(createMockPr(), { issues: [] }, 2);
       expect(consoleSpy).toHaveBeenCalledWith("[syncReactionsToIssues] No AI review found");
       consoleSpy.mockRestore();
     });
@@ -3549,7 +3546,7 @@ describe("ReviewService", () => {
       gitProvider.listPullReviews.mockResolvedValue(mockReviews);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
 
-      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
+      await (service as any).syncReactionsToIssues(createMockPr(), { issues: [] }, 2);
       expect(consoleSpy).toHaveBeenCalledWith(
         "[syncReactionsToIssues] reviewers from reviews: user1",
       );
@@ -3570,7 +3567,7 @@ describe("ReviewService", () => {
       gitProvider.getTeamMembers.mockResolvedValue([{ login: "teamuser1" }]);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
 
-      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
+      await (service as any).syncReactionsToIssues(createMockPr(), { issues: [] }, 2);
       expect(consoleSpy).toHaveBeenCalledWith(
         "[syncReactionsToIssues] requested_reviewers: reviewer1",
       );
@@ -3592,7 +3589,7 @@ describe("ReviewService", () => {
       gitProvider.getPullRequest.mockRejectedValue(new Error("PR not found"));
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
 
-      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
+      await (service as any).syncReactionsToIssues(createMockPr(), { issues: [] }, 2);
       expect(consoleSpy).toHaveBeenCalledWith("[syncReactionsToIssues] final reviewers: ");
       consoleSpy.mockRestore();
     });

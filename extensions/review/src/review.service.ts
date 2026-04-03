@@ -1,6 +1,5 @@
 import {
   GitProviderService,
-  PullRequest,
   PullRequestCommit,
   ChangedFile,
   type LLMMode,
@@ -22,6 +21,7 @@ import { ReviewContextBuilder, type ReviewContext } from "./review-context";
 import { ReviewIssueFilter } from "./review-issue-filter";
 import { ReviewLlmProcessor } from "./review-llm";
 import { ReviewPrComment } from "./review-pr-comment";
+import { PullRequestModel } from "./pull-request-model";
 import {
   extractIssueKeyFromBody as extractIssueKeyFromBodyFn,
   isAiGeneratedComment as isAiGeneratedCommentFn,
@@ -59,12 +59,7 @@ export class ReviewService {
       gitSdk,
     );
     this.llmProcessor = new ReviewLlmProcessor(llmProxyService, reviewSpecService);
-    this.prComment = new ReviewPrComment(
-      gitProvider,
-      config,
-      reviewSpecService,
-      reviewReportService,
-    );
+    this.prComment = new ReviewPrComment(config, reviewSpecService, reviewReportService);
   }
 
   async getContextFromEnv(options: ReviewOptions): Promise<ReviewContext> {
@@ -134,7 +129,7 @@ export class ReviewService {
 
     const specs = await this.issueFilter.loadSpecs(specSources, verbose);
 
-    let pr: PullRequest | undefined;
+    let prModel: PullRequestModel | undefined;
     let commits: PullRequestCommit[] = [];
     let changedFiles: ChangedFile[] = [];
 
@@ -193,24 +188,19 @@ export class ReviewService {
       if (shouldLog(verbose, 1)) {
         console.log(`📥 获取 PR #${prNumber} 信息 (owner: ${owner}, repo: ${repo})`);
       }
-      pr = await this.gitProvider.getPullRequest(owner, repo, prNumber);
-      commits = await this.gitProvider.getPullRequestCommits(owner, repo, prNumber);
-      changedFiles = await this.gitProvider.getPullRequestFiles(owner, repo, prNumber);
+      prModel = new PullRequestModel(this.gitProvider, owner, repo, prNumber);
+      const prInfo = await prModel.getInfo();
+      commits = await prModel.getCommits();
+      changedFiles = await prModel.getFiles();
       if (shouldLog(verbose, 1)) {
-        console.log(`   PR: ${pr?.title}`);
+        console.log(`   PR: ${prInfo?.title}`);
         console.log(`   Commits: ${commits.length}`);
         console.log(`   Changed files: ${changedFiles.length}`);
       }
 
       // 检查是否有其他同名 review workflow 正在运行中（防止同一 PR 重复审查）
-      if (skipDuplicateWorkflow && ci && pr?.head?.sha) {
-        const skipResult = await this.checkDuplicateWorkflow(
-          owner,
-          repo,
-          prNumber,
-          pr.head.sha,
-          verbose,
-        );
+      if (skipDuplicateWorkflow && ci && prInfo?.head?.sha) {
+        const skipResult = await this.checkDuplicateWorkflow(prModel, prInfo.head.sha, verbose);
         if (skipResult) return skipResult;
       }
     } else if (effectiveBaseRef && effectiveHeadRef) {
@@ -336,7 +326,7 @@ export class ReviewService {
       );
     }
 
-    const headSha = pr?.head?.sha || headRef || "HEAD";
+    const headSha = prModel ? await prModel.getHeadSha() : headRef || "HEAD";
     const fileContents = await this.getFileContents(
       owner,
       repo,
@@ -353,8 +343,8 @@ export class ReviewService {
 
     // 获取上一次的审查结果（用于提示词优化）
     let existingResult: ReviewResult | null = null;
-    if (ci && prNumber) {
-      existingResult = await this.getExistingReviewResult(owner, repo, prNumber);
+    if (ci && prModel) {
+      existingResult = await this.getExistingReviewResult(prModel);
       if (existingResult && shouldLog(verbose, 1)) {
         console.log(`📋 获取到上一次审查结果，包含 ${existingResult.issues.length} 个问题`);
       }
@@ -457,7 +447,7 @@ export class ReviewService {
     let existingIssues: ReviewIssue[] = [];
     let allIssues = result.issues;
 
-    if (ci && prNumber && existingResult) {
+    if (ci && prModel && existingResult) {
       existingIssues = existingResult.issues ?? [];
       if (existingIssues.length > 0) {
         if (shouldLog(verbose, 1)) {
@@ -465,7 +455,7 @@ export class ReviewService {
         }
 
         // 先同步最新的 resolved 状态
-        await this.syncResolvedComments(owner, repo, prNumber, existingResult);
+        await this.syncResolvedComments(prModel, existingResult);
 
         // 如果文件有变更，将该文件的历史问题标记为无效
         const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
@@ -475,9 +465,8 @@ export class ReviewService {
         ) {
           existingIssues = await this.invalidateIssuesForChangedFiles(
             existingIssues,
-            pr?.head?.sha,
-            owner,
-            repo,
+            headSha,
+            prModel,
             verbose,
           );
         }
@@ -492,6 +481,7 @@ export class ReviewService {
               specs,
               fileContents,
             },
+            prModel,
           );
         } else {
           if (shouldLog(verbose, 1)) {
@@ -517,15 +507,13 @@ export class ReviewService {
     }
 
     // 第一次提交报告：审查问题完成
-    if (prNumber && !dryRun) {
+    if (prModel && !dryRun) {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 提交 PR 评论 (代码审查完成)...`);
       }
 
       await this.postOrUpdateReviewComment(
-        owner,
-        repo,
-        prNumber,
+        prModel,
         {
           ...result,
           issues: allIssues,
@@ -555,14 +543,12 @@ export class ReviewService {
       result.deletionImpact = deletionImpact;
 
       // 第二次更新报告：删除代码分析完成
-      if (prNumber && !dryRun) {
+      if (prModel && !dryRun) {
         if (shouldLog(verbose, 1)) {
           console.log(`💬 更新 PR 评论 (删除代码分析完成)...`);
         }
         await this.postOrUpdateReviewComment(
-          owner,
-          repo,
-          prNumber,
+          prModel,
           {
             ...result,
             issues: allIssues,
@@ -600,8 +586,10 @@ export class ReviewService {
       throw new Error("collectOnly 模式必须指定 PR 编号");
     }
 
+    const prModel = new PullRequestModel(this.gitProvider, owner, repo, prNumber);
+
     // 1. 从现有的 AI review 评论中读取问题
-    const existingResult = await this.getExistingReviewResult(owner, repo, prNumber);
+    const existingResult = await this.getExistingReviewResult(prModel);
     if (!existingResult) {
       console.log(`ℹ️  PR #${prNumber} 没有找到 AI review 评论`);
       return {
@@ -618,7 +606,7 @@ export class ReviewService {
     }
 
     // 2. 获取 commits 并填充 author 信息
-    const commits = await this.gitProvider.getPullRequestCommits(owner, repo, prNumber);
+    const commits = await prModel.getCommits();
     existingResult.issues = await this.fillIssueAuthors(
       existingResult.issues,
       commits,
@@ -628,10 +616,10 @@ export class ReviewService {
     );
 
     // 3. 同步已解决的评论状态
-    await this.syncResolvedComments(owner, repo, prNumber, existingResult);
+    await this.syncResolvedComments(prModel, existingResult);
 
     // 4. 同步评论 reactions（👍/👎/☹️）
-    await this.syncReactionsToIssues(owner, repo, prNumber, existingResult, verbose);
+    await this.syncReactionsToIssues(prModel, existingResult, verbose);
 
     // 5. LLM 验证历史问题是否已修复
     try {
@@ -639,6 +627,8 @@ export class ReviewService {
         context,
         existingResult.issues,
         commits,
+        undefined,
+        prModel,
       );
     } catch (error) {
       console.warn("⚠️ LLM 验证修复状态失败，跳过:", error);
@@ -656,7 +646,7 @@ export class ReviewService {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 更新 PR 评论...`);
       }
-      await this.postOrUpdateReviewComment(owner, repo, prNumber, existingResult, {
+      await this.postOrUpdateReviewComment(prModel, existingResult, {
         verbose,
         autoApprove,
       });
@@ -698,11 +688,13 @@ export class ReviewService {
     );
 
     // 获取 commits 和 changedFiles 用于生成描述
+    let prModel: PullRequestModel | undefined;
     let commits: PullRequestCommit[] = [];
     let changedFiles: ChangedFile[] = [];
     if (prNumber) {
-      commits = await this.gitProvider.getPullRequestCommits(owner, repo, prNumber);
-      changedFiles = await this.gitProvider.getPullRequestFiles(owner, repo, prNumber);
+      prModel = new PullRequestModel(this.gitProvider, owner, repo, prNumber);
+      commits = await prModel.getCommits();
+      changedFiles = await prModel.getFiles();
     } else if (baseRef && headRef) {
       changedFiles = await this.getChangedFilesBetweenRefs(owner, repo, baseRef, headRef);
       commits = await this.getCommitsBetweenRefs(baseRef, headRef);
@@ -715,13 +707,13 @@ export class ReviewService {
       changedFiles = changedFiles.filter((file) => matchedFilenames.includes(file.filename || ""));
     }
 
-    const prInfo = context.generateDescription
+    const prDesc = context.generateDescription
       ? await this.generatePrDescription(commits, changedFiles, llmMode, undefined, verbose)
       : await this.buildBasicDescription(commits, changedFiles);
     const result: ReviewResult = {
       success: true,
-      title: prInfo.title,
-      description: prInfo.description,
+      title: prDesc.title,
+      description: prDesc.description,
       issues: [],
       summary: [],
       deletionImpact,
@@ -734,11 +726,11 @@ export class ReviewService {
       ci,
     });
 
-    if (ci && prNumber && !dryRun) {
+    if (ci && prModel && !dryRun) {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 提交 PR 评论...`);
       }
-      await this.postOrUpdateReviewComment(owner, repo, prNumber, result, { verbose, autoApprove });
+      await this.postOrUpdateReviewComment(prModel, result, { verbose, autoApprove });
       if (shouldLog(verbose, 1)) {
         console.log(`✅ 评论已提交`);
       }
@@ -771,8 +763,10 @@ export class ReviewService {
 
     // 获取上一次的审查结果以计算正确的轮次
     let existingResult: ReviewResult | null = null;
+    let prModel: PullRequestModel | undefined;
     if (ci && prNumber) {
-      existingResult = await this.getExistingReviewResult(context.owner, context.repo, prNumber);
+      prModel = new PullRequestModel(this.gitProvider, context.owner, context.repo, prNumber);
+      existingResult = await this.getExistingReviewResult(prModel);
     }
     const currentRound = (existingResult?.round ?? 0) + 1;
 
@@ -785,25 +779,25 @@ export class ReviewService {
         unresolved: 0,
         summary: applicableSpecs.length === 0 ? "无适用的审查规则" : "已跳过",
       }));
-    const prInfo =
+    const prDesc =
       context.generateDescription && llmMode
         ? await this.generatePrDescription(commits, changedFiles, llmMode, undefined, verbose)
         : await this.buildBasicDescription(commits, changedFiles);
     const result: ReviewResult = {
       success: true,
-      title: prInfo.title,
-      description: prInfo.description,
+      title: prDesc.title,
+      description: prDesc.description,
       issues: [],
       summary,
       round: currentRound,
     };
 
     // CI 模式下也需要发送 review 评论
-    if (ci && prNumber && !dryRun) {
+    if (ci && prModel && !dryRun) {
       if (shouldLog(verbose, 1)) {
         console.log(`💬 提交 PR 评论...`);
       }
-      await this.postOrUpdateReviewComment(context.owner, context.repo, prNumber, result, {
+      await this.postOrUpdateReviewComment(prModel, result, {
         verbose,
         autoApprove,
       });
@@ -819,18 +813,16 @@ export class ReviewService {
    * 检查是否有其他同名 review workflow 正在运行中
    */
   private async checkDuplicateWorkflow(
-    owner: string,
-    repo: string,
-    prNumber: number,
+    prModel: PullRequestModel,
     headSha: string,
     verbose?: VerboseLevel,
   ): Promise<ReviewResult | null> {
     const ref = process.env.GITHUB_REF || process.env.GITEA_REF || "";
     const prMatch = ref.match(/refs\/pull\/(\d+)/);
-    const currentPrNumber = prMatch ? parseInt(prMatch[1], 10) : prNumber;
+    const currentPrNumber = prMatch ? parseInt(prMatch[1], 10) : prModel.number;
 
     try {
-      const runningWorkflows = await this.gitProvider.listWorkflowRuns(owner, repo, {
+      const runningWorkflows = await prModel.listWorkflowRuns({
         status: "in_progress",
       });
       const currentWorkflowName = process.env.GITHUB_WORKFLOW || process.env.GITEA_WORKFLOW;
@@ -922,8 +914,8 @@ export class ReviewService {
     return this.issueFilter.fillIssueCode(...args);
   }
 
-  protected async getExistingReviewResult(owner: string, repo: string, prNumber: number) {
-    return this.issueFilter.getExistingReviewResult(owner, repo, prNumber, (body) =>
+  protected async getExistingReviewResult(pr: PullRequestModel) {
+    return this.issueFilter.getExistingReviewResult(pr, (body) =>
       this.reviewReportService.parseMarkdown(body),
     );
   }
@@ -1026,17 +1018,12 @@ export class ReviewService {
     return this.prComment.buildLineReviewBody(...args);
   }
 
-  protected async findExistingAiComments(
-    owner: string,
-    repo: string,
-    prNumber: number,
-    verbose?: VerboseLevel,
-  ) {
-    return this.prComment.findExistingAiComments(owner, repo, prNumber, verbose);
+  protected async findExistingAiComments(pr: PullRequestModel, verbose?: VerboseLevel) {
+    return this.prComment.findExistingAiComments(pr, verbose);
   }
 
-  protected async deleteExistingAiReviews(owner: string, repo: string, prNumber: number) {
-    return deleteExistingAiReviewsFn(this.gitProvider, owner, repo, prNumber);
+  protected async deleteExistingAiReviews(pr: PullRequestModel) {
+    return deleteExistingAiReviewsFn(pr);
   }
 
   protected extractIssueKeyFromBody(body: string) {
@@ -1051,20 +1038,9 @@ export class ReviewService {
     return generateIssueKeyFn(issue);
   }
 
-  protected async syncRepliesToIssues(
-    owner: string,
-    repo: string,
-    prNumber: number,
-    reviewComments: any[],
-    result: any,
-  ) {
-    return syncRepliesToIssuesFn(
-      owner,
-      repo,
-      prNumber,
-      reviewComments,
-      result,
-      (line: string, pos?: number) => this.prComment.lineMatchesPosition(line, pos),
+  protected async syncRepliesToIssues(reviewComments: any[], result: any) {
+    return syncRepliesToIssuesFn(reviewComments, result, (line: string, pos?: number) =>
+      this.prComment.lineMatchesPosition(line, pos),
     );
   }
 

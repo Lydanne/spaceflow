@@ -1,6 +1,7 @@
 import "./locales";
 export * from "./review-spec";
 export * from "./review-report";
+export { PullRequestModel } from "./pull-request-model";
 import { defineExtension, t } from "@spaceflow/core";
 import type {
   GitProviderService,
