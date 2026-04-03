@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.74.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.73.0...@spaceflow/review@0.74.0) (2026-04-03)
+
+### 修复BUG
+
+* **review:** 修正无需审查文件时的轮次计算 ([0ee902e](https://github.com/Lydanne/spaceflow/commit/0ee902e6d3a4b2c09efa99d86b3aca4806508fb1))
+
+### 其他修改
+
+* **review-summary:** released version 0.42.0 [no ci] ([6e397e5](https://github.com/Lydanne/spaceflow/commit/6e397e5d389c385142d52b29b0332130be5245cd))
+
 ## [0.73.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.72.0...@spaceflow/review@0.73.0) (2026-04-03)
 
 ### 修复BUG
