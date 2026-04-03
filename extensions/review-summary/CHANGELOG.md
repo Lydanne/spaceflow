@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.44.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.43.0...@spaceflow/review-summary@0.44.0) (2026-04-03)
+
+### 修复BUG
+
+* **gitea:** 修正 PR review 事件类型映射 ([0b86fac](https://github.com/Lydanne/spaceflow/commit/0b86facc6df50eb1fd278d72090c329b5a5aaccf))
+
+### 其他修改
+
+* **core:** released version 0.29.0 [no ci] ([26c7af1](https://github.com/Lydanne/spaceflow/commit/26c7af16384cdfb30aa82d2a84385989e5b1cce8))
+* **publish:** released version 0.53.0 [no ci] ([72a98c0](https://github.com/Lydanne/spaceflow/commit/72a98c0d2dfd87c9319c1c73e0f8754b320013cd))
+* **review:** released version 0.75.0 [no ci] ([2c00ee4](https://github.com/Lydanne/spaceflow/commit/2c00ee436e8e9b029b3f99936cb5001968512ace))
+* **scripts:** released version 0.31.0 [no ci] ([864d556](https://github.com/Lydanne/spaceflow/commit/864d556eea3d271d11ef51ab5e83200e75200a71))
+* **shell:** released version 0.31.0 [no ci] ([66fcf46](https://github.com/Lydanne/spaceflow/commit/66fcf4648b708d46b939cc88050d43470b5dd25b))
+
 ## [0.43.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.42.0...@spaceflow/review-summary@0.43.0) (2026-04-03)
 
 ### 修复BUG
