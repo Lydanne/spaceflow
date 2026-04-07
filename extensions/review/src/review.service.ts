@@ -23,7 +23,7 @@ import { filterFilesByIncludes, extractGlobsFromIncludes } from "./review-includ
 import { ReviewLlmProcessor } from "./review-llm";
 import { PullRequestModel } from "./pull-request-model";
 import { ReviewResultModel, type ReviewResultModelDeps } from "./review-result-model";
-import { REVIEW_COMMENT_MARKER, REVIEW_LINE_COMMENTS_MARKER } from "./review-pr-comment-utils";
+import { REVIEW_COMMENT_MARKER, REVIEW_LINE_COMMENTS_MARKER } from "./utils/review-pr-comment";
 
 export type { ReviewContext } from "./review-context";
 export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./review-llm";

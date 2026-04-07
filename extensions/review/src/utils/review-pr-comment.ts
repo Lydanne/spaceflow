@@ -1,5 +1,5 @@
-import { ReviewIssue, ReviewResult, ReviewStats } from "./review-spec";
-import { PullRequestModel } from "./pull-request-model";
+import { ReviewIssue, ReviewResult, ReviewStats } from "../review-spec";
+import { PullRequestModel } from "../pull-request-model";
 
 export const REVIEW_COMMENT_MARKER = "<!-- spaceflow-review -->";
 export const REVIEW_LINE_COMMENTS_MARKER = "<!-- spaceflow-review-lines -->";
