@@ -9,6 +9,16 @@ import micromatch from "micromatch";
  * - `deleted|*\/**\/*.ts`        → 仅匹配删除文件
  * - `*\/**\/*.ts`               → 不限变更类型（原有行为）
  *
+ * ## 全量 diff 语义说明
+ *
+ * 每次 review 是对当前分支与 base 分支（develop/master）的**全量 diff**，
+ * 文件的 status 由平台 compare API 给出，表示该文件**相对 base 分支**的变更类型。
+ *
+ * 因此，若 `a.ts` 是在当前分支上首次引入的（相对 base 不存在），
+ * 无论后续经过多少次 commit 修改，其 status **始终为 `added`**。
+ * 这意味着 `added|*.ts` 在后续每次 review 中都会继续匹配该文件，
+ * 这是符合预期的行为——只要文件相对 base 是"新建"的，`added|` 就应该始终生效。
+ *
  * 代码结构过滤语法：`added|code-<type>`，例如：
  * - `added|code-function`  → 只审查新增代码中的函数
  * - `added|code-class`     → 只审查新增代码中的类

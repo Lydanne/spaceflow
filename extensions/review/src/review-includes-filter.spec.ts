@@ -217,6 +217,15 @@ describe("review-includes-filter", () => {
       const glFiles = [{ filename: "src/old.ts", status: "deleted" }];
       expect(filterFilesByIncludes(glFiles, [`deleted|${glob}`])).toHaveLength(1);
     });
+
+    it("全量 diff 语义：文件在当前分支首次引入后被多次修改，status 仍为 added，added| 始终匹配", () => {
+      // 场景：a.ts 在 commit1 创建（status=added），在 commit2 修改
+      // 全量 diff（当前分支 vs base）时，compare API 返回的 status 仍为 added
+      // 因此 added|*.ts 在后续每次 review 中都能匹配到该文件
+      const diffFiles = [{ filename: "src/a.ts", status: "added" }];
+      const result = filterFilesByIncludes(diffFiles, [`added|${glob}`]);
+      expect(result.map((f) => f.filename)).toEqual(["src/a.ts"]);
+    });
   });
 
   describe("extractGlobsFromIncludes", () => {
