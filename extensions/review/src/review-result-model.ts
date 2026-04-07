@@ -325,11 +325,33 @@ export class ReviewResultModel {
       // 遍历每个评论，获取其 reactions
       for (const comment of reviewComments) {
         if (!comment.id) continue;
-        // 找到对应的 issue
-        const matchedIssue = this._result.issues.find(
-          (issue) =>
-            issue.file === comment.path && this.lineMatchesPosition(issue.line, comment.position),
-        );
+        // 找到对应的 issue：优先通过 issue-key 精确匹配，回退到 path+line 匹配
+        let matchedIssue: ReviewIssue | undefined;
+        if (comment.body) {
+          const issueKey = extractIssueKeyFromBody(comment.body);
+          if (issueKey) {
+            matchedIssue = this._result.issues.find(
+              (issue) => generateIssueKey(issue) === issueKey,
+            );
+            if (shouldLog(verbose, 3)) {
+              console.log(
+                `[syncReactionsToIssues] comment ${comment.id}: issue-key=${issueKey}, matched=${matchedIssue ? "yes" : "no"}`,
+              );
+            }
+          }
+        }
+        // 如果 issue-key 匹配失败，使用 path+position 回退匹配
+        if (!matchedIssue) {
+          matchedIssue = this._result.issues.find(
+            (issue) =>
+              issue.file === comment.path && this.lineMatchesPosition(issue.line, comment.position),
+          );
+          if (shouldLog(verbose, 3)) {
+            console.log(
+              `[syncReactionsToIssues] comment ${comment.id}: fallback matching path=${comment.path}, position=${comment.position}, matched=${matchedIssue ? "yes" : "no"}`,
+            );
+          }
+        }
         if (matchedIssue) {
           commentIdToIssue.set(comment.id, matchedIssue);
         }
