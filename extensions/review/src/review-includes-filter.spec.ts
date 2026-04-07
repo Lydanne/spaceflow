@@ -257,31 +257,23 @@ describe("review-includes-filter", () => {
   });
 
   describe("extractCodeBlockTypes", () => {
-    it("提取 added 状态的 code-* 类型", () => {
-      const result = extractCodeBlockTypes(["added|code-function", "added|code-class"]);
-      expect(result).toEqual(["function", "class"]);
-    });
-
-    it("默认只提取 added 状态，modified 的 code-* 被忽略", () => {
-      const result = extractCodeBlockTypes(["modified|code-function", "added|code-class"]);
-      expect(result).toEqual(["class"]);
-    });
-
-    it("指定 status=modified 时提取对应类型", () => {
-      const result = extractCodeBlockTypes(
-        ["modified|code-function", "added|code-class"],
-        "modified",
-      );
-      expect(result).toEqual(["function"]);
-    });
-
-    it("纯类型名（无 status 前缀）始终包含", () => {
+    it("提取纯类型名", () => {
       const result = extractCodeBlockTypes(["function", "class"]);
       expect(result).toEqual(["function", "class"]);
     });
 
+    it("status|code-* 语法不被识别，返回空", () => {
+      const result = extractCodeBlockTypes(["added|code-function", "added|code-class"]);
+      expect(result).toEqual([]);
+    });
+
+    it("混合：纯类型名保留，status 前缀语法忽略", () => {
+      const result = extractCodeBlockTypes(["added|code-function", "class"]);
+      expect(result).toEqual(["class"]);
+    });
+
     it("去重：同一类型出现多次只返回一次", () => {
-      const result = extractCodeBlockTypes(["added|code-function", "added|code-function"]);
+      const result = extractCodeBlockTypes(["function", "function"]);
       expect(result).toEqual(["function"]);
     });
 

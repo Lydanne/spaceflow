@@ -407,8 +407,16 @@ export class ReviewContextBuilder {
         return issue;
       }
       const shortHash = issue.commit?.slice(0, 7);
-      const author =
-        shortHash && !shortHash.includes("---") ? commitAuthorMap.get(shortHash) : undefined;
+      const isValidHash = Boolean(shortHash && !shortHash.includes("---"));
+      if (!isValidHash) {
+        if (shouldLog(verbose, 2)) {
+          console.log(
+            `[fillIssueAuthors] issue: file=${issue.file}, commit=${issue.commit} is invalid hash, marking as invalid`,
+          );
+        }
+        return { ...issue, commit: undefined, valid: "false" };
+      }
+      const author = commitAuthorMap.get(shortHash!);
       if (shouldLog(verbose, 2)) {
         console.log(
           `[fillIssueAuthors] issue: file=${issue.file}, commit=${issue.commit}, shortHash=${shortHash}, foundAuthor=${author?.login}, finalAuthor=${(author || defaultAuthor)?.login}`,

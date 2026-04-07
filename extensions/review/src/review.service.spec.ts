@@ -1140,7 +1140,8 @@ describe("ReviewService", () => {
         { sha: "abc1234567890", author: { id: 1, login: "dev1" }, commit: { author: {} } },
       ];
       const result = await (service as any).fillIssueAuthors(issues, commits, "o", "r");
-      expect(result[0].author.login).toBe("dev1");
+      expect(result[0].commit).toBeUndefined();
+      expect(result[0].valid).toBe("false");
     });
   });
 
