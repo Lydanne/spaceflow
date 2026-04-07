@@ -7,7 +7,6 @@ import {
   createStreamLoggerState,
   shouldLog,
   type VerboseLevel,
-  type LlmJsonPutSchema,
   LlmJsonPut,
   parallel,
 } from "@spaceflow/core";
@@ -25,50 +24,14 @@ import micromatch from "micromatch";
 import type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
 import { buildLinesWithNumbers, buildCommitsSection, extractCodeBlocks } from "./utils/review-llm";
 import { extractCodeBlockTypes, extractGlobsFromIncludes } from "./review-includes-filter";
+import {
+  REVIEW_SCHEMA,
+  buildFileReviewPrompt,
+  buildPrDescriptionPrompt,
+  buildPrTitlePrompt,
+} from "./prompt";
 
 export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
-
-const REVIEW_SCHEMA: LlmJsonPutSchema = {
-  type: "object",
-  properties: {
-    issues: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          file: { type: "string", description: "发生问题的文件路径" },
-          line: {
-            type: "string",
-            description:
-              "问题所在的行号，只支持单行或多行 (如 123 或 123-125)，不允许使用 `,` 分隔多个行号",
-          },
-          ruleId: { type: "string", description: "违反的规则 ID（如 JsTs.FileName.UpperCamel）" },
-          specFile: {
-            type: "string",
-            description: "规则来源的规范文件名（如 js&ts.file-name.md）",
-          },
-          reason: { type: "string", description: "问题的简要概括" },
-          suggestion: {
-            type: "string",
-            description:
-              "修改后的完整代码片段。要求以代码为主体，并在代码中使用详细的中文注释解释逻辑改进点。不要包含 Markdown 反引号。",
-          },
-          commit: { type: "string", description: "相关的 7 位 commit SHA" },
-          severity: {
-            type: "string",
-            description: "问题严重程度，根据规则文档中的 severity 标记确定",
-            enum: ["error", "warn"],
-          },
-        },
-        required: ["file", "line", "ruleId", "specFile", "reason"],
-        additionalProperties: false,
-      },
-    },
-    summary: { type: "string", description: "本次代码审查的整体总结" },
-  },
-  required: ["issues", "summary"],
-  additionalProperties: false,
-};
 
 export class ReviewLlmProcessor {
   readonly llmJsonPut: LlmJsonPut<ReviewResult>;
@@ -120,36 +83,6 @@ export class ReviewLlmProcessor {
       // 没有 includes 配置，扩展名匹配即可
       return true;
     });
-  }
-
-  /**
-   * 构建 systemPrompt
-   */
-  buildSystemPrompt(specsSection: string): string {
-    return `你是一个专业的代码审查专家，负责根据团队的编码规范对代码进行严格审查。
-
-## 审查规范
-
-${specsSection}
-
-## 审查要求
-
-1. **严格遵循规范**：只按照上述审查规范进行审查，不要添加规范之外的要求
-2. **精准定位问题**：每个问题必须指明具体的行号，行号从文件内容中的 "行号|" 格式获取
-3. **避免重复报告**：如果提示词中包含"上一次审查结果"，请不要重复报告已存在的问题
-4. **提供可行建议**：对于每个问题，提供具体的修改建议代码
-
-## 注意事项
-
-- 变更文件内容已在上下文中提供，无需调用读取工具
-- 你可以读取项目中的其他文件以了解上下文
-- 不要调用编辑工具修改文件，你的职责是审查而非修改
-- 文件内容格式为 "CommitHash 行号| 代码"，输出的 line 字段应对应原始行号
-
-## 输出要求
-
-- 发现问题时：在 issues 数组中列出所有问题，每个问题包含 file、line、ruleId、specFile、reason、suggestion、severity
-- 无论是否发现问题：都必须在 summary 中提供该文件的审查总结，简要说明审查结果`;
   }
 
   async buildReviewPrompt(
@@ -230,28 +163,16 @@ ${specsSection}
           previousReviewSection = parts.join("\n");
         }
 
-        const userPrompt = `## ${filename} (${file.status})
-
-### 文件内容
-
-\`\`\`
-${linesWithNumbers}
-\`\`\`
-
-### 该文件的相关 Commits
-
-${commitsSection}
-
-### 该文件所在的目录树
-
-${fileDirectoryInfo}
-
-### 上一次审查结果
-
-${previousReviewSection}`;
-
         const specsSection = this.reviewSpecService.buildSpecsSection(fileSpecs);
-        const systemPrompt = this.buildSystemPrompt(specsSection);
+        const { systemPrompt, userPrompt } = buildFileReviewPrompt({
+          filename,
+          status: file.status,
+          linesWithNumbers,
+          commitsSection,
+          fileDirectoryInfo,
+          previousReviewSection,
+          specsSection,
+        });
 
         return { filename, systemPrompt, userPrompt };
       }),
@@ -501,54 +422,14 @@ ${previousReviewSection}`;
     fileContents?: FileContentsMap,
     verbose?: VerboseLevel,
   ): Promise<{ title: string; description: string }> {
-    const commitMessages = commits
-      .map((c) => `- ${c.sha?.slice(0, 7)}: ${c.commit?.message?.split("\n")[0]}`)
-      .join("\n");
-    const fileChanges = changedFiles
-      .slice(0, 30)
-      .map((f) => `- ${f.filename} (${f.status})`)
-      .join("\n");
-    // 构建代码变更内容（只包含变更行，限制总长度）
-    let codeChangesSection = "";
-    if (fileContents && fileContents.size > 0) {
-      const codeSnippets: string[] = [];
-      let totalLength = 0;
-      const maxTotalLength = 8000; // 限制代码总长度
-      for (const [filename, lines] of fileContents) {
-        if (totalLength >= maxTotalLength) break;
-        // 只提取有变更的行（commitHash 不是 "-------"）
-        const changedLines = lines
-          .map(([hash, code], idx) => (hash !== "-------" ? `${idx + 1}: ${code}` : null))
-          .filter(Boolean);
-        if (changedLines.length > 0) {
-          const snippet = `### ${filename}\n\`\`\`\n${changedLines.slice(0, 50).join("\n")}\n\`\`\``;
-          if (totalLength + snippet.length <= maxTotalLength) {
-            codeSnippets.push(snippet);
-            totalLength += snippet.length;
-          }
-        }
-      }
-      if (codeSnippets.length > 0) {
-        codeChangesSection = `\n\n## 代码变更内容\n${codeSnippets.join("\n\n")}`;
-      }
-    }
-    const prompt = `请根据以下 PR 的 commit 记录、文件变更和代码内容，用简洁的中文总结这个 PR 实现了什么功能。
-要求：
-1. 第一行输出 PR 标题，格式必须是: Feat xxx 或 Fix xxx 或 Refactor xxx（根据变更类型选择，整体不超过 50 个字符）
-2. 空一行后输出详细描述
-3. 描述应该简明扼要，突出核心功能点
-4. 使用 Markdown 格式
-5. 不要逐条列出 commit，而是归纳总结
-6. 重点分析代码变更的实际功能
+    const { userPrompt } = buildPrDescriptionPrompt({
+      commits,
+      changedFiles,
+      fileContents,
+    });
 
-## Commit 记录 (${commits.length} 个)
-${commitMessages || "无"}
-
-## 文件变更 (${changedFiles.length} 个文件)
-${fileChanges || "无"}
-${changedFiles.length > 30 ? `\n... 等 ${changedFiles.length - 30} 个文件` : ""}${codeChangesSection}`;
     try {
-      const stream = this.llmProxyService.chatStream([{ role: "user", content: prompt }], {
+      const stream = this.llmProxyService.chatStream([{ role: "user", content: userPrompt }], {
         adapter: llmMode,
       });
       let content = "";
@@ -579,29 +460,10 @@ ${changedFiles.length > 30 ? `\n... 等 ${changedFiles.length - 30} 个文件` :
     commits: PullRequestCommit[],
     changedFiles: ChangedFile[],
   ): Promise<string> {
-    const commitMessages = commits
-      .slice(0, 10)
-      .map((c) => c.commit?.message?.split("\n")[0])
-      .filter(Boolean)
-      .join("\n");
-    const fileChanges = changedFiles
-      .slice(0, 20)
-      .map((f) => `${f.filename} (${f.status})`)
-      .join("\n");
-    const prompt = `请根据以下 commit 记录和文件变更，生成一个简短的 PR 标题。
-要求：
-1. 格式必须是: Feat: xxx 或 Fix: xxx 或 Refactor: xxx
-2. 根据变更内容选择合适的前缀（新功能用 Feat，修复用 Fix，重构用 Refactor）
-3. xxx 部分用简短的中文描述（整体不超过 50 个字符）
-4. 只输出标题，不要加任何解释
+    const { userPrompt } = buildPrTitlePrompt({ commits, changedFiles });
 
-Commit 记录:
-${commitMessages || "无"}
-
-文件变更:
-${fileChanges || "无"}`;
     try {
-      const stream = this.llmProxyService.chatStream([{ role: "user", content: prompt }], {
+      const stream = this.llmProxyService.chatStream([{ role: "user", content: userPrompt }], {
         adapter: "openai",
       });
       let title = "";
