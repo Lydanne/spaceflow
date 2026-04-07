@@ -566,6 +566,9 @@ export class ReviewResultModel {
     const stats = this.stats;
     const shouldAutoApprove = autoApprove && stats.pending === 0;
 
+    // 获取 PR 作者用户名，用于自动批准时 @ 通知
+    const prAuthorLogin = shouldAutoApprove ? (await this.pr.getInfo()).user?.login : undefined;
+
     if (reviewConf.lineComments) {
       const lineReviewBody = this.buildLineReviewBody(
         lineIssues,
@@ -575,12 +578,7 @@ export class ReviewResultModel {
 
       // 如果需要自动批准，追加批准信息到 body
       const finalReviewBody = shouldAutoApprove
-        ? lineReviewBody +
-          `\n\n---\n\n✅ **自动批准合并**\n\n${
-            stats.validTotal > 0
-              ? `所有问题都已解决 (${stats.fixed} 已修复, ${stats.resolved} 已解决)，`
-              : "代码审查通过，未发现问题，"
-          }自动批准此 PR。`
+        ? lineReviewBody + `\n\n---\n\n` + this.buildAutoApproveBody(stats, prAuthorLogin)
         : lineReviewBody;
 
       const reviewEvent = shouldAutoApprove ? REVIEW_STATE.APPROVE : REVIEW_STATE.COMMENT;
@@ -626,11 +624,7 @@ export class ReviewResultModel {
               try {
                 await this.pr.createReview({
                   event: REVIEW_STATE.APPROVE,
-                  body: `✅ **自动批准合并**\n\n${
-                    stats.validTotal > 0
-                      ? `所有问题都已解决 (${stats.fixed} 已修复, ${stats.resolved} 已解决)，`
-                      : "代码审查通过，未发现问题，"
-                  }自动批准此 PR。`,
+                  body: this.buildAutoApproveBody(stats, prAuthorLogin),
                   commit_id: commitId,
                 });
                 console.log(`✅ 已自动批准 PR #${this.pr.number}（所有问题已解决）`);
@@ -667,11 +661,7 @@ export class ReviewResultModel {
       try {
         await this.pr.createReview({
           event: REVIEW_STATE.APPROVE,
-          body: `✅ **自动批准合并**\n\n${
-            stats.validTotal > 0
-              ? `所有问题都已解决 (${stats.fixed} 已修复, ${stats.resolved} 已解决)，`
-              : "代码审查通过，未发现问题，"
-          }自动批准此 PR。`,
+          body: this.buildAutoApproveBody(stats, prAuthorLogin),
           commit_id: commitId,
         });
         console.log(`✅ 已自动批准 PR #${this.pr.number}（所有问题已解决）`);
@@ -679,6 +669,18 @@ export class ReviewResultModel {
         console.warn("⚠️ 自动批准失败:", error);
       }
     }
+  }
+
+  /**
+   * 构建自动批准消息 body，包含 @username mention
+   */
+  private buildAutoApproveBody(stats: ReviewStats, prAuthorLogin?: string): string {
+    const mention = prAuthorLogin ? ` @${prAuthorLogin}` : "";
+    const reason =
+      stats.validTotal > 0
+        ? `所有问题都已解决 (${stats.fixed} 已修复, ${stats.resolved} 已解决)，`
+        : "代码审查通过，未发现问题，";
+    return `✅ **自动批准合并**\n\n${reason}自动批准此 PR。${mention}`;
   }
 
   /**
