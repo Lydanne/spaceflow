@@ -12,6 +12,7 @@ import {
 } from "@spaceflow/core";
 import micromatch from "micromatch";
 import type { DeletionImpactResult } from "./review-spec";
+import { extractGlobsFromIncludes } from "./review-includes-filter";
 import { spawn } from "child_process";
 
 export interface DeletedCodeBlock {
@@ -160,11 +161,12 @@ export class DeletionImpactService {
       console.log(`   📦 发现 ${deletedBlocks.length} 个删除的代码块`);
     }
 
-    // 1.5 使用 includes 过滤文件
+    // 1.5 使用 includes 过滤文件（删除分析模式中只按 glob 匹配，不区分 status）
     if (context.includes && context.includes.length > 0) {
       const beforeCount = deletedBlocks.length;
+      const globs = extractGlobsFromIncludes(context.includes);
       const filenames = deletedBlocks.map((b) => b.file);
-      const matchedFilenames = micromatch(filenames, context.includes);
+      const matchedFilenames = micromatch(filenames, globs);
       deletedBlocks = deletedBlocks.filter((b) => matchedFilenames.includes(b.file));
       if (shouldLog(verbose, 1)) {
         console.log(`   🔍 Includes 过滤: ${beforeCount} -> ${deletedBlocks.length} 个删除块`);

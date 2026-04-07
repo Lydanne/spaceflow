@@ -19,6 +19,7 @@ import { DeletionImpactService } from "./deletion-impact.service";
 import { execSync } from "child_process";
 import { ReviewContextBuilder, type ReviewContext } from "./review-context";
 import { ReviewIssueFilter } from "./review-issue-filter";
+import { filterFilesByIncludes, extractGlobsFromIncludes } from "./review-includes-filter";
 import { ReviewLlmProcessor } from "./review-llm";
 import { PullRequestModel } from "./pull-request-model";
 import { ReviewResultModel, type ReviewResultModelDeps } from "./review-result-model";
@@ -378,22 +379,21 @@ export class ReviewService {
       }
     }
 
-    // 3. 使用 includes 过滤文件和 commits
+    // 3. 使用 includes 过滤文件和 commits（支持 added|/modified|/deleted| 前缀语法）
     if (includes && includes.length > 0) {
       const beforeFiles = changedFiles.length;
-      const filenames = changedFiles.map((file) => file.filename || "");
-      const matchedFilenames = micromatch(filenames, includes);
-      changedFiles = changedFiles.filter((file) => matchedFilenames.includes(file.filename || ""));
+      changedFiles = filterFilesByIncludes(changedFiles, includes);
       if (shouldLog(verbose, 1)) {
         console.log(`   Includes 过滤文件: ${beforeFiles} -> ${changedFiles.length} 个文件`);
       }
 
+      const globs = extractGlobsFromIncludes(includes);
       const beforeCommits = commits.length;
       const filteredCommits: PullRequestCommit[] = [];
       for (const commit of commits) {
         if (!commit.sha) continue;
         const commitFiles = await this.getFilesForCommit(owner, repo, commit.sha, prNumber);
-        if (micromatch.some(commitFiles, includes)) {
+        if (micromatch.some(commitFiles, globs)) {
           filteredCommits.push(commit);
         }
       }
@@ -737,11 +737,9 @@ export class ReviewService {
       commits = await this.getCommitsBetweenRefs(baseRef, headRef);
     }
 
-    // 使用 includes 过滤文件
+    // 使用 includes 过滤文件（支持 added|/modified|/deleted| 前缀语法）
     if (context.includes && context.includes.length > 0) {
-      const filenames = changedFiles.map((file) => file.filename || "");
-      const matchedFilenames = micromatch(filenames, context.includes);
-      changedFiles = changedFiles.filter((file) => matchedFilenames.includes(file.filename || ""));
+      changedFiles = filterFilesByIncludes(changedFiles, context.includes);
     }
 
     const prDesc = context.generateDescription

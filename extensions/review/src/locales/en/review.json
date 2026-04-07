@@ -4,7 +4,7 @@
   "options.prNumber": "PR number, auto-detected from env if not specified",
   "options.base": "Base branch/tag for diff comparison",
   "options.head": "Head branch/tag for diff comparison",
-  "options.includes": "File glob patterns to review, e.g. *.ts *.js (can be specified multiple times)",
+  "options.includes": "File glob patterns to review, e.g. *.ts *.js (can be specified multiple times). Supports change-type prefixes: added|*.ts (new files only), modified|*.ts (modified only), deleted|*.ts (deleted only)",
   "options.llmMode": "LLM mode: claude-code, openai, gemini",
   "options.files": "Only review specified files (space-separated)",
   "options.commits": "Only review specified commits (space-separated)",
