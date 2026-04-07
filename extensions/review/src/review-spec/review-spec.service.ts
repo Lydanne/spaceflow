@@ -70,7 +70,23 @@ export class ReviewSpecService {
       }
     }
 
-    return specs.filter((spec) => spec.extensions.some((ext) => changedExtensions.has(ext)));
+    console.log(
+      `[filterApplicableSpecs] changedExtensions=${JSON.stringify([...changedExtensions])}, specs count=${specs.length}`,
+    );
+    const result = specs.filter((spec) => {
+      const matches = spec.extensions.some((ext) => changedExtensions.has(ext));
+      if (!matches) {
+        console.log(
+          `[filterApplicableSpecs] spec ${spec.filename} (ext: ${JSON.stringify(spec.extensions)}) NOT matched`,
+        );
+      } else {
+        console.log(
+          `[filterApplicableSpecs] spec ${spec.filename} (ext: ${JSON.stringify(spec.extensions)}) MATCHED`,
+        );
+      }
+      return matches;
+    });
+    return result;
   }
 
   async loadReviewSpecs(specDir: string): Promise<ReviewSpec[]> {

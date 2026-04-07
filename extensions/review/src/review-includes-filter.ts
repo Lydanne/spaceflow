@@ -102,6 +102,7 @@ export function filterFilesByIncludes<T extends FileWithStatus>(
   if (!includes || includes.length === 0) return files;
 
   const parsed = includes.map(parseIncludePattern);
+  console.log(`[filterFilesByIncludes] parsed patterns=${JSON.stringify(parsed)}`);
 
   // 排除模式（以 ! 开头），用于最终全局过滤
   const negativeGlobs = parsed
@@ -114,8 +115,13 @@ export function filterFilesByIncludes<T extends FileWithStatus>(
   // 有 status 前缀的 patterns
   const statusPatterns = parsed.filter((p) => p.status !== undefined);
 
+  console.log(
+    `[filterFilesByIncludes] negativeGlobs=${JSON.stringify(negativeGlobs)}, plainGlobs=${JSON.stringify(plainGlobs)}, statusPatterns=${JSON.stringify(statusPatterns)}`,
+  );
+
   return files.filter((file) => {
     const filename = file.filename ?? "";
+    const fileStatus = STATUS_ALIAS[file.status?.toLowerCase() ?? ""] ?? "modified";
     if (!filename) return false;
 
     // 最终排除：命中排除模式的文件直接过滤掉
@@ -123,18 +129,19 @@ export function filterFilesByIncludes<T extends FileWithStatus>(
       negativeGlobs.length > 0 &&
       micromatch.isMatch(filename, negativeGlobs, { matchBase: true })
     ) {
+      console.log(`[filterFilesByIncludes] ${filename} excluded by negativeGlobs`);
       return false;
     }
 
     // 正向匹配：无前缀 glob
     if (plainGlobs.length > 0 && micromatch.isMatch(filename, plainGlobs, { matchBase: true })) {
+      console.log(`[filterFilesByIncludes] ${filename} matched plainGlobs`);
       return true;
     }
 
     // 正向匹配：有 status 前缀的 glob，按文件实际 status 过滤
     // glob 可以带 ! 前缀表示在该 status 范围内排除，如 added|!**/*.spec.ts
     if (statusPatterns.length > 0) {
-      const fileStatus = STATUS_ALIAS[file.status?.toLowerCase() ?? ""] ?? "modified";
       // 按 status 分组，每组内正向 glob + 排除 glob 合并后批量匹配
       const matchingStatusGlobs = statusPatterns
         .filter(({ status }) => status === fileStatus)
@@ -150,11 +157,17 @@ export function filterFilesByIncludes<T extends FileWithStatus>(
           const matchesNegative =
             negativeStatusGlobs.length > 0 &&
             micromatch.isMatch(filename, negativeStatusGlobs, { matchBase: true });
-          if (matchesPositive && !matchesNegative) return true;
+          if (matchesPositive && !matchesNegative) {
+            console.log(
+              `[filterFilesByIncludes] ${filename} (status=${fileStatus}) matched statusPatterns`,
+            );
+            return true;
+          }
         }
       }
     }
 
+    console.log(`[filterFilesByIncludes] ${filename} (status=${fileStatus}) NOT matched`);
     return false;
   });
 }

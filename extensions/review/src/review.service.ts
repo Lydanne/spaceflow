@@ -100,6 +100,14 @@ export class ReviewService {
     // 2. 规则匹配
     const specs = await this.issueFilter.loadSpecs(specSources, verbose);
     const applicableSpecs = this.reviewSpecService.filterApplicableSpecs(specs, changedFiles);
+    if (shouldLog(verbose, 2)) {
+      console.log(
+        `[execute] loadSpecs: loaded ${specs.length} specs from sources: ${JSON.stringify(specSources)}`,
+      );
+      console.log(
+        `[execute] filterApplicableSpecs: ${applicableSpecs.length} applicable out of ${specs.length}, changedFiles=${JSON.stringify(changedFiles.map((f) => f.filename))}`,
+      );
+    }
     if (shouldLog(verbose, 1)) {
       console.log(`   适用的规则文件: ${applicableSpecs.length}`);
     }
@@ -383,9 +391,19 @@ export class ReviewService {
     // 3. 使用 includes 过滤文件和 commits（支持 added|/modified|/deleted| 前缀语法）
     if (includes && includes.length > 0) {
       const beforeFiles = changedFiles.length;
+      if (shouldLog(verbose, 2)) {
+        console.log(
+          `[resolveSourceData] filterFilesByIncludes: before=${JSON.stringify(changedFiles.map((f) => ({ filename: f.filename, status: f.status })))}, includes=${JSON.stringify(includes)}`,
+        );
+      }
       changedFiles = filterFilesByIncludes(changedFiles, includes);
       if (shouldLog(verbose, 1)) {
         console.log(`   Includes 过滤文件: ${beforeFiles} -> ${changedFiles.length} 个文件`);
+      }
+      if (shouldLog(verbose, 2)) {
+        console.log(
+          `[resolveSourceData] filterFilesByIncludes: after=${JSON.stringify(changedFiles.map((f) => f.filename))}`,
+        );
       }
 
       const globs = extractGlobsFromIncludes(includes);

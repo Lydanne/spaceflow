@@ -64,6 +64,9 @@ export class ReviewContextBuilder {
 
   async getContextFromEnv(options: ReviewOptions): Promise<ReviewContext> {
     const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
+    if (shouldLog(options.verbose, 2)) {
+      console.log(`[getContextFromEnv] reviewConf: ${JSON.stringify(reviewConf)}`);
+    }
     const ciConf = this.config.get<CiConfig>("ci");
     const repository = ciConf?.repository;
 
@@ -152,6 +155,12 @@ export class ReviewContextBuilder {
     }
 
     // 合并参数优先级：命令行 > PR 标题 > 配置文件 > 默认值
+    const ctxIncludes = options.includes ?? titleOptions.includes ?? reviewConf.includes;
+    if (shouldLog(options.verbose, 2)) {
+      console.log(
+        `[getContextFromEnv] includes: commandLine=${JSON.stringify(options.includes)}, title=${JSON.stringify(titleOptions.includes)}, config=${JSON.stringify(reviewConf.includes)}, final=${JSON.stringify(ctxIncludes)}`,
+      );
+    }
     return {
       owner,
       repo,
@@ -162,7 +171,7 @@ export class ReviewContextBuilder {
       dryRun: options.dryRun || titleOptions.dryRun || false,
       ci: options.ci ?? false,
       verbose: normalizeVerbose(options.verbose ?? titleOptions.verbose),
-      includes: options.includes ?? titleOptions.includes ?? reviewConf.includes,
+      includes: ctxIncludes,
       filterCodeBlocks: options.filterCodeBlocks ?? reviewConf.filterCodeBlocks,
       llmMode: options.llmMode ?? titleOptions.llmMode ?? reviewConf.llmMode,
       files: this.normalizeFilePaths(options.files),
