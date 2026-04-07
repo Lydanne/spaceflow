@@ -5,8 +5,8 @@ import {
   LlmProxyService,
   logStreamEvent,
   createStreamLoggerState,
-  type VerboseLevel,
   shouldLog,
+  type VerboseLevel,
   type LlmJsonPutSchema,
   LlmJsonPut,
   parallel,
@@ -22,24 +22,10 @@ import {
 import { readdir } from "fs/promises";
 import { dirname, extname } from "path";
 import micromatch from "micromatch";
+import type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
+import { buildLinesWithNumbers, buildCommitsSection } from "./utils/review-llm";
 
-export interface FileReviewPrompt {
-  filename: string;
-  systemPrompt: string;
-  userPrompt: string;
-}
-
-export interface ReviewPrompt {
-  filePrompts: FileReviewPrompt[];
-}
-
-export interface LLMReviewOptions {
-  verbose?: VerboseLevel;
-  concurrency?: number;
-  timeout?: number;
-  retries?: number;
-  retryDelay?: number;
-}
+export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
 
 const REVIEW_SCHEMA: LlmJsonPutSchema = {
   type: "object",
@@ -182,30 +168,8 @@ ${specsSection}
             commitsSection: "- 无相关 commits",
           };
         }
-        const padWidth = String(contentLines.length).length;
-        const linesWithNumbers = contentLines
-          .map(([hash, line], index) => {
-            const lineNum = index + 1;
-            return `${hash} ${String(lineNum).padStart(padWidth)}| ${line}`;
-          })
-          .join("\n");
-        // 从 contentLines 中收集该文件相关的 commit hashes
-        const fileCommitHashes = new Set<string>();
-        for (const [hash] of contentLines) {
-          if (hash !== "-------") {
-            fileCommitHashes.add(hash);
-          }
-        }
-        const relatedCommits = commits.filter((c) => {
-          const shortHash = c.sha?.slice(0, 7) || "";
-          return fileCommitHashes.has(shortHash);
-        });
-        const commitsSection =
-          relatedCommits.length > 0
-            ? relatedCommits
-                .map((c) => `- \`${c.sha?.slice(0, 7)}\` ${c.commit?.message?.split("\n")[0]}`)
-                .join("\n")
-            : "- 无相关 commits";
+        const linesWithNumbers = buildLinesWithNumbers(contentLines);
+        const commitsSection = buildCommitsSection(contentLines, commits);
         return { filename, file, linesWithNumbers, commitsSection };
       });
 
