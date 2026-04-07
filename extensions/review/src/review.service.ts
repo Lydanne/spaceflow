@@ -23,6 +23,7 @@ import { filterFilesByIncludes, extractGlobsFromIncludes } from "./review-includ
 import { ReviewLlmProcessor } from "./review-llm";
 import { PullRequestModel } from "./pull-request-model";
 import { ReviewResultModel, type ReviewResultModelDeps } from "./review-result-model";
+import { REVIEW_COMMENT_MARKER, REVIEW_LINE_COMMENTS_MARKER } from "./review-pr-comment-utils";
 
 export type { ReviewContext } from "./review-context";
 export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./review-llm";
@@ -220,7 +221,7 @@ export class ReviewService {
       files,
       commits: filterCommits,
       localMode,
-      skipDuplicateWorkflow,
+      duplicateWorkflowResolved,
     } = context;
 
     const isDirectFileMode = !!(files && files.length > 0 && baseRef === headRef);
@@ -299,9 +300,14 @@ export class ReviewService {
       }
 
       // 检查是否有其他同名 review workflow 正在运行中
-      if (skipDuplicateWorkflow && ci && prInfo?.head?.sha) {
-        const skipResult = await this.checkDuplicateWorkflow(prModel, prInfo.head.sha, verbose);
-        if (skipResult) {
+      if (duplicateWorkflowResolved !== "off" && ci && prInfo?.head?.sha) {
+        const duplicateResult = await this.checkDuplicateWorkflow(
+          prModel,
+          prInfo.head.sha,
+          duplicateWorkflowResolved,
+          verbose,
+        );
+        if (duplicateResult) {
           return {
             prModel,
             commits,
@@ -309,7 +315,7 @@ export class ReviewService {
             headSha: prInfo.head.sha,
             isLocalMode,
             isDirectFileMode,
-            earlyReturn: skipResult,
+            earlyReturn: duplicateResult,
           };
         }
       }
@@ -862,10 +868,12 @@ export class ReviewService {
 
   /**
    * 检查是否有其他同名 review workflow 正在运行中
+   * 根据 duplicateWorkflowResolved 配置决定是跳过还是删除旧评论
    */
   private async checkDuplicateWorkflow(
     prModel: PullRequestModel,
     headSha: string,
+    mode: "skip" | "delete",
     verbose?: VerboseLevel,
   ): Promise<ReviewResult | null> {
     const ref = process.env.GITHUB_REF || process.env.GITEA_REF || "";
@@ -885,6 +893,19 @@ export class ReviewService {
           (!currentRunId || String(w.id) !== currentRunId),
       );
       if (duplicateReviewRuns.length > 0) {
+        if (mode === "delete") {
+          // 删除模式：清理旧的 AI Review 评论和 PR Review
+          if (shouldLog(verbose, 1)) {
+            console.log(
+              `🗑️ 检测到 ${duplicateReviewRuns.length} 个同名 workflow，清理旧的 AI Review 评论...`,
+            );
+          }
+          await this.cleanupDuplicateAiReviews(prModel, verbose);
+          // 清理后继续执行当前审查
+          return null;
+        }
+
+        // 跳过模式（默认）
         if (shouldLog(verbose, 1)) {
           console.log(
             `⏭️ 跳过审查: 当前 PR #${currentPrNumber} 有 ${duplicateReviewRuns.length} 个同名 workflow 正在运行中`,
@@ -907,6 +928,56 @@ export class ReviewService {
       }
     }
     return null;
+  }
+
+  /**
+   * 清理重复的 AI Review 评论（Issue Comments 和 PR Reviews）
+   */
+  private async cleanupDuplicateAiReviews(
+    prModel: PullRequestModel,
+    verbose?: VerboseLevel,
+  ): Promise<void> {
+    try {
+      // 删除 Issue Comments（主评论）
+      const comments = await prModel.getComments();
+      const aiComments = comments.filter((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
+      let deletedComments = 0;
+      for (const comment of aiComments) {
+        if (comment.id) {
+          try {
+            await prModel.deleteComment(comment.id);
+            deletedComments++;
+          } catch {
+            // 忽略删除失败
+          }
+        }
+      }
+      if (deletedComments > 0 && shouldLog(verbose, 1)) {
+        console.log(`   已删除 ${deletedComments} 个重复的 AI Review 主评论`);
+      }
+
+      // 删除 PR Reviews（行级评论）
+      const reviews = await prModel.getReviews();
+      const aiReviews = reviews.filter((r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER));
+      let deletedReviews = 0;
+      for (const review of aiReviews) {
+        if (review.id) {
+          try {
+            await prModel.deleteReview(review.id);
+            deletedReviews++;
+          } catch {
+            // 已提交的 review 无法删除，忽略
+          }
+        }
+      }
+      if (deletedReviews > 0 && shouldLog(verbose, 1)) {
+        console.log(`   已删除 ${deletedReviews} 个重复的 AI Review PR Review`);
+      }
+    } catch (error) {
+      if (shouldLog(verbose, 1)) {
+        console.warn(`⚠️ 清理旧评论失败:`, error instanceof Error ? error.message : error);
+      }
+    }
   }
 
   // --- Delegation methods for backward compatibility with tests ---

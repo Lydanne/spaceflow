@@ -81,11 +81,12 @@ export interface ReviewOptions {
    */
   local?: LocalReviewMode;
   /**
-   * 跳过重复的 review workflow 检查
-   * - true: 启用检查，当检测到同名 workflow 正在运行时跳过审查
-   * - false: 禁用检查（默认）
+   * 处理重复 workflow 的策略
+   * - 'off': 禁用检查
+   * - 'skip': 检测到同名 workflow 正在运行时跳过审查
+   * - 'delete': 检测到同名 workflow 时删除旧的 AI Review 评论和 PR Review（默认）
    */
-  skipDuplicateWorkflow?: boolean;
+  duplicateWorkflowResolved?: "off" | "skip" | "delete";
   /**
    * 自动批准合并
    * - true: 当所有问题都已解决时，自动提交 APPROVE review
@@ -122,7 +123,7 @@ export const reviewSchema = () =>
     retries: z.number().default(0).optional(),
     retryDelay: z.number().default(1000).optional(),
     invalidateChangedFiles: invalidateChangedFilesSchema.default("invalidate").optional(),
-    skipDuplicateWorkflow: z.boolean().default(false).optional(),
+    duplicateWorkflowResolved: z.enum(["off", "skip", "delete"]).default("delete").optional(),
     autoApprove: z.boolean().default(false).optional(),
     failOnIssues: z.enum(["off", "warn", "error", "warn+error"]).default("off").optional(),
   });

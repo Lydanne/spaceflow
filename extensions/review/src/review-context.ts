@@ -203,8 +203,8 @@ export class ReviewContextBuilder {
       flush: options.flush ?? false,
       eventAction: options.eventAction,
       localMode,
-      skipDuplicateWorkflow:
-        options.skipDuplicateWorkflow ?? reviewConf.skipDuplicateWorkflow ?? false,
+      duplicateWorkflowResolved:
+        options.duplicateWorkflowResolved ?? reviewConf.duplicateWorkflowResolved ?? "delete",
       autoApprove: options.autoApprove ?? reviewConf.autoApprove ?? false,
     };
   }
