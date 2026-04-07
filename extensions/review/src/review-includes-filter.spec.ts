@@ -3,6 +3,7 @@ import {
   parseIncludePattern,
   filterFilesByIncludes,
   extractGlobsFromIncludes,
+  extractCodeBlockTypes,
 } from "./review-includes-filter";
 
 describe("review-includes-filter", () => {
@@ -216,6 +217,15 @@ describe("review-includes-filter", () => {
       const glFiles = [{ filename: "src/old.ts", status: "deleted" }];
       expect(filterFilesByIncludes(glFiles, [`deleted|${glob}`])).toHaveLength(1);
     });
+
+    it("全量 diff 语义：文件在当前分支首次引入后被多次修改，status 仍为 added，added| 始终匹配", () => {
+      // 场景：a.ts 在 commit1 创建（status=added），在 commit2 修改
+      // 全量 diff（当前分支 vs base）时，compare API 返回的 status 仍为 added
+      // 因此 added|*.ts 在后续每次 review 中都能匹配到该文件
+      const diffFiles = [{ filename: "src/a.ts", status: "added" }];
+      const result = filterFilesByIncludes(diffFiles, [`added|${glob}`]);
+      expect(result.map((f) => f.filename)).toEqual(["src/a.ts"]);
+    });
   });
 
   describe("extractGlobsFromIncludes", () => {
@@ -243,6 +253,32 @@ describe("review-includes-filter", () => {
 
     it("空数组返回空数组", () => {
       expect(extractGlobsFromIncludes([])).toEqual([]);
+    });
+  });
+
+  describe("extractCodeBlockTypes", () => {
+    it("提取纯类型名", () => {
+      const result = extractCodeBlockTypes(["function", "class"]);
+      expect(result).toEqual(["function", "class"]);
+    });
+
+    it("status|code-* 语法不被识别，返回空", () => {
+      const result = extractCodeBlockTypes(["added|code-function", "added|code-class"]);
+      expect(result).toEqual([]);
+    });
+
+    it("混合：纯类型名保留，status 前缀语法忽略", () => {
+      const result = extractCodeBlockTypes(["added|code-function", "class"]);
+      expect(result).toEqual(["class"]);
+    });
+
+    it("去重：同一类型出现多次只返回一次", () => {
+      const result = extractCodeBlockTypes(["function", "function"]);
+      expect(result).toEqual(["function"]);
+    });
+
+    it("空数组返回空数组", () => {
+      expect(extractCodeBlockTypes([])).toEqual([]);
     });
   });
 });

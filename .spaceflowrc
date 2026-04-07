@@ -6,7 +6,18 @@
   },
   "review": {
     "references": ["./references"],
-    "includes": ["*/**/*.ts", "!*/**/*.spec.*", "!*/**/*.config.*"],
+    "includes": [
+      "**/*.ts",
+      "!**/*.spec.*",
+      "!**/*.config.*"
+    ],
+    "whenModifiedCode": [
+      "function",
+      "class",
+      "interface",
+      "type",
+      "method"
+    ],
     "generateDescription": true,
     "autoUpdatePrTitle": true,
     "lineComments": true,

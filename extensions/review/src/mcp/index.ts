@@ -1,6 +1,7 @@
 import { t, z, type SpaceflowContext, type GitProviderService } from "@spaceflow/core";
 import { ReviewSpecService } from "../review-spec";
 import type { ReviewConfig } from "../review.config";
+import { extractGlobsFromIncludes } from "../review-includes-filter";
 import { join } from "path";
 import { existsSync } from "fs";
 
@@ -117,7 +118,9 @@ export const tools = [
           .filter((rule) => {
             const includes = rule.includes || spec.includes;
             if (includes.length === 0) return true;
-            return micromatch.isMatch(filePath, includes, { matchBase: true });
+            const globs = extractGlobsFromIncludes(includes);
+            if (globs.length === 0) return true;
+            return micromatch.isMatch(filePath, globs, { matchBase: true });
           })
           .map((rule) => ({
             id: rule.id,

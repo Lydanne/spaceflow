@@ -28,6 +28,7 @@ export interface ReviewContext extends ReviewOptions {
   specSources: string[];
   verbose?: VerboseLevel;
   includes?: string[];
+  whenModifiedCode?: string[];
   files?: string[];
   commits?: string[];
   concurrency?: number;
@@ -64,6 +65,9 @@ export class ReviewContextBuilder {
 
   async getContextFromEnv(options: ReviewOptions): Promise<ReviewContext> {
     const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
+    if (shouldLog(options.verbose, 2)) {
+      console.log(`[getContextFromEnv] reviewConf: ${JSON.stringify(reviewConf)}`);
+    }
     const ciConf = this.config.get<CiConfig>("ci");
     const repository = ciConf?.repository;
 
@@ -152,6 +156,12 @@ export class ReviewContextBuilder {
     }
 
     // 合并参数优先级：命令行 > PR 标题 > 配置文件 > 默认值
+    const ctxIncludes = options.includes ?? titleOptions.includes ?? reviewConf.includes;
+    if (shouldLog(options.verbose, 2)) {
+      console.log(
+        `[getContextFromEnv] includes: commandLine=${JSON.stringify(options.includes)}, title=${JSON.stringify(titleOptions.includes)}, config=${JSON.stringify(reviewConf.includes)}, final=${JSON.stringify(ctxIncludes)}`,
+      );
+    }
     return {
       owner,
       repo,
@@ -162,7 +172,8 @@ export class ReviewContextBuilder {
       dryRun: options.dryRun || titleOptions.dryRun || false,
       ci: options.ci ?? false,
       verbose: normalizeVerbose(options.verbose ?? titleOptions.verbose),
-      includes: options.includes ?? titleOptions.includes ?? reviewConf.includes,
+      includes: ctxIncludes,
+      whenModifiedCode: options.whenModifiedCode ?? reviewConf.whenModifiedCode,
       llmMode: options.llmMode ?? titleOptions.llmMode ?? reviewConf.llmMode,
       files: this.normalizeFilePaths(options.files),
       commits: options.commits,
@@ -193,9 +204,10 @@ export class ReviewContextBuilder {
       flush: options.flush ?? false,
       eventAction: options.eventAction,
       localMode,
-      skipDuplicateWorkflow:
-        options.skipDuplicateWorkflow ?? reviewConf.skipDuplicateWorkflow ?? false,
+      duplicateWorkflowResolved:
+        options.duplicateWorkflowResolved ?? reviewConf.duplicateWorkflowResolved ?? "delete",
       autoApprove: options.autoApprove ?? reviewConf.autoApprove ?? false,
+      systemRules: options.systemRules ?? reviewConf.systemRules,
     };
   }
 
@@ -390,14 +402,26 @@ export class ReviewContextBuilder {
     // 为每个 issue 填充 author
     return issues.map((issue) => {
       if (issue.author) {
+        const shortHash = issue.commit?.slice(0, 7);
+        if (shortHash?.includes("---")) {
+          return { ...issue, commit: undefined, valid: "false" };
+        }
         if (shouldLog(verbose, 2)) {
           console.log(`[fillIssueAuthors] issue already has author: ${issue.author.login}`);
         }
         return issue;
       }
       const shortHash = issue.commit?.slice(0, 7);
-      const author =
-        shortHash && !shortHash.includes("---") ? commitAuthorMap.get(shortHash) : undefined;
+      const isValidHash = Boolean(shortHash && !shortHash.includes("---"));
+      if (!isValidHash) {
+        if (shouldLog(verbose, 2)) {
+          console.log(
+            `[fillIssueAuthors] issue: file=${issue.file}, commit=${issue.commit} is invalid hash, marking as invalid`,
+          );
+        }
+        return { ...issue, commit: undefined, valid: "false" };
+      }
+      const author = commitAuthorMap.get(shortHash!);
       if (shouldLog(verbose, 2)) {
         console.log(
           `[fillIssueAuthors] issue: file=${issue.file}, commit=${issue.commit}, shortHash=${shortHash}, foundAuthor=${author?.login}, finalAuthor=${(author || defaultAuthor)?.login}`,

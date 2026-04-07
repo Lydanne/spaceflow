@@ -19,7 +19,7 @@ import {
   calculateIssueStats,
   REVIEW_COMMENT_MARKER,
   REVIEW_LINE_COMMENTS_MARKER,
-} from "./review-pr-comment-utils";
+} from "./utils/review-pr-comment";
 
 export interface ReviewResultSaveOptions {
   verbose?: VerboseLevel;

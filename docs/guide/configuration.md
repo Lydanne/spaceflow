@@ -102,7 +102,9 @@ AI 代码审查相关配置（需安装 `@spaceflow/review`）。
 {
   "review": {
     "references": ["./references"],
-    "includes": ["*/**/*.ts", "!*/**/*.spec.*", "!*/**/*.config.*"],
+    "includes": ["**/*.ts", "!**/*.spec.*", "!**/*.config.*"],
+    "whenModifiedCode": ["function", "class"],
+    "duplicateWorkflowResolved": "delete",
     "generateDescription": true,
     "autoUpdatePrTitle": true,
     "lineComments": true,
@@ -116,19 +118,21 @@ AI 代码审查相关配置（需安装 `@spaceflow/review`）。
 }
 ```
 
-| 字段                   | 类型       | 默认值        | 说明                                     |
-| ---------------------- | ---------- | ------------- | ---------------------------------------- |
-| `references`           | `string[]` | `[]`          | 审查规范来源，支持本地路径和远程仓库 URL |
-| `includes`             | `string[]` | `["*/**/*"]`  | 审查文件匹配模式（glob）                 |
-| `generateDescription`  | `boolean`  | `false`       | 是否自动生成 PR 描述                     |
-| `autoUpdatePrTitle`    | `boolean`  | `false`       | 是否自动更新 PR 标题                     |
-| `lineComments`         | `boolean`  | `true`        | 是否生成行内评论                         |
-| `verifyFixes`          | `boolean`  | `false`       | 是否验证修复建议                         |
-| `analyzeDeletions`     | `boolean`  | `false`       | 是否分析删除代码的影响                   |
-| `deletionAnalysisMode` | `string`   | `"open-code"` | 删除分析模式                             |
-| `concurrency`          | `number`   | `10`          | 并发审查文件数                           |
-| `retries`              | `number`   | `3`           | 失败重试次数                             |
-| `retryDelay`           | `number`   | `1000`        | 重试间隔（毫秒）                         |
+| 字段                      | 类型       | 默认值        | 说明                                                         |
+| ------------------------- | ---------- | ------------- | ------------------------------------------------------------ |
+| `references`              | `string[]` | `[]`          | 审查规范来源，支持本地路径和远程仓库 URL                     |
+| `includes`                | `string[]` | `["**/*"]`    | 审查文件匹配模式（glob），支持 `added\|`、`modified\|`、`deleted\|` 前缀 |
+| `whenModifiedCode`        | `string[]` | `[]`           | 代码结构过滤，如 `function`、`class`、`interface`  |
+| `duplicateWorkflowResolved` | `"off" \| "skip" \| "delete"` | `"delete"` | 重复 workflow 处理策略：禁用/跳过/删除旧评论               |
+| `generateDescription`   | `boolean`  | `false`       | 是否自动生成 PR 描述                                         |
+| `autoUpdatePrTitle`       | `boolean`  | `false`       | 是否自动更新 PR 标题                                         |
+| `lineComments`            | `boolean`  | `true`        | 是否生成行内评论                                             |
+| `verifyFixes`             | `boolean`  | `false`       | 是否验证修复建议                                             |
+| `analyzeDeletions`        | `boolean`  | `false`       | 是否分析删除代码的影响                                       |
+| `deletionAnalysisMode`    | `string`   | `"open-code"` | 删除分析模式                                                 |
+| `concurrency`             | `number`   | `10`          | 并发审查文件数                                               |
+| `retries`                   | `number`   | `3`           | 失败重试次数                                                 |
+| `retryDelay`              | `number`   | `1000`        | 重试间隔（毫秒）                                             |
 
 ### `publish`
 

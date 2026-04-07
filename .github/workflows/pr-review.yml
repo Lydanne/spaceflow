@@ -38,6 +38,6 @@ jobs:
           OPENAI_MODEL: deepseek-v3-2-251201
         with:
           command: review
-          args: -vv -l openai
+          args: -vvv -l openai
           event-action: ${{ github.event.action }}
           dev-mode: "true"
