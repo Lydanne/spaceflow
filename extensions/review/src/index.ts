@@ -13,7 +13,7 @@ import type {
   LocalReviewMode,
 } from "@spaceflow/core";
 import { parseVerbose } from "@spaceflow/core";
-import { reviewSchema, type AnalyzeDeletionsMode } from "./review.config";
+import { reviewSchema, type AnalyzeDeletionsMode, type ReviewConfig } from "./review.config";
 import { ReviewService } from "./review.service";
 import { ReviewSpecService } from "./review-spec";
 import { ReviewReportService, type ReportFormat } from "./review-report";
@@ -57,6 +57,7 @@ export const extension = defineExtension({
         { flags: "--event-action <action>", description: t("review:options.eventAction") },
         { flags: "--local [mode]", description: t("review:options.local") },
         { flags: "--no-local", description: t("review:options.noLocal") },
+        { flags: "--fail-on-issues [mode]", description: t("review:options.failOnIssues") },
       ],
       run: async (_args, options, ctx) => {
         const isFlush = !!options?.flush;
@@ -116,7 +117,17 @@ export const extension = defineExtension({
           flush: isFlush,
           eventAction: options?.eventAction as string,
           local: parseLocalOption(options?.local),
+          failOnIssues: parseFailOnIssues(options?.failOnIssues),
         };
+
+        function parseFailOnIssues(
+          value: unknown,
+        ): "off" | "warn" | "error" | "warn+error" | undefined {
+          if (value === true || value === "") return "error";
+          if (value === "warn" || value === "error" || value === "off" || value === "warn+error")
+            return value;
+          return undefined;
+        }
 
         function parseLocalOption(value: unknown): LocalReviewMode | undefined {
           if (value === false) return false;
@@ -127,7 +138,25 @@ export const extension = defineExtension({
 
         try {
           const context = await reviewService.getContextFromEnv(reviewOptions);
-          await reviewService.execute(context);
+          const result = await reviewService.execute(context);
+          const effectiveFailOnIssues: "off" | "warn" | "error" | "warn+error" =
+            reviewOptions.failOnIssues ??
+            ctx.config.getPluginConfig<ReviewConfig>("review")?.failOnIssues ??
+            "off";
+          if (effectiveFailOnIssues !== "off") {
+            const blockers = result.issues.filter((issue) => {
+              if (issue.fixed || issue.resolved || issue.valid === "false") return false;
+              if (effectiveFailOnIssues === "warn") return issue.severity === "warn";
+              if (effectiveFailOnIssues === "error") return issue.severity === "error";
+              return issue.severity === "error" || issue.severity === "warn"; // warn+error
+            });
+            if (blockers.length > 0) {
+              ctx.output.error(
+                `审核不通过：存在 ${blockers.length} 个未解决的问题（模式: ${effectiveFailOnIssues}）`,
+              );
+              process.exit(1);
+            }
+          }
         } catch (error) {
           if (error instanceof Error) {
             ctx.output.error(t("common.executionFailed", { error: error.message }));
