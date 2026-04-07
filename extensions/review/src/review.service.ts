@@ -149,6 +149,7 @@ export class ReviewService {
       existingResultModel?.result ?? null,
       context.whenModifiedCode,
       verbose,
+      context.systemRules,
     );
     const result = await this.runLLMReview(llmMode, reviewPrompt, {
       verbose,
@@ -177,6 +178,14 @@ export class ReviewService {
       isDirectFileMode,
       context,
     });
+
+    // 静态规则产生的系统问题直接合并，不经过过滤管道
+    if (reviewPrompt.staticIssues?.length) {
+      result.issues = [...reviewPrompt.staticIssues, ...result.issues];
+      if (shouldLog(verbose, 1)) {
+        console.log(`⚙️  追加 ${reviewPrompt.staticIssues.length} 个静态规则系统问题`);
+      }
+    }
     if (shouldLog(verbose, 1)) {
       console.log(`📝 最终发现 ${result.issues.length} 个问题`);
     }

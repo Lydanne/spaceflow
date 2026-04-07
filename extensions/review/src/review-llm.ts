@@ -30,6 +30,8 @@ import {
   buildPrDescriptionPrompt,
   buildPrTitlePrompt,
 } from "./prompt";
+import type { SystemRules } from "./review.config";
+import { applyStaticRules } from "./system-rules";
 
 export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
 
@@ -93,11 +95,22 @@ export class ReviewLlmProcessor {
     existingResult?: ReviewResult | null,
     whenModifiedCode?: string[],
     verbose?: VerboseLevel,
+    systemRules?: SystemRules,
   ): Promise<ReviewPrompt> {
+    const round = (existingResult?.round ?? 0) + 1;
+    const { staticIssues, skippedFiles } = applyStaticRules(
+      changedFiles,
+      fileContents,
+      systemRules,
+      round,
+      verbose,
+    );
+
     const fileDataList = changedFiles
       .filter((f) => f.status !== "deleted" && f.filename)
       .map((file) => {
         const filename = file.filename!;
+        if (skippedFiles.has(filename)) return null;
         const contentLines = fileContents.get(filename);
         if (!contentLines) {
           return { filename, file, contentLines: null, commitsSection: "- 无相关 commits" };
@@ -107,80 +120,88 @@ export class ReviewLlmProcessor {
       });
 
     const filePrompts: (FileReviewPrompt | null)[] = await Promise.all(
-      fileDataList.map(async ({ filename, file, contentLines, commitsSection }) => {
-        const fileDirectoryInfo = await this.getFileDirectoryInfo(filename);
+      fileDataList
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+        .map(async ({ filename, file, contentLines, commitsSection }) => {
+          const fileDirectoryInfo = await this.getFileDirectoryInfo(filename);
 
-        // 根据文件过滤 specs，只注入与当前文件匹配的规则
-        const fileSpecs = this.filterSpecsForFile(specs, filename);
+          // 根据文件过滤 specs，只注入与当前文件匹配的规则
+          const fileSpecs = this.filterSpecsForFile(specs, filename);
 
-        // 从全局 whenModifiedCode 配置中解析代码结构过滤类型
-        const codeBlockTypes = whenModifiedCode ? extractCodeBlockTypes(whenModifiedCode) : [];
+          // 从全局 whenModifiedCode 配置中解析代码结构过滤类型
+          const codeBlockTypes = whenModifiedCode ? extractCodeBlockTypes(whenModifiedCode) : [];
 
-        // 构建带行号的内容：有 code-* 过滤时只输出匹配的代码块范围
-        let linesWithNumbers: string;
-        if (!contentLines) {
-          linesWithNumbers = "(无法获取内容)";
-        } else if (codeBlockTypes.length > 0) {
-          const visibleRanges = extractCodeBlocks(contentLines, codeBlockTypes);
-          // 如果配置了 whenModifiedCode 但没有匹配的代码块，跳过这个文件
-          if (visibleRanges.length === 0) {
-            if (shouldLog(verbose, 2)) {
-              console.log(
-                `[buildReviewPrompt] ${filename}: 没有匹配的 ${codeBlockTypes.join(", ")} 代码块，跳过审查`,
-              );
+          // 构建带行号的内容：有 code-* 过滤时只输出匹配的代码块范围
+          let linesWithNumbers: string;
+          if (!contentLines) {
+            linesWithNumbers = "(无法获取内容)";
+          } else if (codeBlockTypes.length > 0) {
+            const visibleRanges = extractCodeBlocks(contentLines, codeBlockTypes);
+            // 如果配置了 whenModifiedCode 但没有匹配的代码块，跳过这个文件
+            if (visibleRanges.length === 0) {
+              if (shouldLog(verbose, 2)) {
+                console.log(
+                  `[buildReviewPrompt] ${filename}: 没有匹配的 ${codeBlockTypes.join(", ")} 代码块，跳过审查`,
+                );
+              }
+              return null;
             }
-            return null;
+            linesWithNumbers = buildLinesWithNumbers(contentLines, visibleRanges);
+          } else {
+            linesWithNumbers = buildLinesWithNumbers(contentLines);
           }
-          linesWithNumbers = buildLinesWithNumbers(contentLines, visibleRanges);
-        } else {
-          linesWithNumbers = buildLinesWithNumbers(contentLines);
-        }
 
-        // 获取该文件上一次的审查结果
-        const existingFileSummary = existingResult?.summary?.find((s) => s.file === filename);
-        const existingFileIssues = existingResult?.issues?.filter((i) => i.file === filename) ?? [];
+          // 获取该文件上一次的审查结果
+          const existingFileSummary = existingResult?.summary?.find((s) => s.file === filename);
+          const existingFileIssues =
+            existingResult?.issues?.filter((i) => i.file === filename) ?? [];
 
-        let previousReviewSection = "";
-        if (existingFileSummary || existingFileIssues.length > 0) {
-          const parts: string[] = [];
-          if (existingFileSummary?.summary) {
-            parts.push(`**总结**:\n`);
-            parts.push(`${existingFileSummary.summary}\n`);
-          }
-          if (existingFileIssues.length > 0) {
-            parts.push(`**已发现的问题** (${existingFileIssues.length} 个):\n`);
-            for (const issue of existingFileIssues) {
-              const status = issue.fixed
-                ? "✅ 已修复"
-                : issue.valid === "false"
-                  ? "❌ 无效"
-                  : "⚠️ 待处理";
-              parts.push(`- [${status}] 行 ${issue.line}: ${issue.reason} (规则: ${issue.ruleId})`);
+          let previousReviewSection = "";
+          if (existingFileSummary || existingFileIssues.length > 0) {
+            const parts: string[] = [];
+            if (existingFileSummary?.summary) {
+              parts.push(`**总结**:\n`);
+              parts.push(`${existingFileSummary.summary}\n`);
             }
-            parts.push("");
-            // parts.push("请注意：不要重复报告上述已发现的问题，除非代码有新的变更导致问题复现。\n");
+            if (existingFileIssues.length > 0) {
+              parts.push(`**已发现的问题** (${existingFileIssues.length} 个):\n`);
+              for (const issue of existingFileIssues) {
+                const status = issue.fixed
+                  ? "✅ 已修复"
+                  : issue.valid === "false"
+                    ? "❌ 无效"
+                    : "⚠️ 待处理";
+                parts.push(
+                  `- [${status}] 行 ${issue.line}: ${issue.reason} (规则: ${issue.ruleId})`,
+                );
+              }
+              parts.push("");
+              // parts.push("请注意：不要重复报告上述已发现的问题，除非代码有新的变更导致问题复现。\n");
+            }
+            previousReviewSection = parts.join("\n");
           }
-          previousReviewSection = parts.join("\n");
-        }
 
-        const specsSection = this.reviewSpecService.buildSpecsSection(fileSpecs);
-        const { systemPrompt, userPrompt } = buildFileReviewPrompt({
-          filename,
-          status: file.status,
-          linesWithNumbers,
-          commitsSection,
-          fileDirectoryInfo,
-          previousReviewSection,
-          specsSection,
-        });
+          const specsSection = this.reviewSpecService.buildSpecsSection(fileSpecs);
+          const { systemPrompt, userPrompt } = buildFileReviewPrompt({
+            filename,
+            status: file.status,
+            linesWithNumbers,
+            commitsSection,
+            fileDirectoryInfo,
+            previousReviewSection,
+            specsSection,
+          });
 
-        return { filename, systemPrompt, userPrompt };
-      }),
+          return { filename, systemPrompt, userPrompt };
+        }),
     );
 
     // 过滤掉 null 值（跳过的文件）
     const validFilePrompts = filePrompts.filter((fp): fp is FileReviewPrompt => fp !== null);
-    return { filePrompts: validFilePrompts };
+    return {
+      filePrompts: validFilePrompts,
+      staticIssues: staticIssues.length > 0 ? staticIssues : undefined,
+    };
   }
 
   async runLLMReview(

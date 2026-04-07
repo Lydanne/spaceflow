@@ -207,6 +207,7 @@ export class ReviewContextBuilder {
       duplicateWorkflowResolved:
         options.duplicateWorkflowResolved ?? reviewConf.duplicateWorkflowResolved ?? "delete",
       autoApprove: options.autoApprove ?? reviewConf.autoApprove ?? false,
+      systemRules: options.systemRules ?? reviewConf.systemRules,
     };
   }
 

@@ -28,6 +28,15 @@ export type AnalyzeDeletionsMode = z.infer<typeof analyzeDeletionsModeSchema>;
 export type Severity = z.infer<typeof severitySchema>;
 
 /**
+ * 系统规则配置，不依赖 LLM，在构建 prompt 前直接检查并生成系统问题。
+ * 格式为 [阈值, severity]
+ */
+export interface SystemRules {
+  /** 单文件最大审查行数，超过时跳过 LLM 并生成系统问题。格式: [maxLine, severity] */
+  maxLinesPerFile?: [number, Severity];
+}
+
+/**
  * 变更文件处理策略
  * - 'invalidate': 将变更文件的历史问题标记为无效（默认）
  * - 'keep': 保留历史问题，不做处理
@@ -105,6 +114,8 @@ export interface ReviewOptions {
    * - 'warn+error': 有未解决的 warn 或 error 级别问题时抛出异常
    */
   failOnIssues?: "off" | "warn" | "error" | "warn+error";
+  /** 系统规则配置，不依赖 LLM，直接在检查阶段生成系统问题 */
+  systemRules?: SystemRules;
 }
 
 /** review 命令配置 schema（LLM 敏感配置由系统 llm.config.ts 管理） */
@@ -130,6 +141,14 @@ export const reviewSchema = () =>
     duplicateWorkflowResolved: z.enum(["off", "skip", "delete"]).default("delete").optional(),
     autoApprove: z.boolean().default(false).optional(),
     failOnIssues: z.enum(["off", "warn", "error", "warn+error"]).default("off").optional(),
+    systemRules: z
+      .object({
+        maxLinesPerFile: z
+          .tuple([z.number(), severitySchema])
+          .transform((v): [number, Severity] => [v[0], v[1]])
+          .optional(),
+      })
+      .optional(),
   });
 
 /** review 配置类型（从 schema 推导） */
