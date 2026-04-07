@@ -3,6 +3,8 @@ import { parseChangedLinesFromPatch } from "@spaceflow/core";
 import { readFile } from "fs/promises";
 import { ReviewService, ReviewContext, ReviewPrompt } from "./review.service";
 import type { ReviewOptions } from "./review.config";
+import { PullRequestModel } from "./pull-request-model";
+import { ReviewResultModel } from "./review-result-model";
 
 vi.mock("c12");
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
@@ -215,9 +217,8 @@ describe("ReviewService", () => {
         issues: [],
         summary: [],
       });
-      vi.spyOn(service as any, "buildLineCommitMap").mockResolvedValue(new Map());
       vi.spyOn(service as any, "getFileContents").mockResolvedValue(new Map());
-      vi.spyOn(service as any, "getExistingReviewResult").mockResolvedValue(null);
+      vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(null as any);
     });
 
     it("should execute review for PR successfully", async () => {
@@ -563,7 +564,7 @@ describe("ReviewService", () => {
   describe("ReviewService.runLLMReview", () => {
     it("should call callLLM when llmMode is claude", async () => {
       const callLLMSpy = vi
-        .spyOn(service as any, "callLLM")
+        .spyOn((service as any).llmProcessor, "callLLM")
         .mockResolvedValue({ issues: [], summary: [] });
 
       const mockPrompt: ReviewPrompt = {
@@ -577,7 +578,7 @@ describe("ReviewService", () => {
 
     it("should call callLLM when llmMode is openai", async () => {
       const callLLMSpy = vi
-        .spyOn(service as any, "callLLM")
+        .spyOn((service as any).llmProcessor, "callLLM")
         .mockResolvedValue({ issues: [], summary: [] });
 
       const mockPrompt: ReviewPrompt = {
@@ -602,7 +603,7 @@ describe("ReviewService", () => {
           suggestion: "fix",
         } as any,
       ];
-      const normalized = (service as any).normalizeIssues(issues);
+      const normalized = (service as any).llmProcessor.normalizeIssues(issues);
       expect(normalized).toHaveLength(2);
       expect(normalized[0].line).toBe("10");
       expect(normalized[1].line).toBe("12");
@@ -618,269 +619,6 @@ describe("ReviewService", () => {
       const changedLines = parseChangedLinesFromPatch(patch);
       expect(changedLines.has(2)).toBe(true);
       expect(changedLines.size).toBe(1);
-    });
-  });
-
-  describe("ReviewService.updateIssueLineNumbers", () => {
-    beforeEach(() => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockImplementation((lineStr: string) => {
-        const lines: number[] = [];
-        const rangeMatch = lineStr.match(/^(\d+)-(\d+)$/);
-        if (rangeMatch) {
-          const start = parseInt(rangeMatch[1], 10);
-          const end = parseInt(rangeMatch[2], 10);
-          for (let i = start; i <= end; i++) {
-            lines.push(i);
-          }
-        } else {
-          const line = parseInt(lineStr, 10);
-          if (!isNaN(line)) {
-            lines.push(line);
-          }
-        }
-        return lines;
-      });
-    });
-
-    it("should update issue line numbers when code is inserted before", () => {
-      // 在第1行插入2行，原第5行变成第7行
-      const issues = [
-        {
-          file: "test.ts",
-          line: "5",
-          ruleId: "R1",
-          specFile: "s1.md",
-          reason: "test issue",
-          severity: "error",
-          code: "",
-          round: 1,
-        } as any,
-      ];
-      const filePatchMap = new Map<string, string>([
-        [
-          "test.ts",
-          `@@ -1,3 +1,5 @@
- line1
-+new line 1
-+new line 2
- line2
- line3`,
-        ],
-      ]);
-
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-
-      expect(result[0].line).toBe("7");
-      expect(result[0].originalLine).toBe("5");
-    });
-
-    it("should update issue line numbers when code is deleted before", () => {
-      // 删除第1-2行，原第5行变成第3行
-      const issues = [
-        {
-          file: "test.ts",
-          line: "5",
-          ruleId: "R1",
-          specFile: "s1.md",
-          reason: "test issue",
-          severity: "error",
-          code: "",
-          round: 1,
-        } as any,
-      ];
-      const filePatchMap = new Map<string, string>([
-        [
-          "test.ts",
-          `@@ -1,4 +1,2 @@
--line1
--line2
- line3
- line4`,
-        ],
-      ]);
-
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-
-      expect(result[0].line).toBe("3");
-      expect(result[0].originalLine).toBe("5");
-    });
-
-    it("should mark issue as invalid when the line is deleted", () => {
-      // 删除第5行
-      const issues = [
-        {
-          file: "test.ts",
-          line: "5",
-          ruleId: "R1",
-          specFile: "s1.md",
-          reason: "test issue",
-          severity: "error",
-          code: "",
-          round: 1,
-        } as any,
-      ];
-      const filePatchMap = new Map<string, string>([
-        [
-          "test.ts",
-          `@@ -5,1 +5,0 @@
--deleted line`,
-        ],
-      ]);
-
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-
-      expect(result[0].valid).toBe("false");
-      expect(result[0].originalLine).toBe("5");
-    });
-
-    it("should not update issue when file has no changes", () => {
-      const issues = [
-        {
-          file: "test.ts",
-          line: "5",
-          ruleId: "R1",
-          specFile: "s1.md",
-          reason: "test issue",
-          severity: "error",
-          code: "",
-          round: 1,
-        } as any,
-      ];
-      const filePatchMap = new Map<string, string>([
-        [
-          "other.ts",
-          `@@ -1,1 +1,2 @@
- line1
-+new line`,
-        ],
-      ]);
-
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-
-      expect(result[0].line).toBe("5");
-      expect(result[0].originalLine).toBeUndefined();
-    });
-
-    it("should not update already fixed issues", () => {
-      const issues = [
-        {
-          file: "test.ts",
-          line: "5",
-          ruleId: "R1",
-          specFile: "s1.md",
-          reason: "test issue",
-          severity: "error",
-          code: "",
-          round: 1,
-          fixed: "2024-01-01T00:00:00Z",
-        } as any,
-      ];
-      const filePatchMap = new Map<string, string>([
-        [
-          "test.ts",
-          `@@ -1,1 +1,3 @@
- line1
-+new line 1
-+new line 2`,
-        ],
-      ]);
-
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-
-      expect(result[0].line).toBe("5");
-      expect(result[0].originalLine).toBeUndefined();
-    });
-
-    it("should not update invalid issues", () => {
-      const issues = [
-        {
-          file: "test.ts",
-          line: "5",
-          ruleId: "R1",
-          specFile: "s1.md",
-          reason: "test issue",
-          severity: "error",
-          code: "",
-          round: 1,
-          valid: "false",
-        } as any,
-      ];
-      const filePatchMap = new Map<string, string>([
-        [
-          "test.ts",
-          `@@ -1,1 +1,3 @@
- line1
-+new line 1
-+new line 2`,
-        ],
-      ]);
-
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-
-      expect(result[0].line).toBe("5");
-      expect(result[0].originalLine).toBeUndefined();
-    });
-
-    it("should handle range line numbers", () => {
-      // 在第1行插入2行，原第5-7行变成第7-9行
-      const issues = [
-        {
-          file: "test.ts",
-          line: "5-7",
-          ruleId: "R1",
-          specFile: "s1.md",
-          reason: "test issue",
-          severity: "error",
-          code: "",
-          round: 1,
-        } as any,
-      ];
-      const filePatchMap = new Map<string, string>([
-        [
-          "test.ts",
-          `@@ -1,3 +1,5 @@
- line1
-+new line 1
-+new line 2
- line2
- line3`,
-        ],
-      ]);
-
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-
-      expect(result[0].line).toBe("7-9");
-      expect(result[0].originalLine).toBe("5-7");
-    });
-
-    it("should preserve originalLine if already set", () => {
-      const issues = [
-        {
-          file: "test.ts",
-          line: "7",
-          originalLine: "3",
-          ruleId: "R1",
-          specFile: "s1.md",
-          reason: "test issue",
-          severity: "error",
-          code: "",
-          round: 1,
-        } as any,
-      ];
-      const filePatchMap = new Map<string, string>([
-        [
-          "test.ts",
-          `@@ -1,1 +1,3 @@
- line1
-+new line 1
-+new line 2`,
-        ],
-      ]);
-
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-
-      expect(result[0].line).toBe("9");
-      expect(result[0].originalLine).toBe("3");
     });
   });
 
@@ -1237,206 +975,6 @@ describe("ReviewService", () => {
     });
   });
 
-  describe("ReviewService.calculateIssueStats", () => {
-    it("should calculate stats for empty array", () => {
-      const stats = (service as any).calculateIssueStats([]);
-      expect(stats).toEqual({
-        total: 0,
-        fixed: 0,
-        resolved: 0,
-        invalid: 0,
-        pending: 0,
-        fixRate: 0,
-        resolveRate: 0,
-      });
-    });
-
-    it("should calculate stats correctly", () => {
-      const issues = [
-        { fixed: "2024-01-01" },
-        { fixed: "2024-01-02" },
-        { resolved: "2024-01-03" },
-        { valid: "false" },
-        {},
-        {},
-      ];
-      const stats = (service as any).calculateIssueStats(issues);
-      expect(stats.total).toBe(6);
-      expect(stats.fixed).toBe(2);
-      expect(stats.resolved).toBe(1);
-      expect(stats.invalid).toBe(1);
-      expect(stats.pending).toBe(2);
-      expect(stats.fixRate).toBe(33.3);
-    });
-  });
-
-  describe("ReviewService.filterSpecsForFile", () => {
-    it("should return empty for files without extension", () => {
-      const specs = [{ extensions: ["ts"], includes: [], rules: [] }];
-      expect((service as any).filterSpecsForFile(specs, "Makefile")).toEqual([]);
-    });
-
-    it("should filter by extension", () => {
-      const specs = [
-        { extensions: ["ts"], includes: [], rules: [{ id: "R1" }] },
-        { extensions: ["py"], includes: [], rules: [{ id: "R2" }] },
-      ];
-      const result = (service as any).filterSpecsForFile(specs, "src/app.ts");
-      expect(result).toHaveLength(1);
-      expect(result[0].rules[0].id).toBe("R1");
-    });
-
-    it("should filter by includes pattern when present", () => {
-      const specs = [{ extensions: ["ts"], includes: ["**/*.spec.ts"], rules: [{ id: "R1" }] }];
-      expect((service as any).filterSpecsForFile(specs, "src/app.spec.ts")).toHaveLength(1);
-      expect((service as any).filterSpecsForFile(specs, "src/app.ts")).toHaveLength(0);
-    });
-  });
-
-  describe("ReviewService.buildSystemPrompt", () => {
-    it("should include specs section in prompt", () => {
-      const result = (service as any).buildSystemPrompt("## 规则内容");
-      expect(result).toContain("## 规则内容");
-      expect(result).toContain("代码审查专家");
-    });
-  });
-
-  describe("ReviewService.formatReviewComment", () => {
-    it("should use markdown format in CI with PR", () => {
-      const result = { issues: [], summary: [] };
-      (service as any).formatReviewComment(result, { ci: true, prNumber: 1 });
-      expect((service as any).reviewReportService.formatMarkdown).toHaveBeenCalled();
-    });
-
-    it("should use terminal format by default", () => {
-      const result = { issues: [], summary: [] };
-      (service as any).formatReviewComment(result, {});
-      expect((service as any).reviewReportService.format).toHaveBeenCalledWith(result, "terminal");
-    });
-
-    it("should use specified outputFormat", () => {
-      const result = { issues: [], summary: [] };
-      (service as any).formatReviewComment(result, { outputFormat: "markdown" });
-      expect((service as any).reviewReportService.formatMarkdown).toHaveBeenCalled();
-    });
-  });
-
-  describe("ReviewService.lineMatchesPosition", () => {
-    it("should return false when no position", () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      expect((service as any).lineMatchesPosition("10", undefined)).toBe(false);
-    });
-
-    it("should return true when position is within range", () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10, 11, 12]);
-      expect((service as any).lineMatchesPosition("10-12", 11)).toBe(true);
-    });
-
-    it("should return false when position is outside range", () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10, 11, 12]);
-      expect((service as any).lineMatchesPosition("10-12", 15)).toBe(false);
-    });
-
-    it("should return false for empty line range", () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([]);
-      expect((service as any).lineMatchesPosition("", 10)).toBe(false);
-    });
-  });
-
-  describe("ReviewService.issueToReviewComment", () => {
-    it("should return null for invalid line", () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([]);
-      const issue = { file: "test.ts", line: "abc", ruleId: "R1", specFile: "s1.md", reason: "r" };
-      expect((service as any).issueToReviewComment(issue)).toBeNull();
-    });
-
-    it("should convert issue to review comment", () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      const issue = {
-        file: "test.ts",
-        line: "10",
-        ruleId: "R1",
-        specFile: "s1.md",
-        reason: "问题描述",
-        severity: "error",
-        author: { login: "dev1" },
-        suggestion: "fix code",
-      };
-      const result = (service as any).issueToReviewComment(issue);
-      expect(result).not.toBeNull();
-      expect(result.path).toBe("test.ts");
-      expect(result.new_position).toBe(10);
-      expect(result.body).toContain("🔴");
-      expect(result.body).toContain("@dev1");
-      expect(result.body).toContain("fix code");
-    });
-
-    it("should handle warn severity", () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([5]);
-      const issue = {
-        file: "test.ts",
-        line: "5",
-        ruleId: "R1",
-        specFile: "s1.md",
-        reason: "r",
-        severity: "warn",
-      };
-      const result = (service as any).issueToReviewComment(issue);
-      expect(result.body).toContain("🟡");
-    });
-
-    it("should handle issue without author", () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([5]);
-      const issue = {
-        file: "test.ts",
-        line: "5",
-        ruleId: "R1",
-        specFile: "s1.md",
-        reason: "r",
-        severity: "info",
-      };
-      const result = (service as any).issueToReviewComment(issue);
-      expect(result.body).toContain("未知");
-      expect(result.body).toContain("⚪");
-    });
-
-    it("should include commit info when present", () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([5]);
-      const issue = {
-        file: "test.ts",
-        line: "5",
-        ruleId: "R1",
-        specFile: "s1.md",
-        reason: "r",
-        commit: "abc1234",
-      };
-      const result = (service as any).issueToReviewComment(issue);
-      expect(result.body).toContain("abc1234");
-    });
-  });
-
-  describe("ReviewService.generateIssueKey", () => {
-    it("should generate key from file, line, and ruleId", () => {
-      const issue = { file: "test.ts", line: "10", ruleId: "R1" };
-      expect((service as any).generateIssueKey(issue)).toBe("test.ts:10:R1");
-    });
-  });
-
-  describe("ReviewService.parseExistingReviewResult", () => {
-    it("should return null when parseMarkdown returns null", () => {
-      const mockReviewReportService = (service as any).reviewReportService;
-      mockReviewReportService.parseMarkdown.mockReturnValue(null);
-      expect((service as any).parseExistingReviewResult("body")).toBeNull();
-    });
-
-    it("should return result from parsed markdown", () => {
-      const mockReviewReportService = (service as any).reviewReportService;
-      const mockResult = { issues: [{ id: 1 }], summary: [] };
-      mockReviewReportService.parseMarkdown.mockReturnValue({ result: mockResult });
-      expect((service as any).parseExistingReviewResult("body")).toEqual(mockResult);
-    });
-  });
-
   describe("ReviewService.filterDuplicateIssues", () => {
     it("should filter issues that exist in valid existing issues", () => {
       const newIssues = [
@@ -1459,22 +997,6 @@ describe("ReviewService", () => {
     });
   });
 
-  describe("ReviewService.getFallbackTitle", () => {
-    it("should return first commit message", () => {
-      const commits = [{ commit: { message: "feat: add feature\n\ndetails" } }];
-      expect((service as any).getFallbackTitle(commits)).toBe("feat: add feature");
-    });
-
-    it("should return default when no commits", () => {
-      expect((service as any).getFallbackTitle([])).toBe("PR 更新");
-    });
-
-    it("should truncate long titles", () => {
-      const commits = [{ commit: { message: "a".repeat(100) } }];
-      expect((service as any).getFallbackTitle(commits).length).toBeLessThanOrEqual(50);
-    });
-  });
-
   describe("ReviewService.normalizeFilePaths", () => {
     it("should return undefined for empty array", () => {
       expect((service as any).normalizeFilePaths([])).toEqual([]);
@@ -1490,151 +1012,27 @@ describe("ReviewService", () => {
     });
   });
 
-  describe("ReviewService.getExistingReviewResult", () => {
-    it("should return null when no AI review exists", async () => {
-      gitProvider.listIssueComments.mockResolvedValue([{ body: "normal comment" }] as any);
-      const result = await (service as any).getExistingReviewResult("o", "r", 1);
-      expect(result).toBeNull();
-    });
-
-    it("should return parsed result when AI review exists", async () => {
-      const mockResult = { issues: [], summary: [] };
-      const mockReviewReportService = (service as any).reviewReportService;
-      mockReviewReportService.parseMarkdown.mockReturnValue({ result: mockResult });
-      gitProvider.listIssueComments.mockResolvedValue([
-        { body: "<!-- spaceflow-review --> review content" },
-      ] as any);
-      const result = await (service as any).getExistingReviewResult("o", "r", 1);
-      expect(result).toEqual(mockResult);
-    });
-
-    it("should return null on error", async () => {
-      gitProvider.listIssueComments.mockRejectedValue(new Error("API error"));
-      const result = await (service as any).getExistingReviewResult("o", "r", 1);
-      expect(result).toBeNull();
-    });
-  });
-
-  describe("ReviewService.deleteExistingAiReviews", () => {
-    it("should delete AI reviews via review API", async () => {
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review --> old review" },
-        { id: 2, body: "normal review" },
-      ] as any);
-      gitProvider.listIssueComments.mockResolvedValue([] as any);
-      gitProvider.deletePullReview.mockResolvedValue(undefined as any);
-      await (service as any).deleteExistingAiReviews("o", "r", 1);
-      expect(gitProvider.deletePullReview).toHaveBeenCalledWith("o", "r", 1, 1);
-      expect(gitProvider.deletePullReview).toHaveBeenCalledTimes(1);
-    });
-
-    it("should delete AI reviews via issue comment API", async () => {
-      gitProvider.listPullReviews.mockResolvedValue([] as any);
-      gitProvider.listIssueComments.mockResolvedValue([
-        { id: 10, body: "<!-- spaceflow-review --> old comment" },
-        { id: 11, body: "normal comment" },
-      ] as any);
-      gitProvider.deleteIssueComment.mockResolvedValue(undefined as any);
-      await (service as any).deleteExistingAiReviews("o", "r", 1);
-      expect(gitProvider.deleteIssueComment).toHaveBeenCalledWith("o", "r", 10);
-      expect(gitProvider.deleteIssueComment).toHaveBeenCalledTimes(1);
-    });
-
-    it("should handle review API error gracefully", async () => {
-      gitProvider.listPullReviews.mockRejectedValue(new Error("fail"));
-      gitProvider.listIssueComments.mockResolvedValue([] as any);
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      await (service as any).deleteExistingAiReviews("o", "r", 1);
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-
-    it("should handle issue comment API error gracefully", async () => {
-      gitProvider.listPullReviews.mockResolvedValue([] as any);
-      gitProvider.listIssueComments.mockRejectedValue(new Error("fail"));
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      await (service as any).deleteExistingAiReviews("o", "r", 1);
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-
-    it("should log error when deleting comment fails", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      gitProvider.listPullReviews.mockResolvedValue([] as any);
-      gitProvider.listIssueComments.mockResolvedValue([
-        { id: 10, body: "<!-- spaceflow-review --> old comment" },
-      ] as any);
-      gitProvider.deleteIssueComment.mockRejectedValue(new Error("delete failed"));
-
-      await (service as any).deleteExistingAiReviews("o", "r", 1);
-      expect(consoleSpy).toHaveBeenCalledWith("⚠️ 删除评论 10 失败:", expect.any(Error));
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe("ReviewService.invalidateIssuesForChangedFiles", () => {
-    it("should return issues unchanged when no headSha", async () => {
-      const issues = [{ file: "a.ts", line: "1" }];
-      const result = await (service as any).invalidateIssuesForChangedFiles(
-        issues,
-        undefined,
-        "o",
-        "r",
-      );
-      expect(result).toBe(issues);
-    });
-
-    it("should invalidate issues for changed files", async () => {
-      gitProvider.getCommitDiff = vi
-        .fn()
-        .mockResolvedValue(
-          "diff --git a/changed.ts b/changed.ts\n--- a/changed.ts\n+++ b/changed.ts\n@@ -1,1 +1,2 @@\n line1\n+new",
-        ) as any;
-      const issues = [
-        { file: "changed.ts", line: "1", ruleId: "R1" },
-        { file: "unchanged.ts", line: "2", ruleId: "R2" },
-        { file: "changed.ts", line: "3", ruleId: "R3", fixed: "2024-01-01" },
-      ];
-      const result = await (service as any).invalidateIssuesForChangedFiles(
-        issues,
-        "abc123",
-        "o",
-        "r",
-      );
-      expect(result).toHaveLength(3);
-      expect(result[0].valid).toBe("false");
-      expect(result[1].valid).toBeUndefined();
-      expect(result[2].fixed).toBe("2024-01-01");
-    });
-
-    it("should return issues unchanged when no diff files", async () => {
-      gitProvider.getCommitDiff = vi.fn().mockResolvedValue("") as any;
-      const issues = [{ file: "a.ts", line: "1" }];
-      const result = await (service as any).invalidateIssuesForChangedFiles(
-        issues,
-        "abc123",
-        "o",
-        "r",
-      );
-      expect(result).toBe(issues);
-    });
-
-    it("should handle API error gracefully", async () => {
-      gitProvider.getCommitDiff = vi.fn().mockRejectedValue(new Error("fail")) as any;
-      const issues = [{ file: "a.ts", line: "1" }];
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const result = await (service as any).invalidateIssuesForChangedFiles(
-        issues,
-        "abc123",
-        "o",
-        "r",
-      );
-      expect(result).toBe(issues);
-      consoleSpy.mockRestore();
-    });
-  });
-
   describe("ReviewService.fillIssueCode", () => {
+    beforeEach(() => {
+      mockReviewSpecService.parseLineRange = vi.fn().mockImplementation((lineStr: string) => {
+        const lines: number[] = [];
+        const rangeMatch = lineStr.match(/^(\d+)-(\d+)$/);
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = parseInt(rangeMatch[2], 10);
+          for (let i = start; i <= end; i++) {
+            lines.push(i);
+          }
+        } else {
+          const line = parseInt(lineStr, 10);
+          if (!isNaN(line)) {
+            lines.push(line);
+          }
+        }
+        return lines;
+      });
+    });
+
     it("should fill code from file contents", async () => {
       const issues = [{ file: "test.ts", line: "2" }];
       const fileContents = new Map([
@@ -1746,239 +1144,6 @@ describe("ReviewService", () => {
     });
   });
 
-  describe("ReviewService.reviewSingleFile", () => {
-    it("should return issues from LLM stream", async () => {
-      const llmProxy = (service as any).llmProxyService;
-      const mockStream = (async function* () {
-        yield {
-          type: "result",
-          response: {
-            structuredOutput: {
-              issues: [{ file: "test.ts", line: "1", ruleId: "R1", reason: "bad" }],
-              summary: "found issues",
-            },
-          },
-        };
-      })();
-      llmProxy.chatStream.mockReturnValue(mockStream);
-      const filePrompt = { filename: "test.ts", systemPrompt: "sys", userPrompt: "user" };
-      const result = await (service as any).reviewSingleFile("openai", filePrompt, 2);
-      expect(result.issues).toHaveLength(1);
-      expect(result.summary.file).toBe("test.ts");
-    });
-
-    it("should throw on error event", async () => {
-      const llmProxy = (service as any).llmProxyService;
-      const mockStream = (async function* () {
-        yield { type: "error", message: "LLM failed" };
-      })();
-      llmProxy.chatStream.mockReturnValue(mockStream);
-      const filePrompt = { filename: "test.ts", systemPrompt: "sys", userPrompt: "user" };
-      await expect((service as any).reviewSingleFile("openai", filePrompt)).rejects.toThrow(
-        "LLM failed",
-      );
-    });
-
-    it("should return empty issues when no structured output", async () => {
-      const llmProxy = (service as any).llmProxyService;
-      const mockStream = (async function* () {
-        yield { type: "result", response: {} };
-      })();
-      llmProxy.chatStream.mockReturnValue(mockStream);
-      const filePrompt = { filename: "test.ts", systemPrompt: "sys", userPrompt: "user" };
-      const result = await (service as any).reviewSingleFile("openai", filePrompt);
-      expect(result.issues).toHaveLength(0);
-      expect(result.summary.summary).toBe("");
-    });
-  });
-
-  describe("ReviewService.postOrUpdateReviewComment", () => {
-    it("should post review comment", async () => {
-      const configReader = (service as any).config;
-      configReader.getPluginConfig.mockReturnValue({});
-      gitProvider.listIssueComments.mockResolvedValue([] as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
-      gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc123" } } as any);
-      gitProvider.createIssueComment.mockResolvedValue({} as any);
-      const result = { issues: [], summary: [], round: 1 };
-      await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
-      expect(gitProvider.createIssueComment).toHaveBeenCalled();
-    });
-
-    it("should update PR title when autoUpdatePrTitle enabled", async () => {
-      const configReader = (service as any).config;
-      configReader.getPluginConfig.mockReturnValue({ autoUpdatePrTitle: true });
-      gitProvider.listIssueComments.mockResolvedValue([] as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
-      gitProvider.editPullRequest.mockResolvedValue({} as any);
-      gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc123" } } as any);
-      gitProvider.createIssueComment.mockResolvedValue({} as any);
-      const result = { issues: [], summary: [], round: 1, title: "New Title" };
-      await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
-      expect(gitProvider.editPullRequest).toHaveBeenCalledWith("o", "r", 1, { title: "New Title" });
-    });
-
-    it("should handle createIssueComment error gracefully", async () => {
-      const configReader = (service as any).config;
-      configReader.getPluginConfig.mockReturnValue({});
-      gitProvider.listIssueComments.mockResolvedValue([] as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
-      gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc123" } } as any);
-      gitProvider.createIssueComment.mockRejectedValue(new Error("fail") as any);
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const result = { issues: [], summary: [], round: 1 };
-      await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-
-    it("should include line comments when configured", async () => {
-      const configReader = (service as any).config;
-      configReader.getPluginConfig.mockReturnValue({ lineComments: true });
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listIssueComments.mockResolvedValue([] as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
-      gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc123" } } as any);
-      gitProvider.createIssueComment.mockResolvedValue({} as any);
-      gitProvider.createPullReview.mockResolvedValue({} as any);
-      const result = {
-        issues: [
-          {
-            file: "test.ts",
-            line: "10",
-            ruleId: "R1",
-            specFile: "s.md",
-            reason: "r",
-            severity: "error",
-            round: 1,
-          },
-        ],
-        summary: [],
-        round: 1,
-      };
-      await (service as any).postOrUpdateReviewComment("o", "r", 1, result);
-      expect(gitProvider.createPullReview.mock.calls.length).toBeGreaterThan(0);
-      const callArgs = gitProvider.createPullReview.mock.calls[0];
-      expect(callArgs[3].comments.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe("ReviewService.syncResolvedComments", () => {
-    it("should mark matched issues as resolved via path:line fallback", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listResolvedThreads.mockResolvedValue([
-        { path: "test.ts", line: 10, resolvedBy: { login: "user1" } },
-      ] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect((result.issues[0] as any).resolved).toBeDefined();
-      expect((result.issues[0] as any).resolvedBy).toEqual({ id: undefined, login: "user1" });
-    });
-
-    it("should mark matched issues as resolved via issue key in body", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listResolvedThreads.mockResolvedValue([
-        {
-          path: "test.ts",
-          line: 10,
-          resolvedBy: { login: "user1" },
-          body: `🟡 **问题**\n<!-- issue-key: test.ts:10:RuleA -->`,
-        },
-      ] as any);
-      const result = {
-        issues: [{ file: "test.ts", line: "10", ruleId: "RuleA" }],
-      };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect((result.issues[0] as any).resolved).toBeDefined();
-      expect((result.issues[0] as any).resolvedBy).toEqual({ id: undefined, login: "user1" });
-    });
-
-    it("should match correct issue by issue key when multiple issues at same position", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listResolvedThreads.mockResolvedValue([
-        {
-          path: "test.ts",
-          line: 10,
-          resolvedBy: { login: "user1" },
-          body: `🟡 **问题B**\n<!-- issue-key: test.ts:10:RuleB -->`,
-        },
-      ] as any);
-      const result = {
-        issues: [
-          { file: "test.ts", line: "10", ruleId: "RuleA" } as any,
-          { file: "test.ts", line: "10", ruleId: "RuleB" } as any,
-        ],
-      };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect(result.issues[0].resolved).toBeUndefined(); // RuleA 未解决
-      expect(result.issues[0].resolvedBy).toBeUndefined();
-      expect(result.issues[1].resolved).toBeDefined(); // RuleB 已解决
-      expect(result.issues[1].resolvedBy).toEqual({ id: undefined, login: "user1" });
-    });
-
-    it("should skip when no resolved threads", async () => {
-      gitProvider.listResolvedThreads.mockResolvedValue([] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect((result.issues[0] as any).resolved).toBeUndefined();
-    });
-
-    it("should skip threads without path", async () => {
-      gitProvider.listResolvedThreads.mockResolvedValue([
-        { path: undefined, line: 10, resolvedBy: { login: "user1" } },
-      ] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", ruleId: "Rule1" }] };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect((result.issues[0] as any).resolved).toBeUndefined();
-    });
-
-    it("should handle error gracefully", async () => {
-      gitProvider.listResolvedThreads.mockRejectedValue(new Error("fail"));
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const result = { issues: [] };
-      await (service as any).syncResolvedComments("o", "r", 1, result);
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe("ReviewService.callLLM", () => {
-    it("should aggregate results from multiple files", async () => {
-      const llmProxy = (service as any).llmProxyService;
-      const mockStream = (async function* () {
-        yield {
-          type: "result",
-          response: {
-            structuredOutput: {
-              issues: [{ file: "a.ts", line: "1", ruleId: "R1", reason: "bad" }],
-              summary: "ok",
-            },
-          },
-        };
-      })();
-      llmProxy.chatStream.mockReturnValue(mockStream);
-      const reviewPrompt = {
-        filePrompts: [{ filename: "a.ts", systemPrompt: "sys", userPrompt: "user" }],
-      };
-      const result = await (service as any).callLLM("openai", reviewPrompt);
-      expect(result.issues).toHaveLength(1);
-      expect(result.summary).toHaveLength(1);
-    });
-
-    it("should handle failed file review", async () => {
-      const llmProxy = (service as any).llmProxyService;
-      const mockStream = (async function* () {
-        yield { type: "error", message: "LLM failed" };
-      })();
-      llmProxy.chatStream.mockReturnValue(mockStream);
-      const reviewPrompt = {
-        filePrompts: [{ filename: "a.ts", systemPrompt: "sys", userPrompt: "user" }],
-      };
-      const result = await (service as any).callLLM("openai", reviewPrompt);
-      expect(result.summary[0].summary).toContain("审查失败");
-    });
-  });
-
   describe("ReviewService.executeCollectOnly", () => {
     it("should return empty result when no existing review", async () => {
       gitProvider.listPullReviews.mockResolvedValue([] as any);
@@ -1998,15 +1163,18 @@ describe("ReviewService", () => {
     it("should collect and return existing review result", async () => {
       const mockResult = { issues: [{ file: "a.ts", line: "1", ruleId: "R1" }], summary: [] };
       const mockReviewReportService = (service as any).reviewReportService;
-      mockReviewReportService.parseMarkdown.mockReturnValue({ result: mockResult });
       mockReviewReportService.formatStatsTerminal = vi.fn().mockReturnValue("stats");
-      gitProvider.listIssueComments.mockResolvedValue([
-        { id: 10, body: "<!-- spaceflow-review --> content" },
-      ] as any);
       gitProvider.listPullReviews.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequestCommits.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({} as any);
+      vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(
+        ReviewResultModel.create(
+          new PullRequestModel(gitProvider as any, "o", "r", 1),
+          mockResult as any,
+          (service as any).resultModelDeps,
+        ),
+      );
       const context = { owner: "o", repo: "r", prNumber: 1, ci: false, dryRun: false };
       const result = await (service as any).executeCollectOnly(context);
       expect(result.issues).toHaveLength(1);
@@ -2018,15 +1186,18 @@ describe("ReviewService", () => {
     it("should route to executeCollectOnly when flush is true", async () => {
       const mockResult = { issues: [{ file: "a.ts", line: "1", ruleId: "R1" }], summary: [] };
       const mockReviewReportService = (service as any).reviewReportService;
-      mockReviewReportService.parseMarkdown.mockReturnValue({ result: mockResult });
       mockReviewReportService.formatStatsTerminal = vi.fn().mockReturnValue("stats");
-      gitProvider.listIssueComments.mockResolvedValue([
-        { id: 10, body: "<!-- spaceflow-review --> content" },
-      ] as any);
       gitProvider.listPullReviews.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequestCommits.mockResolvedValue([] as any);
       gitProvider.getPullRequest.mockResolvedValue({} as any);
+      vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(
+        ReviewResultModel.create(
+          new PullRequestModel(gitProvider as any, "o", "r", 1),
+          mockResult as any,
+          (service as any).resultModelDeps,
+        ),
+      );
       const context = {
         owner: "o",
         repo: "r",
@@ -2147,7 +1318,7 @@ describe("ReviewService", () => {
 
     it("should auto-detect prNumber from event in CI mode", async () => {
       configService.get.mockReturnValue({ repository: "owner/repo", refName: "main" });
-      vi.spyOn(service as any, "getPrNumberFromEvent").mockResolvedValue(42);
+      vi.spyOn((service as any).contextBuilder, "getPrNumberFromEvent").mockResolvedValue(42);
       gitProvider.getPullRequest.mockResolvedValue({ title: "feat: test" } as any);
       const options = { dryRun: false, ci: true, verbose: 1 };
       const context = await service.getContextFromEnv(options as any);
@@ -2196,7 +1367,7 @@ describe("ReviewService", () => {
       configService.get.mockReturnValue({ repository: "owner/repo", refName: "main" });
       mockGitSdkService.getCurrentBranch.mockReturnValue("feature");
       mockGitSdkService.getDefaultBranch.mockReturnValue("main");
-      const options = { dryRun: false, ci: false, verbose: 1 };
+      const options = { dryRun: false, ci: false, verbose: 1, local: false };
       const context = await service.getContextFromEnv(options as any);
       expect(context.headRef).toBe("feature");
       expect(context.baseRef).toBe("main");
@@ -2206,7 +1377,7 @@ describe("ReviewService", () => {
       configService.get.mockReturnValue({ repository: "owner/repo", refName: "main" });
       mockGitSdkService.getCurrentBranch.mockReturnValue("feature");
       mockGitSdkService.getDefaultBranch.mockReturnValue("main");
-      const options = { dryRun: false, ci: false };
+      const options = { dryRun: false, ci: false, local: false };
       const context = await service.getContextFromEnv(options as any);
       expect(context.headRef).toBe("feature");
       expect(context.baseRef).toBe("main");
@@ -2238,13 +1409,6 @@ describe("ReviewService", () => {
     });
   });
 
-  describe("ReviewService.getFileDirectoryInfo", () => {
-    it("should return root directory marker for root files", async () => {
-      const result = await (service as any).getFileDirectoryInfo("file.ts");
-      expect(result).toBe("（根目录）");
-    });
-  });
-
   describe("ReviewService.getCommitsBetweenRefs", () => {
     it("should return commits from git sdk", async () => {
       mockGitSdkService.getCommitsBetweenRefs.mockResolvedValue([
@@ -2262,179 +1426,6 @@ describe("ReviewService", () => {
       ]);
       const result = await (service as any).getFilesForCommit("abc123");
       expect(result).toHaveLength(1);
-    });
-  });
-
-  describe("ReviewService.syncReactionsToIssues", () => {
-    it("should skip when no AI review found", async () => {
-      gitProvider.listPullReviews.mockResolvedValue([{ body: "normal" }] as any);
-      const result = { issues: [] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
-      expect(result.issues).toEqual([]);
-    });
-
-    it("should handle error gracefully", async () => {
-      gitProvider.listPullReviews.mockRejectedValue(new Error("fail"));
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const result = { issues: [] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-    it("should mark issue as invalid on thumbs down from reviewer", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review-lines --> content", user: { login: "bot" } },
-        { id: 2, body: "LGTM", user: { login: "reviewer1" } },
-      ] as any);
-      gitProvider.getPullRequest.mockResolvedValue({
-        head: { sha: "abc" },
-        requested_reviewers: [],
-        requested_reviewers_teams: [],
-      } as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([
-        { id: 100, path: "test.ts", position: 10 },
-      ] as any);
-      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
-        { content: "-1", user: { login: "reviewer1" } },
-      ] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", valid: "true" }] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
-      expect(result.issues[0].valid).toBe("false");
-    });
-
-    it("should add requested_reviewers to reviewers set", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review-lines --> content", user: { login: "bot" } },
-      ] as any);
-      gitProvider.getPullRequest.mockResolvedValue({
-        requested_reviewers: [{ login: "req-reviewer" }],
-        requested_reviewers_teams: [],
-      } as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([
-        { id: 100, path: "test.ts", position: 10 },
-      ] as any);
-      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
-        { content: "-1", user: { login: "req-reviewer" } },
-      ] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", valid: "true" }] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
-      expect(result.issues[0].valid).toBe("false");
-    });
-
-    it("should skip comments without id", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review-lines --> content" },
-      ] as any);
-      gitProvider.getPullRequest.mockResolvedValue({
-        requested_reviewers: [],
-        requested_reviewers_teams: [],
-      } as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([
-        { path: "test.ts", position: 10 },
-      ] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", reactions: [] }] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
-      expect(result.issues[0].reactions).toHaveLength(0);
-    });
-
-    it("should skip when reactions are empty", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review-lines --> content" },
-      ] as any);
-      gitProvider.getPullRequest.mockResolvedValue({
-        requested_reviewers: [],
-        requested_reviewers_teams: [],
-      } as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([
-        { id: 100, path: "test.ts", position: 10 },
-      ] as any);
-      gitProvider.getPullReviewCommentReactions.mockResolvedValue([] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", reactions: [] }] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
-      expect(result.issues[0].reactions).toHaveLength(0);
-    });
-
-    it("should store multiple reaction types", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review-lines --> content" },
-      ] as any);
-      gitProvider.getPullRequest.mockResolvedValue({
-        requested_reviewers: [],
-        requested_reviewers_teams: [],
-      } as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([
-        { id: 100, path: "test.ts", position: 10 },
-      ] as any);
-      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
-        { content: "+1", user: { login: "user1" } },
-        { content: "+1", user: { login: "user2" } },
-        { content: "heart", user: { login: "user1" } },
-      ] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", reactions: [] }] };
-      await (service as any).syncReactionsToIssues("o", "r", 1, result);
-      expect(result.issues[0].reactions).toHaveLength(2);
-    });
-
-    it("should not mark as invalid when thumbs down from non-reviewer", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      gitProvider.listPullReviews.mockResolvedValue([
-        { id: 1, body: "<!-- spaceflow-review-lines --> content" },
-      ] as any);
-      gitProvider.getPullRequest.mockResolvedValue({
-        requested_reviewers: [],
-        requested_reviewers_teams: [],
-      } as any);
-      gitProvider.listPullReviewComments.mockResolvedValue([
-        { id: 100, path: "test.ts", position: 10 },
-      ] as any);
-      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
-        { content: "-1", user: { login: "random-user" } },
-      ] as any);
-      const result = { issues: [{ file: "test.ts", line: "10", valid: "true", reactions: [] }] };
-      expect(result.issues[0].valid).toBe("true");
-    });
-  });
-
-  describe("ReviewService.buildLineReviewBody", () => {
-    it("should include previous round summary when round > 1", () => {
-      const issues = [
-        { round: 2, fixed: "2024-01-01", resolved: undefined, valid: undefined },
-        { round: 2, resolved: "2024-01-02", fixed: undefined, valid: undefined },
-        { round: 2, valid: "false", fixed: undefined, resolved: undefined },
-        { round: 2, fixed: undefined, resolved: undefined, valid: undefined },
-      ];
-      const allIssues = [
-        ...issues,
-        { round: 1, fixed: "2024-01-01" },
-        { round: 1, resolved: "2024-01-02" },
-        { round: 1, valid: "false" },
-        { round: 1 },
-      ];
-      const result = (service as any).buildLineReviewBody(issues, 2, allIssues);
-      expect(result).toContain("Round 1 回顾");
-      expect(result).toContain("🟢 已修复 | 1");
-      expect(result).toContain("⚪ 已解决 | 1");
-      expect(result).toContain("❌ 无效 | 1");
-      expect(result).toContain("⚠️ 待处理 | 1");
-    });
-
-    it("should not include previous round summary when round <= 1", () => {
-      const issues = [{ round: 1 }];
-      const allIssues = [{ round: 1 }];
-      const result = (service as any).buildLineReviewBody(issues, 1, allIssues);
-      expect(result).not.toContain("Round 1 回顾");
-    });
-
-    it("should show no issues message when issues array is empty", () => {
-      const issues = [];
-      const allIssues = [];
-      const result = (service as any).buildLineReviewBody(issues, 1, allIssues);
-      expect(result).toContain("✅ 未发现新问题");
     });
   });
 
@@ -2543,225 +1534,6 @@ describe("ReviewService", () => {
     });
   });
 
-  describe("ReviewService.generatePrTitle", () => {
-    it("should generate title from LLM", async () => {
-      const llmProxy = (service as any).llmProxyService;
-      const mockStream = (async function* () {
-        yield { type: "text", content: "Feat: 新功能" };
-      })();
-      llmProxy.chatStream.mockReturnValue(mockStream);
-      const commits = [{ sha: "abc", commit: { message: "feat: add" } }];
-      const changedFiles = [{ filename: "a.ts", status: "modified" }];
-      const result = await (service as any).generatePrTitle(commits, changedFiles);
-      expect(result).toBe("Feat: 新功能");
-    });
-
-    it("should fallback on error", async () => {
-      const llmProxy = (service as any).llmProxyService;
-      const mockStream = (async function* () {
-        yield { type: "error", message: "fail" };
-      })();
-      llmProxy.chatStream.mockReturnValue(mockStream);
-      const commits = [{ sha: "abc", commit: { message: "feat: add feature" } }];
-      const result = await (service as any).generatePrTitle(commits, []);
-      expect(result).toBe("feat: add feature");
-    });
-  });
-
-  describe("ReviewService.extractIssueKeyFromBody", () => {
-    it("should extract issue key from AI comment body", () => {
-      const body = `🟡 **问题描述**\n- **规则**: \`Rule1\`\n<!-- issue-key: test.ts:10:Rule1 -->`;
-      expect((service as any).extractIssueKeyFromBody(body)).toBe("test.ts:10:Rule1");
-    });
-
-    it("should return null for user reply without issue key marker", () => {
-      expect((service as any).extractIssueKeyFromBody("这个问题已经修复了")).toBeNull();
-      expect((service as any).extractIssueKeyFromBody("")).toBeNull();
-    });
-  });
-
-  describe("ReviewService.isAiGeneratedComment", () => {
-    it("should detect comment with issue-key marker", () => {
-      const body = `🟡 **问题**\n<!-- issue-key: test.ts:10:Rule1 -->`;
-      expect((service as any).isAiGeneratedComment(body)).toBe(true);
-    });
-
-    it("should detect comment with structured AI format (规则 + 文件)", () => {
-      const body = ` **魔法字符串问题**\n- **文件**: \`test.ts:64-98\`\n- **规则**: \`JsTs.Base.NoMagicStringsAndNumbers\` (来自 \`js&ts.base.md\`)`;
-      expect((service as any).isAiGeneratedComment(body)).toBe(true);
-    });
-
-    it("should return false for normal user reply", () => {
-      expect((service as any).isAiGeneratedComment("这个问题已经修复了")).toBe(false);
-      expect((service as any).isAiGeneratedComment("LGTM")).toBe(false);
-      expect((service as any).isAiGeneratedComment("")).toBe(false);
-    });
-
-    it("should return false for partial match (only 规则 or only 文件)", () => {
-      expect((service as any).isAiGeneratedComment("- **规则**: something")).toBe(false);
-      expect((service as any).isAiGeneratedComment("- **文件**: something")).toBe(false);
-    });
-  });
-
-  describe("ReviewService.syncRepliesToIssues", () => {
-    it("should sync user replies to matched issues and filter out AI comments", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      const reviewComments = [
-        {
-          id: 1,
-          path: "test.ts",
-          position: 10,
-          body: `🟡 **问题描述**\n<!-- issue-key: test.ts:10:JsTs.Base.Rule1 -->`,
-          user: { id: 1, login: "bot" },
-          created_at: "2024-01-01",
-        },
-        {
-          id: 2,
-          path: "test.ts",
-          position: 10,
-          body: "reply from user",
-          user: { id: 2, login: "dev" },
-          created_at: "2024-01-02",
-        },
-      ];
-      const result = {
-        issues: [{ file: "test.ts", line: "10", ruleId: "JsTs.Base.Rule1", replies: [] }],
-      };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
-      expect(result.issues[0].replies).toHaveLength(1);
-      expect(result.issues[0].replies[0].body).toBe("reply from user");
-      expect(result.issues[0].replies[0].user.login).toBe("dev");
-    });
-
-    it("should match user reply to correct issue by issue key when multiple issues at same position", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      const reviewComments = [
-        {
-          id: 1,
-          path: "test.ts",
-          position: 10,
-          body: `🔴 **问题A**\n<!-- issue-key: test.ts:10:JsTs.Base.RuleA -->`,
-          user: { id: 1, login: "bot" },
-          created_at: "2024-01-01T01:00:00Z",
-        },
-        {
-          id: 2,
-          path: "test.ts",
-          position: 10,
-          body: `🟡 **问题B**\n<!-- issue-key: test.ts:10:JsTs.Base.RuleB -->`,
-          user: { id: 1, login: "bot" },
-          created_at: "2024-01-01T02:00:00Z",
-        },
-        {
-          id: 3,
-          path: "test.ts",
-          position: 10,
-          body: "针对问题B的回复",
-          user: { id: 2, login: "dev" },
-          created_at: "2024-01-01T03:00:00Z",
-        },
-      ];
-      const result = {
-        issues: [
-          { file: "test.ts", line: "10", ruleId: "JsTs.Base.RuleA" } as any,
-          { file: "test.ts", line: "10", ruleId: "JsTs.Base.RuleB" } as any,
-        ],
-      };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
-      expect(result.issues[0].replies).toBeUndefined(); // RuleA 无回复
-      expect(result.issues[1].replies).toHaveLength(1);
-      expect(result.issues[1].replies[0].body).toBe("针对问题B的回复");
-    });
-
-    it("should skip comments without path or position", async () => {
-      const reviewComments = [{ id: 1, body: "no path" }];
-      const result = { issues: [] };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
-      expect(result.issues).toEqual([]);
-    });
-
-    it("should handle error gracefully", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockImplementation(() => {
-        throw new Error("fail");
-      });
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const reviewComments = [
-        { id: 1, path: "test.ts", position: 10, body: "a", created_at: "2024-01-01" },
-        { id: 2, path: "test.ts", position: 10, body: "b", created_at: "2024-01-02" },
-      ];
-      const result = { issues: [{ file: "test.ts", line: "10", replies: [] }] };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-
-    it("should fallback to path:position match when no issue key is available", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      const reviewComments = [
-        {
-          id: 1,
-          path: "test.ts",
-          position: 10,
-          body: "some comment without issue key",
-          user: { id: 1, login: "user1" },
-          created_at: "2024-01-01",
-        },
-        {
-          id: 2,
-          path: "test.ts",
-          position: 10,
-          body: "user reply",
-          user: { id: 2, login: "user2" },
-          created_at: "2024-01-02",
-        },
-      ];
-      const result = {
-        issues: [{ file: "test.ts", line: "10", ruleId: "SomeRule" } as any],
-      };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
-      // 两条都不含 issue key，都会通过 fallback path:position 匹配
-      expect(result.issues[0].replies).toHaveLength(2);
-    });
-
-    it("should filter out bot comments with AI structured format but without issue-key", async () => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockReturnValue([10]);
-      const reviewComments = [
-        {
-          id: 1,
-          path: "test.ts",
-          position: 10,
-          body: `🟡 **问题描述**\n<!-- issue-key: test.ts:10:JsTs.Base.ComplexFunc -->`,
-          user: { id: 1, login: "bot" },
-          created_at: "2024-01-01T01:00:00Z",
-        },
-        {
-          id: 2,
-          path: "test.ts",
-          position: 10,
-          body: ` **魔法字符串问题**\n- **文件**: \`test.ts:64-98\`\n- **规则**: \`JsTs.Base.NoMagicStringsAndNumbers\` (来自 \`js&ts.base.md\`)\n- **Commit**: 3390baa\n- **建议**:\n\`\`\`ts\nconst UNKNOWN = '未知';\n\`\`\``,
-          user: { id: 12, login: "GiteaActions" },
-          created_at: "2024-01-01T02:00:00Z",
-        },
-        {
-          id: 3,
-          path: "test.ts",
-          position: 10,
-          body: "已修复，谢谢",
-          user: { id: 5, login: "dev" },
-          created_at: "2024-01-01T03:00:00Z",
-        },
-      ];
-      const result = {
-        issues: [{ file: "test.ts", line: "10", ruleId: "JsTs.Base.ComplexFunc" } as any],
-      };
-      await (service as any).syncRepliesToIssues("o", "r", 1, reviewComments, result);
-      // bot 的结构化评论应被过滤，只保留用户的真实回复
-      expect(result.issues[0].replies).toHaveLength(1);
-      expect(result.issues[0].replies[0].body).toBe("已修复，谢谢");
-      expect(result.issues[0].replies[0].user.login).toBe("dev");
-    });
-  });
-
   describe("ReviewService.execute - CI with existingResult", () => {
     beforeEach(() => {
       vi.spyOn(service as any, "runLLMReview").mockResolvedValue({
@@ -2769,16 +1541,25 @@ describe("ReviewService", () => {
         issues: [{ file: "test.ts", line: "5", ruleId: "R1", reason: "new issue" }],
         summary: [{ file: "test.ts", summary: "ok" }],
       });
-      vi.spyOn(service as any, "buildLineCommitMap").mockResolvedValue(new Map());
       vi.spyOn(service as any, "getFileContents").mockResolvedValue(new Map());
     });
 
     it("should merge existing issues with new issues in CI mode", async () => {
-      vi.spyOn(service as any, "getExistingReviewResult").mockResolvedValue({
-        issues: [{ file: "old.ts", line: "1", ruleId: "R2", reason: "old issue", valid: "true" }],
-        summary: [],
-        round: 1,
-      });
+      vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(
+        ReviewResultModel.create(
+          new PullRequestModel(gitProvider as any, "o", "r", 1),
+          {
+            success: true,
+            description: "",
+            issues: [
+              { file: "old.ts", line: "1", ruleId: "R2", reason: "old issue", valid: "true" },
+            ],
+            summary: [],
+            round: 1,
+          } as any,
+          (service as any).resultModelDeps,
+        ),
+      );
       const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({});
       gitProvider.getPullRequest.mockResolvedValue({ title: "PR", head: { sha: "abc" } } as any);
@@ -2808,11 +1589,19 @@ describe("ReviewService", () => {
     });
 
     it("should verify fixes when verifyFixes is true", async () => {
-      vi.spyOn(service as any, "getExistingReviewResult").mockResolvedValue({
-        issues: [{ file: "old.ts", line: "1", ruleId: "R2", reason: "old", valid: "true" }],
-        summary: [],
-        round: 1,
-      });
+      vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(
+        ReviewResultModel.create(
+          new PullRequestModel(gitProvider as any, "o", "r", 1),
+          {
+            success: true,
+            description: "",
+            issues: [{ file: "old.ts", line: "1", ruleId: "R2", reason: "old", valid: "true" }],
+            summary: [],
+            round: 1,
+          } as any,
+          (service as any).resultModelDeps,
+        ),
+      );
       const configReader = (service as any).config;
       configReader.getPluginConfig.mockReturnValue({});
       gitProvider.getPullRequest.mockResolvedValue({ title: "PR", head: { sha: "abc" } } as any);
@@ -2849,9 +1638,8 @@ describe("ReviewService", () => {
         issues: [],
         summary: [],
       });
-      vi.spyOn(service as any, "buildLineCommitMap").mockResolvedValue(new Map());
       vi.spyOn(service as any, "getFileContents").mockResolvedValue(new Map());
-      vi.spyOn(service as any, "getExistingReviewResult").mockResolvedValue(null);
+      vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(null as any);
     });
 
     it("should filter by specified commits", async () => {
@@ -3041,6 +1829,13 @@ describe("ReviewService", () => {
       gitProvider.listIssueComments.mockResolvedValue([
         { id: 10, body: "<!-- spaceflow-review --> content" },
       ] as any);
+      vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(
+        ReviewResultModel.create(
+          new PullRequestModel(gitProvider as any, "o", "r", 1),
+          mockResult as any,
+          (service as any).resultModelDeps,
+        ),
+      );
       gitProvider.listPullReviews.mockResolvedValue([] as any);
       gitProvider.listPullReviewComments.mockResolvedValue([] as any);
       gitProvider.getPullRequestCommits.mockResolvedValue([] as any);
@@ -3162,7 +1957,7 @@ describe("ReviewService", () => {
     });
   });
 
-  describe("ReviewService.buildFallbackDescription", () => {
+  describe("ReviewService.buildBasicDescription", () => {
     it("should build description from commits and files", async () => {
       const llmProxy = (service as any).llmProxyService;
       const mockStream = (async function* () {
@@ -3175,7 +1970,7 @@ describe("ReviewService", () => {
         { filename: "b.ts", status: "modified" },
         { filename: "c.ts", status: "deleted" },
       ];
-      const result = await (service as any).buildFallbackDescription(commits, changedFiles);
+      const result = await (service as any).buildBasicDescription(commits, changedFiles);
       expect(result.description).toContain("提交记录");
       expect(result.description).toContain("文件变更");
       expect(result.description).toContain("新增 1");
@@ -3189,44 +1984,8 @@ describe("ReviewService", () => {
         yield { type: "text", content: "Feat: empty" };
       })();
       llmProxy.chatStream.mockReturnValue(mockStream);
-      const result = await (service as any).buildFallbackDescription([], []);
+      const result = await (service as any).buildBasicDescription([], []);
       expect(result.title).toBeDefined();
-    });
-  });
-
-  describe("ReviewService.normalizeIssues - comma separated", () => {
-    it("should split comma separated lines into multiple issues", () => {
-      const issues = [
-        { file: "test.ts", line: "10, 20", ruleId: "R1", reason: "bad", suggestion: "fix it" },
-      ];
-      const result = (service as any).normalizeIssues(issues);
-      expect(result).toHaveLength(2);
-      expect(result[0].line).toBe("10");
-      expect(result[0].suggestion).toBe("fix it");
-      expect(result[1].line).toBe("20");
-      expect(result[1].suggestion).toContain("参考");
-    });
-  });
-
-  describe("ReviewService.formatReviewComment - terminal format", () => {
-    it("should use terminal format when not CI", () => {
-      const mockReviewReportService = (service as any).reviewReportService;
-      mockReviewReportService.format.mockReturnValue("terminal output");
-      const result = (service as any).formatReviewComment(
-        { issues: [], summary: [] },
-        { ci: false },
-      );
-      expect(result).toBe("terminal output");
-    });
-
-    it("should use specified outputFormat", () => {
-      const mockReviewReportService = (service as any).reviewReportService;
-      mockReviewReportService.format.mockReturnValue("terminal output");
-      const result = (service as any).formatReviewComment(
-        { issues: [], summary: [] },
-        { outputFormat: "terminal" },
-      );
-      expect(result).toBe("terminal output");
     });
   });
 
@@ -3250,299 +2009,7 @@ describe("ReviewService", () => {
     });
   });
 
-  describe("ReviewService.buildLineCommitMap", () => {
-    it("should build line commit map from commits", async () => {
-      gitProvider.getCommitDiff = vi
-        .fn()
-        .mockResolvedValue(
-          "diff --git a/file.ts b/file.ts\n--- a/file.ts\n+++ b/file.ts\n@@ -1,2 +1,3 @@\n line1\n+new line\n line2",
-        ) as any;
-      const commits = [{ sha: "abc1234567890" }];
-      const result = await (service as any).buildLineCommitMap("o", "r", commits);
-      expect(result.has("file.ts")).toBe(true);
-      expect(result.get("file.ts").get(2)).toBe("abc1234");
-    });
-
-    it("should skip commits without sha", async () => {
-      const commits = [{ sha: undefined }];
-      const result = await (service as any).buildLineCommitMap("o", "r", commits);
-      expect(result.size).toBe(0);
-    });
-
-    it("should fallback to git sdk on API error", async () => {
-      gitProvider.getCommitDiff = vi.fn().mockRejectedValue(new Error("fail")) as any;
-      mockGitSdkService.getCommitDiff = vi.fn().mockReturnValue([]);
-      const commits = [{ sha: "abc1234567890" }];
-      const result = await (service as any).buildLineCommitMap("o", "r", commits);
-      expect(mockGitSdkService.getCommitDiff).toHaveBeenCalledWith("abc1234567890");
-      expect(result.size).toBe(0);
-    });
-  });
-
-  describe("ReviewService.invalidateIssuesForChangedFiles", () => {
-    it("should return issues unchanged when no headSha", async () => {
-      const issues = [{ file: "test.ts" }];
-      const result = await (service as any).invalidateIssuesForChangedFiles(
-        issues,
-        undefined,
-        "o",
-        "r",
-      );
-      expect(result).toBe(issues);
-    });
-
-    it("should log warning when no headSha", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const issues = [{ file: "test.ts" }];
-      await (service as any).invalidateIssuesForChangedFiles(issues, undefined, "o", "r", 1);
-      expect(consoleSpy).toHaveBeenCalledWith("   ⚠️ 无法获取 PR head SHA，跳过变更文件检查");
-      consoleSpy.mockRestore();
-    });
-
-    it("should invalidate issues for changed files", async () => {
-      gitProvider.getCommitDiff = vi
-        .fn()
-        .mockResolvedValue(
-          "diff --git a/changed.ts b/changed.ts\n--- a/changed.ts\n+++ b/changed.ts\n@@ -1,1 +1,2 @@\n line1\n+new",
-        ) as any;
-      const issues = [
-        { file: "changed.ts", line: "1", ruleId: "R1" },
-        { file: "unchanged.ts", line: "2", ruleId: "R2" },
-        { file: "changed.ts", line: "3", ruleId: "R3", fixed: "2024-01-01" },
-      ];
-      const result = await (service as any).invalidateIssuesForChangedFiles(
-        issues,
-        "abc123",
-        "o",
-        "r",
-        1,
-      );
-      expect(result).toHaveLength(3);
-      expect(result[0].valid).toBe("false");
-      expect(result[1].valid).toBeUndefined();
-      expect(result[2].fixed).toBe("2024-01-01");
-    });
-
-    it("should log when files are invalidated", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      gitProvider.getCommitDiff = vi
-        .fn()
-        .mockResolvedValue(
-          "diff --git a/changed.ts b/changed.ts\n--- a/changed.ts\n+++ b/changed.ts\n@@ -1,1 +1,2 @@\n line1\n+new",
-        ) as any;
-      const issues = [{ file: "changed.ts", line: "1", ruleId: "R1" }];
-      await (service as any).invalidateIssuesForChangedFiles(issues, "abc123", "o", "r", 1);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "   🗑️ Issue changed.ts:1 所在文件有变更，标记为无效",
-      );
-      expect(consoleSpy).toHaveBeenCalledWith("   📊 共标记 1 个历史问题为无效（文件有变更）");
-      consoleSpy.mockRestore();
-    });
-
-    it("should return issues unchanged when no diff files", async () => {
-      gitProvider.getCommitDiff = vi.fn().mockResolvedValue("") as any;
-      const issues = [{ file: "test.ts", line: "1" }];
-      const result = await (service as any).invalidateIssuesForChangedFiles(
-        issues,
-        "abc123",
-        "o",
-        "r",
-        1,
-      );
-      expect(result).toBe(issues);
-    });
-
-    it("should log when no diff files", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      gitProvider.getCommitDiff = vi.fn().mockResolvedValue("") as any;
-      const issues = [{ file: "test.ts", line: "1" }];
-      await (service as any).invalidateIssuesForChangedFiles(issues, "abc123", "o", "r", 1);
-      expect(consoleSpy).toHaveBeenCalledWith("   ⏭️ 最新 commit 无文件变更");
-      consoleSpy.mockRestore();
-    });
-
-    it("should handle API error gracefully", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      gitProvider.getCommitDiff = vi.fn().mockRejectedValue(new Error("fail")) as any;
-      const issues = [{ file: "test.ts", line: "1" }];
-      const result = await (service as any).invalidateIssuesForChangedFiles(
-        issues,
-        "abc123",
-        "o",
-        "r",
-        1,
-      );
-      expect(result).toBe(issues);
-      expect(consoleSpy).toHaveBeenCalledWith("   ⚠️ 获取最新 commit 变更文件失败: Error: fail");
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe("ReviewService.updateIssueLineNumbers", () => {
-    beforeEach(() => {
-      mockReviewSpecService.parseLineRange = vi.fn().mockImplementation((lineStr: string) => {
-        const lines: number[] = [];
-        const rangeMatch = lineStr.match(/^(\d+)-(\d+)$/);
-        if (rangeMatch) {
-          const start = parseInt(rangeMatch[1], 10);
-          const end = parseInt(rangeMatch[2], 10);
-          for (let i = start; i <= end; i++) {
-            lines.push(i);
-          }
-        } else {
-          const line = parseInt(lineStr, 10);
-          if (!isNaN(line)) {
-            lines.push(line);
-          }
-        }
-        return lines;
-      });
-    });
-
-    it("should return issues unchanged when no patch for file", () => {
-      const issues = [{ file: "test.ts", line: "5", ruleId: "R1" }];
-      const filePatchMap = new Map([["other.ts", "@@ -1,1 +1,2 @@\n-old1\n+new1\n+new2"]]);
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-      expect(result).toEqual(issues);
-    });
-
-    it("should skip issues that are already fixed/resolved/invalid", () => {
-      const issues = [
-        { file: "test.ts", line: "5", ruleId: "R1", fixed: "2024-01-01" },
-        { file: "test.ts", line: "6", ruleId: "R2", resolved: "2024-01-02" },
-        { file: "test.ts", line: "7", ruleId: "R3", valid: "false" },
-      ];
-      const filePatchMap = new Map([["test.ts", "@@ -1,1 +1,2 @@\n-old1\n+new1\n+new2"]]);
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-      expect(result).toEqual(issues);
-    });
-
-    it("should mark issue as invalid when line is deleted", () => {
-      const filePatchMap = new Map([["test.ts", "@@ -1,1 +1,0 @@\n-old1"]]);
-      const issues = [{ file: "test.ts", line: "1", ruleId: "R1" }];
-      const result = (service as any).updateIssueLineNumbers(issues, filePatchMap);
-      expect(result[0].valid).toBe("false");
-      expect(result[0].originalLine).toBe("1");
-    });
-
-    it("should log when line is deleted and marked invalid", () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const filePatchMap = new Map([["test.ts", "@@ -1,1 +1,0 @@\n-old1"]]);
-      const issues = [{ file: "test.ts", line: "1", ruleId: "R1" }];
-      (service as any).updateIssueLineNumbers(issues, filePatchMap, 1);
-      expect(consoleSpy).toHaveBeenCalledWith("📍 Issue test.ts:1 对应的代码已被删除，标记为无效");
-      consoleSpy.mockRestore();
-    });
-
-    it("should log when line range is collapsed to single line", () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const filePatchMap = new Map([["test.ts", "@@ -1,2 +1,1 @@\n-old1\n-old2\n+new1"]]);
-      const issues = [{ file: "test.ts", line: "1-2", ruleId: "R1" }];
-      (service as any).updateIssueLineNumbers(issues, filePatchMap, 1);
-      expect(consoleSpy).toHaveBeenCalledWith("📍 Issue 行号更新: test.ts:1-2 -> test.ts:1");
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe("ReviewService.findExistingAiComments", () => {
-    it("should log comments when verbose level >= 2", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const mockComments = [
-        { id: 1, body: "test comment 1" },
-        { id: 2, body: "test comment 2<!-- spaceflow-review -->" },
-      ] as any;
-      gitProvider.listIssueComments.mockResolvedValue(mockComments);
-
-      await (service as any).findExistingAiComments("o", "r", 1, 2);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "[findExistingAiComments] listIssueComments returned 2 comments",
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "[findExistingAiComments] comment id=1, body starts with: test comment 1",
-      );
-      consoleSpy.mockRestore();
-    });
-
-    it("should log error when API fails", async () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      gitProvider.listIssueComments.mockRejectedValue(new Error("API error"));
-
-      const result = await (service as any).findExistingAiComments("o", "r", 1);
-      expect(result).toEqual([]);
-      expect(consoleSpy).toHaveBeenCalledWith("[findExistingAiComments] error:", expect.any(Error));
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe("ReviewService.syncReactionsToIssues", () => {
-    it("should log when no AI review found", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      gitProvider.listPullReviews.mockResolvedValue([] as any);
-
-      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
-      expect(consoleSpy).toHaveBeenCalledWith("[syncReactionsToIssues] No AI review found");
-      consoleSpy.mockRestore();
-    });
-
-    it("should log reviewers from reviews", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const mockReviews = [
-        { user: { login: "user1" }, body: "normal review" },
-        { user: { login: "bot" }, body: "<!-- spaceflow-review-lines --> AI review", id: 123 },
-      ] as any;
-      gitProvider.listPullReviews.mockResolvedValue(mockReviews);
-      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
-
-      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "[syncReactionsToIssues] reviewers from reviews: user1",
-      );
-      consoleSpy.mockRestore();
-    });
-
-    it("should log requested reviewers and teams", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const mockReviews = [
-        { user: { login: "bot" }, body: "<!-- spaceflow-review-lines --> AI review", id: 123 },
-      ] as any;
-      const mockPr = {
-        requested_reviewers: [{ login: "reviewer1" }],
-        requested_reviewers_teams: [{ name: "team1", id: 123 }],
-      } as any;
-      gitProvider.listPullReviews.mockResolvedValue(mockReviews);
-      gitProvider.getPullRequest.mockResolvedValue(mockPr);
-      gitProvider.getTeamMembers.mockResolvedValue([{ login: "teamuser1" }]);
-      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
-
-      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "[syncReactionsToIssues] requested_reviewers: reviewer1",
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[syncReactionsToIssues] requested_reviewers_teams: [{"name":"team1","id":123}]',
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "[syncReactionsToIssues] team team1(123) members: teamuser1",
-      );
-      consoleSpy.mockRestore();
-    });
-
-    it("should log final reviewers", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      const mockReviews = [
-        { user: { login: "bot" }, body: "<!-- spaceflow-review-lines --> AI review", id: 123 },
-      ] as any;
-      gitProvider.listPullReviews.mockResolvedValue(mockReviews);
-      gitProvider.getPullRequest.mockRejectedValue(new Error("PR not found"));
-      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
-
-      await (service as any).syncReactionsToIssues("o", "r", 1, { issues: [] }, 2);
-      expect(consoleSpy).toHaveBeenCalledWith("[syncReactionsToIssues] final reviewers: ");
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe("ReviewService.deleteExistingAiReviews", () => {
+  describe("ReviewService.filterIssuesByValidCommits", () => {
     beforeEach(() => {
       mockReviewSpecService.parseLineRange = vi.fn().mockImplementation((lineStr: string) => {
         const lines: number[] = [];

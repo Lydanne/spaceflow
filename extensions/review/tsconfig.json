@@ -1,5 +1,5 @@
 {
-  "extends": "../../packages/core/tsconfig.skill.json",
+  "extends": "../../packages/core/tsconfig.extension.json",
   "compilerOptions": {
     "types": ["vitest/globals"]
   },

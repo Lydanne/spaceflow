@@ -91,6 +91,14 @@ export interface ReviewOptions {
    * - false: 不自动批准（默认）
    */
   autoApprove?: boolean;
+  /**
+   * 存在未解决问题时以非零退出码退出（工作流抛出异常）
+   * - 'off': 禁用（默认），即使有问题也正常退出
+   * - 'warn': 有未解决的 warn 级别问题时抛出异常
+   * - 'error': 有未解决的 error 级别问题时抛出异常
+   * - 'warn+error': 有未解决的 warn 或 error 级别问题时抛出异常
+   */
+  failOnIssues?: "off" | "warn" | "error" | "warn+error";
 }
 
 /** review 命令配置 schema（LLM 敏感配置由系统 llm.config.ts 管理） */
@@ -114,6 +122,7 @@ export const reviewSchema = () =>
     invalidateChangedFiles: invalidateChangedFilesSchema.default("invalidate").optional(),
     skipDuplicateWorkflow: z.boolean().default(false).optional(),
     autoApprove: z.boolean().default(false).optional(),
+    failOnIssues: z.enum(["off", "warn", "error", "warn+error"]).default("off").optional(),
   });
 
 /** review 配置类型（从 schema 推导） */

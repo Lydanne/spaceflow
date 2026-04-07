@@ -147,6 +147,8 @@ export interface ReviewResult {
   summary: FileSummary[];
   deletionImpact?: DeletionImpactResult;
   round: number; // 当前 review 的轮次
+  /** 最后一次审查时的 head commit SHA */
+  headSha?: string;
   /** 问题统计信息 */
   stats?: ReviewStats;
 }
