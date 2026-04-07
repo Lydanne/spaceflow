@@ -11,12 +11,12 @@
       "!**/*.spec.*",
       "!**/*.config.*"
     ],
-    "filterCodeBlocks": [
-      "added|code-function",
-      "added|code-class",
-      "added|code-interface",
-      "added|code-type",
-      "added|code-method"
+    "whenModifiedCode": [
+      "function",
+      "class",
+      "interface",
+      "type",
+      "method"
     ],
     "generateDescription": true,
     "autoUpdatePrTitle": true,

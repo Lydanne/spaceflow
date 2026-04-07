@@ -28,6 +28,7 @@ export interface ReviewContext extends ReviewOptions {
   specSources: string[];
   verbose?: VerboseLevel;
   includes?: string[];
+  whenModifiedCode?: string[];
   files?: string[];
   commits?: string[];
   concurrency?: number;
@@ -172,7 +173,7 @@ export class ReviewContextBuilder {
       ci: options.ci ?? false,
       verbose: normalizeVerbose(options.verbose ?? titleOptions.verbose),
       includes: ctxIncludes,
-      filterCodeBlocks: options.filterCodeBlocks ?? reviewConf.filterCodeBlocks,
+      whenModifiedCode: options.whenModifiedCode ?? reviewConf.whenModifiedCode,
       llmMode: options.llmMode ?? titleOptions.llmMode ?? reviewConf.llmMode,
       files: this.normalizeFilePaths(options.files),
       commits: options.commits,

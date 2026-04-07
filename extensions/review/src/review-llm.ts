@@ -24,11 +24,7 @@ import { dirname, extname } from "path";
 import micromatch from "micromatch";
 import type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
 import { buildLinesWithNumbers, buildCommitsSection, extractCodeBlocks } from "./utils/review-llm";
-import {
-  extractCodeBlockTypes,
-  extractGlobsFromIncludes,
-  type IncludeStatusPrefix,
-} from "./review-includes-filter";
+import { extractCodeBlockTypes, extractGlobsFromIncludes } from "./review-includes-filter";
 
 export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
 
@@ -162,7 +158,7 @@ ${specsSection}
     fileContents: FileContentsMap,
     commits: PullRequestCommit[],
     existingResult?: ReviewResult | null,
-    filterCodeBlocks?: string[],
+    whenModifiedCode?: string[],
   ): Promise<ReviewPrompt> {
     const fileDataList = changedFiles
       .filter((f) => f.status !== "deleted" && f.filename)
@@ -183,10 +179,8 @@ ${specsSection}
         // 根据文件过滤 specs，只注入与当前文件匹配的规则
         const fileSpecs = this.filterSpecsForFile(specs, filename);
 
-        // 从全局 filterCodeBlocks 配置中解析代码结构过滤类型（按文件 status 过滤）
-        const codeBlockTypes = filterCodeBlocks
-          ? extractCodeBlockTypes(filterCodeBlocks, (file.status as IncludeStatusPrefix) ?? "added")
-          : [];
+        // 从全局 whenModifiedCode 配置中解析代码结构过滤类型
+        const codeBlockTypes = whenModifiedCode ? extractCodeBlockTypes(whenModifiedCode) : [];
 
         // 构建带行号的内容：有 code-* 过滤时只输出匹配的代码块范围
         let linesWithNumbers: string;

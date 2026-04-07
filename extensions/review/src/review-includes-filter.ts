@@ -22,7 +22,7 @@ import micromatch from "micromatch";
 export type IncludeStatusPrefix = "added" | "modified" | "deleted";
 
 /**
- * 代码结构类型，用于 filterCodeBlocks 配置
+ * 代码结构类型，用于 whenModifiedCode 配置
  */
 export type CodeBlockType = "function" | "class" | "interface" | "type" | "method";
 
@@ -181,34 +181,15 @@ export function extractGlobsFromIncludes(includes: string[]): string[] {
 }
 
 /**
- * 从 filterCodeBlocks 配置中解析代码结构过滤类型。
- *
- * 支持两种格式：
- * - `"added|code-function"` — 仅对 added 文件过滤函数
- * - `"function"` — 不限 status，始终过滤函数
- *
- * 只返回匹配指定 status 的类型（默认 added）；无 status 前缀的条目始终包含。
+ * 从 whenModifiedCode 配置中解析代码结构过滤类型。
+ * 只接受简单的类型名称，如 "function"、"class"、"interface"、"type"、"method"
  */
-export function extractCodeBlockTypes(
-  filterCodeBlocks: string[],
-  status: IncludeStatusPrefix = "added",
-): CodeBlockType[] {
+export function extractCodeBlockTypes(whenModifiedCode: string[]): CodeBlockType[] {
   const types = new Set<CodeBlockType>();
-  for (const entry of filterCodeBlocks) {
-    const separatorIndex = entry.indexOf("|");
-    if (separatorIndex === -1) {
-      if ((CODE_BLOCK_TYPES as string[]).includes(entry)) {
-        types.add(entry as CodeBlockType);
-      }
-    } else {
-      const prefix = entry.slice(0, separatorIndex).trim().toLowerCase();
-      const rest = entry.slice(separatorIndex + 1).trim();
-      const entryStatus = STATUS_ALIAS[prefix] as IncludeStatusPrefix | undefined;
-      if (entryStatus !== status) continue;
-      const type = rest.startsWith("code-") ? rest.slice("code-".length) : rest;
-      if ((CODE_BLOCK_TYPES as string[]).includes(type)) {
-        types.add(type as CodeBlockType);
-      }
+  for (const entry of whenModifiedCode) {
+    const trimmed = entry.trim();
+    if ((CODE_BLOCK_TYPES as string[]).includes(trimmed)) {
+      types.add(trimmed as CodeBlockType);
     }
   }
   return [...types];

@@ -147,7 +147,7 @@ export class ReviewService {
       fileContents,
       commits,
       existingResultModel?.result ?? null,
-      context.filterCodeBlocks,
+      context.whenModifiedCode,
     );
     const result = await this.runLLMReview(llmMode, reviewPrompt, {
       verbose,

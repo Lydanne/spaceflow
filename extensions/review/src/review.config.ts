@@ -47,7 +47,11 @@ export interface ReviewOptions {
   references?: string[];
   verbose?: VerboseLevel;
   includes?: string[];
-  filterCodeBlocks?: string[];
+  /**
+   * 代码结构过滤配置，指定在代码审查时要关注的代码结构类型
+   * 支持格式："function"、"class"、"interface"、"type"、"method"
+   */
+  whenModifiedCode?: string[];
   llmMode?: LLMMode;
   files?: string[];
   commits?: string[];
@@ -109,7 +113,7 @@ export const reviewSchema = () =>
     references: z.array(z.string()).optional(),
     llmMode: llmModeSchema.default("openai").optional(),
     includes: z.array(z.string()).optional(),
-    filterCodeBlocks: z.array(z.string()).optional(),
+    whenModifiedCode: z.array(z.string()).optional(),
     rules: z.record(z.string(), severitySchema).optional(),
     verifyFixes: z.boolean().default(false),
     verifyFixesConcurrency: z.number().default(10).optional(),

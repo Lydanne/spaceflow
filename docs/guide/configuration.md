@@ -103,7 +103,7 @@ AI 代码审查相关配置（需安装 `@spaceflow/review`）。
   "review": {
     "references": ["./references"],
     "includes": ["**/*.ts", "!**/*.spec.*", "!**/*.config.*"],
-    "filterCodeBlocks": ["added|code-function", "added|code-class"],
+    "whenModifiedCode": ["function", "class"],
     "duplicateWorkflowResolved": "delete",
     "generateDescription": true,
     "autoUpdatePrTitle": true,
@@ -122,7 +122,7 @@ AI 代码审查相关配置（需安装 `@spaceflow/review`）。
 | ------------------------- | ---------- | ------------- | ------------------------------------------------------------ |
 | `references`              | `string[]` | `[]`          | 审查规范来源，支持本地路径和远程仓库 URL                     |
 | `includes`                | `string[]` | `["**/*"]`    | 审查文件匹配模式（glob），支持 `added\|`、`modified\|`、`deleted\|` 前缀 |
-| `filterCodeBlocks`        | `string[]` | `[]`          | 代码结构过滤，如 `added\|code-function`、`code-class`         |
+| `whenModifiedCode`        | `string[]` | `[]`           | 代码结构过滤，如 `function`、`class`、`interface`  |
 | `duplicateWorkflowResolved` | `"off" \| "skip" \| "delete"` | `"delete"` | 重复 workflow 处理策略：禁用/跳过/删除旧评论               |
 | `generateDescription`   | `boolean`  | `false`       | 是否自动生成 PR 描述                                         |
 | `autoUpdatePrTitle`       | `boolean`  | `false`       | 是否自动更新 PR 标题                                         |
