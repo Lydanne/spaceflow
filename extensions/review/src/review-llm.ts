@@ -159,6 +159,7 @@ ${specsSection}
     commits: PullRequestCommit[],
     existingResult?: ReviewResult | null,
     whenModifiedCode?: string[],
+    verbose?: VerboseLevel,
   ): Promise<ReviewPrompt> {
     const fileDataList = changedFiles
       .filter((f) => f.status !== "deleted" && f.filename)
@@ -172,7 +173,7 @@ ${specsSection}
         return { filename, file, contentLines, commitsSection };
       });
 
-    const filePrompts: FileReviewPrompt[] = await Promise.all(
+    const filePrompts: (FileReviewPrompt | null)[] = await Promise.all(
       fileDataList.map(async ({ filename, file, contentLines, commitsSection }) => {
         const fileDirectoryInfo = await this.getFileDirectoryInfo(filename);
 
@@ -188,6 +189,15 @@ ${specsSection}
           linesWithNumbers = "(无法获取内容)";
         } else if (codeBlockTypes.length > 0) {
           const visibleRanges = extractCodeBlocks(contentLines, codeBlockTypes);
+          // 如果配置了 whenModifiedCode 但没有匹配的代码块，跳过这个文件
+          if (visibleRanges.length === 0) {
+            if (shouldLog(verbose, 2)) {
+              console.log(
+                `[buildReviewPrompt] ${filename}: 没有匹配的 ${codeBlockTypes.join(", ")} 代码块，跳过审查`,
+              );
+            }
+            return null;
+          }
           linesWithNumbers = buildLinesWithNumbers(contentLines, visibleRanges);
         } else {
           linesWithNumbers = buildLinesWithNumbers(contentLines);
@@ -247,7 +257,9 @@ ${previousReviewSection}`;
       }),
     );
 
-    return { filePrompts };
+    // 过滤掉 null 值（跳过的文件）
+    const validFilePrompts = filePrompts.filter((fp): fp is FileReviewPrompt => fp !== null);
+    return { filePrompts: validFilePrompts };
   }
 
   async runLLMReview(
