@@ -4,12 +4,32 @@ import micromatch from "micromatch";
  * includes 模式中的变更类型前缀
  *
  * 语法：`<status>|<glob>`，例如：
- * - `added|*\/**\/*.ts`   → 仅匹配新增文件
- * - `modified|*\/**\/*.ts` → 仅匹配修改文件
- * - `deleted|*\/**\/*.ts`  → 仅匹配删除文件
- * - `*\/**\/*.ts`          → 不限变更类型（原有行为）
+ * - `added|*\/**\/*.ts`          → 仅匹配新增文件
+ * - `modified|*\/**\/*.ts`       → 仅匹配修改文件
+ * - `deleted|*\/**\/*.ts`        → 仅匹配删除文件
+ * - `*\/**\/*.ts`               → 不限变更类型（原有行为）
+ *
+ * 代码结构过滤语法：`added|code-<type>`，例如：
+ * - `added|code-function`  → 只审查新增代码中的函数
+ * - `added|code-class`     → 只审查新增代码中的类
+ * - `added|code-interface` → 只审查新增代码中的接口
+ * - `added|code-type`      → 只审查新增代码中的类型别名
+ * - `added|code-method`    → 只审查新增代码中的方法
  */
 export type IncludeStatusPrefix = "added" | "modified" | "deleted";
+
+/**
+ * 代码结构类型，用于 added|code-* 语法
+ */
+export type CodeBlockType = "function" | "class" | "interface" | "type" | "method";
+
+export const CODE_BLOCK_TYPES: CodeBlockType[] = [
+  "function",
+  "class",
+  "interface",
+  "type",
+  "method",
+];
 
 /** status 值到前缀的映射（兼容 GitHub/GitLab/Gitea 各平台） */
 const STATUS_ALIAS: Record<string, IncludeStatusPrefix> = {
@@ -25,8 +45,13 @@ const STATUS_ALIAS: Record<string, IncludeStatusPrefix> = {
 export interface ParsedIncludePattern {
   /** 变更类型前缀，undefined 表示不限类型 */
   status: IncludeStatusPrefix | undefined;
-  /** 去掉前缀后的 glob 模式 */
+  /** 去掉前缀后的 glob 模式；当 codeBlock 存在时此字段为空字符串 */
   glob: string;
+  /**
+   * 代码结构类型，仅当模式为 `added|code-<type>` 时有值。
+   * 表示只从新增代码中提取对应结构（函数/类/接口/类型/方法）送审。
+   */
+  codeBlock?: CodeBlockType;
 }
 
 /**
@@ -51,6 +76,15 @@ export function parseIncludePattern(pattern: string): ParsedIncludePattern {
     // 前缀无法识别（如 extglob 中的 `|`），当作普通 glob 处理
     return { status: undefined, glob: pattern };
   }
+
+  // 检测 code-<type> 代码结构语法（当前只对 added 状态有意义）
+  if (glob.startsWith("code-")) {
+    const codeType = glob.slice("code-".length) as CodeBlockType;
+    if ((CODE_BLOCK_TYPES as string[]).includes(codeType)) {
+      return { status, glob: "", codeBlock: codeType };
+    }
+  }
+
   return { status, glob };
 }
 
@@ -138,7 +172,26 @@ export function filterFilesByIncludes<T extends FileWithStatus>(
 /**
  * 从 includes 模式列表中提取纯 glob（用于 commit 过滤，commit 没有 status 概念）。
  * 带 status 前缀的模式会去掉前缀，仅保留 glob 部分。
+ * code-* 模式不产生 glob，会被过滤掉。
  */
 export function extractGlobsFromIncludes(includes: string[]): string[] {
-  return includes.map((p) => parseIncludePattern(p).glob);
+  return includes.map((p) => parseIncludePattern(p).glob).filter((g) => g.length > 0);
+}
+
+/**
+ * 从 includes 模式列表中提取 code-* 代码结构过滤类型。
+ * 只返回指定 status 的代码结构类型（默认收集 added）。
+ */
+export function extractCodeBlockTypes(
+  includes: string[],
+  status: IncludeStatusPrefix = "added",
+): CodeBlockType[] {
+  const types = new Set<CodeBlockType>();
+  for (const pattern of includes) {
+    const parsed = parseIncludePattern(pattern);
+    if (parsed.codeBlock && parsed.status === status) {
+      types.add(parsed.codeBlock);
+    }
+  }
+  return [...types];
 }

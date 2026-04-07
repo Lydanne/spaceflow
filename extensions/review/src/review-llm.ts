@@ -23,7 +23,8 @@ import { readdir } from "fs/promises";
 import { dirname, extname } from "path";
 import micromatch from "micromatch";
 import type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
-import { buildLinesWithNumbers, buildCommitsSection } from "./utils/review-llm";
+import { buildLinesWithNumbers, buildCommitsSection, extractCodeBlocks } from "./utils/review-llm";
+import { extractCodeBlockTypes } from "./review-includes-filter";
 
 export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
 
@@ -161,21 +162,33 @@ ${specsSection}
         const filename = file.filename!;
         const contentLines = fileContents.get(filename);
         if (!contentLines) {
-          return {
-            filename,
-            file,
-            linesWithNumbers: "(无法获取内容)",
-            commitsSection: "- 无相关 commits",
-          };
+          return { filename, file, contentLines: null, commitsSection: "- 无相关 commits" };
         }
-        const linesWithNumbers = buildLinesWithNumbers(contentLines);
         const commitsSection = buildCommitsSection(contentLines, commits);
-        return { filename, file, linesWithNumbers, commitsSection };
+        return { filename, file, contentLines, commitsSection };
       });
 
     const filePrompts: FileReviewPrompt[] = await Promise.all(
-      fileDataList.map(async ({ filename, file, linesWithNumbers, commitsSection }) => {
+      fileDataList.map(async ({ filename, file, contentLines, commitsSection }) => {
         const fileDirectoryInfo = await this.getFileDirectoryInfo(filename);
+
+        // 根据文件过滤 specs，只注入与当前文件匹配的规则
+        const fileSpecs = this.filterSpecsForFile(specs, filename);
+
+        // 收集该文件对应 specs 的 code-* 过滤类型
+        const allSpecIncludes = fileSpecs.flatMap((s) => s.includes);
+        const codeBlockTypes = extractCodeBlockTypes(allSpecIncludes);
+
+        // 构建带行号的内容：有 code-* 过滤时只输出匹配的代码块范围
+        let linesWithNumbers: string;
+        if (!contentLines) {
+          linesWithNumbers = "(无法获取内容)";
+        } else if (codeBlockTypes.length > 0) {
+          const visibleRanges = extractCodeBlocks(contentLines, codeBlockTypes);
+          linesWithNumbers = buildLinesWithNumbers(contentLines, visibleRanges);
+        } else {
+          linesWithNumbers = buildLinesWithNumbers(contentLines);
+        }
 
         // 获取该文件上一次的审查结果
         const existingFileSummary = existingResult?.summary?.find((s) => s.file === filename);
@@ -224,8 +237,6 @@ ${fileDirectoryInfo}
 
 ${previousReviewSection}`;
 
-        // 根据文件过滤 specs，只注入与当前文件匹配的规则
-        const fileSpecs = this.filterSpecsForFile(specs, filename);
         const specsSection = this.reviewSpecService.buildSpecsSection(fileSpecs);
         const systemPrompt = this.buildSystemPrompt(specsSection);
 
