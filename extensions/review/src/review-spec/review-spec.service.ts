@@ -13,6 +13,7 @@ import { homedir } from "os";
 import { execSync } from "child_process";
 import micromatch from "micromatch";
 import { ReviewSpec, ReviewRule, RuleExample, Severity } from "./types";
+import { extractGlobsFromIncludes } from "../review-includes-filter";
 
 /** 远程规则缓存 TTL（毫秒），默认 5 分钟 */
 const REMOTE_SPEC_CACHE_TTL = 5 * 60 * 1000;
@@ -69,7 +70,23 @@ export class ReviewSpecService {
       }
     }
 
-    return specs.filter((spec) => spec.extensions.some((ext) => changedExtensions.has(ext)));
+    console.log(
+      `[filterApplicableSpecs] changedExtensions=${JSON.stringify([...changedExtensions])}, specs count=${specs.length}`,
+    );
+    const result = specs.filter((spec) => {
+      const matches = spec.extensions.some((ext) => changedExtensions.has(ext));
+      if (!matches) {
+        console.log(
+          `[filterApplicableSpecs] spec ${spec.filename} (ext: ${JSON.stringify(spec.extensions)}) NOT matched`,
+        );
+      } else {
+        console.log(
+          `[filterApplicableSpecs] spec ${spec.filename} (ext: ${JSON.stringify(spec.extensions)}) MATCHED`,
+        );
+      }
+      return matches;
+    });
+    return result;
   }
 
   async loadReviewSpecs(specDir: string): Promise<ReviewSpec[]> {
@@ -524,8 +541,10 @@ export class ReviewSpecService {
         return true;
       }
 
-      // 检查文件是否匹配 includes 模式
-      const matches = micromatch.isMatch(issue.file, includes, { matchBase: true });
+      // 检查文件是否匹配 includes 模式（转换为纯 glob，避免 status| 前缀和 code-* 空串传入 micromatch）
+      const globs = extractGlobsFromIncludes(includes);
+      if (globs.length === 0) return true;
+      const matches = micromatch.isMatch(issue.file, globs, { matchBase: true });
       if (!matches) {
         // console.log(`   Issue [${issue.ruleId}] 在文件 ${issue.file} 不匹配 includes 模式，跳过`);
       }
@@ -638,8 +657,10 @@ export class ReviewSpecService {
         if (scoped.includes.length === 0) {
           return true;
         }
-        // 使用 micromatch 检查文件是否匹配 includes 模式
-        return issueFile && micromatch.isMatch(issueFile, scoped.includes, { matchBase: true });
+        // 使用 micromatch 检查文件是否匹配 includes 模式（转换为纯 glob）
+        const globs = extractGlobsFromIncludes(scoped.includes);
+        if (globs.length === 0) return true;
+        return issueFile && micromatch.isMatch(issueFile, globs, { matchBase: true });
       });
 
       if (matched) {

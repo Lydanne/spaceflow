@@ -1134,13 +1134,23 @@ describe("ReviewService", () => {
       expect(result[0].author.login).toBe("GitUser");
     });
 
+    it("should mark invalid when existing author but ------- commit hash", async () => {
+      const issues = [
+        { file: "test.ts", line: "1", commit: "-------", author: { id: "1", login: "dev1" } },
+      ];
+      const result = await (service as any).fillIssueAuthors(issues, [], "o", "r");
+      expect(result[0].commit).toBeUndefined();
+      expect(result[0].valid).toBe("false");
+    });
+
     it("should handle issues with ------- commit hash", async () => {
       const issues = [{ file: "test.ts", line: "1", commit: "-------" }];
       const commits = [
         { sha: "abc1234567890", author: { id: 1, login: "dev1" }, commit: { author: {} } },
       ];
       const result = await (service as any).fillIssueAuthors(issues, commits, "o", "r");
-      expect(result[0].author.login).toBe("dev1");
+      expect(result[0].commit).toBeUndefined();
+      expect(result[0].valid).toBe("false");
     });
   });
 

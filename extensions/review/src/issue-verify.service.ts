@@ -3,7 +3,6 @@ import {
   type LLMMode,
   type VerboseLevel,
   shouldLog,
-  type LlmJsonPutSchema,
   LlmJsonPut,
   parallel,
 } from "@spaceflow/core";
@@ -15,6 +14,7 @@ import {
   FileContentsMap,
   FileContentLine,
 } from "./review-spec";
+import { VERIFY_SCHEMA, buildIssueVerifyPrompt } from "./prompt";
 
 interface VerifyResult {
   fixed: boolean;
@@ -24,26 +24,6 @@ interface VerifyResult {
 
 const TRUE = "true";
 const FALSE = "false";
-
-const VERIFY_SCHEMA: LlmJsonPutSchema = {
-  type: "object",
-  properties: {
-    fixed: {
-      type: "boolean",
-      description: "问题是否已被修复",
-    },
-    valid: {
-      type: "boolean",
-      description: "问题是否有效，有效的条件就是你需要看看代码是否符合规范",
-    },
-    reason: {
-      type: "string",
-      description: "判断依据，说明为什么认为问题已修复或仍存在",
-    },
-  },
-  required: ["fixed", "valid", "reason"],
-  additionalProperties: false,
-};
 
 export class IssueVerifyService {
   constructor(
@@ -138,7 +118,7 @@ export class IssueVerifyService {
       toVerify,
       async ({ issue, fileContent, ruleInfo }) =>
         this.verifySingleIssue(issue, fileContent, ruleInfo, llmMode, llmJsonPut, verbose),
-      ({ issue }) => `${issue.file}:${issue.line}`,
+      ({ issue }) => `${issue.file}:${issue.line}:${issue.ruleId}`,
     );
 
     for (const result of results) {
@@ -147,7 +127,7 @@ export class IssueVerifyService {
       } else {
         // 失败时保留原始 issue
         const originalItem = toVerify.find(
-          (item) => `${item.issue.file}:${item.issue.line}` === result.id,
+          (item) => `${item.issue.file}:${item.issue.line}:${item.issue.ruleId}` === result.id,
         );
         if (originalItem) {
           verifiedIssues.push(originalItem.issue);
@@ -175,7 +155,13 @@ export class IssueVerifyService {
     llmJsonPut: LlmJsonPut<VerifyResult>,
     verbose?: VerboseLevel,
   ): Promise<ReviewIssue> {
-    const verifyPrompt = this.buildVerifyPrompt(issue, fileContent, ruleInfo);
+    const specsSection = ruleInfo ? this.reviewSpecService.buildSpecsSection([ruleInfo.spec]) : "";
+    const verifyPrompt = buildIssueVerifyPrompt({
+      issue,
+      fileContent,
+      ruleInfo,
+      specsSection,
+    });
 
     try {
       const stream = this.llmProxyService.chatStream(
@@ -239,6 +225,7 @@ export class IssueVerifyService {
   }
 
   /**
+   * @deprecated 使用 prompt/issue-verify.ts 中的 buildIssueVerifyPrompt
    * 构建验证单个 issue 是否已修复的 prompt
    */
   protected buildVerifyPrompt(
@@ -246,64 +233,13 @@ export class IssueVerifyService {
     fileContent: FileContentLine[],
     ruleInfo: { rule: ReviewRule; spec: ReviewSpec } | null,
   ): { systemPrompt: string; userPrompt: string } {
-    const padWidth = String(fileContent.length).length;
-    const linesWithNumbers = fileContent
-      .map(([, line], index) => `${String(index + 1).padStart(padWidth)}| ${line}`)
-      .join("\n");
+    const specsSection = ruleInfo ? this.reviewSpecService.buildSpecsSection([ruleInfo.spec]) : "";
 
-    const systemPrompt = `你是一个代码审查专家。你的任务是判断之前发现的一个代码问题：
-1. 是否有效（是否真的违反了规则）
-2. 是否已经被修复
-
-请仔细分析当前的代码内容。
-
-## 输出要求
-- valid: 布尔值，true 表示问题有效（代码确实违反了规则），false 表示问题无效（误报）
-- fixed: 布尔值，true 表示问题已经被修复，false 表示问题仍然存在
-- reason: 判断依据
-
-## 判断标准
-
-### valid 判断
-- 根据规则 ID 和问题描述，判断代码是否真的违反了该规则
-- 如果问题描述与实际代码不符，valid 为 false
-- 如果规则不适用于该代码场景，valid 为 false
-
-### fixed 判断
-- 只有当问题所在的代码已被修改，且修改后的代码不再违反规则时，fixed 才为 true
-- 如果问题所在的代码仍然存在且仍违反规则，fixed 必须为 false
-- 如果代码行号发生变化但问题本质仍存在，fixed 必须为 false
-
-## 重要提醒
-- valid=false 时，fixed 的值无意义（无效问题无需修复）
-- 请确保 valid 和 fixed 的值与 reason 的描述一致！`;
-
-    // 构建规则定义部分
-    let ruleSection = "";
-    if (ruleInfo) {
-      ruleSection = this.reviewSpecService.buildSpecsSection([ruleInfo.spec]);
-    }
-
-    const userPrompt = `## 规则定义
-
-${ruleSection}
-
-## 之前发现的问题
-
-- **文件**: ${issue.file}
-- **行号**: ${issue.line}
-- **规则**: ${issue.ruleId} (来自 ${issue.specFile})
-- **问题描述**: ${issue.reason}
-${issue.suggestion ? `- **原建议**: ${issue.suggestion}` : ""}
-
-## 当前文件内容
-
-\`\`\`
-${linesWithNumbers}
-\`\`\`
-
-请判断这个问题是否有效，以及是否已经被修复。`;
-
-    return { systemPrompt, userPrompt };
+    return buildIssueVerifyPrompt({
+      issue,
+      fileContent,
+      ruleInfo,
+      specsSection,
+    });
   }
 }
