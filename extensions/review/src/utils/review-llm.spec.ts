@@ -31,22 +31,18 @@ describe("utils/review-llm", () => {
 
     it("只指定首行时，末尾被忽略区间产生 ignore 占位", () => {
       const result = buildLinesWithNumbers(lines, [[1, 1]]);
-      expect(result).toBe(
-        "abc1234 1| line one\n...... ..| ignore 2-3 code",
-      );
+      expect(result).toBe("abc1234 1| line one\n....... ignore 2-3 line .......");
     });
 
     it("只指定末行时，开头被忽略区间产生 ignore 占位", () => {
       const result = buildLinesWithNumbers(lines, [[3, 3]]);
-      expect(result).toBe(
-        "...... ..| ignore 1-2 code\nabc1234 3| line three",
-      );
+      expect(result).toBe("....... ignore 1-2 line .......\nabc1234 3| line three");
     });
 
     it("只指定中间行时，前后均产生 ignore 占位", () => {
       const result = buildLinesWithNumbers(lines, [[2, 2]]);
       expect(result).toBe(
-        "...... ..| ignore 1-1 code\n------- 2| line two\n...... ..| ignore 3-3 code",
+        "....... ignore 1-1 line .......\n------- 2| line two\n....... ignore 3-3 line .......",
       );
     });
 
@@ -58,14 +54,18 @@ describe("utils/review-llm", () => {
         ["-------", "d"],
         ["abc1234", "e"],
       ];
-      const result = buildLinesWithNumbers(fiveLines, [[1, 1], [5, 5]]);
-      expect(result).toBe(
-        "abc1234 1| a\n...... ..| ignore 2-4 code\nabc1234 5| e",
-      );
+      const result = buildLinesWithNumbers(fiveLines, [
+        [1, 1],
+        [5, 5],
+      ]);
+      expect(result).toBe("abc1234 1| a\n....... ignore 2-4 line .......\nabc1234 5| e");
     });
 
     it("重叠的 visibleRanges 合并后不产生 ignore 占位", () => {
-      const result = buildLinesWithNumbers(lines, [[1, 2], [2, 3]]);
+      const result = buildLinesWithNumbers(lines, [
+        [1, 2],
+        [2, 3],
+      ]);
       expect(result).not.toContain("ignore");
       expect(result.split("\n")).toHaveLength(3);
     });
@@ -77,9 +77,12 @@ describe("utils/review-llm", () => {
     });
 
     it("visibleRanges 无序时按起始行号排序后正常输出", () => {
-      const result = buildLinesWithNumbers(lines, [[3, 3], [1, 1]]);
+      const result = buildLinesWithNumbers(lines, [
+        [3, 3],
+        [1, 1],
+      ]);
       expect(result).toBe(
-        "abc1234 1| line one\n...... ..| ignore 2-2 code\nabc1234 3| line three",
+        "abc1234 1| line one\n....... ignore 2-2 line .......\nabc1234 3| line three",
       );
     });
   });
@@ -117,15 +120,15 @@ describe("utils/review-llm", () => {
     });
 
     it("提取 export function", () => {
-      expect(
-        extractCodeBlocks([["abc1234", "export function hello() { }"]], ["function"]),
-      ).toEqual([[1, 1]]);
+      expect(extractCodeBlocks([["abc1234", "export function hello() { }"]], ["function"])).toEqual(
+        [[1, 1]],
+      );
     });
 
     it("提取 async function", () => {
-      expect(
-        extractCodeBlocks([["abc1234", "async function load() { }"]], ["function"]),
-      ).toEqual([[1, 1]]);
+      expect(extractCodeBlocks([["abc1234", "async function load() { }"]], ["function"])).toEqual([
+        [1, 1],
+      ]);
     });
 
     it("上下文行中的 function 不被提取，只提取新增行中的", () => {
@@ -148,9 +151,7 @@ describe("utils/review-llm", () => {
     });
 
     it("提取 export class", () => {
-      expect(
-        extractCodeBlocks([["abc1234", "export class Bar { }"]], ["class"]),
-      ).toEqual([[1, 1]]);
+      expect(extractCodeBlocks([["abc1234", "export class Bar { }"]], ["class"])).toEqual([[1, 1]]);
     });
 
     it("提取多行 interface", () => {
@@ -169,9 +170,9 @@ describe("utils/review-llm", () => {
     });
 
     it("提取泛型 type（含 <）", () => {
-      expect(
-        extractCodeBlocks([["abc1234", "type Result<T> = { data: T };"]], ["type"]),
-      ).toEqual([[1, 1]]);
+      expect(extractCodeBlocks([["abc1234", "type Result<T> = { data: T };"]], ["type"])).toEqual([
+        [1, 1],
+      ]);
     });
 
     it("同时提取 function 和 class，中间上下文行不影响结果", () => {
@@ -180,7 +181,10 @@ describe("utils/review-llm", () => {
         ["-------", "const x = 1;"],
         ["abc1234", "class Bar { }"],
       ];
-      expect(extractCodeBlocks(lines, ["function", "class"])).toEqual([[1, 1], [3, 3]]);
+      expect(extractCodeBlocks(lines, ["function", "class"])).toEqual([
+        [1, 1],
+        [3, 3],
+      ]);
     });
 
     it("相邻代码块合并为一个范围", () => {

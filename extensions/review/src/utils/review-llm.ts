@@ -43,7 +43,7 @@ export function buildLinesWithNumbers(
 
     // 被忽略的前缀区间
     if (clampedStart > prevEnd + 1) {
-      output.push(`...... ..| ignore ${prevEnd + 1}-${clampedStart - 1} code`);
+      output.push(`....... ignore ${prevEnd + 1}-${clampedStart - 1} line .......`);
     }
 
     // 输出可见行
@@ -58,7 +58,7 @@ export function buildLinesWithNumbers(
 
   // 被忽略的末尾区间
   if (prevEnd < contentLines.length) {
-    output.push(`...... ..| ignore ${prevEnd + 1}-${contentLines.length} code`);
+    output.push(`....... ignore ${prevEnd + 1}-${contentLines.length} line .......`);
   }
 
   return output.join("\n");
