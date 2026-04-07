@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.32.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.31.0...@spaceflow/shell@0.32.0) (2026-04-07)
+
+### 新特性
+
+* **review:** 新增 failOnIssues 选项,支持根据未解决问题状态控制工作流退出 ([6139538](https://github.com/Lydanne/spaceflow/commit/6139538008af8247ffccdf5aad94d6fa980b73de))
+* **review:** 新增 PullRequestModel 封装 PR 数据访问层 ([3292f1f](https://github.com/Lydanne/spaceflow/commit/3292f1f7d0713ffbb1cdac9e3d3660a013a16fe1))
+* **review:** 新增 ReviewContext 和 ReviewIssueFilter 核心模块 ([dd3c2ce](https://github.com/Lydanne/spaceflow/commit/dd3c2ce107088a17255c19ee1becfa4090d84be6))
+
+### 修复BUG
+
+* **review:** 优化 merge commit 过滤逻辑 ([7c5bed6](https://github.com/Lydanne/spaceflow/commit/7c5bed66c193fa0368f5e32741995f4252576517))
+* **review:** 修正 issue 统计中 resolved 状态的重复计数问题 ([b61f95e](https://github.com/Lydanne/spaceflow/commit/b61f95e92300dd9c508f3063b3174df1c10a90ad))
+
+### 代码重构
+
+* **review:** 优化 PR Review 提交流程,避免重复创建同轮次评论 ([c6977e0](https://github.com/Lydanne/spaceflow/commit/c6977e0ef4497aa3100281b76281e97dc313ab1a))
+* **review:** 优化 PullRequestModel 缓存返回和依赖注入 ([9537a58](https://github.com/Lydanne/spaceflow/commit/9537a587f7ccc900de589aa38bc45a05d73f3f8f))
+* **review:** 优化参数传递和代码组织 ([a1c165e](https://github.com/Lydanne/spaceflow/commit/a1c165ed6a804d6c683bada65f0eafd705d02dac))
+* **review:** 提取 LLM 审查相关类型和工具函数到独立模块 ([78cff32](https://github.com/Lydanne/spaceflow/commit/78cff327459c377c57486b4322c5a29f9bedf162))
+* **review:** 提取公共工具函数并优化代码复用 ([936bd6f](https://github.com/Lydanne/spaceflow/commit/936bd6f5e1b70c397696ed67ec64b77f63445eb1))
+* **review:** 提取自动批准消息构建逻辑并支持 @PR 作者通知 ([0e6ad66](https://github.com/Lydanne/spaceflow/commit/0e6ad66b3d38d811ecbfb1da2a0426b2eb21b6fd))
+* **review:** 新增 includes 模式的变更类型前缀语法支持 ([d0aacad](https://github.com/Lydanne/spaceflow/commit/d0aacada1f3144bac2934d50d547df17f4e9d305))
+* **review:** 新增 ReviewResultModel 封装审查结果数据访问层 ([a4be34a](https://github.com/Lydanne/spaceflow/commit/a4be34aaa1f722ea0748efb67bd4999bff08b769))
+* **review:** 重构类型定义位置并导出公共常量 ([0293f02](https://github.com/Lydanne/spaceflow/commit/0293f0220d4b7604b44d53c3fa547ca01961cc2d))
+* **tsconfig:** 重命名 tsconfig.skill.json 为 tsconfig.extension.json ([16c80f9](https://github.com/Lydanne/spaceflow/commit/16c80f98ccffafeac06261f94341298523cebd93))
+
+### 文档更新
+
+* **review:** 更新文档,补充 includes 变更类型过滤和 failOnIssues 选项说明 ([6389048](https://github.com/Lydanne/spaceflow/commit/63890487e330909e4e30c392de723c052ee5fa23))
+
+### 其他修改
+
+* **core:** released version 0.30.0 [no ci] ([7a94a63](https://github.com/Lydanne/spaceflow/commit/7a94a632cd246d3d58c0e8cb85dd1c361ed39b6c))
+* **publish:** released version 0.54.0 [no ci] ([64b467d](https://github.com/Lydanne/spaceflow/commit/64b467d663caa2ec5b793f609c01f150ab416bea))
+* **review-summary:** released version 0.44.0 [no ci] ([e3f943e](https://github.com/Lydanne/spaceflow/commit/e3f943e876a1ff0f4db61c7113c8b9c145e6e5c8))
+* **review-summary:** released version 0.45.0 [no ci] ([640e71d](https://github.com/Lydanne/spaceflow/commit/640e71dd6da42ff055fc925767418f9ba742c8b1))
+* **review:** released version 0.76.0 [no ci] ([e2fa897](https://github.com/Lydanne/spaceflow/commit/e2fa8974268d98765410afa9fad7d15e0bdb82ad))
+* **review:** released version 0.77.0 [no ci] ([9794cc4](https://github.com/Lydanne/spaceflow/commit/9794cc42faf1a773406171f4c3dc4f556889bc93))
+* **scripts:** released version 0.32.0 [no ci] ([7871aa9](https://github.com/Lydanne/spaceflow/commit/7871aa94a7f1227d6f09fc43ea69fb7d4e193ec4))
+
 ## [0.31.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@0.30.0...@spaceflow/shell@0.31.0) (2026-04-03)
 
 ### 修复BUG
