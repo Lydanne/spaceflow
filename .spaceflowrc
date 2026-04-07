@@ -7,9 +7,9 @@
   "review": {
     "references": ["./references"],
     "includes": [
-      "*/**/*.ts",
-      "!*/**/*.spec.*",
-      "!*/**/*.config.*"
+      "**/*.ts",
+      "!**/*.spec.*",
+      "!**/*.config.*"
     ],
     "filterCodeBlocks": [
       "added|code-function",
