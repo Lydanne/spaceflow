@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.47.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.46.0...@spaceflow/review-summary@0.47.0) (2026-04-07)
+
+### 新特性
+
+* **review:** 新增 code-* 代码结构过滤语法,支持按函数/类/接口等类型审查新增代码 ([f3b17d3](https://github.com/Lydanne/spaceflow/commit/f3b17d36c6360269a2fd4075311ae764e85cf428))
+
+### 代码重构
+
+* **ci:** 将 PR 审查工作流日志级别从 -vv 提升至 -vvv ([43bd563](https://github.com/Lydanne/spaceflow/commit/43bd5632dbd7151e11977520ca0634fdbc393279))
+* **review:** 优化 syncReactionsToIssues 中的 issue 匹配逻辑,优先使用 issue-key 精确匹配并回退到 path+position 匹配 ([eb8ea47](https://github.com/Lydanne/spaceflow/commit/eb8ea47c56466aa25d58358a09f1e0c9094aa28d))
+* **review:** 修改 buildLinesWithNumbers 忽略占位符格式,从 `...... ..| ignore X-Y code` 改为 `....... ignore X-Y line .......` ([a45dc1a](https://github.com/Lydanne/spaceflow/commit/a45dc1a5b92d50f75682782cec24b0100732e434))
+* **review:** 将 code-* 语法从 includes 迁移至独立 filterCodeBlocks 配置项 ([ed4b921](https://github.com/Lydanne/spaceflow/commit/ed4b9217a563d992b76d1e55af21f9b364329737))
+* **review:** 将 filterCodeBlocks 重命名为 whenModifiedCode,简化代码结构过滤语法 ([951c570](https://github.com/Lydanne/spaceflow/commit/951c570ceb7c04d25265d043c3948687bbb230f1))
+* **review:** 将 prompt 构建逻辑提取到独立的 prompt 模块,新增类型验证和 schema 定义 ([5f21356](https://github.com/Lydanne/spaceflow/commit/5f21356964ad4f08004e229ac7bd538c0301b37d))
+* **review:** 将 review-pr-comment-utils 重构为 utils/review-pr-comment,新增完整测试覆盖 ([29041b6](https://github.com/Lydanne/spaceflow/commit/29041b635e3a6ecbd2b2ae49ad1b657aa1a66e9c))
+* **review:** 将 skipDuplicateWorkflow 重构为 duplicateWorkflowResolved,支持 skip/delete 两种处理模式 ([37238f9](https://github.com/Lydanne/spaceflow/commit/37238f9ae8ed38c67f46acb963e3ebb795c0ef71))
+* **review:** 将无效 commit hash 的 issue 标记为 invalid 并清除 commit 字段,移除 code-* 前缀语法支持 ([0a89136](https://github.com/Lydanne/spaceflow/commit/0a89136b32cf49a70dbdfa26683e97ee13dc207e))
+* **review:** 提前检测无效 commit hash,在 fillIssueAuthors 中对已有 author 的 issue 也进行校验 ([c166496](https://github.com/Lydanne/spaceflow/commit/c1664966066bca032bd936b6c1d2c8f320949f9c))
+* **review:** 新增 systemRules 静态规则系统,支持 maxLinesPerFile 限制并跳过超限文件的 LLM 审查 ([3721d0f](https://github.com/Lydanne/spaceflow/commit/3721d0f46d40f71230aceb060350682a3d5642d7))
+* **review:** 新增 whenModifiedCode 过滤逻辑,跳过无匹配代码块的文件并记录日志 ([3d0c1e1](https://github.com/Lydanne/spaceflow/commit/3d0c1e1a4b492e62104af92d16208c206934ad10))
+* **review:** 简化 includes glob 模式,移除冗余的 `*/**` 前缀 ([56cf145](https://github.com/Lydanne/spaceflow/commit/56cf145fbf8f1311df9d538fffc61581d4ead400))
+
+### 测试用例
+
+* **review:** 新增全量 diff 语义测试,验证 added| 对分支首次引入文件的持续匹配行为 ([5b72577](https://github.com/Lydanne/spaceflow/commit/5b725772091d1d4fe5207af1b7d176e705bdb8d3))
+
+### 其他修改
+
+* **review:** released version 0.78.0 [no ci] ([98a8d6b](https://github.com/Lydanne/spaceflow/commit/98a8d6b05c37fa6c5220289c94b69784ad3c2479))
+
 ## [0.46.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.45.0...@spaceflow/review-summary@0.46.0) (2026-04-07)
 
 ### 新特性
