@@ -401,6 +401,10 @@ export class ReviewContextBuilder {
     // 为每个 issue 填充 author
     return issues.map((issue) => {
       if (issue.author) {
+        const shortHash = issue.commit?.slice(0, 7);
+        if (shortHash?.includes("---")) {
+          return { ...issue, commit: undefined, valid: "false" };
+        }
         if (shouldLog(verbose, 2)) {
           console.log(`[fillIssueAuthors] issue already has author: ${issue.author.login}`);
         }
