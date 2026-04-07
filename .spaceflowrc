@@ -9,7 +9,9 @@
     "includes": [
       "*/**/*.ts",
       "!*/**/*.spec.*",
-      "!*/**/*.config.*",
+      "!*/**/*.config.*"
+    ],
+    "filterCodeBlocks": [
       "added|code-function",
       "added|code-class",
       "added|code-interface",

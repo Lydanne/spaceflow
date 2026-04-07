@@ -24,7 +24,11 @@ import { dirname, extname } from "path";
 import micromatch from "micromatch";
 import type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
 import { buildLinesWithNumbers, buildCommitsSection, extractCodeBlocks } from "./utils/review-llm";
-import { extractCodeBlockTypes } from "./review-includes-filter";
+import {
+  extractCodeBlockTypes,
+  extractGlobsFromIncludes,
+  type IncludeStatusPrefix,
+} from "./review-includes-filter";
 
 export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
 
@@ -110,8 +114,11 @@ export class ReviewLlmProcessor {
       }
 
       // 如果有 includes 配置，检查文件名是否匹配 includes 模式
+      // 需先提取纯 glob（去掉 added|/modified| 前缀，过滤 code-* 空串），避免 micromatch 报错
       if (spec.includes.length > 0) {
-        return micromatch.isMatch(filename, spec.includes, { matchBase: true });
+        const globs = extractGlobsFromIncludes(spec.includes);
+        if (globs.length === 0) return true;
+        return micromatch.isMatch(filename, globs, { matchBase: true });
       }
 
       // 没有 includes 配置，扩展名匹配即可
@@ -155,6 +162,7 @@ ${specsSection}
     fileContents: FileContentsMap,
     commits: PullRequestCommit[],
     existingResult?: ReviewResult | null,
+    filterCodeBlocks?: string[],
   ): Promise<ReviewPrompt> {
     const fileDataList = changedFiles
       .filter((f) => f.status !== "deleted" && f.filename)
@@ -175,9 +183,10 @@ ${specsSection}
         // 根据文件过滤 specs，只注入与当前文件匹配的规则
         const fileSpecs = this.filterSpecsForFile(specs, filename);
 
-        // 收集该文件对应 specs 的 code-* 过滤类型
-        const allSpecIncludes = fileSpecs.flatMap((s) => s.includes);
-        const codeBlockTypes = extractCodeBlockTypes(allSpecIncludes);
+        // 从全局 filterCodeBlocks 配置中解析代码结构过滤类型（按文件 status 过滤）
+        const codeBlockTypes = filterCodeBlocks
+          ? extractCodeBlockTypes(filterCodeBlocks, (file.status as IncludeStatusPrefix) ?? "added")
+          : [];
 
         // 构建带行号的内容：有 code-* 过滤时只输出匹配的代码块范围
         let linesWithNumbers: string;

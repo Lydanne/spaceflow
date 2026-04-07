@@ -163,6 +163,7 @@ export class ReviewContextBuilder {
       ci: options.ci ?? false,
       verbose: normalizeVerbose(options.verbose ?? titleOptions.verbose),
       includes: options.includes ?? titleOptions.includes ?? reviewConf.includes,
+      filterCodeBlocks: options.filterCodeBlocks ?? reviewConf.filterCodeBlocks,
       llmMode: options.llmMode ?? titleOptions.llmMode ?? reviewConf.llmMode,
       files: this.normalizeFilePaths(options.files),
       commits: options.commits,

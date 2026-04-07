@@ -18,18 +18,11 @@ import micromatch from "micromatch";
  * 无论后续经过多少次 commit 修改，其 status **始终为 `added`**。
  * 这意味着 `added|*.ts` 在后续每次 review 中都会继续匹配该文件，
  * 这是符合预期的行为——只要文件相对 base 是"新建"的，`added|` 就应该始终生效。
- *
- * 代码结构过滤语法：`added|code-<type>`，例如：
- * - `added|code-function`  → 只审查新增代码中的函数
- * - `added|code-class`     → 只审查新增代码中的类
- * - `added|code-interface` → 只审查新增代码中的接口
- * - `added|code-type`      → 只审查新增代码中的类型别名
- * - `added|code-method`    → 只审查新增代码中的方法
  */
 export type IncludeStatusPrefix = "added" | "modified" | "deleted";
 
 /**
- * 代码结构类型，用于 added|code-* 语法
+ * 代码结构类型，用于 filterCodeBlocks 配置
  */
 export type CodeBlockType = "function" | "class" | "interface" | "type" | "method";
 
@@ -55,13 +48,8 @@ const STATUS_ALIAS: Record<string, IncludeStatusPrefix> = {
 export interface ParsedIncludePattern {
   /** 变更类型前缀，undefined 表示不限类型 */
   status: IncludeStatusPrefix | undefined;
-  /** 去掉前缀后的 glob 模式；当 codeBlock 存在时此字段为空字符串 */
+  /** 去掉前缀后的 glob 模式 */
   glob: string;
-  /**
-   * 代码结构类型，仅当模式为 `added|code-<type>` 时有值。
-   * 表示只从新增代码中提取对应结构（函数/类/接口/类型/方法）送审。
-   */
-  codeBlock?: CodeBlockType;
 }
 
 /**
@@ -85,14 +73,6 @@ export function parseIncludePattern(pattern: string): ParsedIncludePattern {
   if (!status) {
     // 前缀无法识别（如 extglob 中的 `|`），当作普通 glob 处理
     return { status: undefined, glob: pattern };
-  }
-
-  // 检测 code-<type> 代码结构语法（当前只对 added 状态有意义）
-  if (glob.startsWith("code-")) {
-    const codeType = glob.slice("code-".length) as CodeBlockType;
-    if ((CODE_BLOCK_TYPES as string[]).includes(codeType)) {
-      return { status, glob: "", codeBlock: codeType };
-    }
   }
 
   return { status, glob };
@@ -182,25 +162,40 @@ export function filterFilesByIncludes<T extends FileWithStatus>(
 /**
  * 从 includes 模式列表中提取纯 glob（用于 commit 过滤，commit 没有 status 概念）。
  * 带 status 前缀的模式会去掉前缀，仅保留 glob 部分。
- * code-* 模式不产生 glob，会被过滤掉。
  */
 export function extractGlobsFromIncludes(includes: string[]): string[] {
   return includes.map((p) => parseIncludePattern(p).glob).filter((g) => g.length > 0);
 }
 
 /**
- * 从 includes 模式列表中提取 code-* 代码结构过滤类型。
- * 只返回指定 status 的代码结构类型（默认收集 added）。
+ * 从 filterCodeBlocks 配置中解析代码结构过滤类型。
+ *
+ * 支持两种格式：
+ * - `"added|code-function"` — 仅对 added 文件过滤函数
+ * - `"function"` — 不限 status，始终过滤函数
+ *
+ * 只返回匹配指定 status 的类型（默认 added）；无 status 前缀的条目始终包含。
  */
 export function extractCodeBlockTypes(
-  includes: string[],
+  filterCodeBlocks: string[],
   status: IncludeStatusPrefix = "added",
 ): CodeBlockType[] {
   const types = new Set<CodeBlockType>();
-  for (const pattern of includes) {
-    const parsed = parseIncludePattern(pattern);
-    if (parsed.codeBlock && parsed.status === status) {
-      types.add(parsed.codeBlock);
+  for (const entry of filterCodeBlocks) {
+    const separatorIndex = entry.indexOf("|");
+    if (separatorIndex === -1) {
+      if ((CODE_BLOCK_TYPES as string[]).includes(entry)) {
+        types.add(entry as CodeBlockType);
+      }
+    } else {
+      const prefix = entry.slice(0, separatorIndex).trim().toLowerCase();
+      const rest = entry.slice(separatorIndex + 1).trim();
+      const entryStatus = STATUS_ALIAS[prefix] as IncludeStatusPrefix | undefined;
+      if (entryStatus !== status) continue;
+      const type = rest.startsWith("code-") ? rest.slice("code-".length) : rest;
+      if ((CODE_BLOCK_TYPES as string[]).includes(type)) {
+        types.add(type as CodeBlockType);
+      }
     }
   }
   return [...types];
