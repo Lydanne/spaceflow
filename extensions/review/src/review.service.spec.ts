@@ -1489,6 +1489,26 @@ describe("ReviewService", () => {
       expect(mockGitSdkService.getUncommittedFiles).not.toHaveBeenCalled();
       expect(mockGitSdkService.getStagedFiles).not.toHaveBeenCalled();
     });
+
+    it("should ignore includes filtering in direct file mode", async () => {
+      const context: ReviewContext = {
+        owner: "o",
+        repo: "r",
+        dryRun: true,
+        ci: false,
+        specSources: ["/spec"],
+        files: ["miniprogram/utils/asyncSharedUtilsLoader.js"],
+        includes: ["**/*.ts", "added|**/*.js"],
+        localMode: false,
+      };
+
+      const result = await (service as any).resolveSourceData(context);
+
+      expect(result.isDirectFileMode).toBe(true);
+      expect(result.changedFiles).toEqual([
+        { filename: "miniprogram/utils/asyncSharedUtilsLoader.js", status: "modified" },
+      ]);
+    });
   });
 
   describe("ReviewService.getFilesForCommit", () => {
