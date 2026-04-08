@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.79.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.78.0...@spaceflow/review@0.79.0) (2026-04-08)
+
+### 新特性
+
+* **review:** 完善 review 命令文档,新增直接文件审查模式说明和配置优先级补充 ([25916c8](https://github.com/Lydanne/spaceflow/commit/25916c8bb7b11b748b6fc5e5ea9a62c954d5c7fc))
+
+### 其他修改
+
+* **review-summary:** released version 0.47.0 [no ci] ([7cd6664](https://github.com/Lydanne/spaceflow/commit/7cd66645f528355b3849d49ac3fb563267bd16e9))
+
 ## [0.78.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.77.0...@spaceflow/review@0.78.0) (2026-04-07)
 
 ### 新特性
