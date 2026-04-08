@@ -15,7 +15,7 @@ import { parseTitleOptions } from "./parse-title-options";
 import { type ReviewIssue, type UserInfo } from "./review-spec";
 import { readFile } from "fs/promises";
 import { join } from "path";
-import { isAbsolute, relative } from "path";
+import { isAbsolute, normalize, relative } from "path";
 import { homedir } from "os";
 import type { ReportFormat } from "./review-report";
 
@@ -137,11 +137,15 @@ export class ReviewContextBuilder {
       specSources.push(...reviewConf.references);
     }
 
+    const normalizedFiles = this.normalizeFilePaths(options.files);
+
     // 解析本地模式：非 CI、非 PR、无 base/head 时默认启用 uncommitted 模式
+    // 当显式指定 files 时，强制走“按文件审查模式”，不进入本地未提交模式
     const localMode = this.resolveLocalMode(options, {
       ci: options.ci,
       hasPrNumber: !!prNumber,
       hasBaseHead: !!(options.base || options.head),
+      hasFiles: !!normalizedFiles?.length,
     });
 
     // 当没有 PR 且没有指定 base/head 且不是本地模式时，自动获取默认值
@@ -175,7 +179,7 @@ export class ReviewContextBuilder {
       includes: ctxIncludes,
       whenModifiedCode: options.whenModifiedCode ?? reviewConf.whenModifiedCode,
       llmMode: options.llmMode ?? titleOptions.llmMode ?? reviewConf.llmMode,
-      files: this.normalizeFilePaths(options.files),
+      files: normalizedFiles,
       commits: options.commits,
       verifyFixes:
         options.verifyFixes ?? titleOptions.verifyFixes ?? reviewConf.verifyFixes ?? true,
@@ -219,8 +223,12 @@ export class ReviewContextBuilder {
    */
   resolveLocalMode(
     options: ReviewOptions,
-    env: { ci: boolean; hasPrNumber: boolean; hasBaseHead: boolean },
+    env: { ci: boolean; hasPrNumber: boolean; hasBaseHead: boolean; hasFiles: boolean },
   ): "uncommitted" | "staged" | false {
+    // 显式指定了 files，优先进入按文件审查模式
+    if (env.hasFiles) {
+      return false;
+    }
     // 显式指定了 --no-local
     if (options.local === false) {
       return false;
@@ -249,13 +257,19 @@ export class ReviewContextBuilder {
     if (!files || files.length === 0) return files;
 
     const cwd = process.cwd();
-    return files.map((file) => {
-      if (isAbsolute(file)) {
-        // 绝对路径转换为相对路径
-        return relative(cwd, file);
-      }
-      return file;
-    });
+    return files.map((file) => this.normalizeSingleFilePath(file, cwd));
+  }
+
+  /**
+   * 规范化单个文件路径为仓库相对路径：
+   * - 绝对路径转相对路径
+   * - 统一分隔符为 /
+   * - 移除前导 ./
+   */
+  private normalizeSingleFilePath(file: string, cwd: string): string {
+    const normalizedInput = normalize(file);
+    const relativePath = isAbsolute(normalizedInput) ? relative(cwd, normalizedInput) : normalizedInput;
+    return relativePath.replaceAll("\\", "/").replace(/^\.\/+/, "");
   }
 
   /**

@@ -97,6 +97,10 @@ export class ReviewService {
     if (source.earlyReturn) return source.earlyReturn;
 
     const { prModel, commits, changedFiles, headSha, isDirectFileMode } = source;
+    const effectiveWhenModifiedCode = isDirectFileMode ? undefined : context.whenModifiedCode;
+    if (isDirectFileMode && context.whenModifiedCode?.length && shouldLog(verbose, 1)) {
+      console.log(`ℹ️  直接文件模式下忽略 whenModifiedCode 过滤`);
+    }
 
     // 2. 规则匹配
     const specs = await this.issueFilter.loadSpecs(specSources, verbose);
@@ -147,7 +151,7 @@ export class ReviewService {
       fileContents,
       commits,
       existingResultModel?.result ?? null,
-      context.whenModifiedCode,
+      effectiveWhenModifiedCode,
       verbose,
       context.systemRules,
     );
@@ -234,7 +238,7 @@ export class ReviewService {
       duplicateWorkflowResolved,
     } = context;
 
-    const isDirectFileMode = !!(files && files.length > 0 && baseRef === headRef);
+    const isDirectFileMode = !!(files && files.length > 0 && !prNumber);
     let isLocalMode = !!localMode;
     let effectiveBaseRef = baseRef;
     let effectiveHeadRef = headRef;
@@ -294,8 +298,16 @@ export class ReviewService {
       }
     }
 
+    // 直接文件审查模式（-f）：绕过 diff，直接按指定文件构造审查输入
+    if (isDirectFileMode) {
+      if (shouldLog(verbose, 1)) {
+        console.log(`📥 直接审查指定文件模式 (${files!.length} 个文件)`);
+      }
+      changedFiles = files!.map((f) => ({ filename: f, status: "modified" as const }));
+      isLocalMode = true;
+    }
     // PR 模式、分支比较模式、或本地模式回退后的分支比较
-    if (prNumber) {
+    else if (prNumber) {
       if (shouldLog(verbose, 1)) {
         console.log(`📥 获取 PR #${prNumber} 信息 (owner: ${owner}, repo: ${repo})`);
       }
@@ -330,12 +342,7 @@ export class ReviewService {
         }
       }
     } else if (effectiveBaseRef && effectiveHeadRef) {
-      if (files && files.length > 0 && effectiveBaseRef === effectiveHeadRef) {
-        if (shouldLog(verbose, 1)) {
-          console.log(`📥 直接审查指定文件模式 (${files.length} 个文件)`);
-        }
-        changedFiles = files.map((f) => ({ filename: f, status: "modified" as const }));
-      } else if (changedFiles.length === 0) {
+      if (changedFiles.length === 0) {
         if (shouldLog(verbose, 1)) {
           console.log(
             `📥 获取 ${effectiveBaseRef}...${effectiveHeadRef} 的差异 (owner: ${owner}, repo: ${repo})`,

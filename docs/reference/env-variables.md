@@ -2,6 +2,12 @@
 
 Spaceflow 使用的所有环境变量参考。
 
+## 与配置文件同时存在时
+
+- 配置文件先按层级合并（项目配置覆盖全局配置）。
+- 对核心映射字段（如 `gitProvider.token`、`llm.openai.apiKey`），环境变量用于补全缺失值，通常不会覆盖已配置的非空值。
+- `review` 插件配置（如 `review.includes`、`review.duplicateWorkflowResolved`）主要来自配置文件或命令行参数，不直接通过环境变量读取。
+
 ## 通用
 
 | 变量             | 说明                 | 默认值  |
