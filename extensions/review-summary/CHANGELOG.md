@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.49.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.48.0...@spaceflow/review-summary@0.49.0) (2026-04-08)
+
+### 新特性
+
+* **review:** 在 review.md 中补充 `-f` 模式忽略 `includes` 过滤的说明,新增测试用例验证直接文件模式下的过滤行为 ([9c15284](https://github.com/Lydanne/spaceflow/commit/9c1528486f93b89442ba6eea4d1cb4503be5f6c7))
+
+### 其他修改
+
+* **review:** released version 0.80.0 [no ci] ([f2ce9ae](https://github.com/Lydanne/spaceflow/commit/f2ce9ae760c0d58dce1e02157be162996b4da6ee))
+
 ## [0.48.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.47.0...@spaceflow/review-summary@0.48.0) (2026-04-08)
 
 ### 新特性
