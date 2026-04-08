@@ -412,7 +412,11 @@ export class ReviewService {
     }
 
     // 3. 使用 includes 过滤文件和 commits（支持 added|/modified|/deleted| 前缀语法）
-    if (includes && includes.length > 0) {
+    if (isDirectFileMode && includes && includes.length > 0) {
+      if (shouldLog(verbose, 1)) {
+        console.log(`ℹ️  直接文件模式下忽略 includes 过滤`);
+      }
+    } else if (includes && includes.length > 0) {
       const beforeFiles = changedFiles.length;
       if (shouldLog(verbose, 2)) {
         console.log(
