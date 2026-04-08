@@ -127,6 +127,10 @@ describe("ReviewService", () => {
       parseDiffText: vi.fn().mockReturnValue([]),
       getRemoteUrl: vi.fn().mockReturnValue(null),
       parseRepositoryFromRemoteUrl: vi.fn().mockReturnValue(null),
+      getUncommittedFiles: vi.fn().mockReturnValue([]),
+      getStagedFiles: vi.fn().mockReturnValue([]),
+      getUncommittedDiff: vi.fn().mockReturnValue([]),
+      getStagedDiff: vi.fn().mockReturnValue([]),
       getChangedFilesBetweenRefs: vi.fn().mockResolvedValue([]),
       getCommitsBetweenRefs: vi.fn().mockResolvedValue([]),
       getDiffBetweenRefs: vi.fn().mockResolvedValue([]),
@@ -417,6 +421,26 @@ describe("ReviewService", () => {
       };
       const result = await service.execute(context);
       expect(result.success).toBe(true);
+    });
+
+    it("should ignore whenModifiedCode in direct file mode", async () => {
+      const context: ReviewContext = {
+        owner: "owner",
+        repo: "repo",
+        files: ["src/app.ts"],
+        specSources: ["/spec/dir"],
+        dryRun: true,
+        ci: false,
+        llmMode: "openai",
+        whenModifiedCode: ["function", "class"],
+      };
+      const buildReviewPromptSpy = vi.spyOn(service as any, "buildReviewPrompt");
+
+      const result = await service.execute(context);
+
+      expect(result.success).toBe(true);
+      expect(buildReviewPromptSpy).toHaveBeenCalled();
+      expect(buildReviewPromptSpy.mock.calls[0][5]).toBeUndefined();
     });
 
     it("should filter files by includes pattern", async () => {
@@ -1363,14 +1387,28 @@ describe("ReviewService", () => {
 
     it("should normalize absolute file paths", async () => {
       configService.get.mockReturnValue({ repository: "owner/repo", refName: "main" });
+      const absPath = `${process.cwd()}/src/file.ts`;
       const options = {
         dryRun: false,
         ci: false,
-        files: ["/absolute/path/to/file.ts", "relative.ts"],
+        files: [absPath, "./relative.ts"],
       };
       const context = await service.getContextFromEnv(options as any);
       expect(context.files).toBeDefined();
-      expect(context.files![1]).toBe("relative.ts");
+      expect(context.files).toEqual(["src/file.ts", "relative.ts"]);
+    });
+
+    it("should force direct file mode when files are specified", async () => {
+      configService.get.mockReturnValue({ repository: "owner/repo", refName: "main" });
+      const options = {
+        dryRun: false,
+        ci: false,
+        local: "uncommitted" as const,
+        files: ["./miniprogram/utils/asyncSharedUtilsLoader.js"],
+      };
+      const context = await service.getContextFromEnv(options as any);
+      expect(context.localMode).toBe(false);
+      expect(context.files).toEqual(["miniprogram/utils/asyncSharedUtilsLoader.js"]);
     });
 
     it("should auto-detect base/head with verbose logging", async () => {
@@ -1426,6 +1464,30 @@ describe("ReviewService", () => {
       ]);
       const result = await (service as any).getCommitsBetweenRefs("main", "feature");
       expect(result).toHaveLength(1);
+    });
+  });
+
+  describe("ReviewService.resolveSourceData - direct file mode", () => {
+    it("should bypass local uncommitted scanning when files are specified", async () => {
+      const context: ReviewContext = {
+        owner: "o",
+        repo: "r",
+        dryRun: true,
+        ci: false,
+        specSources: ["/spec"],
+        files: ["miniprogram/utils/asyncSharedUtilsLoader.js"],
+        localMode: false,
+      };
+
+      const result = await (service as any).resolveSourceData(context);
+
+      expect(result.isDirectFileMode).toBe(true);
+      expect(result.isLocalMode).toBe(true);
+      expect(result.changedFiles).toEqual([
+        { filename: "miniprogram/utils/asyncSharedUtilsLoader.js", status: "modified" },
+      ]);
+      expect(mockGitSdkService.getUncommittedFiles).not.toHaveBeenCalled();
+      expect(mockGitSdkService.getStagedFiles).not.toHaveBeenCalled();
     });
   });
 

@@ -183,11 +183,18 @@ AI 智能提交相关配置。
 
 ## 配置优先级
 
-1. **命令行参数**（最高优先级）
-2. **环境变量**
-3. **项目配置文件**（`.spaceflowrc` > `.spaceflow/spaceflow.json`）
-4. **全局配置文件**（`~/.spaceflowrc` > `~/.spaceflow/spaceflow.json`）
-5. **Extension 默认值**（最低优先级）
+配置来源分两层理解：
+
+1. **配置文件层级**（从低到高）  
+   `~/.spaceflow/spaceflow.json` < `~/.spaceflowrc` < `.spaceflow/spaceflow.json` < `.spaceflowrc`
+2. **默认值补全**  
+   在配置文件缺失字段时，系统会用环境变量和内置默认值补全（如 `gitProvider.*`、`llm.*`、`ci.*`）。
+3. **命令行参数**（命令级最高优先级）  
+   具体命令的运行参数（例如 `spaceflow review -l openai`）优先于配置文件中的同名项。
+
+::: tip 环境变量与配置文件同时存在时
+对已映射的核心字段（如 `gitProvider.token`、`llm.openai.apiKey`），通常是**配置文件优先**；环境变量主要用于补全未配置字段。
+:::
 
 ## JSON Schema
 
