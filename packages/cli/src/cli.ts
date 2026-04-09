@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 declare const __CLI_VERSION__: string;
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
 import { join, resolve } from "path";
 import { execSync } from "child_process";
 import {
@@ -45,6 +45,99 @@ function getEffectiveCwd(): string {
 function readExternalExtensions(cwd: string): string[] {
   const deps = getExtensionDependencies(cwd, { local: true });
   return Object.keys(deps);
+}
+
+/**
+ * 读取 JSON 文件（不存在或解析失败时返回 null）
+ */
+function readJsonFile<T>(path: string): T | null {
+  if (!existsSync(path)) {
+    return null;
+  }
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as T;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 标准化 dependencies（仅保留 string 值）
+ */
+function normalizeDependencies(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  const result: Record<string, string> = {};
+  for (const [name, version] of Object.entries(value)) {
+    if (typeof version === "string") {
+      result[name] = version;
+    }
+  }
+  return result;
+}
+
+/**
+ * 比较 .spaceflowrc 与 .spaceflow/package.json 依赖是否一致
+ * 说明：
+ * - 只比较双方都存在的依赖（交集）
+ * - 交集中任一依赖版本不一致即判定不一致
+ */
+function isDependencyVersionConsistent(
+  rcDeps: Record<string, string>,
+  packageDeps: Record<string, string>,
+): boolean {
+  const commonKeys = Object.keys(rcDeps).filter((key) =>
+    Object.prototype.hasOwnProperty.call(packageDeps, key),
+  );
+  for (const key of commonKeys) {
+    if (rcDeps[key] !== packageDeps[key]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * 若 .spaceflowrc 与 .spaceflow/package.json 的依赖版本不一致，删除 .spaceflow 目录
+ */
+function resetSpaceflowDirOnDependencyMismatch(projectRoot: string, spaceflowDir: string): void {
+  if (!existsSync(spaceflowDir)) {
+    return;
+  }
+
+  const rcPath = join(projectRoot, ".spaceflowrc");
+  const rcConfig = readJsonFile<Record<string, unknown>>(rcPath);
+  if (existsSync(rcPath) && !rcConfig) {
+    console.warn("⚠ .spaceflowrc 解析失败，跳过 .spaceflow 依赖一致性检查");
+    return;
+  }
+  const rcConfigSafe = rcConfig || {};
+  const rcDeps = normalizeDependencies(rcConfigSafe.dependencies);
+
+  const pkgPath = join(spaceflowDir, "package.json");
+  const pkg = readJsonFile<Record<string, unknown>>(pkgPath);
+  if (existsSync(pkgPath) && !pkg) {
+    console.warn("⚠ .spaceflow/package.json 解析失败，跳过 .spaceflow 依赖一致性检查");
+    return;
+  }
+  const pkgSafe = pkg || {};
+  const pkgDeps = normalizeDependencies(pkgSafe.dependencies);
+
+  if (isDependencyVersionConsistent(rcDeps, pkgDeps)) {
+    return;
+  }
+
+  console.warn(
+    "⚠ 检测到 .spaceflowrc 与 .spaceflow/package.json 依赖版本不一致，删除 .spaceflow 目录重建",
+  );
+  try {
+    rmSync(spaceflowDir, { recursive: true, force: true });
+  } catch (error) {
+    console.warn(
+      `⚠ 删除 .spaceflow 目录失败: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 /**
@@ -370,6 +463,7 @@ if (isMcpCommand()) {
 
   // 2. 确保 .spaceflow/ 目录结构完整（目录 + package.json + .gitignore）
   const spaceflowDir = join(projectRoot, SPACEFLOW_DIR);
+  resetSpaceflowDirOnDependencyMismatch(projectRoot, spaceflowDir);
   ensureSpaceflowPackageJson(spaceflowDir, projectRoot);
 
   // 3. 确保依赖已安装
