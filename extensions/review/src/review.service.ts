@@ -112,29 +112,21 @@ export class ReviewService {
     }
 
     // 2. 规则匹配
-    const specs = await this.issueFilter.loadSpecs(specSources, verbose);
-    const applicableSpecs = this.reviewSpecService.filterApplicableSpecs(
-      specs,
-      source.changedFiles,
-    );
+    const allSpecs = await this.issueFilter.loadSpecs(specSources, verbose);
+    const specs = this.reviewSpecService.filterApplicableSpecs(allSpecs, source.changedFiles);
     if (shouldLog(verbose, 2)) {
       console.log(
         `[execute] loadSpecs: loaded ${specs.length} specs from sources: ${JSON.stringify(specSources)}`,
       );
       console.log(
-        `[execute] filterApplicableSpecs: ${applicableSpecs.length} applicable out of ${specs.length}, changedFiles=${JSON.stringify(source.changedFiles.map((f) => f.filename))}`,
+        `[execute] filterApplicableSpecs: ${specs.length} applicable out of ${allSpecs.length}, changedFiles=${JSON.stringify(source.changedFiles.map((f) => f.filename))}`,
       );
     }
     if (shouldLog(verbose, 1)) {
-      console.log(`   适用的规则文件: ${applicableSpecs.length}`);
+      console.log(`   适用的规则文件: ${specs.length}`);
     }
-    if (applicableSpecs.length === 0 || source.changedFiles.length === 0) {
-      return this.handleNoApplicableSpecs(
-        context,
-        applicableSpecs,
-        source.changedFiles,
-        source.commits,
-      );
+    if (specs.length === 0 || source.changedFiles.length === 0) {
+      return this.handleNoApplicableSpecs(context, specs, source.changedFiles, source.commits);
     }
 
     // 3. 获取文件内容 + LLM 审查
@@ -178,7 +170,6 @@ export class ReviewService {
     // 4. 运行 LLM 审查 + 过滤新 issues
     const result = await this.buildReviewResult(context, reviewPrompt, llmMode, {
       specs,
-      applicableSpecs,
       fileContents,
       changedFiles: source.changedFiles,
       commits: source.commits,
@@ -219,7 +210,6 @@ export class ReviewService {
     llmMode: LLMMode,
     source: {
       specs: ReviewSpec[];
-      applicableSpecs: ReviewSpec[];
       fileContents: FileContentsMap;
       changedFiles: ChangedFile[];
       commits: PullRequestCommit[];
@@ -227,8 +217,7 @@ export class ReviewService {
     },
   ): Promise<ReviewResult> {
     const { verbose } = context;
-    const { specs, applicableSpecs, fileContents, changedFiles, commits, isDirectFileMode } =
-      source;
+    const { specs, fileContents, changedFiles, commits, isDirectFileMode } = source;
 
     const result = await this.llmProcessor.runLLMReview(llmMode, reviewPrompt, {
       verbose,
@@ -255,7 +244,7 @@ export class ReviewService {
     }
 
     result.issues = await this.issueFilter.fillIssueCode(result.issues, fileContents);
-    result.issues = this.filterNewIssues(result.issues, specs, applicableSpecs, {
+    result.issues = this.filterNewIssues(result.issues, specs, {
       commits,
       fileContents,
       changedFiles,
@@ -292,7 +281,6 @@ export class ReviewService {
   protected filterNewIssues(
     issues: ReviewResult["issues"],
     specs: any[],
-    applicableSpecs: any[],
     opts: {
       commits: PullRequestCommit[];
       fileContents: any;
@@ -304,7 +292,7 @@ export class ReviewService {
     const { commits, fileContents, changedFiles, isDirectFileMode, context } = opts;
     const { verbose } = context;
 
-    let filtered = this.reviewSpecService.filterIssuesByIncludes(issues, applicableSpecs);
+    let filtered = this.reviewSpecService.filterIssuesByIncludes(issues, specs);
     if (shouldLog(verbose, 1)) {
       console.log(`   应用 includes 过滤后: ${filtered.length} 个问题`);
     }
@@ -314,7 +302,7 @@ export class ReviewService {
       console.log(`   应用规则存在性过滤后: ${filtered.length} 个问题`);
     }
 
-    filtered = this.reviewSpecService.filterIssuesByOverrides(filtered, applicableSpecs, verbose);
+    filtered = this.reviewSpecService.filterIssuesByOverrides(filtered, specs, verbose);
 
     // 变更行过滤
     if (shouldLog(verbose, 3)) {

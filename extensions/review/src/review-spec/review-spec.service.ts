@@ -65,7 +65,7 @@ export class ReviewSpecService {
    * 根据变更文件的扩展名过滤适用的规则文件
    * 只按扩展名过滤，includes 和 override 在 LLM 审查后处理
    */
-  filterApplicableSpecs(specs: ReviewSpec[], changedFiles: { filename?: string }[]): ReviewSpec[] {
+  filterApplicableSpecs(specs: ReviewSpec[], changedFiles: ChangedFile[]): ReviewSpec[] {
     const changedExtensions = new Set<string>();
 
     for (const file of changedFiles) {
@@ -489,9 +489,7 @@ export class ReviewSpecService {
       await access(targetDir);
       return targetDir;
     } catch {
-      console.warn(
-        `   警告: 克隆仓库中未找到子目录 ${normalizedSubPath}，改为使用仓库根目录`,
-      );
+      console.warn(`   警告: 克隆仓库中未找到子目录 ${normalizedSubPath}，改为使用仓库根目录`);
       return cacheDir;
     }
   }
