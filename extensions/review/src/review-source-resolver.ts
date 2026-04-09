@@ -5,13 +5,14 @@ import {
   type VerboseLevel,
   shouldLog,
   GitSdkService,
+  parseChangedLinesFromPatch,
 } from "@spaceflow/core";
 import micromatch from "micromatch";
 import type { ReviewContext } from "./review-context";
 import { ReviewIssueFilter } from "./review-issue-filter";
 import { filterFilesByIncludes, extractGlobsFromIncludes } from "./review-includes-filter";
 import { PullRequestModel } from "./pull-request-model";
-import { ReviewResult } from "./review-spec";
+import { ReviewResult, FileContentsMap, FileContentLine } from "./review-spec";
 import { REVIEW_COMMENT_MARKER, REVIEW_LINE_COMMENTS_MARKER } from "./utils/review-pr-comment";
 import type {
   SourceData,
@@ -79,6 +80,7 @@ export class ReviewSourceResolver {
           ...local.earlyReturn,
           changedFiles: ChangedFileCollection.from(local.earlyReturn.changedFiles),
           isDirectFileMode: false,
+          fileContents: new Map(),
         };
       isLocalMode = local.isLocalMode;
       changedFiles = local.changedFiles;
@@ -102,6 +104,7 @@ export class ReviewSourceResolver {
           headSha: prData.headSha!,
           isLocalMode,
           isDirectFileMode,
+          fileContents: new Map(),
         };
       }
       prModel = prData.prModel;
@@ -138,13 +141,25 @@ export class ReviewSourceResolver {
     ));
 
     const headSha = prModel ? await prModel.getHeadSha() : context.headRef || "HEAD";
+    const collectedFiles = ChangedFileCollection.from(changedFiles);
+    const fileContents = await this.getFileContents(
+      context.owner,
+      context.repo,
+      collectedFiles.toArray(),
+      commits,
+      headSha,
+      context.prNumber,
+      isLocalMode,
+      context.verbose,
+    );
     return {
       prModel,
       commits,
-      changedFiles: ChangedFileCollection.from(changedFiles),
+      changedFiles: collectedFiles,
       headSha,
       isLocalMode,
       isDirectFileMode,
+      fileContents,
     };
   }
 
@@ -395,6 +410,98 @@ export class ReviewSourceResolver {
     }
 
     return { commits, changedFiles: changedFiles.toArray() };
+  }
+
+  // ─── 文件内容 ─────────────────────────────────────────
+
+  /**
+   * 获取文件内容并构建行号到 commit hash 的映射
+   * 返回 Map<filename, Array<[commitHash, lineCode]>>
+   */
+  async getFileContents(
+    owner: string,
+    repo: string,
+    changedFiles: ChangedFile[],
+    commits: PullRequestCommit[],
+    ref: string,
+    prNumber?: number,
+    isLocalMode?: boolean,
+    verbose?: VerboseLevel,
+  ): Promise<FileContentsMap> {
+    const contents: FileContentsMap = new Map();
+    const latestCommitHash = commits[commits.length - 1]?.sha?.slice(0, 7) || "+local+";
+
+    if (shouldLog(verbose, 1)) {
+      console.log(`📊 正在构建行号到变更的映射...`);
+    }
+
+    for (const file of changedFiles) {
+      if (file.filename && file.status !== "deleted") {
+        try {
+          let rawContent: string;
+          if (isLocalMode) {
+            rawContent = this.gitSdk.getWorkingFileContent(file.filename);
+          } else if (prNumber) {
+            rawContent = await this.gitProvider.getFileContent(owner, repo, file.filename, ref);
+          } else {
+            rawContent = await this.gitSdk.getFileContent(ref, file.filename);
+          }
+          const lines = rawContent.split("\n");
+
+          let changedLines = parseChangedLinesFromPatch(file.patch);
+
+          const isNewFile =
+            file.status === "added" ||
+            file.status === "A" ||
+            (file.additions && file.additions > 0 && file.deletions === 0 && !file.patch);
+          if (changedLines.size === 0 && isNewFile) {
+            changedLines = new Set(lines.map((_, i) => i + 1));
+            if (shouldLog(verbose, 2)) {
+              console.log(
+                `   ℹ️ ${file.filename}: 新增文件无 patch，将所有 ${lines.length} 行标记为变更`,
+              );
+            }
+          }
+
+          if (shouldLog(verbose, 3)) {
+            console.log(`   📄 ${file.filename}: ${lines.length} 行, ${changedLines.size} 行变更`);
+            console.log(`      latestCommitHash: ${latestCommitHash}`);
+            if (changedLines.size > 0 && changedLines.size <= 20) {
+              console.log(
+                `      变更行号: ${Array.from(changedLines)
+                  .sort((a, b) => a - b)
+                  .join(", ")}`,
+              );
+            } else if (changedLines.size > 20) {
+              console.log(`      变更行号: (共 ${changedLines.size} 行，省略详情)`);
+            }
+            if (!file.patch) {
+              console.log(
+                `      ⚠️ 该文件没有 patch 信息 (status=${file.status}, additions=${file.additions}, deletions=${file.deletions})`,
+              );
+            } else {
+              console.log(
+                `      patch 前 200 字符: ${file.patch.slice(0, 200).replace(/\n/g, "\\n")}`,
+              );
+            }
+          }
+
+          const contentLines: FileContentLine[] = lines.map((line, index) => {
+            const lineNum = index + 1;
+            const hash = changedLines.has(lineNum) ? latestCommitHash : "-------";
+            return [hash, line];
+          });
+          contents.set(file.filename, contentLines);
+        } catch (error) {
+          console.warn(`警告: 无法获取文件内容: ${file.filename}`, error);
+        }
+      }
+    }
+
+    if (shouldLog(verbose, 1)) {
+      console.log(`📊 映射构建完成，共 ${contents.size} 个文件`);
+    }
+    return contents;
   }
 
   // ─── 重复 workflow 检查 ──────────────────────────────────

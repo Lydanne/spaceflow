@@ -129,17 +129,8 @@ export class ReviewService {
       return this.handleNoApplicableSpecs(context, specs, source.changedFiles, source.commits);
     }
 
-    // 3. 获取文件内容 + LLM 审查
-    const fileContents = await this.issueFilter.getFileContents(
-      context.owner,
-      context.repo,
-      source.changedFiles.toArray(),
-      source.commits,
-      source.headSha,
-      context.prNumber,
-      verbose,
-      source.isLocalMode,
-    );
+    // 3. LLM 审查
+    const { fileContents } = source;
     if (!llmMode) throw new Error("必须指定 LLM 类型");
 
     // 获取上一次的审查结果（用于提示词优化和轮次推进）
@@ -382,7 +373,6 @@ export class ReviewService {
           existingResultModel.issues,
           commits,
           { specs, fileContents },
-          prModel,
         );
       } else {
         if (shouldLog(verbose, 1)) {
@@ -524,16 +514,32 @@ export class ReviewService {
     await resultModel.syncReactions(verbose);
 
     // 5. LLM 验证历史问题是否已修复
-    try {
-      resultModel.issues = await this.issueFilter.verifyAndUpdateIssues(
-        context,
-        resultModel.issues,
-        commits,
-        undefined,
-        prModel,
-      );
-    } catch (error) {
-      console.warn("⚠️ LLM 验证修复状态失败，跳过:", error);
+    if (context.verifyFixes && context.specSources?.length) {
+      try {
+        const changedFiles = await prModel.getFiles();
+        const headSha = await prModel.getHeadSha();
+        const verifySpecs = await this.issueFilter.loadSpecs(context.specSources, verbose);
+        const verifyFileContents = await this.sourceResolver.getFileContents(
+          owner,
+          repo,
+          changedFiles,
+          commits,
+          headSha,
+          prNumber,
+          false,
+          verbose,
+        );
+        resultModel.issues = await this.issueFilter.verifyAndUpdateIssues(
+          context,
+          resultModel.issues,
+          commits,
+          { specs: verifySpecs, fileContents: verifyFileContents },
+        );
+      } catch (error) {
+        console.warn("⚠️ LLM 验证修复状态失败，跳过:", error);
+      }
+    } else if (!context.verifyFixes && shouldLog(verbose, 1)) {
+      console.log(`   ⏭️  跳过历史问题验证 (verifyFixes=false)`);
     }
 
     // 6. 统计问题状态并设置到 result

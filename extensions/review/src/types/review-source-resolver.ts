@@ -1,6 +1,6 @@
 import type { PullRequestCommit, ChangedFile } from "@spaceflow/core";
 import type { PullRequestModel } from "../pull-request-model";
-import type { ReviewResult } from "../review-spec";
+import type { ReviewResult, FileContentsMap } from "../review-spec";
 import type { ChangedFileCollection } from "../changed-file-collection";
 
 /**
@@ -14,6 +14,7 @@ export interface SourceData {
   headSha: string;
   isLocalMode: boolean;
   isDirectFileMode: boolean;
+  fileContents: FileContentsMap;
   earlyReturn?: ReviewResult;
 }
 

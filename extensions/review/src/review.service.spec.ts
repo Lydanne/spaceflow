@@ -88,6 +88,9 @@ class TestReviewService extends ReviewService {
   get _llmProxyService() {
     return this.llmProxyService;
   }
+  get _sourceResolver() {
+    return this.sourceResolver;
+  }
 
   executeCollectOnly(context: Partial<ReviewContext>) {
     return super.executeCollectOnly(context as ReviewContext);
@@ -277,7 +280,7 @@ describe("ReviewService", () => {
   describe("ReviewService.execute", () => {
     beforeEach(() => {
       vi.spyOn(service._llmProcessor, "runLLMReview").mockResolvedValue(mockResult());
-      vi.spyOn(service._issueFilter, "getFileContents").mockResolvedValue(new Map());
+      vi.spyOn(service._sourceResolver, "getFileContents").mockResolvedValue(new Map());
       vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(null as any);
     });
 
@@ -898,7 +901,7 @@ describe("ReviewService", () => {
 
       expect(result.isDirectFileMode).toBe(true);
       expect(result.isLocalMode).toBe(true);
-      expect(result.changedFiles).toEqual([
+      expect(result.changedFiles.toArray()).toEqual([
         { filename: "miniprogram/utils/asyncSharedUtilsLoader.js", status: "modified" },
       ]);
       expect(mockGitSdkService.getUncommittedFiles).not.toHaveBeenCalled();
@@ -920,7 +923,7 @@ describe("ReviewService", () => {
       const result = await service.resolveSourceData(context);
 
       expect(result.isDirectFileMode).toBe(true);
-      expect(result.changedFiles).toEqual([
+      expect(result.changedFiles.toArray()).toEqual([
         { filename: "miniprogram/utils/asyncSharedUtilsLoader.js", status: "modified" },
       ]);
     });
@@ -934,7 +937,7 @@ describe("ReviewService", () => {
           summary: [mockSummary({ file: "test.ts", summary: "ok" })],
         }),
       );
-      vi.spyOn(service._issueFilter, "getFileContents").mockResolvedValue(new Map());
+      vi.spyOn(service._sourceResolver, "getFileContents").mockResolvedValue(new Map());
     });
 
     it("should merge existing issues with new issues in CI mode", async () => {
@@ -1027,7 +1030,7 @@ describe("ReviewService", () => {
   describe("ReviewService.execute - filterCommits branch", () => {
     beforeEach(() => {
       vi.spyOn(service._llmProcessor, "runLLMReview").mockResolvedValue(mockResult());
-      vi.spyOn(service._issueFilter, "getFileContents").mockResolvedValue(new Map());
+      vi.spyOn(service._sourceResolver, "getFileContents").mockResolvedValue(new Map());
       vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(null as any);
     });
 

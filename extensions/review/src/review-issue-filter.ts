@@ -5,20 +5,9 @@ import {
   type VerboseLevel,
   shouldLog,
   GitSdkService,
-  parseChangedLinesFromPatch,
-  parseDiffText,
-  parseHunksFromPatch,
-  calculateNewLineNumber,
 } from "@spaceflow/core";
 import type { IConfigReader } from "@spaceflow/core";
-import { PullRequestModel } from "./pull-request-model";
-import {
-  ReviewSpecService,
-  ReviewSpec,
-  ReviewIssue,
-  FileContentsMap,
-  FileContentLine,
-} from "./review-spec";
+import { ReviewSpecService, ReviewSpec, ReviewIssue, FileContentsMap } from "./review-spec";
 import { IssueVerifyService } from "./issue-verify.service";
 import { generateIssueKey } from "./utils/review-pr-comment";
 import type { ReviewContext } from "./review-context";
@@ -65,16 +54,14 @@ export class ReviewIssueFilter {
 
   /**
    * LLM 验证历史问题是否已修复
-   * 如果传入 preloaded（specs/fileContents），直接使用；否则从 PR 获取
    */
   async verifyAndUpdateIssues(
     context: ReviewContext,
     issues: ReviewIssue[],
     commits: PullRequestCommit[],
-    preloaded?: { specs: ReviewSpec[]; fileContents: FileContentsMap },
-    pr?: PullRequestModel,
+    preloaded: { specs: ReviewSpec[]; fileContents: FileContentsMap },
   ): Promise<ReviewIssue[]> {
-    const { llmMode, specSources, verbose } = context;
+    const { llmMode, verbose } = context;
     const unfixedIssues = issues.filter((i) => i.valid !== "false" && !i.fixed);
 
     if (unfixedIssues.length === 0) {
@@ -88,37 +75,11 @@ export class ReviewIssueFilter {
       return issues;
     }
 
-    if (!preloaded && (!specSources?.length || !pr)) {
-      if (shouldLog(verbose, 1)) {
-        console.log(`   ⏭️  跳过 LLM 验证（缺少 specSources 或 pr）`);
-      }
-      return issues;
-    }
-
     if (shouldLog(verbose, 1)) {
       console.log(`\n🔍 开始 LLM 验证 ${unfixedIssues.length} 个未修复问题...`);
     }
 
-    let specs: ReviewSpec[];
-    let fileContents: FileContentsMap;
-
-    if (preloaded) {
-      specs = preloaded.specs;
-      fileContents = preloaded.fileContents;
-    } else {
-      const changedFiles = await pr!.getFiles();
-      const headSha = await pr!.getHeadSha();
-      specs = await this.loadSpecs(specSources, verbose);
-      fileContents = await this.getFileContents(
-        pr!.owner,
-        pr!.repo,
-        changedFiles,
-        commits,
-        headSha,
-        pr!.number,
-        verbose,
-      );
-    }
+    const { specs, fileContents } = preloaded;
 
     return await this.issueVerifyService.verifyIssueFixes(
       issues,
@@ -173,104 +134,6 @@ export class ReviewIssueFilter {
     } else {
       return this.gitSdk.getFilesForCommit(sha);
     }
-  }
-
-  /**
-   * 获取文件内容并构建行号到 commit hash 的映射
-   * 返回 Map<filename, Array<[commitHash, lineCode]>>
-   */
-  async getFileContents(
-    owner: string,
-    repo: string,
-    changedFiles: ChangedFile[],
-    commits: PullRequestCommit[],
-    ref: string,
-    prNumber?: number,
-    verbose?: VerboseLevel,
-    isLocalMode?: boolean,
-  ): Promise<FileContentsMap> {
-    const contents: FileContentsMap = new Map();
-    const latestCommitHash = commits[commits.length - 1]?.sha?.slice(0, 7) || "+local+";
-
-    // 优先使用 changedFiles 中的 patch 字段（来自 PR 的整体 diff base...head）
-    // 这样行号是相对于最终文件的，而不是每个 commit 的父 commit
-    if (shouldLog(verbose, 1)) {
-      console.log(`📊 正在构建行号到变更的映射...`);
-    }
-
-    for (const file of changedFiles) {
-      if (file.filename && file.status !== "deleted") {
-        try {
-          let rawContent: string;
-          if (isLocalMode) {
-            // 本地模式：读取工作区文件的当前内容
-            rawContent = this.gitSdk.getWorkingFileContent(file.filename);
-          } else if (prNumber) {
-            rawContent = await this.gitProvider.getFileContent(owner, repo, file.filename, ref);
-          } else {
-            rawContent = await this.gitSdk.getFileContent(ref, file.filename);
-          }
-          const lines = rawContent.split("\n");
-
-          // 优先使用 file.patch（PR 整体 diff），这是相对于最终文件的行号
-          let changedLines = parseChangedLinesFromPatch(file.patch);
-
-          // 如果 changedLines 为空，需要判断是否应该将所有行标记为变更
-          // 情况1: 文件是新增的（status 为 added/A）
-          // 情况2: patch 为空但文件有 additions（部分 Git Provider API 可能不返回完整 patch）
-          const isNewFile =
-            file.status === "added" ||
-            file.status === "A" ||
-            (file.additions && file.additions > 0 && file.deletions === 0 && !file.patch);
-          if (changedLines.size === 0 && isNewFile) {
-            changedLines = new Set(lines.map((_, i) => i + 1));
-            if (shouldLog(verbose, 2)) {
-              console.log(
-                `   ℹ️ ${file.filename}: 新增文件无 patch，将所有 ${lines.length} 行标记为变更`,
-              );
-            }
-          }
-
-          if (shouldLog(verbose, 3)) {
-            console.log(`   📄 ${file.filename}: ${lines.length} 行, ${changedLines.size} 行变更`);
-            console.log(`      latestCommitHash: ${latestCommitHash}`);
-            if (changedLines.size > 0 && changedLines.size <= 20) {
-              console.log(
-                `      变更行号: ${Array.from(changedLines)
-                  .sort((a, b) => a - b)
-                  .join(", ")}`,
-              );
-            } else if (changedLines.size > 20) {
-              console.log(`      变更行号: (共 ${changedLines.size} 行，省略详情)`);
-            }
-            if (!file.patch) {
-              console.log(
-                `      ⚠️ 该文件没有 patch 信息 (status=${file.status}, additions=${file.additions}, deletions=${file.deletions})`,
-              );
-            } else {
-              console.log(
-                `      patch 前 200 字符: ${file.patch.slice(0, 200).replace(/\n/g, "\\n")}`,
-              );
-            }
-          }
-
-          const contentLines: FileContentLine[] = lines.map((line, index) => {
-            const lineNum = index + 1;
-            // 如果该行在 PR 的整体 diff 中被标记为变更，则使用最新 commit hash
-            const hash = changedLines.has(lineNum) ? latestCommitHash : "-------";
-            return [hash, line];
-          });
-          contents.set(file.filename, contentLines);
-        } catch (error) {
-          console.warn(`警告: 无法获取文件内容: ${file.filename}`, error);
-        }
-      }
-    }
-
-    if (shouldLog(verbose, 1)) {
-      console.log(`📊 映射构建完成，共 ${contents.size} 个文件`);
-    }
-    return contents;
   }
 
   async fillIssueCode(

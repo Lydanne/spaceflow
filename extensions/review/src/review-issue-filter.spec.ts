@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import { ReviewIssueFilter } from "./review-issue-filter";
+import { ReviewSourceResolver } from "./review-source-resolver";
 import type { ReviewIssue, FileContentsMap } from "./review-spec/types";
 
 function mockIssue(overrides: Partial<ReviewIssue> = {}): ReviewIssue {
@@ -18,6 +19,7 @@ function mockIssue(overrides: Partial<ReviewIssue> = {}): ReviewIssue {
 
 describe("ReviewIssueFilter", () => {
   let filter: ReviewIssueFilter;
+  let resolver: ReviewSourceResolver;
   let gitProvider: any;
   let configService: any;
   let mockReviewSpecService: any;
@@ -96,6 +98,7 @@ describe("ReviewIssueFilter", () => {
       mockIssueVerifyService as any,
       mockGitSdkService as any,
     );
+    resolver = new ReviewSourceResolver(gitProvider as any, mockGitSdkService as any, filter);
   });
 
   afterEach(() => {
@@ -120,7 +123,7 @@ describe("ReviewIssueFilter", () => {
 
       gitProvider.getFileContent.mockResolvedValue("line1\nnew line 1\nnew line 2\nline2\nline3");
 
-      const result = await filter.getFileContents(
+      const result = await resolver.getFileContents(
         "owner",
         "repo",
         changedFiles,
@@ -150,7 +153,7 @@ describe("ReviewIssueFilter", () => {
 
       gitProvider.getFileContent.mockResolvedValue("line1\nline2\nline3");
 
-      const result = await filter.getFileContents(
+      const result = await resolver.getFileContents(
         "owner",
         "repo",
         changedFiles,
@@ -177,7 +180,7 @@ describe("ReviewIssueFilter", () => {
 
       gitProvider.getFileContent.mockResolvedValue("line1\nline2\nline3");
 
-      const result = await filter.getFileContents(
+      const result = await resolver.getFileContents(
         "owner",
         "repo",
         changedFiles,
@@ -200,7 +203,7 @@ describe("ReviewIssueFilter", () => {
       ];
       const commits = [{ sha: "abc1234567890" }];
 
-      const result = await filter.getFileContents(
+      const result = await resolver.getFileContents(
         "owner",
         "repo",
         changedFiles,
@@ -222,7 +225,7 @@ describe("ReviewIssueFilter", () => {
         },
       ];
       const commits = [{ sha: "abc1234567890" }];
-      const result = await filter.getFileContents("o", "r", changedFiles, commits, "abc", 1);
+      const result = await resolver.getFileContents("o", "r", changedFiles, commits, "abc", 1);
       expect(result.has("test.ts")).toBe(true);
       expect(result.get("test.ts")).toHaveLength(3);
     });
@@ -233,7 +236,7 @@ describe("ReviewIssueFilter", () => {
         { filename: "test.ts", status: "modified", patch: "@@ -1,1 +1,2 @@\n line1\n+line2" },
       ];
       const commits = [{ sha: "abc1234567890" }];
-      const result = await filter.getFileContents("o", "r", changedFiles, commits, "HEAD");
+      const result = await resolver.getFileContents("o", "r", changedFiles, commits, "HEAD");
       expect(result.has("test.ts")).toBe(true);
     });
 
@@ -241,7 +244,7 @@ describe("ReviewIssueFilter", () => {
       gitProvider.getFileContent.mockRejectedValue(new Error("not found") as any);
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const changedFiles = [{ filename: "missing.ts", status: "modified" }];
-      const result = await filter.getFileContents("o", "r", changedFiles, [], "HEAD", 1);
+      const result = await resolver.getFileContents("o", "r", changedFiles, [], "HEAD", 1);
       expect(result.size).toBe(0);
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
@@ -253,7 +256,16 @@ describe("ReviewIssueFilter", () => {
         { filename: "test.ts", status: "modified", patch: "@@ -1,1 +1,2 @@\n line1\n+line2" },
       ];
       const commits = [{ sha: "abc1234567890" }];
-      const result = await filter.getFileContents("o", "r", changedFiles, commits, "abc", 1, 3);
+      const result = await resolver.getFileContents(
+        "o",
+        "r",
+        changedFiles,
+        commits,
+        "abc",
+        1,
+        false,
+        3,
+      );
       expect(result.has("test.ts")).toBe(true);
     });
 
@@ -261,7 +273,7 @@ describe("ReviewIssueFilter", () => {
       gitProvider.getFileContent.mockResolvedValue("line1\nline2" as any);
       const changedFiles = [{ filename: "new.ts", status: "added", additions: 2, deletions: 0 }];
       const commits = [{ sha: "abc1234567890" }];
-      const result = await filter.getFileContents("o", "r", changedFiles, commits, "abc", 1);
+      const result = await resolver.getFileContents("o", "r", changedFiles, commits, "abc", 1);
       expect(result.has("new.ts")).toBe(true);
       const lines = result.get("new.ts");
       expect(lines![0][0]).toBe("abc1234");
