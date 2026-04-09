@@ -65,7 +65,7 @@ export class ReviewContextBuilder {
 
   async getContextFromEnv(options: ReviewOptions): Promise<ReviewContext> {
     const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");
-    if (shouldLog(options.verbose, 2)) {
+    if (shouldLog(options.verbose, 3)) {
       console.log(`[getContextFromEnv] reviewConf: ${JSON.stringify(reviewConf)}`);
     }
     const ciConf = this.config.get<CiConfig>("ci");
@@ -268,7 +268,9 @@ export class ReviewContextBuilder {
    */
   private normalizeSingleFilePath(file: string, cwd: string): string {
     const normalizedInput = normalize(file);
-    const relativePath = isAbsolute(normalizedInput) ? relative(cwd, normalizedInput) : normalizedInput;
+    const relativePath = isAbsolute(normalizedInput)
+      ? relative(cwd, normalizedInput)
+      : normalizedInput;
     return relativePath.replaceAll("\\", "/").replace(/^\.\/+/, "");
   }
 
