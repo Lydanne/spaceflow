@@ -194,7 +194,6 @@ export class ReviewIssueFilter {
 
     // 优先使用 changedFiles 中的 patch 字段（来自 PR 的整体 diff base...head）
     // 这样行号是相对于最终文件的，而不是每个 commit 的父 commit
-    // buildLineCommitMap 遍历每个 commit 的 diff，行号可能与最终文件不一致
     if (shouldLog(verbose, 1)) {
       console.log(`📊 正在构建行号到变更的映射...`);
     }
@@ -468,56 +467,5 @@ export class ReviewIssueFilter {
 
   generateIssueKey(issue: ReviewIssue): string {
     return generateIssueKey(issue);
-  }
-
-  /**
-   * 构建文件行号到 commit hash 的映射
-   * 遍历每个 commit，获取其修改的文件和行号
-   * 优先使用 API，失败时回退到 git 命令
-   */
-  async buildLineCommitMap(
-    owner: string,
-    repo: string,
-    commits: PullRequestCommit[],
-    verbose?: VerboseLevel,
-  ): Promise<Map<string, Map<number, string>>> {
-    // Map<filename, Map<lineNumber, commitHash>>
-    const fileLineMap = new Map<string, Map<number, string>>();
-
-    // 按时间顺序遍历 commits（早的在前），后面的 commit 会覆盖前面的
-    for (const commit of commits) {
-      if (!commit.sha) continue;
-
-      const shortHash = commit.sha.slice(0, 7);
-      let files: Array<{ filename: string; patch: string }> = [];
-
-      // 优先使用 getCommitDiff API 获取 diff 文本
-      try {
-        const diffText = await this.gitProvider.getCommitDiff(owner, repo, commit.sha);
-        files = parseDiffText(diffText);
-      } catch {
-        // API 失败，回退到 git 命令
-        files = this.gitSdk.getCommitDiff(commit.sha);
-      }
-      if (shouldLog(verbose, 2)) console.log(`   commit ${shortHash}: ${files.length} 个文件变更`);
-
-      for (const file of files) {
-        // 解析这个 commit 修改的行号
-        const changedLines = parseChangedLinesFromPatch(file.patch);
-
-        // 获取或创建文件的行号映射
-        if (!fileLineMap.has(file.filename)) {
-          fileLineMap.set(file.filename, new Map());
-        }
-        const lineMap = fileLineMap.get(file.filename)!;
-
-        // 记录每行对应的 commit hash
-        for (const lineNum of changedLines) {
-          lineMap.set(lineNum, shortHash);
-        }
-      }
-    }
-
-    return fileLineMap;
   }
 }
