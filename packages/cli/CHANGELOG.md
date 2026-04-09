@@ -1,5 +1,121 @@
 # Changelog
 
+## [0.41.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@0.40.0...@spaceflow/cli@0.41.0) (2026-04-09)
+
+### 新特性
+
+* **review-spec:** 新增目录 URL 解析和 clone 降级测试,覆盖子路径处理和 API 失败回退场景 ([fdd8a67](https://github.com/Lydanne/spaceflow/commit/fdd8a67ea3f428ec88e293b1dd11ae279ed6af3d))
+* **review:** 在 review.md 中补充 `-f` 模式忽略 `includes` 过滤的说明,新增测试用例验证直接文件模式下的过滤行为 ([9c15284](https://github.com/Lydanne/spaceflow/commit/9c1528486f93b89442ba6eea4d1cb4503be5f6c7))
+* **review:** 完善 review 命令文档,新增直接文件审查模式说明和配置优先级补充 ([25916c8](https://github.com/Lydanne/spaceflow/commit/25916c8bb7b11b748b6fc5e5ea9a62c954d5c7fc))
+* **review:** 新增 code-* 代码结构过滤语法,支持按函数/类/接口等类型审查新增代码 ([f3b17d3](https://github.com/Lydanne/spaceflow/commit/f3b17d36c6360269a2fd4075311ae764e85cf428))
+* **review:** 新增 failOnIssues 选项,支持根据未解决问题状态控制工作流退出 ([6139538](https://github.com/Lydanne/spaceflow/commit/6139538008af8247ffccdf5aad94d6fa980b73de))
+* **review:** 新增 PullRequestModel 封装 PR 数据访问层 ([3292f1f](https://github.com/Lydanne/spaceflow/commit/3292f1f7d0713ffbb1cdac9e3d3660a013a16fe1))
+* **review:** 新增 ReviewContext 和 ReviewIssueFilter 核心模块 ([dd3c2ce](https://github.com/Lydanne/spaceflow/commit/dd3c2ce107088a17255c19ee1becfa4090d84be6))
+* **review:** 新增自动批准功能，当所有问题解决时自动提交 APPROVE review ([4155342](https://github.com/Lydanne/spaceflow/commit/4155342511f76d6cd9001a14a144fce55a7a8946))
+* **review:** 添加 skipDuplicateWorkflow 和 autoApprove 配置选项支持 ([3ede6e3](https://github.com/Lydanne/spaceflow/commit/3ede6e30d89ced5ef57e154e42f723da5e3c5d92))
+* **review:** 添加 workflow 重复运行检测，防止同一 PR 并发审查 ([a3777af](https://github.com/Lydanne/spaceflow/commit/a3777affb10b6fb4f88a83660ce2a81f9f2d6498))
+
+### 修复BUG
+
+* **gitea:** 修正 PR review 事件类型映射 ([0b86fac](https://github.com/Lydanne/spaceflow/commit/0b86facc6df50eb1fd278d72090c329b5a5aaccf))
+* **review-summary:** 在用户名前添加 @ 符号以支持用户提及 ([a4aa03f](https://github.com/Lydanne/spaceflow/commit/a4aa03f377bb26e1fa7adc90568d89f2bb9936ce))
+* **review-summary:** 在用户名前添加 @ 符号以支持用户提及 ([fd83df4](https://github.com/Lydanne/spaceflow/commit/fd83df4a647e6c4d42617b44fdaf0ebbec7892e4))
+* **review:** 为 skipDuplicateWorkflow 添加错误处理以应对权限不足问题 ([6d0292d](https://github.com/Lydanne/spaceflow/commit/6d0292d20b6eba790f594c555ceb18b75ebfe253))
+* **review:** 优化 merge commit 过滤逻辑 ([7c5bed6](https://github.com/Lydanne/spaceflow/commit/7c5bed66c193fa0368f5e32741995f4252576517))
+* **review:** 修正 issue 统计中 resolved 状态的重复计数问题 ([b61f95e](https://github.com/Lydanne/spaceflow/commit/b61f95e92300dd9c508f3063b3174df1c10a90ad))
+* **review:** 修正无需审查文件时的轮次计算 ([0ee902e](https://github.com/Lydanne/spaceflow/commit/0ee902e6d3a4b2c09efa99d86b3aca4806508fb1))
+* **review:** 在 CI 模式下为 PR 提交 review 评论 ([39a9911](https://github.com/Lydanne/spaceflow/commit/39a9911ee356e54bd4a5b219905226b9f9b6322b))
+
+### 代码重构
+
+* **ci:** 将 PR 审查工作流日志级别从 -vv 提升至 -vvv ([43bd563](https://github.com/Lydanne/spaceflow/commit/43bd5632dbd7151e11977520ca0634fdbc393279))
+* **cli:** 新增依赖版本一致性检查,在 .spaceflowrc 与 .spaceflow/package.json 依赖不一致时自动删除并重建 .spaceflow 目录 ([c93b165](https://github.com/Lydanne/spaceflow/commit/c93b165e16ea0e94dcdfffa97dea9cb329189495))
+* **review-spec:** 重构远程规则拉取逻辑,新增 tea api 支持和多级降级策略,移除 TTL 缓存机制改用持久化本地目录 ([066d9c8](https://github.com/Lydanne/spaceflow/commit/066d9c8d41515fd57eb9fc069361fe44feac46ec))
+* **review:** 优化 PR Review 提交流程,避免重复创建同轮次评论 ([c6977e0](https://github.com/Lydanne/spaceflow/commit/c6977e0ef4497aa3100281b76281e97dc313ab1a))
+* **review:** 优化 PullRequestModel 缓存返回和依赖注入 ([9537a58](https://github.com/Lydanne/spaceflow/commit/9537a587f7ccc900de589aa38bc45a05d73f3f8f))
+* **review:** 优化 syncReactionsToIssues 中的 issue 匹配逻辑,优先使用 issue-key 精确匹配并回退到 path+position 匹配 ([eb8ea47](https://github.com/Lydanne/spaceflow/commit/eb8ea47c56466aa25d58358a09f1e0c9094aa28d))
+* **review:** 优化参数传递和代码组织 ([a1c165e](https://github.com/Lydanne/spaceflow/commit/a1c165ed6a804d6c683bada65f0eafd705d02dac))
+* **review:** 优化问题统计逻辑，区分 fixed 和 resolved 状态 ([c4dda30](https://github.com/Lydanne/spaceflow/commit/c4dda30fed17ce020fcce9af8874dfa89ccca20b))
+* **review:** 修改 buildLinesWithNumbers 忽略占位符格式,从 `...... ..| ignore X-Y code` 改为 `....... ignore X-Y line .......` ([a45dc1a](https://github.com/Lydanne/spaceflow/commit/a45dc1a5b92d50f75682782cec24b0100732e434))
+* **review:** 区分 ☹️ 和 👎 reaction 的语义，☹️ 标记无效，👎 标记未解决 ([f1419fe](https://github.com/Lydanne/spaceflow/commit/f1419fe47448a80f373ffac082ac3a2e9320d200))
+* **review:** 将 code-* 语法从 includes 迁移至独立 filterCodeBlocks 配置项 ([ed4b921](https://github.com/Lydanne/spaceflow/commit/ed4b9217a563d992b76d1e55af21f9b364329737))
+* **review:** 将 filterCodeBlocks 重命名为 whenModifiedCode,简化代码结构过滤语法 ([951c570](https://github.com/Lydanne/spaceflow/commit/951c570ceb7c04d25265d043c3948687bbb230f1))
+* **review:** 将 prompt 构建逻辑提取到独立的 prompt 模块,新增类型验证和 schema 定义 ([5f21356](https://github.com/Lydanne/spaceflow/commit/5f21356964ad4f08004e229ac7bd538c0301b37d))
+* **review:** 将 review-pr-comment-utils 重构为 utils/review-pr-comment,新增完整测试覆盖 ([29041b6](https://github.com/Lydanne/spaceflow/commit/29041b635e3a6ecbd2b2ae49ad1b657aa1a66e9c))
+* **review:** 将 skipDuplicateWorkflow 重构为 duplicateWorkflowResolved,支持 skip/delete 两种处理模式 ([37238f9](https://github.com/Lydanne/spaceflow/commit/37238f9ae8ed38c67f46acb963e3ebb795c0ef71))
+* **review:** 将无效 commit hash 的 issue 标记为 invalid 并清除 commit 字段,移除 code-* 前缀语法支持 ([0a89136](https://github.com/Lydanne/spaceflow/commit/0a89136b32cf49a70dbdfa26683e97ee13dc207e))
+* **review:** 提前检测无效 commit hash,在 fillIssueAuthors 中对已有 author 的 issue 也进行校验 ([c166496](https://github.com/Lydanne/spaceflow/commit/c1664966066bca032bd936b6c1d2c8f320949f9c))
+* **review:** 提取 LLM 审查相关类型和工具函数到独立模块 ([78cff32](https://github.com/Lydanne/spaceflow/commit/78cff327459c377c57486b4322c5a29f9bedf162))
+* **review:** 提取公共工具函数并优化代码复用 ([936bd6f](https://github.com/Lydanne/spaceflow/commit/936bd6f5e1b70c397696ed67ec64b77f63445eb1))
+* **review:** 提取自动批准消息构建逻辑并支持 @PR 作者通知 ([0e6ad66](https://github.com/Lydanne/spaceflow/commit/0e6ad66b3d38d811ecbfb1da2a0426b2eb21b6fd))
+* **review:** 新增 includes 模式的变更类型前缀语法支持 ([d0aacad](https://github.com/Lydanne/spaceflow/commit/d0aacada1f3144bac2934d50d547df17f4e9d305))
+* **review:** 新增 ReviewResultModel 封装审查结果数据访问层 ([a4be34a](https://github.com/Lydanne/spaceflow/commit/a4be34aaa1f722ea0748efb67bd4999bff08b769))
+* **review:** 新增 systemRules 静态规则系统,支持 maxLinesPerFile 限制并跳过超限文件的 LLM 审查 ([3721d0f](https://github.com/Lydanne/spaceflow/commit/3721d0f46d40f71230aceb060350682a3d5642d7))
+* **review:** 新增 whenModifiedCode 过滤逻辑,跳过无匹配代码块的文件并记录日志 ([3d0c1e1](https://github.com/Lydanne/spaceflow/commit/3d0c1e1a4b492e62104af92d16208c206934ad10))
+* **review:** 简化 includes glob 模式,移除冗余的 `*/**` 前缀 ([56cf145](https://github.com/Lydanne/spaceflow/commit/56cf145fbf8f1311df9d538fffc61581d4ead400))
+* **review:** 重构类型定义位置并导出公共常量 ([0293f02](https://github.com/Lydanne/spaceflow/commit/0293f0220d4b7604b44d53c3fa547ca01961cc2d))
+* **tsconfig:** 重命名 tsconfig.skill.json 为 tsconfig.extension.json ([16c80f9](https://github.com/Lydanne/spaceflow/commit/16c80f98ccffafeac06261f94341298523cebd93))
+
+### 文档更新
+
+* **review:** 更新文档,补充 includes 变更类型过滤和 failOnIssues 选项说明 ([6389048](https://github.com/Lydanne/spaceflow/commit/63890487e330909e4e30c392de723c052ee5fa23))
+
+### 测试用例
+
+* **review:** 新增全量 diff 语义测试,验证 added| 对分支首次引入文件的持续匹配行为 ([5b72577](https://github.com/Lydanne/spaceflow/commit/5b725772091d1d4fe5207af1b7d176e705bdb8d3))
+
+### 其他修改
+
+* **core:** released version 0.26.0 [no ci] ([cc597b0](https://github.com/Lydanne/spaceflow/commit/cc597b000bae00885de32eb2ad4287805de7ce5a))
+* **core:** released version 0.27.0 [no ci] ([053d624](https://github.com/Lydanne/spaceflow/commit/053d624997b04e47537dac4ca0c7a99ed4a4cd36))
+* **core:** released version 0.28.0 [no ci] ([6baebaa](https://github.com/Lydanne/spaceflow/commit/6baebaa4cd777b6f8babcb5d8a2f25c426f8da05))
+* **core:** released version 0.29.0 [no ci] ([26c7af1](https://github.com/Lydanne/spaceflow/commit/26c7af16384cdfb30aa82d2a84385989e5b1cce8))
+* **core:** released version 0.30.0 [no ci] ([7a94a63](https://github.com/Lydanne/spaceflow/commit/7a94a632cd246d3d58c0e8cb85dd1c361ed39b6c))
+* **publish:** released version 0.50.0 [no ci] ([8020040](https://github.com/Lydanne/spaceflow/commit/802004073c276705868ffbef4d5daae6a0068d39))
+* **publish:** released version 0.51.0 [no ci] ([1fbe22a](https://github.com/Lydanne/spaceflow/commit/1fbe22a538cdcb6264e3937c5706d75f67fa4f2a))
+* **publish:** released version 0.52.0 [no ci] ([bcbc2a9](https://github.com/Lydanne/spaceflow/commit/bcbc2a97e5bdedfd728330a33f19ec9172d80f40))
+* **publish:** released version 0.53.0 [no ci] ([72a98c0](https://github.com/Lydanne/spaceflow/commit/72a98c0d2dfd87c9319c1c73e0f8754b320013cd))
+* **publish:** released version 0.54.0 [no ci] ([64b467d](https://github.com/Lydanne/spaceflow/commit/64b467d663caa2ec5b793f609c01f150ab416bea))
+* **review-summary:** released version 0.35.0 [no ci] ([4f2607d](https://github.com/Lydanne/spaceflow/commit/4f2607def2725946f32eccc4aa4e687a3cdd9bab))
+* **review-summary:** released version 0.36.0 [no ci] ([95c3d5c](https://github.com/Lydanne/spaceflow/commit/95c3d5cbac67c1ffa4c821faaffb476c502fe2c7))
+* **review-summary:** released version 0.37.0 [no ci] ([455c581](https://github.com/Lydanne/spaceflow/commit/455c58140def453d95c8fc85b1ea8fde39037abc))
+* **review-summary:** released version 0.38.0 [no ci] ([119c2a8](https://github.com/Lydanne/spaceflow/commit/119c2a8861a02e68a4e31135aa88799fe63d29ff))
+* **review-summary:** released version 0.39.0 [no ci] ([40fbd43](https://github.com/Lydanne/spaceflow/commit/40fbd435b3895b22b04dce7cce4c487f0edbdd2a))
+* **review-summary:** released version 0.40.0 [no ci] ([9c5c262](https://github.com/Lydanne/spaceflow/commit/9c5c26256984c9349def2801af6e77b7013e703f))
+* **review-summary:** released version 0.41.0 [no ci] ([49ebc70](https://github.com/Lydanne/spaceflow/commit/49ebc707ef33ff231d8a44614b6640a07462edca))
+* **review-summary:** released version 0.42.0 [no ci] ([6e397e5](https://github.com/Lydanne/spaceflow/commit/6e397e5d389c385142d52b29b0332130be5245cd))
+* **review-summary:** released version 0.43.0 [no ci] ([02d8232](https://github.com/Lydanne/spaceflow/commit/02d8232e28b8c1f0f1a53ffc8b43638ab9a0b3ba))
+* **review-summary:** released version 0.44.0 [no ci] ([e3f943e](https://github.com/Lydanne/spaceflow/commit/e3f943e876a1ff0f4db61c7113c8b9c145e6e5c8))
+* **review-summary:** released version 0.45.0 [no ci] ([640e71d](https://github.com/Lydanne/spaceflow/commit/640e71dd6da42ff055fc925767418f9ba742c8b1))
+* **review-summary:** released version 0.46.0 [no ci] ([72fa783](https://github.com/Lydanne/spaceflow/commit/72fa783ef5c104d654a29481300d791b333df0ee))
+* **review-summary:** released version 0.47.0 [no ci] ([7cd6664](https://github.com/Lydanne/spaceflow/commit/7cd66645f528355b3849d49ac3fb563267bd16e9))
+* **review-summary:** released version 0.48.0 [no ci] ([71629d2](https://github.com/Lydanne/spaceflow/commit/71629d27024b4c27c5bbe8564a2b87d45548882d))
+* **review-summary:** released version 0.49.0 [no ci] ([db292af](https://github.com/Lydanne/spaceflow/commit/db292af7580944d29bdb28fd717872c0955325ad))
+* **review:** released version 0.67.0 [no ci] ([8a95083](https://github.com/Lydanne/spaceflow/commit/8a95083d4ffd3367dc96cfa1754b9b0e3fea15dc))
+* **review:** released version 0.68.0 [no ci] ([c58b0e7](https://github.com/Lydanne/spaceflow/commit/c58b0e7718191bd8c9652df21485a1e962eb1c0e))
+* **review:** released version 0.69.0 [no ci] ([826661c](https://github.com/Lydanne/spaceflow/commit/826661c5c162aefd4424989fe54681c323d51588))
+* **review:** released version 0.70.0 [no ci] ([ae35738](https://github.com/Lydanne/spaceflow/commit/ae3573851a9156c2f4870405e2cb77c8297ad808))
+* **review:** released version 0.71.0 [no ci] ([bcfe523](https://github.com/Lydanne/spaceflow/commit/bcfe5232a66c809e461e8e58d823e9a17aa184ea))
+* **review:** released version 0.72.0 [no ci] ([966d138](https://github.com/Lydanne/spaceflow/commit/966d13801344ffd104a7f0664b894faff47dd4a3))
+* **review:** released version 0.73.0 [no ci] ([b20c43f](https://github.com/Lydanne/spaceflow/commit/b20c43f18b7be383a49e616b15e43798bbe8693f))
+* **review:** released version 0.74.0 [no ci] ([a4f13f2](https://github.com/Lydanne/spaceflow/commit/a4f13f241e1648fed47f6691b6fcc70d95e6ff55))
+* **review:** released version 0.75.0 [no ci] ([2c00ee4](https://github.com/Lydanne/spaceflow/commit/2c00ee436e8e9b029b3f99936cb5001968512ace))
+* **review:** released version 0.76.0 [no ci] ([e2fa897](https://github.com/Lydanne/spaceflow/commit/e2fa8974268d98765410afa9fad7d15e0bdb82ad))
+* **review:** released version 0.77.0 [no ci] ([9794cc4](https://github.com/Lydanne/spaceflow/commit/9794cc42faf1a773406171f4c3dc4f556889bc93))
+* **review:** released version 0.78.0 [no ci] ([98a8d6b](https://github.com/Lydanne/spaceflow/commit/98a8d6b05c37fa6c5220289c94b69784ad3c2479))
+* **review:** released version 0.79.0 [no ci] ([8957b17](https://github.com/Lydanne/spaceflow/commit/8957b17e2b641375a7a94a6419e09ecf921a858d))
+* **review:** released version 0.80.0 [no ci] ([f2ce9ae](https://github.com/Lydanne/spaceflow/commit/f2ce9ae760c0d58dce1e02157be162996b4da6ee))
+* **scripts:** released version 0.28.0 [no ci] ([55db5cf](https://github.com/Lydanne/spaceflow/commit/55db5cfa1dc0a1e318085caa0cfd9f91b06dcb21))
+* **scripts:** released version 0.29.0 [no ci] ([496843a](https://github.com/Lydanne/spaceflow/commit/496843add224941b646837d8fc8ec03f790530fc))
+* **scripts:** released version 0.30.0 [no ci] ([16cb023](https://github.com/Lydanne/spaceflow/commit/16cb02382f11d77bdc3cfc156932ebc5de6a9634))
+* **scripts:** released version 0.31.0 [no ci] ([864d556](https://github.com/Lydanne/spaceflow/commit/864d556eea3d271d11ef51ab5e83200e75200a71))
+* **scripts:** released version 0.32.0 [no ci] ([7871aa9](https://github.com/Lydanne/spaceflow/commit/7871aa94a7f1227d6f09fc43ea69fb7d4e193ec4))
+* **shell:** released version 0.28.0 [no ci] ([01f180f](https://github.com/Lydanne/spaceflow/commit/01f180f2508e75524a33e66fea580a738adc689f))
+* **shell:** released version 0.29.0 [no ci] ([368f8c8](https://github.com/Lydanne/spaceflow/commit/368f8c83ae3e485df5bfd4128e46aef4a6689eb0))
+* **shell:** released version 0.30.0 [no ci] ([a54bc46](https://github.com/Lydanne/spaceflow/commit/a54bc4679f9682f9e9b86b655a8aadfacddceb68))
+* **shell:** released version 0.31.0 [no ci] ([66fcf46](https://github.com/Lydanne/spaceflow/commit/66fcf4648b708d46b939cc88050d43470b5dd25b))
+* **shell:** released version 0.32.0 [no ci] ([88bdc81](https://github.com/Lydanne/spaceflow/commit/88bdc81cb0ec7809fbd76c7b157e0177b2f4db20))
+
 ## [0.40.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@0.39.0...@spaceflow/cli@0.40.0) (2026-03-03)
 
 ### 新特性
