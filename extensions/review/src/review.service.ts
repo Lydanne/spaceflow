@@ -12,27 +12,28 @@ import type { IConfigReader } from "@spaceflow/core";
 import { type ReviewConfig } from "./review.config";
 import { ReviewSpecService, ReviewResult, FileSummary } from "./review-spec";
 import { MarkdownFormatter, ReviewReportService } from "./review-report";
-import micromatch from "micromatch";
 import { ReviewOptions } from "./review.config";
 import { IssueVerifyService } from "./issue-verify.service";
 import { DeletionImpactService } from "./deletion-impact.service";
 import { execSync } from "child_process";
 import { ReviewContextBuilder, type ReviewContext } from "./review-context";
 import { ReviewIssueFilter } from "./review-issue-filter";
-import { filterFilesByIncludes, extractGlobsFromIncludes } from "./review-includes-filter";
+import { filterFilesByIncludes } from "./review-includes-filter";
 import { ReviewLlmProcessor } from "./review-llm";
 import { PullRequestModel } from "./pull-request-model";
 import { ReviewResultModel, type ReviewResultModelDeps } from "./review-result-model";
-import { REVIEW_COMMENT_MARKER, REVIEW_LINE_COMMENTS_MARKER } from "./utils/review-pr-comment";
+import { ReviewSourceResolver, type SourceData } from "./review-source-resolver";
 
 export type { ReviewContext } from "./review-context";
 export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./review-llm";
+export type { SourceData } from "./review-source-resolver";
 
 export class ReviewService {
   protected readonly contextBuilder: ReviewContextBuilder;
   protected readonly issueFilter: ReviewIssueFilter;
   protected readonly llmProcessor: ReviewLlmProcessor;
   protected readonly resultModelDeps: ReviewResultModelDeps;
+  protected readonly sourceResolver: ReviewSourceResolver;
 
   constructor(
     protected readonly gitProvider: GitProviderService,
@@ -53,6 +54,7 @@ export class ReviewService {
       gitSdk,
     );
     this.llmProcessor = new ReviewLlmProcessor(llmProxyService, reviewSpecService);
+    this.sourceResolver = new ReviewSourceResolver(gitProvider, gitSdk, this.issueFilter);
     this.resultModelDeps = {
       gitProvider,
       config,
@@ -216,257 +218,11 @@ export class ReviewService {
   // ─── 提取的子方法 ──────────────────────────────────────
 
   /**
-   * 解析输入数据：根据模式（本地/PR/分支比较）获取 commits、changedFiles 等。
-   * 包含前置过滤（merge commit、files、commits、includes）。
-   * 如果需要提前返回（如同分支、重复 workflow），通过 earlyReturn 字段传递。
+   * 解析输入数据：委托给 ReviewSourceResolver。
+   * @see ReviewSourceResolver#resolve
    */
-  protected async resolveSourceData(context: ReviewContext): Promise<{
-    prModel?: PullRequestModel;
-    commits: PullRequestCommit[];
-    changedFiles: ChangedFile[];
-    headSha: string;
-    isLocalMode: boolean;
-    isDirectFileMode: boolean;
-    earlyReturn?: ReviewResult;
-  }> {
-    const {
-      owner,
-      repo,
-      prNumber,
-      baseRef,
-      headRef,
-      verbose,
-      ci,
-      includes,
-      files,
-      commits: filterCommits,
-      localMode,
-      duplicateWorkflowResolved,
-    } = context;
-
-    const isDirectFileMode = !!(files && files.length > 0 && !prNumber);
-    let isLocalMode = !!localMode;
-    let effectiveBaseRef = baseRef;
-    let effectiveHeadRef = headRef;
-
-    let prModel: PullRequestModel | undefined;
-    let commits: PullRequestCommit[] = [];
-    let changedFiles: ChangedFile[] = [];
-
-    if (isLocalMode) {
-      // 本地模式：从 git 获取未提交/暂存区的变更
-      if (shouldLog(verbose, 1)) {
-        console.log(`📥 本地模式: 获取${localMode === "staged" ? "暂存区" : "未提交"}的代码变更`);
-      }
-      const localFiles =
-        localMode === "staged" ? this.gitSdk.getStagedFiles() : this.gitSdk.getUncommittedFiles();
-
-      if (localFiles.length === 0) {
-        // 本地无变更，回退到分支比较模式
-        if (shouldLog(verbose, 1)) {
-          console.log(
-            `ℹ️  没有${localMode === "staged" ? "暂存区" : "未提交"}的代码变更，回退到分支比较模式`,
-          );
-        }
-        isLocalMode = false;
-        effectiveHeadRef = this.gitSdk.getCurrentBranch() ?? "HEAD";
-        effectiveBaseRef = this.gitSdk.getDefaultBranch();
-        if (shouldLog(verbose, 1)) {
-          console.log(`📌 自动检测分支: base=${effectiveBaseRef}, head=${effectiveHeadRef}`);
-        }
-        // 同分支无法比较，提前返回
-        if (effectiveBaseRef === effectiveHeadRef) {
-          console.log(`ℹ️  当前分支 ${effectiveHeadRef} 与默认分支相同，没有可审查的代码变更`);
-          return {
-            commits: [],
-            changedFiles: [],
-            headSha: "HEAD",
-            isLocalMode: false,
-            isDirectFileMode: false,
-            earlyReturn: { success: true, description: "", issues: [], summary: [], round: 1 },
-          };
-        }
-      } else {
-        // 一次性获取所有 diff，避免每个文件调用一次 git 命令
-        const localDiffs =
-          localMode === "staged" ? this.gitSdk.getStagedDiff() : this.gitSdk.getUncommittedDiff();
-        const diffMap = new Map(localDiffs.map((d) => [d.filename, d.patch]));
-
-        changedFiles = localFiles.map((f) => ({
-          filename: f.filename,
-          status: f.status as ChangedFile["status"],
-          patch: diffMap.get(f.filename),
-        }));
-
-        if (shouldLog(verbose, 1)) {
-          console.log(`   Changed files: ${changedFiles.length}`);
-        }
-      }
-    }
-
-    // 直接文件审查模式（-f）：绕过 diff，直接按指定文件构造审查输入
-    if (isDirectFileMode) {
-      if (shouldLog(verbose, 1)) {
-        console.log(`📥 直接审查指定文件模式 (${files!.length} 个文件)`);
-      }
-      changedFiles = files!.map((f) => ({ filename: f, status: "modified" as const }));
-      isLocalMode = true;
-    }
-    // PR 模式、分支比较模式、或本地模式回退后的分支比较
-    else if (prNumber) {
-      if (shouldLog(verbose, 1)) {
-        console.log(`📥 获取 PR #${prNumber} 信息 (owner: ${owner}, repo: ${repo})`);
-      }
-      prModel = new PullRequestModel(this.gitProvider, owner, repo, prNumber);
-      const prInfo = await prModel.getInfo();
-      commits = await prModel.getCommits();
-      changedFiles = await prModel.getFiles();
-      if (shouldLog(verbose, 1)) {
-        console.log(`   PR: ${prInfo?.title}`);
-        console.log(`   Commits: ${commits.length}`);
-        console.log(`   Changed files: ${changedFiles.length}`);
-      }
-
-      // 检查是否有其他同名 review workflow 正在运行中
-      if (duplicateWorkflowResolved !== "off" && ci && prInfo?.head?.sha) {
-        const duplicateResult = await this.checkDuplicateWorkflow(
-          prModel,
-          prInfo.head.sha,
-          duplicateWorkflowResolved,
-          verbose,
-        );
-        if (duplicateResult) {
-          return {
-            prModel,
-            commits,
-            changedFiles,
-            headSha: prInfo.head.sha,
-            isLocalMode,
-            isDirectFileMode,
-            earlyReturn: duplicateResult,
-          };
-        }
-      }
-    } else if (effectiveBaseRef && effectiveHeadRef) {
-      if (changedFiles.length === 0) {
-        if (shouldLog(verbose, 1)) {
-          console.log(
-            `📥 获取 ${effectiveBaseRef}...${effectiveHeadRef} 的差异 (owner: ${owner}, repo: ${repo})`,
-          );
-        }
-        changedFiles = await this.issueFilter.getChangedFilesBetweenRefs(
-          owner,
-          repo,
-          effectiveBaseRef,
-          effectiveHeadRef,
-        );
-        commits = await this.issueFilter.getCommitsBetweenRefs(effectiveBaseRef, effectiveHeadRef);
-        if (shouldLog(verbose, 1)) {
-          console.log(`   Changed files: ${changedFiles.length}`);
-          console.log(`   Commits: ${commits.length}`);
-        }
-      }
-    } else if (!isLocalMode) {
-      if (shouldLog(verbose, 1)) {
-        console.log(`❌ 错误: 缺少 prNumber 或 baseRef/headRef`, { prNumber, baseRef, headRef });
-      }
-      throw new Error("必须指定 PR 编号或者 base/head 分支");
-    }
-
-    // ── 前置过滤 ──────────────────────────────────────────
-
-    // 0. 过滤掉 merge commit
-    {
-      const before = commits.length;
-      commits = commits.filter((c) => {
-        const message = c.commit?.message || "";
-        return !message.startsWith("Merge ");
-      });
-      if (before !== commits.length && shouldLog(verbose, 1)) {
-        console.log(`   跳过 Merge Commits: ${before} -> ${commits.length} 个`);
-      }
-    }
-
-    // 1. 按指定的 files 过滤
-    if (files && files.length > 0) {
-      const before = changedFiles.length;
-      changedFiles = changedFiles.filter((f) => files.includes(f.filename || ""));
-      if (shouldLog(verbose, 1)) {
-        console.log(`   Files 过滤文件: ${before} -> ${changedFiles.length} 个文件`);
-      }
-    }
-
-    // 2. 按指定的 commits 过滤
-    if (filterCommits && filterCommits.length > 0) {
-      const beforeCommits = commits.length;
-      commits = commits.filter((c) => filterCommits.some((fc) => fc && c.sha?.startsWith(fc)));
-      if (shouldLog(verbose, 1)) {
-        console.log(`   Commits 过滤: ${beforeCommits} -> ${commits.length} 个`);
-      }
-
-      const beforeFiles = changedFiles.length;
-      const commitFilenames = new Set<string>();
-      for (const commit of commits) {
-        if (!commit.sha) continue;
-        const commitFiles = await this.issueFilter.getFilesForCommit(
-          owner,
-          repo,
-          commit.sha,
-          prNumber,
-        );
-        commitFiles.forEach((f) => commitFilenames.add(f));
-      }
-      changedFiles = changedFiles.filter((f) => commitFilenames.has(f.filename || ""));
-      if (shouldLog(verbose, 1)) {
-        console.log(`   按 Commits 过滤文件: ${beforeFiles} -> ${changedFiles.length} 个文件`);
-      }
-    }
-
-    // 3. 使用 includes 过滤文件和 commits（支持 added|/modified|/deleted| 前缀语法）
-    if (isDirectFileMode && includes && includes.length > 0) {
-      if (shouldLog(verbose, 1)) {
-        console.log(`ℹ️  直接文件模式下忽略 includes 过滤`);
-      }
-    } else if (includes && includes.length > 0) {
-      const beforeFiles = changedFiles.length;
-      if (shouldLog(verbose, 2)) {
-        console.log(
-          `[resolveSourceData] filterFilesByIncludes: before=${JSON.stringify(changedFiles.map((f) => ({ filename: f.filename, status: f.status })))}, includes=${JSON.stringify(includes)}`,
-        );
-      }
-      changedFiles = filterFilesByIncludes(changedFiles, includes);
-      if (shouldLog(verbose, 1)) {
-        console.log(`   Includes 过滤文件: ${beforeFiles} -> ${changedFiles.length} 个文件`);
-      }
-      if (shouldLog(verbose, 2)) {
-        console.log(
-          `[resolveSourceData] filterFilesByIncludes: after=${JSON.stringify(changedFiles.map((f) => f.filename))}`,
-        );
-      }
-
-      const globs = extractGlobsFromIncludes(includes);
-      const beforeCommits = commits.length;
-      const filteredCommits: PullRequestCommit[] = [];
-      for (const commit of commits) {
-        if (!commit.sha) continue;
-        const commitFiles = await this.issueFilter.getFilesForCommit(
-          owner,
-          repo,
-          commit.sha,
-          prNumber,
-        );
-        if (micromatch.some(commitFiles, globs)) {
-          filteredCommits.push(commit);
-        }
-      }
-      commits = filteredCommits;
-      if (shouldLog(verbose, 1)) {
-        console.log(`   Includes 过滤 Commits: ${beforeCommits} -> ${commits.length} 个`);
-      }
-    }
-
-    const headSha = prModel ? await prModel.getHeadSha() : headRef || "HEAD";
-    return { prModel, commits, changedFiles, headSha, isLocalMode, isDirectFileMode };
+  protected async resolveSourceData(context: ReviewContext): Promise<SourceData> {
+    return this.sourceResolver.resolve(context);
   }
 
   /**
@@ -923,120 +679,6 @@ export class ReviewService {
     }
 
     return result;
-  }
-
-  /**
-   * 检查是否有其他同名 review workflow 正在运行中
-   * 根据 duplicateWorkflowResolved 配置决定是跳过还是删除旧评论
-   */
-  private async checkDuplicateWorkflow(
-    prModel: PullRequestModel,
-    headSha: string,
-    mode: "skip" | "delete",
-    verbose?: VerboseLevel,
-  ): Promise<ReviewResult | null> {
-    const ref = process.env.GITHUB_REF || process.env.GITEA_REF || "";
-    const prMatch = ref.match(/refs\/pull\/(\d+)/);
-    const currentPrNumber = prMatch ? parseInt(prMatch[1], 10) : prModel.number;
-
-    try {
-      const runningWorkflows = await prModel.listWorkflowRuns({
-        status: "in_progress",
-      });
-      const currentWorkflowName = process.env.GITHUB_WORKFLOW || process.env.GITEA_WORKFLOW;
-      const currentRunId = process.env.GITHUB_RUN_ID || process.env.GITEA_RUN_ID;
-      const duplicateReviewRuns = runningWorkflows.filter(
-        (w) =>
-          w.sha === headSha &&
-          w.name === currentWorkflowName &&
-          (!currentRunId || String(w.id) !== currentRunId),
-      );
-      if (duplicateReviewRuns.length > 0) {
-        if (mode === "delete") {
-          // 删除模式：清理旧的 AI Review 评论和 PR Review
-          if (shouldLog(verbose, 1)) {
-            console.log(
-              `🗑️ 检测到 ${duplicateReviewRuns.length} 个同名 workflow，清理旧的 AI Review 评论...`,
-            );
-          }
-          await this.cleanupDuplicateAiReviews(prModel, verbose);
-          // 清理后继续执行当前审查
-          return null;
-        }
-
-        // 跳过模式（默认）
-        if (shouldLog(verbose, 1)) {
-          console.log(
-            `⏭️ 跳过审查: 当前 PR #${currentPrNumber} 有 ${duplicateReviewRuns.length} 个同名 workflow 正在运行中`,
-          );
-        }
-        return {
-          success: true,
-          description: `跳过审查: PR #${currentPrNumber} 有 ${duplicateReviewRuns.length} 个同名 workflow 正在运行中，等待完成后重新审查`,
-          issues: [],
-          summary: [],
-          round: 1,
-        };
-      }
-    } catch (error) {
-      if (shouldLog(verbose, 1)) {
-        console.warn(
-          `⚠️ 无法检查重复 workflow（可能缺少 repo owner 权限），跳过此检查:`,
-          error instanceof Error ? error.message : error,
-        );
-      }
-    }
-    return null;
-  }
-
-  /**
-   * 清理重复的 AI Review 评论（Issue Comments 和 PR Reviews）
-   */
-  private async cleanupDuplicateAiReviews(
-    prModel: PullRequestModel,
-    verbose?: VerboseLevel,
-  ): Promise<void> {
-    try {
-      // 删除 Issue Comments（主评论）
-      const comments = await prModel.getComments();
-      const aiComments = comments.filter((c) => c.body?.includes(REVIEW_COMMENT_MARKER));
-      let deletedComments = 0;
-      for (const comment of aiComments) {
-        if (comment.id) {
-          try {
-            await prModel.deleteComment(comment.id);
-            deletedComments++;
-          } catch {
-            // 忽略删除失败
-          }
-        }
-      }
-      if (deletedComments > 0 && shouldLog(verbose, 1)) {
-        console.log(`   已删除 ${deletedComments} 个重复的 AI Review 主评论`);
-      }
-
-      // 删除 PR Reviews（行级评论）
-      const reviews = await prModel.getReviews();
-      const aiReviews = reviews.filter((r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER));
-      let deletedReviews = 0;
-      for (const review of aiReviews) {
-        if (review.id) {
-          try {
-            await prModel.deleteReview(review.id);
-            deletedReviews++;
-          } catch {
-            // 已提交的 review 无法删除，忽略
-          }
-        }
-      }
-      if (deletedReviews > 0 && shouldLog(verbose, 1)) {
-        console.log(`   已删除 ${deletedReviews} 个重复的 AI Review PR Review`);
-      }
-    } catch (error) {
-      if (shouldLog(verbose, 1)) {
-        console.warn(`⚠️ 清理旧评论失败:`, error instanceof Error ? error.message : error);
-      }
-    }
   }
 
   /**
