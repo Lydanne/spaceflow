@@ -25,7 +25,7 @@ export class ChangedFileCollection implements Iterable<ChangedFile> {
   }
 
   toArray(): ChangedFile[] {
-    return this._files;
+    return [...this._files];
   }
 
   [Symbol.iterator](): Iterator<ChangedFile> {
@@ -40,7 +40,7 @@ export class ChangedFileCollection implements Iterable<ChangedFile> {
     const exts = new Set<string>();
     for (const f of this._files) {
       if (f.filename) {
-        const ext = extname(f.filename).replace(/^\./, "");
+        const ext = extname(f.filename).replace(/^\./, "").toLowerCase();
         if (ext) exts.add(ext);
       }
     }
@@ -77,11 +77,11 @@ export class ChangedFileCollection implements Iterable<ChangedFile> {
 
   filterByFilenames(names: Iterable<string>): ChangedFileCollection {
     const nameSet = new Set(names);
-    return this.filter((f) => nameSet.has(f.filename ?? ""));
+    return this.filter((f) => !!f.filename && nameSet.has(f.filename));
   }
 
   filterByCommitFiles(commitFilenames: Iterable<string>): ChangedFileCollection {
     const nameSet = new Set(commitFilenames);
-    return this.filter((f) => nameSet.has(f.filename ?? ""));
+    return this.filter((f) => !!f.filename && nameSet.has(f.filename));
   }
 }
