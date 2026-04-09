@@ -391,7 +391,7 @@ describe("ReviewResultModel", () => {
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       const issues = [{ file: "a.ts", line: "1" }] as any[];
       const model = ReviewResultModel.create(createPr(gitProvider), createResult({ issues }), deps);
-      await model.invalidateChangedFiles(undefined, 1);
+      await model.invalidateChangedFiles(undefined, undefined, 1);
       expect(issues[0].valid).toBeUndefined();
       expect(consoleSpy).toHaveBeenCalledWith("   ⚠️ 无法获取 PR head SHA，跳过变更文件检查");
       consoleSpy.mockRestore();
@@ -402,7 +402,7 @@ describe("ReviewResultModel", () => {
       gitProvider.getCommitDiff.mockResolvedValue("");
       const issues = [{ file: "a.ts", line: "1" }] as any[];
       const model = ReviewResultModel.create(createPr(gitProvider), createResult({ issues }), deps);
-      await model.invalidateChangedFiles("abc123", 1);
+      await model.invalidateChangedFiles("abc123", undefined, 1);
       expect(issues[0].valid).toBeUndefined();
       consoleSpy.mockRestore();
     });
@@ -417,7 +417,7 @@ describe("ReviewResultModel", () => {
         { file: "unchanged.ts", line: "2", ruleId: "R2" },
       ] as any[];
       const model = ReviewResultModel.create(createPr(gitProvider), createResult({ issues }), deps);
-      await model.invalidateChangedFiles("abc123", 1);
+      await model.invalidateChangedFiles("abc123", undefined, 1);
       expect(model.issues[0].valid).toBe("false");
       expect(model.issues[1].valid).toBeUndefined();
       consoleSpy.mockRestore();
@@ -445,9 +445,40 @@ describe("ReviewResultModel", () => {
       gitProvider.getCommitDiff.mockRejectedValue(new Error("diff fail"));
       const issues = [{ file: "a.ts", line: "1" }] as any[];
       const model = ReviewResultModel.create(createPr(gitProvider), createResult({ issues }), deps);
-      await model.invalidateChangedFiles("abc123", 1);
+      await model.invalidateChangedFiles("abc123", undefined, 1);
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
+    });
+
+    it("should preserve resolved issue when current code differs from issue.code", async () => {
+      gitProvider.getCommitDiff.mockResolvedValue(
+        "diff --git a/changed.ts b/changed.ts\n--- a/changed.ts\n+++ b/changed.ts\n@@ -1,1 +1,2 @@\n line1\n+new",
+      );
+      const issues = [
+        { file: "changed.ts", line: "1", ruleId: "R1", resolved: "2024-01-01", code: "old code" },
+      ] as any[];
+      const model = ReviewResultModel.create(createPr(gitProvider), createResult({ issues }), deps);
+      const fileContents: Map<string, [string, string][]> = new Map([
+        ["changed.ts", [["abc1234", "new code"]]],
+      ]);
+      await model.invalidateChangedFiles("abc123", fileContents);
+      expect(model.issues[0].valid).toBeUndefined();
+      expect(model.issues[0].resolved).toBe("2024-01-01");
+    });
+
+    it("should invalidate resolved issue when current code matches issue.code", async () => {
+      gitProvider.getCommitDiff.mockResolvedValue(
+        "diff --git a/changed.ts b/changed.ts\n--- a/changed.ts\n+++ b/changed.ts\n@@ -1,1 +1,2 @@\n old code\n+new",
+      );
+      const issues = [
+        { file: "changed.ts", line: "1", ruleId: "R1", resolved: "2024-01-01", code: "old code" },
+      ] as any[];
+      const model = ReviewResultModel.create(createPr(gitProvider), createResult({ issues }), deps);
+      const fileContents: Map<string, [string, string][]> = new Map([
+        ["changed.ts", [["abc1234", "old code"]]],
+      ]);
+      await model.invalidateChangedFiles("abc123", fileContents);
+      expect(model.issues[0].valid).toBe("false");
     });
   });
 

@@ -323,7 +323,7 @@ export class ReviewService {
         reviewConf.invalidateChangedFiles !== "off" &&
         reviewConf.invalidateChangedFiles !== "keep"
       ) {
-        await existingResultModel.invalidateChangedFiles(headSha, verbose);
+        await existingResultModel.invalidateChangedFiles(headSha, fileContents, verbose);
       }
 
       // 验证历史问题是否已修复
