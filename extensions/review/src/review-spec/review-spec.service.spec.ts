@@ -1289,6 +1289,9 @@ const MAX_COUNT = 100;
         .mockResolvedValueOnce(undefined);
       (mkdir as Mock).mockResolvedValue(undefined);
       (child_process.execSync as Mock).mockReturnValue("");
+      (child_process.execFileSync as Mock).mockImplementation(() => {
+        throw new Error("tea unavailable");
+      });
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const result = await service.resolveSpecSources([
@@ -1296,15 +1299,56 @@ const MAX_COUNT = 100;
       ]);
 
       expect(result.some((dir) => dir.includes("xgj__review-spec/references"))).toBe(true);
-      expect((child_process.execSync as Mock).mock.calls[0][0]).toContain(
-        'git clone --depth 1 "https://git.bjxgj.com/xgj/review-spec.git"',
+      const cloneCall = (child_process.execSync as Mock).mock.calls.find((call) =>
+        String(call[0]).includes('git clone --depth 1 "https://git.bjxgj.com/xgj/review-spec.git"'),
+      );
+      expect(cloneCall).toBeTruthy();
+      consoleSpy.mockRestore();
+    });
+
+    it("should resolve remote specs via tea when provider API fails", async () => {
+      gitProvider.listRepositoryContents.mockRejectedValue(new Error("401 unauthorized"));
+      (child_process.execSync as Mock).mockReturnValue(""); // command -v tea
+      (child_process.execFileSync as Mock)
+        .mockReturnValueOnce(
+          JSON.stringify([
+            {
+              name: "git.bjxgj.com",
+              url: "https://git.bjxgj.com",
+            },
+          ]),
+        ) // tea login list -o json
+        .mockReturnValueOnce(
+          JSON.stringify([
+            {
+              type: "file",
+              name: "js.base.md",
+              path: "references/js.base.md",
+            },
+          ]),
+        ) // tea api contents
+        .mockReturnValueOnce("# Test `[JsTs.Base]`"); // tea api raw file
+      (readdir as Mock).mockResolvedValue([]);
+      (mkdir as Mock).mockResolvedValue(undefined);
+      (writeFile as Mock).mockResolvedValue(undefined);
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const result = await service.resolveSpecSources([
+        "https://git.bjxgj.com/xgj/review-spec/src/branch/main/references",
+      ]);
+
+      expect(result.some((dir) => dir.includes("review-spec"))).toBe(true);
+      expect(child_process.execFileSync).toHaveBeenCalledWith(
+        "tea",
+        ["api", "-l", "git.bjxgj.com", "/repos/xgj/review-spec/contents/references?ref=main"],
+        expect.objectContaining({ encoding: "utf-8", stdio: "pipe" }),
       );
       consoleSpy.mockRestore();
     });
   });
 
   describe("fetchRemoteSpecs", () => {
-    it("should fetch and cache remote specs", async () => {
+    it("should fetch and persist remote specs into review-spec dir", async () => {
       gitProvider.listRepositoryContents.mockResolvedValue([
         { type: "file", name: "rule.md", path: "rule.md" },
       ]);
@@ -1328,7 +1372,7 @@ const MAX_COUNT = 100;
       consoleSpy.mockRestore();
     });
 
-    it("should handle API failure and use expired cache", async () => {
+    it("should handle API failure and use local specs directory", async () => {
       gitProvider.listRepositoryContents.mockRejectedValue(new Error("API error"));
       (readdir as Mock).mockResolvedValue(["cached.md"]);
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -1340,7 +1384,7 @@ const MAX_COUNT = 100;
       logSpy.mockRestore();
     });
 
-    it("should handle API failure without cache", async () => {
+    it("should handle API failure without local specs directory", async () => {
       gitProvider.listRepositoryContents.mockRejectedValue(new Error("API error"));
       (readdir as Mock).mockRejectedValue(new Error("no cache"));
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -1352,15 +1396,12 @@ const MAX_COUNT = 100;
       logSpy.mockRestore();
     });
 
-    it("should use valid cache in non-CI environment", async () => {
-      const originalCI = process.env.CI;
-      delete process.env.CI;
-      (readFile as Mock).mockResolvedValue(String(Date.now()));
+    it("should use local specs directory as fallback", async () => {
+      gitProvider.listRepositoryContents.mockRejectedValue(new Error("API error"));
       (readdir as Mock).mockResolvedValue(["cached.md"]);
       const ref = { owner: "org", repo: "repo" };
       const result = await (service as any).fetchRemoteSpecs(ref);
       expect(result).toBeTruthy();
-      process.env.CI = originalCI;
     });
   });
 

@@ -39,7 +39,7 @@ export class ReviewIssueFilter {
     if (shouldLog(verbose, 1)) {
       console.log(`📂 解析规则来源: ${specSources.length} 个`);
     }
-    const specDirs = await this.reviewSpecService.resolveSpecSources(specSources);
+    const specDirs = await this.reviewSpecService.resolveSpecSources(specSources, verbose);
     if (shouldLog(verbose, 2)) {
       console.log(`   解析到 ${specDirs.length} 个规则目录`, specDirs);
     }

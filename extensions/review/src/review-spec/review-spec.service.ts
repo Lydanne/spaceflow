@@ -7,19 +7,26 @@ import {
   type RemoteRepoRef,
   type RepositoryContent,
 } from "@spaceflow/core";
-import { readdir, readFile, mkdir, access, writeFile } from "fs/promises";
+import { readdir, readFile, mkdir, access, writeFile, unlink } from "fs/promises";
 import { join, basename, extname } from "path";
 import { homedir } from "os";
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
 import micromatch from "micromatch";
 import { ReviewSpec, ReviewRule, RuleExample, Severity } from "./types";
 import { extractGlobsFromIncludes } from "../review-includes-filter";
 
-/** 远程规则缓存 TTL（毫秒），默认 5 分钟 */
-const REMOTE_SPEC_CACHE_TTL = 5 * 60 * 1000;
-
 export class ReviewSpecService {
   constructor(protected readonly gitProvider?: GitProviderService) {}
+
+  protected normalizeServerUrl(url: string): string {
+    return url.trim().replace(/\/+$/, "");
+  }
+
+  protected logVerbose(verbose: VerboseLevel | undefined, level: number, message: string): void {
+    if (shouldLog(verbose, level as VerboseLevel)) {
+      console.log(message);
+    }
+  }
   /**
    * 检查规则 ID 是否匹配（精确匹配或前缀匹配）
    * 例如: "JsTs.FileName" 匹配 "JsTs.FileName" 和 "JsTs.FileName.UpperCamel"
@@ -114,66 +121,249 @@ export class ReviewSpecService {
     return specs;
   }
 
-  async resolveSpecSources(sources: string[]): Promise<string[]> {
+  async resolveSpecSources(sources: string[], verbose?: VerboseLevel): Promise<string[]> {
     const dirs: string[] = [];
 
     for (const source of sources) {
+      this.logVerbose(verbose, 3, `   🔎 规则来源: ${source}`);
       const repoRef = parseRepoUrl(source);
+      if (repoRef) {
+        this.logVerbose(
+          verbose,
+          3,
+          `      解析远程仓库: ${repoRef.serverUrl}/${repoRef.owner}/${repoRef.repo} path=${repoRef.path || "(root)"} ref=${repoRef.ref || "(default)"}`,
+        );
+      } else {
+        this.logVerbose(verbose, 3, `      非仓库 URL，按本地目录处理`);
+      }
       if (repoRef && this.gitProvider) {
-        const dir = await this.fetchRemoteSpecs(repoRef);
+        this.logVerbose(verbose, 3, `      尝试方式 #1: Git Provider API`);
+        const dir = await this.fetchRemoteSpecs(repoRef, verbose);
         if (dir) {
           dirs.push(dir);
+          this.logVerbose(verbose, 2, `      ✅ 采用方式: Git Provider API -> ${dir}`);
           continue;
         }
+        this.logVerbose(verbose, 3, `      ❌ Git Provider API 未获取到规则，继续尝试`);
+      }
+      if (repoRef) {
+        this.logVerbose(verbose, 3, `      尝试方式 #2: tea api`);
+        const teaDir = await this.fetchRemoteSpecsViaTea(repoRef, verbose);
+        if (teaDir) {
+          dirs.push(teaDir);
+          this.logVerbose(verbose, 2, `      ✅ 采用方式: tea api -> ${teaDir}`);
+          continue;
+        }
+        this.logVerbose(verbose, 3, `      ❌ tea api 未获取到规则，继续尝试`);
       }
       // API 拉取失败或未配置 provider 时，回退到 git clone（使用仓库根 URL，而非目录 URL）
       if (repoRef) {
+        this.logVerbose(verbose, 3, `      尝试方式 #3: git clone 回退`);
         const fallbackCloneUrl = this.buildRepoCloneUrl(repoRef);
-        const fallbackDir = await this.cloneSpecRepo(fallbackCloneUrl, repoRef.path);
+        this.logVerbose(verbose, 3, `         clone URL: ${fallbackCloneUrl}`);
+        const fallbackDir = await this.cloneSpecRepo(fallbackCloneUrl, repoRef.path, verbose);
         if (fallbackDir) {
           dirs.push(fallbackDir);
+          this.logVerbose(verbose, 2, `      ✅ 采用方式: git clone 回退 -> ${fallbackDir}`);
           continue;
         }
+        this.logVerbose(verbose, 3, `      ❌ git clone 回退失败`);
       }
       if (this.isRepoUrl(source)) {
-        const dir = await this.cloneSpecRepo(source);
+        this.logVerbose(verbose, 3, `      尝试方式 #4: 直接 clone 来源 URL`);
+        const dir = await this.cloneSpecRepo(source, undefined, verbose);
         if (dir) {
           dirs.push(dir);
+          this.logVerbose(verbose, 2, `      ✅ 采用方式: 直接 clone 来源 URL -> ${dir}`);
+        } else {
+          this.logVerbose(verbose, 3, `      ❌ 直接 clone 来源 URL 失败`);
         }
       } else {
         // 检查是否是 deps 目录，如果是则扫描子目录的 references
         const resolvedDirs = await this.resolveDepsDir(source);
         dirs.push(...resolvedDirs);
+        this.logVerbose(
+          verbose,
+          3,
+          `      deps 目录解析结果: ${resolvedDirs.length > 0 ? resolvedDirs.join(", ") : "(空)"}`,
+        );
       }
     }
 
     return dirs;
   }
 
+  protected buildRemoteSpecDir(ref: RemoteRepoRef): string {
+    const dirKey = `${ref.owner}__${ref.repo}${ref.path ? `__${ref.path.replace(/\//g, "_")}` : ""}${ref.ref ? `@${ref.ref}` : ""}`;
+    return join(homedir(), ".spaceflow", "review-spec", dirKey);
+  }
+
+  protected async getLocalSpecsDir(dir: string): Promise<string | null> {
+    try {
+      const entries = await readdir(dir);
+      if (!entries.some((f) => f.endsWith(".md"))) {
+        return null;
+      }
+      return dir;
+    } catch {
+      return null;
+    }
+  }
+
+  protected async prepareRemoteSpecDirForWrite(dir: string): Promise<void> {
+    await mkdir(dir, { recursive: true });
+    try {
+      const entries = await readdir(dir);
+      for (const name of entries) {
+        if (name.endsWith(".md") || name === ".timestamp") {
+          await unlink(join(dir, name));
+        }
+      }
+    } catch {
+      // 忽略目录清理失败，后续写入时再处理
+    }
+  }
+
+  protected isTeaInstalled(): boolean {
+    try {
+      execSync("command -v tea", { stdio: "pipe" });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  protected getTeaLoginForServer(serverUrl: string): string | null {
+    try {
+      const output = execFileSync("tea", ["login", "list", "-o", "json"], {
+        encoding: "utf-8",
+        stdio: "pipe",
+      });
+      const normalizedServerUrl = this.normalizeServerUrl(serverUrl);
+      const logins = JSON.parse(output) as Array<{ name?: string; url?: string }>;
+      const matched = logins.find(
+        (login) => login.url && this.normalizeServerUrl(login.url) === normalizedServerUrl,
+      );
+      return matched?.name ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  protected runTeaApi(endpoint: string, loginName: string): string {
+    const args = ["api", "-l", loginName, endpoint];
+    return execFileSync("tea", args, {
+      encoding: "utf-8",
+      stdio: "pipe",
+    });
+  }
+
+  protected encodePathSegments(path: string): string {
+    if (!path) return "";
+    return path
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
+  }
+
+  protected buildTeaContentsEndpoint(ref: RemoteRepoRef): string {
+    const owner = encodeURIComponent(ref.owner);
+    const repo = encodeURIComponent(ref.repo);
+    const encodedPath = this.encodePathSegments(ref.path || "");
+    const pathPart = encodedPath ? `/${encodedPath}` : "";
+    const query = ref.ref ? `?ref=${encodeURIComponent(ref.ref)}` : "";
+    return `/repos/${owner}/${repo}/contents${pathPart}${query}`;
+  }
+
+  protected buildTeaRawFileEndpoint(ref: RemoteRepoRef, filePath: string): string {
+    const owner = encodeURIComponent(ref.owner);
+    const repo = encodeURIComponent(ref.repo);
+    const encodedFilePath = this.encodePathSegments(filePath);
+    const query = ref.ref ? `?ref=${encodeURIComponent(ref.ref)}` : "";
+    return `/repos/${owner}/${repo}/raw/${encodedFilePath}${query}`;
+  }
+
+  /**
+   * 使用 tea api 拉取远程规则
+   * 前置条件：本地安装 tea 且已登录目标服务器
+   */
+  protected async fetchRemoteSpecsViaTea(
+    ref: RemoteRepoRef,
+    verbose?: VerboseLevel,
+  ): Promise<string | null> {
+    if (!this.isTeaInstalled()) {
+      this.logVerbose(verbose, 3, `         tea 不可用（未安装）`);
+      return null;
+    }
+    const loginName = this.getTeaLoginForServer(ref.serverUrl);
+    if (!loginName) {
+      this.logVerbose(
+        verbose,
+        3,
+        `         tea 未登录目标服务器: ${this.normalizeServerUrl(ref.serverUrl)}`,
+      );
+      return null;
+    }
+    this.logVerbose(verbose, 3, `         tea 登录名: ${loginName}`);
+    const specDir = this.buildRemoteSpecDir(ref);
+    this.logVerbose(verbose, 3, `         本地规则目录: ${specDir}`);
+    try {
+      console.log(
+        `   📡 使用 tea 拉取规则: ${ref.owner}/${ref.repo}${ref.path ? `/${ref.path}` : ""}${ref.ref ? `@${ref.ref}` : ""}`,
+      );
+      const contentsEndpoint = this.buildTeaContentsEndpoint(ref);
+      this.logVerbose(verbose, 3, `         tea api endpoint(contents): ${contentsEndpoint}`);
+      const contentsRaw = this.runTeaApi(contentsEndpoint, loginName);
+      const contents = JSON.parse(contentsRaw) as Array<{
+        type?: string;
+        name?: string;
+        path?: string;
+      }>;
+      const mdFiles = contents.filter(
+        (f) => f.type === "file" && !!f.name && f.name.endsWith(".md") && !!f.path,
+      );
+      if (mdFiles.length === 0) {
+        console.warn("   ⚠️ tea 远程目录中未找到 .md 规则文件");
+        return null;
+      }
+      const fetchedFiles: Array<{ name: string; content: string }> = [];
+      for (const file of mdFiles) {
+        const fileEndpoint = this.buildTeaRawFileEndpoint(ref, file.path!);
+        this.logVerbose(verbose, 3, `         tea api endpoint(raw): ${fileEndpoint}`);
+        const fileContent = this.runTeaApi(fileEndpoint, loginName);
+        fetchedFiles.push({ name: file.name!, content: fileContent });
+      }
+      await this.prepareRemoteSpecDirForWrite(specDir);
+      for (const file of fetchedFiles) {
+        await writeFile(join(specDir, file.name), file.content, "utf-8");
+      }
+      console.log(`   ✅ 已通过 tea 拉取 ${mdFiles.length} 个规则文件到本地目录`);
+      return specDir;
+    } catch (error) {
+      console.warn(`   ⚠️ tea 拉取规则失败:`, error instanceof Error ? error.message : error);
+      const localDir = await this.getLocalSpecsDir(specDir);
+      if (localDir) {
+        const mdCount = await this.getSpecFileCount(localDir);
+        this.logVerbose(verbose, 3, `         本地目录命中: ${localDir} (.md=${mdCount})`);
+        console.log(`   📦 使用本地已存在规则目录`);
+        return localDir;
+      }
+      this.logVerbose(verbose, 3, `         本地目录未命中: ${specDir}`);
+      return null;
+    }
+  }
+
   /**
    * 通过 Git API 从远程仓库拉取规则文件
-   * 缓存到 ~/.spaceflow/review-spec-cache/ 目录，带 TTL
+   * 保存到 ~/.spaceflow/review-spec/ 目录
    */
-  protected async fetchRemoteSpecs(ref: RemoteRepoRef): Promise<string | null> {
-    const cacheKey = `${ref.owner}__${ref.repo}${ref.path ? `__${ref.path.replace(/\//g, "_")}` : ""}${ref.ref ? `@${ref.ref}` : ""}`;
-    const cacheDir = join(homedir(), ".spaceflow", "review-spec-cache", cacheKey);
-    // 检查缓存是否有效（非 CI 环境下使用 TTL）
-    const isCI = !!process.env.CI;
-    if (!isCI) {
-      try {
-        const timestampFile = join(cacheDir, ".timestamp");
-        const timestamp = await readFile(timestampFile, "utf-8");
-        const age = Date.now() - Number(timestamp);
-        if (age < REMOTE_SPEC_CACHE_TTL) {
-          const entries = await readdir(cacheDir);
-          if (entries.some((f) => f.endsWith(".md"))) {
-            return cacheDir;
-          }
-        }
-      } catch {
-        // 缓存不存在或无效，继续拉取
-      }
-    }
+  protected async fetchRemoteSpecs(
+    ref: RemoteRepoRef,
+    verbose?: VerboseLevel,
+  ): Promise<string | null> {
+    const specDir = this.buildRemoteSpecDir(ref);
+    this.logVerbose(verbose, 3, `         本地规则目录: ${specDir}`);
     try {
       console.log(
         `   📡 从远程仓库拉取规则: ${ref.owner}/${ref.repo}${ref.path ? `/${ref.path}` : ""}${ref.ref ? `@${ref.ref}` : ""}`,
@@ -191,7 +381,7 @@ export class ReviewSpecService {
         console.warn(`   ⚠️ 远程目录中未找到 .md 规则文件`);
         return null;
       }
-      await mkdir(cacheDir, { recursive: true });
+      const fetchedFiles: Array<{ name: string; content: string }> = [];
       for (const file of mdFiles) {
         const content = await this.gitProvider!.getFileContent(
           ref.owner,
@@ -199,25 +389,34 @@ export class ReviewSpecService {
           file.path,
           ref.ref,
         );
-        await writeFile(join(cacheDir, file.name), content, "utf-8");
+        fetchedFiles.push({ name: file.name, content });
       }
-      // 写入时间戳
-      await writeFile(join(cacheDir, ".timestamp"), String(Date.now()), "utf-8");
-      console.log(`   ✅ 已拉取 ${mdFiles.length} 个规则文件到缓存`);
-      return cacheDir;
+      await this.prepareRemoteSpecDirForWrite(specDir);
+      for (const file of fetchedFiles) {
+        await writeFile(join(specDir, file.name), file.content, "utf-8");
+      }
+      console.log(`   ✅ 已拉取 ${mdFiles.length} 个规则文件到本地目录`);
+      return specDir;
     } catch (error) {
       console.warn(`   ⚠️ 远程规则拉取失败:`, error instanceof Error ? error.message : error);
-      // 尝试使用过期缓存
-      try {
-        const entries = await readdir(cacheDir);
-        if (entries.some((f) => f.endsWith(".md"))) {
-          console.log(`   📦 使用过期缓存`);
-          return cacheDir;
-        }
-      } catch {
-        // 无缓存可用
+      const localDir = await this.getLocalSpecsDir(specDir);
+      if (localDir) {
+        const mdCount = await this.getSpecFileCount(localDir);
+        this.logVerbose(verbose, 3, `         本地目录命中: ${localDir} (.md=${mdCount})`);
+        console.log(`   📦 使用本地已存在规则目录`);
+        return localDir;
       }
+      this.logVerbose(verbose, 3, `         本地目录未命中: ${specDir}`);
       return null;
+    }
+  }
+
+  protected async getSpecFileCount(dir: string): Promise<number> {
+    try {
+      const entries = await readdir(dir);
+      return entries.filter((f) => f.endsWith(".md")).length;
+    } catch {
+      return 0;
     }
   }
 
@@ -297,7 +496,11 @@ export class ReviewSpecService {
     }
   }
 
-  protected async cloneSpecRepo(repoUrl: string, subPath?: string): Promise<string | null> {
+  protected async cloneSpecRepo(
+    repoUrl: string,
+    subPath?: string,
+    verbose?: VerboseLevel,
+  ): Promise<string | null> {
     const repoName = this.extractRepoName(repoUrl);
     if (!repoName) {
       console.warn(`警告: 无法解析仓库名称: ${repoUrl}`);
@@ -305,10 +508,12 @@ export class ReviewSpecService {
     }
 
     const cacheDir = join(homedir(), ".spaceflow", "review-spec", repoName);
+    this.logVerbose(verbose, 3, `         clone 目标目录: ${cacheDir}`);
 
     try {
       await access(cacheDir);
       // console.log(`   使用缓存的规则仓库: ${cacheDir}`);
+      this.logVerbose(verbose, 3, `         发现已存在仓库目录，尝试 git pull`);
       try {
         execSync("git pull --ff-only", { cwd: cacheDir, stdio: "pipe" });
         // console.log(`   已更新规则仓库`);
@@ -319,6 +524,7 @@ export class ReviewSpecService {
     } catch {
       // console.log(`   克隆规则仓库: ${repoUrl}`);
       try {
+        this.logVerbose(verbose, 3, `         本地仓库目录不存在，执行 git clone`);
         await mkdir(join(homedir(), ".spaceflow", "review-spec"), { recursive: true });
         execSync(`git clone --depth 1 "${repoUrl}" "${cacheDir}"`, { stdio: "pipe" });
         // console.log(`   克隆完成: ${cacheDir}`);
