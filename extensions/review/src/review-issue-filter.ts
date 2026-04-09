@@ -237,7 +237,7 @@ export class ReviewIssueFilter {
       return false;
     });
     if (beforeCount !== filtered.length && shouldLog(verbose, 1)) {
-      console.log(`   过滤非本次 PR commits 问题后: ${beforeCount} -> ${filtered.length} 个问题`);
+      console.log(`   变更行过滤后: ${beforeCount} -> ${filtered.length} 个问题`);
     }
     return filtered;
   }

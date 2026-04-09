@@ -486,7 +486,7 @@ describe("ReviewIssueFilter", () => {
         mockIssue({ file: "test.ts", line: "2", ruleId: "R2" }),
       ];
       filter.filterIssuesByValidCommits(issues, commits, fileContents as FileContentsMap, 1);
-      expect(consoleSpy).toHaveBeenCalledWith("   过滤非本次 PR commits 问题后: 2 -> 1 个问题");
+      expect(consoleSpy).toHaveBeenCalledWith("   变更行过滤后: 2 -> 1 个问题");
       consoleSpy.mockRestore();
     });
 
@@ -568,6 +568,61 @@ describe("ReviewIssueFilter", () => {
         "   ✅ Issue test.ts:2 - 行 2 hash=abc1234 匹配，保留",
       );
       consoleSpy.mockRestore();
+    });
+
+    it("should use changed-lines mode when commits is empty", () => {
+      const issues = [
+        mockIssue({ file: "test.ts", line: "1", ruleId: "R1" }),
+        mockIssue({ file: "test.ts", line: "2", ruleId: "R2" }),
+        mockIssue({ file: "test.ts", line: "3", ruleId: "R3" }),
+      ];
+      const commits: never[] = [];
+      const fileContents: FileContentsMap = new Map([
+        [
+          "test.ts",
+          [
+            ["-------", "unchanged line"],
+            ["abc1234", "changed line"],
+            ["-------", "unchanged line"],
+          ],
+        ],
+      ]);
+
+      const result = filter.filterIssuesByValidCommits(issues, commits, fileContents);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].line).toBe("2");
+    });
+
+    it("should log 'commits 为空' message at verbose level 3 when commits is empty", () => {
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const commits: never[] = [];
+      const fileContents: FileContentsMap = new Map([["test.ts", [["abc1234", "changed line"]]]]);
+      const issues = [mockIssue({ file: "test.ts", line: "1", ruleId: "R1" })];
+      filter.filterIssuesByValidCommits(issues, commits, fileContents, 3);
+      expect(consoleSpy).toHaveBeenCalledWith("   🔍 commits 为空，使用变更行模式过滤");
+      consoleSpy.mockRestore();
+    });
+
+    it("should filter all issues when commits is empty and no changed lines", () => {
+      const issues = [
+        mockIssue({ file: "test.ts", line: "1", ruleId: "R1" }),
+        mockIssue({ file: "test.ts", line: "2", ruleId: "R2" }),
+      ];
+      const commits: never[] = [];
+      const fileContents: FileContentsMap = new Map([
+        [
+          "test.ts",
+          [
+            ["-------", "unchanged line"],
+            ["-------", "unchanged line"],
+          ],
+        ],
+      ]);
+
+      const result = filter.filterIssuesByValidCommits(issues, commits, fileContents);
+
+      expect(result).toHaveLength(0);
     });
   });
 
