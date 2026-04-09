@@ -976,6 +976,13 @@ const MAX_COUNT = 100;
       expect(result).toBe("org__repo");
     });
 
+    it("should extract from directory URL", () => {
+      const result = (service as any).extractRepoName(
+        "https://git.bjxgj.com/xgj/review-spec/src/branch/main/references",
+      );
+      expect(result).toBe("xgj__review-spec");
+    });
+
     it("should handle single part path", () => {
       const result = (service as any).extractRepoName("repo");
       expect(result).toBe("repo");
@@ -1274,6 +1281,26 @@ const MAX_COUNT = 100;
       ]);
       expect(result.length).toBeGreaterThanOrEqual(0);
     });
+
+    it("should fallback to clone repo root URL when API fetch fails for directory URL", async () => {
+      gitProvider.listRepositoryContents.mockRejectedValue(new Error("401 unauthorized"));
+      (access as Mock)
+        .mockRejectedValueOnce(new Error("not found"))
+        .mockResolvedValueOnce(undefined);
+      (mkdir as Mock).mockResolvedValue(undefined);
+      (child_process.execSync as Mock).mockReturnValue("");
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const result = await service.resolveSpecSources([
+        "https://git.bjxgj.com/xgj/review-spec/src/branch/main/references",
+      ]);
+
+      expect(result.some((dir) => dir.includes("xgj__review-spec/references"))).toBe(true);
+      expect((child_process.execSync as Mock).mock.calls[0][0]).toContain(
+        'git clone --depth 1 "https://git.bjxgj.com/xgj/review-spec.git"',
+      );
+      consoleSpy.mockRestore();
+    });
   });
 
   describe("fetchRemoteSpecs", () => {
@@ -1414,6 +1441,19 @@ const MAX_COUNT = 100;
       (child_process.execSync as Mock).mockReturnValue("");
       const result = await (service as any).cloneSpecRepo("https://github.com/org/repo.git");
       expect(result).toBeTruthy();
+    });
+
+    it("should return sub directory when subPath is provided", async () => {
+      (access as Mock)
+        .mockRejectedValueOnce(new Error("not found"))
+        .mockResolvedValueOnce(undefined);
+      (mkdir as Mock).mockResolvedValue(undefined);
+      (child_process.execSync as Mock).mockReturnValue("");
+      const result = await (service as any).cloneSpecRepo(
+        "https://github.com/org/repo.git",
+        "references",
+      );
+      expect(result).toContain("org__repo/references");
     });
 
     it("should handle clone failure", async () => {

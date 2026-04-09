@@ -118,12 +118,20 @@ export class ReviewSpecService {
     const dirs: string[] = [];
 
     for (const source of sources) {
-      // 优先尝试解析为远程仓库 URL（浏览器复制的链接）
       const repoRef = parseRepoUrl(source);
       if (repoRef && this.gitProvider) {
         const dir = await this.fetchRemoteSpecs(repoRef);
         if (dir) {
           dirs.push(dir);
+          continue;
+        }
+      }
+      // API 拉取失败或未配置 provider 时，回退到 git clone（使用仓库根 URL，而非目录 URL）
+      if (repoRef) {
+        const fallbackCloneUrl = this.buildRepoCloneUrl(repoRef);
+        const fallbackDir = await this.cloneSpecRepo(fallbackCloneUrl, repoRef.path);
+        if (fallbackDir) {
+          dirs.push(fallbackDir);
           continue;
         }
       }
@@ -268,7 +276,28 @@ export class ReviewSpecService {
     );
   }
 
-  protected async cloneSpecRepo(repoUrl: string): Promise<string | null> {
+  protected buildRepoCloneUrl(ref: RemoteRepoRef): string {
+    return `${ref.serverUrl}/${ref.owner}/${ref.repo}.git`;
+  }
+
+  protected async resolveClonedSpecDir(cacheDir: string, subPath?: string): Promise<string> {
+    const normalizedSubPath = subPath?.trim().replace(/^\/+|\/+$/g, "");
+    if (!normalizedSubPath) {
+      return cacheDir;
+    }
+    const targetDir = join(cacheDir, normalizedSubPath);
+    try {
+      await access(targetDir);
+      return targetDir;
+    } catch {
+      console.warn(
+        `   警告: 克隆仓库中未找到子目录 ${normalizedSubPath}，改为使用仓库根目录`,
+      );
+      return cacheDir;
+    }
+  }
+
+  protected async cloneSpecRepo(repoUrl: string, subPath?: string): Promise<string | null> {
     const repoName = this.extractRepoName(repoUrl);
     if (!repoName) {
       console.warn(`警告: 无法解析仓库名称: ${repoUrl}`);
@@ -286,14 +315,14 @@ export class ReviewSpecService {
       } catch {
         console.warn(`   警告: 无法更新规则仓库，使用现有版本`);
       }
-      return cacheDir;
+      return this.resolveClonedSpecDir(cacheDir, subPath);
     } catch {
       // console.log(`   克隆规则仓库: ${repoUrl}`);
       try {
         await mkdir(join(homedir(), ".spaceflow", "review-spec"), { recursive: true });
         execSync(`git clone --depth 1 "${repoUrl}" "${cacheDir}"`, { stdio: "pipe" });
         // console.log(`   克隆完成: ${cacheDir}`);
-        return cacheDir;
+        return this.resolveClonedSpecDir(cacheDir, subPath);
       } catch (error) {
         console.warn(`警告: 无法克隆仓库 ${repoUrl}:`, error);
         return null;
@@ -302,6 +331,11 @@ export class ReviewSpecService {
   }
 
   protected extractRepoName(repoUrl: string): string | null {
+    const parsedRef = parseRepoUrl(repoUrl);
+    if (parsedRef) {
+      return `${parsedRef.owner}__${parsedRef.repo}`;
+    }
+
     let path = repoUrl;
     path = path.replace(/\.git$/, "");
     path = path.replace(/^git@[^:]+:/, "");
