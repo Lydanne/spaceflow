@@ -143,11 +143,16 @@ export class ReviewResultModel {
    * - 合并历史 issues（this.issues）+ newIssues
    * - 复制 newResult 的元信息（title/description/deletionImpact 等）
    *
-   * 调用方应在调用前完成对历史 issues 的预处理（syncResolved、invalidateChangedFiles、verifyFixes、去重等）。
+   * 调用方应在调用前完成对历史 issues 的预处理（syncResolved、invalidateChangedFiles、verifyFixes 等）。
    */
   nextRound(newResult: ReviewResult): ReviewResultModel {
     const nextRoundNum = this._result.round + 1;
-    const taggedNewIssues = newResult.issues.map((issue) => ({ ...issue, round: nextRoundNum }));
+
+    // 去重：过滤掉已存在于历史 issues 中的新问题（含 valid:false 的都参与去重）
+    const existingKeys = new Set(this._result.issues.map((i) => generateIssueKey(i)));
+    const dedupedNewIssues = newResult.issues.filter((i) => !existingKeys.has(generateIssueKey(i)));
+
+    const taggedNewIssues = dedupedNewIssues.map((issue) => ({ ...issue, round: nextRoundNum }));
     const mergedResult: ReviewResult = {
       ...newResult,
       round: nextRoundNum,

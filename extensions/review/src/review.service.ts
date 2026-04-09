@@ -307,6 +307,7 @@ export class ReviewService {
   ): Promise<ReviewResultModel> {
     const { prModel, commits, headSha, specs, fileContents } = source;
     const { verbose, ci } = context;
+    result.headSha = headSha;
 
     if (ci && prModel && existingResultModel && existingResultModel.issues.length > 0) {
       if (shouldLog(verbose, 1)) {
@@ -340,24 +341,12 @@ export class ReviewService {
         }
       }
 
-      // 去重：与所有历史 issues 去重
-      const { filteredIssues: newIssues, skippedCount } = this.issueFilter.filterDuplicateIssues(
-        result.issues,
-        existingResultModel.issues,
-      );
-      if (skippedCount > 0 && shouldLog(verbose, 1)) {
-        console.log(`   跳过 ${skippedCount} 个重复问题，新增 ${newIssues.length} 个问题`);
-      }
-      result.issues = newIssues;
-      result.headSha = headSha;
-
-      // 自动 round 递增 + issues 合并
+      // 自动 round 递增 + 去重 + issues 合并
       return existingResultModel.nextRound(result);
     }
 
     // 首次审查或无历史结果
     result.round = 1;
-    result.headSha = headSha;
     result.issues = result.issues.map((issue) => ({ ...issue, round: 1 }));
     return prModel
       ? ReviewResultModel.create(prModel, result, this.resultModelDeps)
