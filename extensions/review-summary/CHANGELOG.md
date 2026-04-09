@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.50.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.49.0...@spaceflow/review-summary@0.50.0) (2026-04-09)
+
+### 新特性
+
+* **review-spec:** 新增目录 URL 解析和 clone 降级测试,覆盖子路径处理和 API 失败回退场景 ([fdd8a67](https://github.com/Lydanne/spaceflow/commit/fdd8a67ea3f428ec88e293b1dd11ae279ed6af3d))
+
+### 代码重构
+
+* **cli:** 新增依赖版本一致性检查,在 .spaceflowrc 与 .spaceflow/package.json 依赖不一致时自动删除并重建 .spaceflow 目录 ([c93b165](https://github.com/Lydanne/spaceflow/commit/c93b165e16ea0e94dcdfffa97dea9cb329189495))
+* **review-spec:** 重构远程规则拉取逻辑,新增 tea api 支持和多级降级策略,移除 TTL 缓存机制改用持久化本地目录 ([066d9c8](https://github.com/Lydanne/spaceflow/commit/066d9c8d41515fd57eb9fc069361fe44feac46ec))
+
+### 其他修改
+
+* **cli:** released version 0.41.0 [no ci] ([a14a39e](https://github.com/Lydanne/spaceflow/commit/a14a39eb0edfc69fa5584fb65d39349a62608a1c))
+* **publish:** released version 0.55.0 [no ci] ([9e1a81b](https://github.com/Lydanne/spaceflow/commit/9e1a81bb1e742446c158288b34803d6d0350230c))
+* **review:** released version 0.81.0 [no ci] ([88c2cc2](https://github.com/Lydanne/spaceflow/commit/88c2cc228cffd136e450ea19b473a569a0723550))
+* **scripts:** released version 0.33.0 [no ci] ([515099f](https://github.com/Lydanne/spaceflow/commit/515099f1dd6eda61cea9494750e5a73db4f6696a))
+* **shell:** released version 0.33.0 [no ci] ([c9f6615](https://github.com/Lydanne/spaceflow/commit/c9f66152b33ab14343c9060b6d8bb30552262a61))
+
 ## [0.49.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.48.0...@spaceflow/review-summary@0.49.0) (2026-04-08)
 
 ### 新特性
