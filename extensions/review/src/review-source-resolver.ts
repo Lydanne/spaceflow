@@ -463,9 +463,20 @@ export class ReviewSourceResolver {
             }
           }
 
+          let blameMap: Map<number, string> | undefined;
+          if (!isLocalMode) {
+            try {
+              blameMap = await this.gitSdk.getFileBlame(ref, file.filename);
+            } catch {
+              // blame 失败时回退到 latestCommitHash
+            }
+          }
+
           if (shouldLog(verbose, 3)) {
             console.log(`   📄 ${file.filename}: ${lines.length} 行, ${changedLines.size} 行变更`);
-            console.log(`      latestCommitHash: ${latestCommitHash}`);
+            console.log(
+              `      blame: ${blameMap ? `${blameMap.size} 行` : `不可用，回退到 ${latestCommitHash}`}`,
+            );
             if (changedLines.size > 0 && changedLines.size <= 20) {
               console.log(
                 `      变更行号: ${Array.from(changedLines)
@@ -488,7 +499,10 @@ export class ReviewSourceResolver {
 
           const contentLines: FileContentLine[] = lines.map((line, index) => {
             const lineNum = index + 1;
-            const hash = changedLines.has(lineNum) ? latestCommitHash : "-------";
+            if (!changedLines.has(lineNum)) {
+              return ["-------", line];
+            }
+            const hash = blameMap?.get(lineNum) ?? latestCommitHash;
             return [hash, line];
           });
           contents.set(file.filename, contentLines);

@@ -300,7 +300,7 @@ export class ReviewService {
         `      showAll=${context.showAll}, isDirectFileMode=${isDirectFileMode}, commits.length=${commits.length}`,
       );
     }
-    if (!context.showAll && !isDirectFileMode && commits.length > 0) {
+    if (!context.showAll && !isDirectFileMode) {
       if (shouldLog(verbose, 2)) {
         console.log(`   🔍 开始变更行过滤，当前 ${filtered.length} 个问题`);
       }
@@ -314,9 +314,7 @@ export class ReviewService {
         console.log(`   🔍 变更行过滤完成，剩余 ${filtered.length} 个问题`);
       }
     } else if (shouldLog(verbose, 1)) {
-      console.log(
-        `   跳过变更行过滤 (${context.showAll ? "showAll=true" : isDirectFileMode ? "直接审查文件模式" : "commits.length=0"})`,
-      );
+      console.log(`   跳过变更行过滤 (${context.showAll ? "showAll=true" : "直接审查文件模式"})`);
     }
 
     filtered = this.reviewSpecService.formatIssues(filtered, {

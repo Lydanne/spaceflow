@@ -189,6 +189,34 @@ export class GitSdkService {
   }
 
   /**
+   * 获取指定 ref 下文件每行所属的 commit hash（前7位）
+   * 返回 Map<1-based-lineNum, commitHash7>
+   */
+  async getFileBlame(
+    ref: string,
+    filename: string,
+    options?: GitRunOptions,
+  ): Promise<Map<number, string>> {
+    const result = await this.runCommand(["blame", "--porcelain", ref, "--", filename], options);
+    const lineMap = new Map<number, string>();
+    const lines = result.split("\n");
+    let currentHash = "";
+    let lineNum = 0;
+    for (const line of lines) {
+      // porcelain 格式：每个 hunk 首行是 "<hash> <orig> <final> [<lines>]"
+      const hunkMatch = line.match(/^([0-9a-f]{40}) \d+ (\d+)/);
+      if (hunkMatch) {
+        currentHash = hunkMatch[1].slice(0, 7);
+        lineNum = parseInt(hunkMatch[2], 10);
+      } else if (line.startsWith("\t") && lineNum > 0) {
+        // tab 开头的行是实际代码行，此时 lineNum 已正确
+        lineMap.set(lineNum, currentHash);
+      }
+    }
+    return lineMap;
+  }
+
+  /**
    * 获取工作区文件的当前内容（包含未提交的修改）
    * 直接读取文件系统，而不是从 git 获取
    * @throws 如果文件不存在或无法读取

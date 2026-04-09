@@ -173,9 +173,15 @@ export class ReviewIssueFilter {
     verbose?: VerboseLevel,
   ): ReviewIssue[] {
     const validCommitHashes = new Set(commits.map((c) => c.sha?.slice(0, 7)).filter(Boolean));
+    // commits 为空时（如分支比较模式本地无 commit 信息），退化为"行是否在 diff 变更范围内"模式
+    const useChangedLinesMode = validCommitHashes.size === 0;
 
     if (shouldLog(verbose, 3)) {
-      console.log(`   🔍 有效 commit hashes: ${Array.from(validCommitHashes).join(", ")}`);
+      if (useChangedLinesMode) {
+        console.log(`   🔍 commits 为空，使用变更行模式过滤`);
+      } else {
+        console.log(`   🔍 有效 commit hashes: ${Array.from(validCommitHashes).join(", ")}`);
+      }
     }
 
     const beforeCount = issues.length;
@@ -197,12 +203,16 @@ export class ReviewIssueFilter {
         return true;
       }
 
-      // 检查问题行范围内是否有任意一行属于本次 PR 的有效 commits
+      // 检查问题行范围内是否有任意一行属于本次变更（diff 范围）
       for (const lineNum of lineNums) {
         const lineData = contentLines[lineNum - 1];
         if (lineData) {
           const [actualHash] = lineData;
-          if (actualHash !== "-------" && validCommitHashes.has(actualHash)) {
+          const isChangedLine = actualHash !== "-------";
+          const isValid = useChangedLinesMode
+            ? isChangedLine
+            : isChangedLine && validCommitHashes.has(actualHash);
+          if (isValid) {
             if (shouldLog(verbose, 3)) {
               console.log(
                 `   ✅ Issue ${issue.file}:${issue.line} - 行 ${lineNum} hash=${actualHash} 匹配，保留`,
@@ -213,9 +223,9 @@ export class ReviewIssueFilter {
         }
       }
 
-      // 问题行都不属于本次 PR 的有效 commits
+      // 问题行都不属于本次变更范围
       if (shouldLog(verbose, 2)) {
-        console.log(`   Issue ${issue.file}:${issue.line} 不在本次 PR 变更行范围内，跳过`);
+        console.log(`   Issue ${issue.file}:${issue.line} 不在本次变更行范围内，跳过`);
       }
       if (shouldLog(verbose, 3)) {
         const hashes = lineNums.map((ln) => {
