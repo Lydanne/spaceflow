@@ -121,7 +121,7 @@ export class ReviewService {
     }
 
     // 3. 获取文件内容 + LLM 审查
-    const fileContents = await this.getFileContents(
+    const fileContents = await this.issueFilter.getFileContents(
       context.owner,
       context.repo,
       changedFiles,
@@ -145,7 +145,7 @@ export class ReviewService {
       console.log(`🔄 当前审查轮次: ${(existingResultModel?.round ?? 0) + 1}`);
     }
 
-    const reviewPrompt = await this.buildReviewPrompt(
+    const reviewPrompt = await this.llmProcessor.buildReviewPrompt(
       specs,
       changedFiles,
       fileContents,
@@ -155,7 +155,7 @@ export class ReviewService {
       verbose,
       context.systemRules,
     );
-    const result = await this.runLLMReview(llmMode, reviewPrompt, {
+    const result = await this.llmProcessor.runLLMReview(llmMode, reviewPrompt, {
       verbose,
       concurrency: context.concurrency,
       timeout: context.timeout,
@@ -165,8 +165,14 @@ export class ReviewService {
 
     // 填充 PR 功能描述和标题
     const prInfo = context.generateDescription
-      ? await this.generatePrDescription(commits, changedFiles, llmMode, fileContents, verbose)
-      : await this.buildBasicDescription(commits, changedFiles);
+      ? await this.llmProcessor.generatePrDescription(
+          commits,
+          changedFiles,
+          llmMode,
+          fileContents,
+          verbose,
+        )
+      : await this.llmProcessor.buildBasicDescription(commits, changedFiles);
     result.title = prInfo.title;
     result.description = prInfo.description;
     if (shouldLog(verbose, 1)) {
@@ -174,7 +180,7 @@ export class ReviewService {
     }
 
     // 4. 过滤新 issues
-    result.issues = await this.fillIssueCode(result.issues, fileContents);
+    result.issues = await this.issueFilter.fillIssueCode(result.issues, fileContents);
     result.issues = this.filterNewIssues(result.issues, specs, applicableSpecs, {
       commits,
       fileContents,
@@ -348,13 +354,13 @@ export class ReviewService {
             `📥 获取 ${effectiveBaseRef}...${effectiveHeadRef} 的差异 (owner: ${owner}, repo: ${repo})`,
           );
         }
-        changedFiles = await this.getChangedFilesBetweenRefs(
+        changedFiles = await this.issueFilter.getChangedFilesBetweenRefs(
           owner,
           repo,
           effectiveBaseRef,
           effectiveHeadRef,
         );
-        commits = await this.getCommitsBetweenRefs(effectiveBaseRef, effectiveHeadRef);
+        commits = await this.issueFilter.getCommitsBetweenRefs(effectiveBaseRef, effectiveHeadRef);
         if (shouldLog(verbose, 1)) {
           console.log(`   Changed files: ${changedFiles.length}`);
           console.log(`   Commits: ${commits.length}`);
@@ -402,7 +408,12 @@ export class ReviewService {
       const commitFilenames = new Set<string>();
       for (const commit of commits) {
         if (!commit.sha) continue;
-        const commitFiles = await this.getFilesForCommit(owner, repo, commit.sha, prNumber);
+        const commitFiles = await this.issueFilter.getFilesForCommit(
+          owner,
+          repo,
+          commit.sha,
+          prNumber,
+        );
         commitFiles.forEach((f) => commitFilenames.add(f));
       }
       changedFiles = changedFiles.filter((f) => commitFilenames.has(f.filename || ""));
@@ -438,7 +449,12 @@ export class ReviewService {
       const filteredCommits: PullRequestCommit[] = [];
       for (const commit of commits) {
         if (!commit.sha) continue;
-        const commitFiles = await this.getFilesForCommit(owner, repo, commit.sha, prNumber);
+        const commitFiles = await this.issueFilter.getFilesForCommit(
+          owner,
+          repo,
+          commit.sha,
+          prNumber,
+        );
         if (micromatch.some(commitFiles, globs)) {
           filteredCommits.push(commit);
         }
@@ -495,7 +511,12 @@ export class ReviewService {
       if (shouldLog(verbose, 2)) {
         console.log(`   🔍 开始变更行过滤，当前 ${filtered.length} 个问题`);
       }
-      filtered = this.filterIssuesByValidCommits(filtered, commits, fileContents, verbose);
+      filtered = this.issueFilter.filterIssuesByValidCommits(
+        filtered,
+        commits,
+        fileContents,
+        verbose,
+      );
       if (shouldLog(verbose, 2)) {
         console.log(`   🔍 变更行过滤完成，剩余 ${filtered.length} 个问题`);
       }
@@ -564,7 +585,7 @@ export class ReviewService {
       }
 
       // 去重：与所有历史 issues 去重
-      const { filteredIssues: newIssues, skippedCount } = this.filterDuplicateIssues(
+      const { filteredIssues: newIssues, skippedCount } = this.issueFilter.filterDuplicateIssues(
         result.issues,
         existingResultModel.issues,
       );
@@ -612,7 +633,7 @@ export class ReviewService {
 
     // 填充 author 信息
     if (commits.length > 0) {
-      finalModel.issues = await this.fillIssueAuthors(
+      finalModel.issues = await this.contextBuilder.fillIssueAuthors(
         finalModel.issues,
         commits,
         owner,
@@ -694,7 +715,7 @@ export class ReviewService {
 
     // 2. 获取 commits 并填充 author 信息
     const commits = await prModel.getCommits();
-    resultModel.issues = await this.fillIssueAuthors(
+    resultModel.issues = await this.contextBuilder.fillIssueAuthors(
       resultModel.issues,
       commits,
       owner,
@@ -779,8 +800,13 @@ export class ReviewService {
       commits = await prModel.getCommits();
       changedFiles = await prModel.getFiles();
     } else if (baseRef && headRef) {
-      changedFiles = await this.getChangedFilesBetweenRefs(owner, repo, baseRef, headRef);
-      commits = await this.getCommitsBetweenRefs(baseRef, headRef);
+      changedFiles = await this.issueFilter.getChangedFilesBetweenRefs(
+        owner,
+        repo,
+        baseRef,
+        headRef,
+      );
+      commits = await this.issueFilter.getCommitsBetweenRefs(baseRef, headRef);
     }
 
     // 使用 includes 过滤文件（支持 added|/modified|/deleted| 前缀语法）
@@ -789,8 +815,14 @@ export class ReviewService {
     }
 
     const prDesc = context.generateDescription
-      ? await this.generatePrDescription(commits, changedFiles, llmMode, undefined, verbose)
-      : await this.buildBasicDescription(commits, changedFiles);
+      ? await this.llmProcessor.generatePrDescription(
+          commits,
+          changedFiles,
+          llmMode,
+          undefined,
+          verbose,
+        )
+      : await this.llmProcessor.buildBasicDescription(commits, changedFiles);
     const result: ReviewResult = {
       success: true,
       title: prDesc.title,
@@ -861,8 +893,14 @@ export class ReviewService {
       }));
     const prDesc =
       context.generateDescription && llmMode
-        ? await this.generatePrDescription(commits, changedFiles, llmMode, undefined, verbose)
-        : await this.buildBasicDescription(commits, changedFiles);
+        ? await this.llmProcessor.generatePrDescription(
+            commits,
+            changedFiles,
+            llmMode,
+            undefined,
+            verbose,
+          )
+        : await this.llmProcessor.buildBasicDescription(commits, changedFiles);
     const result: ReviewResult = {
       success: true,
       title: prDesc.title,
@@ -999,82 +1037,6 @@ export class ReviewService {
         console.warn(`⚠️ 清理旧评论失败:`, error instanceof Error ? error.message : error);
       }
     }
-  }
-
-  // --- Delegation methods for backward compatibility with tests ---
-
-  protected async fillIssueAuthors(...args: Parameters<ReviewContextBuilder["fillIssueAuthors"]>) {
-    return this.contextBuilder.fillIssueAuthors(...args);
-  }
-
-  protected async getFileContents(...args: Parameters<ReviewIssueFilter["getFileContents"]>) {
-    return this.issueFilter.getFileContents(...args);
-  }
-
-  protected async getFilesForCommit(...args: Parameters<ReviewIssueFilter["getFilesForCommit"]>) {
-    return this.issueFilter.getFilesForCommit(...args);
-  }
-
-  protected async getChangedFilesBetweenRefs(
-    ...args: Parameters<ReviewIssueFilter["getChangedFilesBetweenRefs"]>
-  ) {
-    return this.issueFilter.getChangedFilesBetweenRefs(...args);
-  }
-
-  protected async getCommitsBetweenRefs(
-    ...args: Parameters<ReviewIssueFilter["getCommitsBetweenRefs"]>
-  ) {
-    return this.issueFilter.getCommitsBetweenRefs(...args);
-  }
-
-  protected filterIssuesByValidCommits(
-    ...args: Parameters<ReviewIssueFilter["filterIssuesByValidCommits"]>
-  ) {
-    return this.issueFilter.filterIssuesByValidCommits(...args);
-  }
-
-  protected filterDuplicateIssues(...args: Parameters<ReviewIssueFilter["filterDuplicateIssues"]>) {
-    return this.issueFilter.filterDuplicateIssues(...args);
-  }
-
-  protected async fillIssueCode(...args: Parameters<ReviewIssueFilter["fillIssueCode"]>) {
-    return this.issueFilter.fillIssueCode(...args);
-  }
-
-  protected async runLLMReview(...args: Parameters<ReviewLlmProcessor["runLLMReview"]>) {
-    return this.llmProcessor.runLLMReview(...args);
-  }
-
-  protected async buildReviewPrompt(...args: Parameters<ReviewLlmProcessor["buildReviewPrompt"]>) {
-    return this.llmProcessor.buildReviewPrompt(...args);
-  }
-
-  protected async generatePrDescription(
-    ...args: Parameters<ReviewLlmProcessor["generatePrDescription"]>
-  ) {
-    return this.llmProcessor.generatePrDescription(...args);
-  }
-
-  protected async buildBasicDescription(
-    ...args: Parameters<ReviewLlmProcessor["buildBasicDescription"]>
-  ) {
-    return this.llmProcessor.buildBasicDescription(...args);
-  }
-
-  protected normalizeFilePaths(...args: Parameters<ReviewContextBuilder["normalizeFilePaths"]>) {
-    return this.contextBuilder.normalizeFilePaths(...args);
-  }
-
-  protected resolveAnalyzeDeletions(
-    ...args: Parameters<ReviewContextBuilder["resolveAnalyzeDeletions"]>
-  ) {
-    return this.contextBuilder.resolveAnalyzeDeletions(...args);
-  }
-
-  protected async getPrNumberFromEvent(
-    ...args: Parameters<ReviewContextBuilder["getPrNumberFromEvent"]>
-  ) {
-    return this.contextBuilder.getPrNumberFromEvent(...args);
   }
 
   /**
