@@ -1,6 +1,5 @@
 import {
   PullRequestCommit,
-  ChangedFile,
   type LLMMode,
   LlmProxyService,
   logStreamEvent,
@@ -23,6 +22,7 @@ import { dirname, extname } from "path";
 import micromatch from "micromatch";
 import type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
 import { buildLinesWithNumbers, buildCommitsSection, extractCodeBlocks } from "./utils/review-llm";
+import { ChangedFileCollection } from "./changed-file-collection";
 import { extractCodeBlockTypes, extractGlobsFromIncludes } from "./review-includes-filter";
 import {
   REVIEW_SCHEMA,
@@ -89,7 +89,7 @@ export class ReviewLlmProcessor {
 
   async buildReviewPrompt(
     specs: ReviewSpec[],
-    changedFiles: ChangedFile[],
+    changedFiles: ChangedFileCollection,
     fileContents: FileContentsMap,
     commits: PullRequestCommit[],
     existingResult?: ReviewResult | null,
@@ -99,25 +99,23 @@ export class ReviewLlmProcessor {
   ): Promise<ReviewPrompt> {
     const round = (existingResult?.round ?? 0) + 1;
     const { staticIssues, skippedFiles } = applyStaticRules(
-      changedFiles,
+      changedFiles.toArray(),
       fileContents,
       systemRules,
       round,
       verbose,
     );
 
-    const fileDataList = changedFiles
-      .filter((f) => f.status !== "deleted" && f.filename)
-      .map((file) => {
-        const filename = file.filename!;
-        if (skippedFiles.has(filename)) return null;
-        const contentLines = fileContents.get(filename);
-        if (!contentLines) {
-          return { filename, file, contentLines: null, commitsSection: "- 无相关 commits" };
-        }
-        const commitsSection = buildCommitsSection(contentLines, commits);
-        return { filename, file, contentLines, commitsSection };
-      });
+    const fileDataList = changedFiles.nonDeletedFiles().map((file) => {
+      const filename = file.filename!;
+      if (skippedFiles.has(filename)) return null;
+      const contentLines = fileContents.get(filename);
+      if (!contentLines) {
+        return { filename, file, contentLines: null, commitsSection: "- 无相关 commits" };
+      }
+      const commitsSection = buildCommitsSection(contentLines, commits);
+      return { filename, file, contentLines, commitsSection };
+    });
 
     const filePrompts: (FileReviewPrompt | null)[] = await Promise.all(
       fileDataList
@@ -438,14 +436,14 @@ export class ReviewLlmProcessor {
    */
   async generatePrDescription(
     commits: PullRequestCommit[],
-    changedFiles: ChangedFile[],
+    changedFiles: ChangedFileCollection,
     llmMode: LLMMode,
     fileContents?: FileContentsMap,
     verbose?: VerboseLevel,
   ): Promise<{ title: string; description: string }> {
     const { userPrompt } = buildPrDescriptionPrompt({
       commits,
-      changedFiles,
+      changedFiles: changedFiles.toArray(),
       fileContents,
     });
 
@@ -479,9 +477,9 @@ export class ReviewLlmProcessor {
    */
   async generatePrTitle(
     commits: PullRequestCommit[],
-    changedFiles: ChangedFile[],
+    changedFiles: ChangedFileCollection,
   ): Promise<string> {
-    const { userPrompt } = buildPrTitlePrompt({ commits, changedFiles });
+    const { userPrompt } = buildPrTitlePrompt({ commits, changedFiles: changedFiles.toArray() });
 
     try {
       const stream = this.llmProxyService.chatStream([{ role: "user", content: userPrompt }], {
@@ -514,7 +512,7 @@ export class ReviewLlmProcessor {
    */
   async buildBasicDescription(
     commits: PullRequestCommit[],
-    changedFiles: ChangedFile[],
+    changedFiles: ChangedFileCollection,
   ): Promise<{ title: string; description: string }> {
     const parts: string[] = [];
     // 使用 LLM 生成标题
@@ -529,9 +527,7 @@ export class ReviewLlmProcessor {
       }
     }
     if (changedFiles.length > 0) {
-      const added = changedFiles.filter((f) => f.status === "added").length;
-      const modified = changedFiles.filter((f) => f.status === "modified").length;
-      const deleted = changedFiles.filter((f) => f.status === "deleted").length;
+      const { added, modified, deleted } = changedFiles.countByStatus();
       const stats: string[] = [];
       if (added > 0) stats.push(`新增 ${added}`);
       if (modified > 0) stats.push(`修改 ${modified}`);

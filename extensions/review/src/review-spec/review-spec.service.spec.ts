@@ -1,5 +1,6 @@
 import { vi, type Mock } from "vitest";
 import { ReviewSpecService } from "./review-spec.service";
+import { ChangedFileCollection } from "../changed-file-collection";
 import { readdir, readFile, mkdir, access, writeFile } from "fs/promises";
 import * as child_process from "child_process";
 
@@ -475,7 +476,7 @@ const MAX_COUNT = 100;
         { filename: "src/user/user.controller.ts" },
       ];
 
-      const result = service.filterApplicableSpecs(specs, changedFiles);
+      const result = service.filterApplicableSpecs(specs, ChangedFileCollection.from(changedFiles));
 
       // 只按扩展名过滤，includes 在 LLM 审查后处理
       expect(result).toHaveLength(2);
@@ -509,7 +510,7 @@ const MAX_COUNT = 100;
 
       const changedFiles = [{ filename: "src/app.ts" }];
 
-      const result = service.filterApplicableSpecs(specs, changedFiles);
+      const result = service.filterApplicableSpecs(specs, ChangedFileCollection.from(changedFiles));
 
       expect(result).toHaveLength(1);
       expect(result[0].filename).toBe("js&ts.base.md");
@@ -1532,7 +1533,7 @@ const MAX_COUNT = 100;
         },
       ];
       const changedFiles = [{ filename: "Makefile" }, { filename: "src/app.ts" }];
-      const result = service.filterApplicableSpecs(specs, changedFiles);
+      const result = service.filterApplicableSpecs(specs, ChangedFileCollection.from(changedFiles));
       expect(result).toHaveLength(1);
     });
 
@@ -1550,7 +1551,7 @@ const MAX_COUNT = 100;
         },
       ];
       const changedFiles = [{}];
-      const result = service.filterApplicableSpecs(specs, changedFiles);
+      const result = service.filterApplicableSpecs(specs, ChangedFileCollection.from(changedFiles));
       expect(result).toHaveLength(0);
     });
   });

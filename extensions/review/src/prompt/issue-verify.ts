@@ -62,6 +62,10 @@ export const buildIssueVerifyPrompt: PromptFn<IssueVerifyContext> = (ctx) => {
     ruleSection = `### ${spec.filename} (${spec.type})\n\n${spec.content.slice(0, 200)}...\n\n#### 规则\n- ${rule.id}: ${rule.title}\n  ${rule.description}`;
   }
 
+  const originalCodeSection = ctx.issue.code
+    ? `\n## 问题发现时的原始代码（用于对比）\n\n\`\`\`\n${ctx.issue.code}\n\`\`\`\n`
+    : "";
+
   const userPrompt = `## 规则定义
 
 ${ruleSection}
@@ -69,18 +73,19 @@ ${ruleSection}
 ## 之前发现的问题
 
 - **文件**: ${ctx.issue.file}
-- **行号**: ${ctx.issue.line}
+- **行号**: ${ctx.issue.line}（问题发现时的行号，可能因代码变更而偏移）
 - **规则**: ${ctx.issue.ruleId} (来自 ${ctx.issue.specFile})
 - **问题描述**: ${ctx.issue.reason}
 ${ctx.issue.suggestion ? `- **原建议**: ${ctx.issue.suggestion}` : ""}
-
+${originalCodeSection}
 ## 当前文件内容
 
 \`\`\`
 ${linesWithNumbers}
 \`\`\`
 
-请判断这个问题是否有效，以及是否已经被修复。`;
+请判断这个问题是否有效，以及是否已经被修复。
+**注意**：如果提供了"问题发现时的原始代码"，请优先通过搜索该代码片段来定位问题位置，而不是仅依赖行号（行号可能因代码变更已经偏移）。`;
 
   return { systemPrompt, userPrompt };
 };

@@ -9,7 +9,13 @@ import {
 import type { IConfigReader } from "@spaceflow/core";
 import { PullRequestModel } from "./pull-request-model";
 import { type ReviewConfig } from "./review.config";
-import { ReviewSpecService, ReviewIssue, ReviewResult, ReviewStats } from "./review-spec";
+import {
+  ReviewSpecService,
+  ReviewIssue,
+  ReviewResult,
+  ReviewStats,
+  FileContentsMap,
+} from "./review-spec";
 import { ReviewReportService, type ReportFormat } from "./review-report";
 import { extname } from "path";
 import {
@@ -143,11 +149,16 @@ export class ReviewResultModel {
    * - 合并历史 issues（this.issues）+ newIssues
    * - 复制 newResult 的元信息（title/description/deletionImpact 等）
    *
-   * 调用方应在调用前完成对历史 issues 的预处理（syncResolved、invalidateChangedFiles、verifyFixes、去重等）。
+   * 调用方应在调用前完成对历史 issues 的预处理（syncResolved、invalidateChangedFiles、verifyFixes 等）。
    */
   nextRound(newResult: ReviewResult): ReviewResultModel {
     const nextRoundNum = this._result.round + 1;
-    const taggedNewIssues = newResult.issues.map((issue) => ({ ...issue, round: nextRoundNum }));
+
+    // 去重：过滤掉已存在于历史 issues 中的新问题（含 valid:false 的都参与去重）
+    const existingKeys = new Set(this._result.issues.map((i) => generateIssueKey(i)));
+    const dedupedNewIssues = newResult.issues.filter((i) => !existingKeys.has(generateIssueKey(i)));
+
+    const taggedNewIssues = dedupedNewIssues.map((issue) => ({ ...issue, round: nextRoundNum }));
     const mergedResult: ReviewResult = {
       ...newResult,
       round: nextRoundNum,
@@ -415,9 +426,14 @@ export class ReviewResultModel {
 
   /**
    * 将有变更文件的历史 issue 标记为无效。
-   * 简化策略：如果文件在最新 commit 中有变更，则将该文件的所有历史问题标记为无效。
+   * 策略：如果文件在最新 commit 中有变更，则将该文件的历史问题标记为无效，但以下情况保留：
+   * - issue 已被用户手动 resolved 且当前代码行内容与 issue.code 不同（说明用户 resolve 后代码已变，应保留其 resolve 状态）
    */
-  async invalidateChangedFiles(headSha: string | undefined, verbose?: VerboseLevel): Promise<void> {
+  async invalidateChangedFiles(
+    headSha: string | undefined,
+    fileContents?: FileContentsMap,
+    verbose?: VerboseLevel,
+  ): Promise<void> {
     if (!headSha) {
       if (shouldLog(verbose, 1)) {
         console.log(`   ⚠️ 无法获取 PR head SHA，跳过变更文件检查`);
@@ -449,14 +465,43 @@ export class ReviewResultModel {
 
       // 将变更文件的历史 issue 标记为无效
       let invalidatedCount = 0;
+      let preservedCount = 0;
       this._result.issues = this._result.issues.map((issue) => {
-        // 如果 issue 已修复、已解决或已无效，不需要处理
-        if (issue.fixed || issue.resolved || issue.valid === "false") {
+        // 如果 issue 已修复或已无效，不需要处理
+        if (issue.fixed || issue.valid === "false") {
           return issue;
         }
 
-        // 如果 issue 所在文件有变更，标记为无效
+        // 如果 issue 所在文件有变更
         if (changedFileSet.has(issue.file)) {
+          // 已 resolved 的 issue：检查当前代码行是否与 issue.code 不同
+          // 不同说明用户 resolve 后代码确实变了，保留其 resolve 状态
+          if (issue.resolved && issue.code && fileContents) {
+            const contentLines = fileContents.get(issue.file);
+            if (contentLines) {
+              const lineNums = issue.line
+                .split("-")
+                .map(Number)
+                .filter((n) => !isNaN(n));
+              const startLine = lineNums[0];
+              const endLine = lineNums[lineNums.length - 1];
+              const currentCode = contentLines
+                .slice(startLine - 1, endLine)
+                .map(([, line]) => line)
+                .join("\n")
+                .trim();
+              if (currentCode !== issue.code) {
+                preservedCount++;
+                if (shouldLog(verbose, 1)) {
+                  console.log(
+                    `   ✅ Issue ${issue.file}:${issue.line} 已 resolved 且代码已变更，保留`,
+                  );
+                }
+                return issue;
+              }
+            }
+          }
+
           invalidatedCount++;
           if (shouldLog(verbose, 1)) {
             console.log(`   🗑️ Issue ${issue.file}:${issue.line} 所在文件有变更，标记为无效`);
@@ -467,8 +512,11 @@ export class ReviewResultModel {
         return issue;
       });
 
-      if (invalidatedCount > 0 && shouldLog(verbose, 1)) {
-        console.log(`   📊 共标记 ${invalidatedCount} 个历史问题为无效（文件有变更）`);
+      if ((invalidatedCount > 0 || preservedCount > 0) && shouldLog(verbose, 1)) {
+        const parts: string[] = [];
+        if (invalidatedCount > 0) parts.push(`标记 ${invalidatedCount} 个无效`);
+        if (preservedCount > 0) parts.push(`保留 ${preservedCount} 个已 resolved`);
+        console.log(`   📊 Issue 处理: ${parts.join("，")}`);
       }
     } catch (error) {
       if (shouldLog(verbose, 1)) {

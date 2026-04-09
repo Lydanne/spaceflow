@@ -1,5 +1,6 @@
 import { t, z, type SpaceflowContext, type GitProviderService } from "@spaceflow/core";
 import { ReviewSpecService } from "../review-spec";
+import { ChangedFileCollection } from "../changed-file-collection";
 import type { ReviewConfig } from "../review.config";
 import { extractGlobsFromIncludes } from "../review-includes-filter";
 import { join } from "path";
@@ -110,7 +111,10 @@ export const tools = [
       const workDir = ctx.cwd;
       const allSpecs = await loadAllSpecs(workDir, ctx);
       const specService = new ReviewSpecService();
-      const applicableSpecs = specService.filterApplicableSpecs(allSpecs, [{ filename: filePath }]);
+      const applicableSpecs = specService.filterApplicableSpecs(
+        allSpecs,
+        ChangedFileCollection.from([{ filename: filePath }]),
+      );
       const micromatchModule = await import("micromatch");
       const micromatch = micromatchModule.default || micromatchModule;
       const rules = applicableSpecs.flatMap((spec) =>

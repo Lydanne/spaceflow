@@ -7,8 +7,9 @@ import {
   type RemoteRepoRef,
   type RepositoryContent,
 } from "@spaceflow/core";
+import { ChangedFileCollection } from "../changed-file-collection";
 import { readdir, readFile, mkdir, access, writeFile, unlink } from "fs/promises";
-import { join, basename, extname } from "path";
+import { join, basename } from "path";
 import { homedir } from "os";
 import { execSync, execFileSync } from "child_process";
 import micromatch from "micromatch";
@@ -65,17 +66,8 @@ export class ReviewSpecService {
    * 根据变更文件的扩展名过滤适用的规则文件
    * 只按扩展名过滤，includes 和 override 在 LLM 审查后处理
    */
-  filterApplicableSpecs(specs: ReviewSpec[], changedFiles: { filename?: string }[]): ReviewSpec[] {
-    const changedExtensions = new Set<string>();
-
-    for (const file of changedFiles) {
-      if (file.filename) {
-        const ext = extname(file.filename).slice(1).toLowerCase();
-        if (ext) {
-          changedExtensions.add(ext);
-        }
-      }
-    }
+  filterApplicableSpecs(specs: ReviewSpec[], changedFiles: ChangedFileCollection): ReviewSpec[] {
+    const changedExtensions = changedFiles.extensions();
 
     console.log(
       `[filterApplicableSpecs] changedExtensions=${JSON.stringify([...changedExtensions])}, specs count=${specs.length}`,
@@ -489,9 +481,7 @@ export class ReviewSpecService {
       await access(targetDir);
       return targetDir;
     } catch {
-      console.warn(
-        `   警告: 克隆仓库中未找到子目录 ${normalizedSubPath}，改为使用仓库根目录`,
-      );
+      console.warn(`   警告: 克隆仓库中未找到子目录 ${normalizedSubPath}，改为使用仓库根目录`);
       return cacheDir;
     }
   }

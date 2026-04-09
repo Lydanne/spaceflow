@@ -129,7 +129,6 @@ interface ReviewIssue {
 | `callLLM()`                   | 并行审查多个文件               |
 | `reviewSingleFile()`          | 审查单个文件                   |
 | `getFileContents()`           | 获取文件内容并构建行号映射     |
-| `buildLineCommitMap()`        | 构建行号到 commit 的映射       |
 | `filterDuplicateIssues()`     | 过滤重复问题                   |
 | `postOrUpdateReviewComment()` | 发布/更新 PR 评论              |
 | `generatePrDescription()`     | AI 生成 PR 功能描述            |
