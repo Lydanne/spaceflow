@@ -349,10 +349,10 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
     const title = prNumber ? `PR #${prNumber} Review 状态统计` : "Review 状态统计";
     const lines = [`## 📊 ${title}\n`, `| 指标 | 数量 |`, `|------|------|`];
     lines.push(
-      `| 有效问题 | ${stats.validTotal} (🟢已修复 ${stats.fixed}, ⚪已解决 ${stats.resolved}, ⚠️待处理 ${stats.pending}) |`,
+      `| 有效问题 | ${stats.validTotal} (🟢已验收 ${stats.fixed}, ⚪已解决 ${stats.resolved}, ⚠️待处理 ${stats.pending}) |`,
     );
     lines.push(`| ❌ 无效问题 | ${stats.invalid} |`);
-    lines.push(`| 修复率 | ${stats.fixRate}% (${stats.fixed}/${stats.validTotal}) |`);
+    lines.push(`| 验收率 | ${stats.fixRate}% (${stats.fixed}/${stats.validTotal}) |`);
     lines.push(`| 解决率 | ${stats.resolveRate}% (${stats.resolved}/${stats.validTotal}) |`);
     return lines.join("\n");
   }
