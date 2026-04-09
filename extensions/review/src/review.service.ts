@@ -10,7 +10,13 @@ import {
 } from "@spaceflow/core";
 import type { IConfigReader } from "@spaceflow/core";
 import { type ReviewConfig } from "./review.config";
-import { ReviewSpecService, ReviewResult, FileSummary } from "./review-spec";
+import {
+  ReviewSpecService,
+  ReviewResult,
+  FileSummary,
+  ReviewSpec,
+  FileContentsMap,
+} from "./review-spec";
 import { MarkdownFormatter, ReviewReportService } from "./review-report";
 import { ReviewOptions } from "./review.config";
 import { IssueVerifyService } from "./issue-verify.service";
@@ -98,37 +104,46 @@ export class ReviewService {
     const source = await this.resolveSourceData(context);
     if (source.earlyReturn) return source.earlyReturn;
 
-    const { prModel, commits, changedFiles, headSha, isDirectFileMode } = source;
-    const effectiveWhenModifiedCode = isDirectFileMode ? undefined : context.whenModifiedCode;
-    if (isDirectFileMode && context.whenModifiedCode?.length && shouldLog(verbose, 1)) {
+    const effectiveWhenModifiedCode = source.isDirectFileMode
+      ? undefined
+      : context.whenModifiedCode;
+    if (source.isDirectFileMode && context.whenModifiedCode?.length && shouldLog(verbose, 1)) {
       console.log(`ℹ️  直接文件模式下忽略 whenModifiedCode 过滤`);
     }
 
     // 2. 规则匹配
     const specs = await this.issueFilter.loadSpecs(specSources, verbose);
-    const applicableSpecs = this.reviewSpecService.filterApplicableSpecs(specs, changedFiles);
+    const applicableSpecs = this.reviewSpecService.filterApplicableSpecs(
+      specs,
+      source.changedFiles,
+    );
     if (shouldLog(verbose, 2)) {
       console.log(
         `[execute] loadSpecs: loaded ${specs.length} specs from sources: ${JSON.stringify(specSources)}`,
       );
       console.log(
-        `[execute] filterApplicableSpecs: ${applicableSpecs.length} applicable out of ${specs.length}, changedFiles=${JSON.stringify(changedFiles.map((f) => f.filename))}`,
+        `[execute] filterApplicableSpecs: ${applicableSpecs.length} applicable out of ${specs.length}, changedFiles=${JSON.stringify(source.changedFiles.map((f) => f.filename))}`,
       );
     }
     if (shouldLog(verbose, 1)) {
       console.log(`   适用的规则文件: ${applicableSpecs.length}`);
     }
-    if (applicableSpecs.length === 0 || changedFiles.length === 0) {
-      return this.handleNoApplicableSpecs(context, applicableSpecs, changedFiles, commits);
+    if (applicableSpecs.length === 0 || source.changedFiles.length === 0) {
+      return this.handleNoApplicableSpecs(
+        context,
+        applicableSpecs,
+        source.changedFiles,
+        source.commits,
+      );
     }
 
     // 3. 获取文件内容 + LLM 审查
     const fileContents = await this.issueFilter.getFileContents(
       context.owner,
       context.repo,
-      changedFiles,
-      commits,
-      headSha,
+      source.changedFiles,
+      source.commits,
+      source.headSha,
       context.prNumber,
       verbose,
       source.isLocalMode,
@@ -137,8 +152,11 @@ export class ReviewService {
 
     // 获取上一次的审查结果（用于提示词优化和轮次推进）
     let existingResultModel: ReviewResultModel | null = null;
-    if (context.ci && prModel) {
-      existingResultModel = await ReviewResultModel.loadFromPr(prModel, this.resultModelDeps);
+    if (context.ci && source.prModel) {
+      existingResultModel = await ReviewResultModel.loadFromPr(
+        source.prModel,
+        this.resultModelDeps,
+      );
       if (existingResultModel && shouldLog(verbose, 1)) {
         console.log(`📋 获取到上一次审查结果，包含 ${existingResultModel.issues.length} 个问题`);
       }
@@ -149,14 +167,69 @@ export class ReviewService {
 
     const reviewPrompt = await this.llmProcessor.buildReviewPrompt(
       specs,
-      changedFiles,
+      source.changedFiles,
       fileContents,
-      commits,
+      source.commits,
       existingResultModel?.result ?? null,
       effectiveWhenModifiedCode,
       verbose,
       context.systemRules,
     );
+    // 4. 运行 LLM 审查 + 过滤新 issues
+    const result = await this.buildReviewResult(context, reviewPrompt, llmMode, {
+      specs,
+      applicableSpecs,
+      fileContents,
+      changedFiles: source.changedFiles,
+      commits: source.commits,
+      isDirectFileMode: source.isDirectFileMode,
+    });
+
+    // 5. 构建最终的 ReviewResultModel
+    const finalModel = await this.buildFinalModel(
+      context,
+      result,
+      {
+        prModel: source.prModel,
+        commits: source.commits,
+        headSha: source.headSha,
+        specs,
+        fileContents,
+      },
+      existingResultModel,
+    );
+
+    // 6. 保存 + 输出
+    await this.saveAndOutput(context, finalModel, source.commits);
+    return finalModel.result;
+  }
+
+  // ─── 提取的子方法 ──────────────────────────────────────
+
+  /**
+   * 运行 LLM 审查并构建过滤后的 ReviewResult：
+   * - 调用 LLM 生成问题列表
+   * - 填充 PR 标题/描述
+   * - 过滤新 issues（去重、commit 范围等）
+   * - 合并静态规则问题
+   */
+  protected async buildReviewResult(
+    context: ReviewContext,
+    reviewPrompt: Awaited<ReturnType<typeof this.llmProcessor.buildReviewPrompt>>,
+    llmMode: LLMMode,
+    source: {
+      specs: ReviewSpec[];
+      applicableSpecs: ReviewSpec[];
+      fileContents: FileContentsMap;
+      changedFiles: ChangedFile[];
+      commits: PullRequestCommit[];
+      isDirectFileMode: boolean;
+    },
+  ): Promise<ReviewResult> {
+    const { verbose } = context;
+    const { specs, applicableSpecs, fileContents, changedFiles, commits, isDirectFileMode } =
+      source;
+
     const result = await this.llmProcessor.runLLMReview(llmMode, reviewPrompt, {
       verbose,
       concurrency: context.concurrency,
@@ -181,7 +254,6 @@ export class ReviewService {
       console.log(`📝 LLM 审查完成，发现 ${result.issues.length} 个问题`);
     }
 
-    // 4. 过滤新 issues
     result.issues = await this.issueFilter.fillIssueCode(result.issues, fileContents);
     result.issues = this.filterNewIssues(result.issues, specs, applicableSpecs, {
       commits,
@@ -202,20 +274,8 @@ export class ReviewService {
       console.log(`📝 最终发现 ${result.issues.length} 个问题`);
     }
 
-    // 5. 构建最终的 ReviewResultModel
-    const finalModel = await this.buildFinalModel(
-      context,
-      result,
-      { prModel, commits, headSha, specs, fileContents },
-      existingResultModel,
-    );
-
-    // 6. 保存 + 输出
-    await this.saveAndOutput(context, finalModel, commits);
-    return finalModel.result;
+    return result;
   }
-
-  // ─── 提取的子方法 ──────────────────────────────────────
 
   /**
    * 解析输入数据：委托给 ReviewSourceResolver。
