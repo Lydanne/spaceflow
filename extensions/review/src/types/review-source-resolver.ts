@@ -1,6 +1,7 @@
 import type { PullRequestCommit, ChangedFile } from "@spaceflow/core";
 import type { PullRequestModel } from "../pull-request-model";
 import type { ReviewResult } from "../review-spec";
+import type { ChangedFileCollection } from "../changed-file-collection";
 
 /**
  * resolve() 的最终返回类型。
@@ -9,7 +10,7 @@ import type { ReviewResult } from "../review-spec";
 export interface SourceData {
   prModel?: PullRequestModel;
   commits: PullRequestCommit[];
-  changedFiles: ChangedFile[];
+  changedFiles: ChangedFileCollection;
   headSha: string;
   isLocalMode: boolean;
   isDirectFileMode: boolean;

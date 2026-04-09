@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import { ReviewLlmProcessor } from "./review-llm";
 import type { ReviewPrompt } from "./review.service";
+import { ChangedFileCollection } from "./changed-file-collection";
 
 vi.mock("c12");
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
@@ -147,7 +148,7 @@ describe("ReviewLlmProcessor", () => {
       const commits = [{ sha: "abc1234567890", commit: { message: "fix" } }];
       const result = await processor.buildReviewPrompt(
         specs as any,
-        changedFiles,
+        ChangedFileCollection.from(changedFiles),
         fileContents as any,
         commits,
       );
@@ -160,14 +161,24 @@ describe("ReviewLlmProcessor", () => {
     it("should skip deleted files", async () => {
       const specs = [{ extensions: ["ts"], includes: [], rules: [] }];
       const changedFiles = [{ filename: "deleted.ts", status: "deleted" }];
-      const result = await processor.buildReviewPrompt(specs as any, changedFiles, new Map(), []);
+      const result = await processor.buildReviewPrompt(
+        specs as any,
+        ChangedFileCollection.from(changedFiles),
+        new Map(),
+        [],
+      );
       expect(result.filePrompts).toHaveLength(0);
     });
 
     it("should handle missing file contents", async () => {
       const specs = [{ extensions: ["ts"], includes: [], rules: [] }];
       const changedFiles = [{ filename: "test.ts", status: "modified" }];
-      const result = await processor.buildReviewPrompt(specs as any, changedFiles, new Map(), []);
+      const result = await processor.buildReviewPrompt(
+        specs as any,
+        ChangedFileCollection.from(changedFiles),
+        new Map(),
+        [],
+      );
       expect(result.filePrompts).toHaveLength(1);
       expect(result.filePrompts[0].userPrompt).toContain("无法获取内容");
     });
@@ -182,7 +193,7 @@ describe("ReviewLlmProcessor", () => {
       };
       const result = await processor.buildReviewPrompt(
         specs as any,
-        changedFiles,
+        ChangedFileCollection.from(changedFiles),
         fileContents as any,
         [],
         existingResult as any,
@@ -199,7 +210,11 @@ describe("ReviewLlmProcessor", () => {
       mockLlmProxyService.chatStream.mockReturnValue(mockStream);
       const commits = [{ sha: "abc123", commit: { message: "feat: add" } }];
       const changedFiles = [{ filename: "a.ts", status: "modified" }];
-      const result = await processor.generatePrDescription(commits, changedFiles, "openai");
+      const result = await processor.generatePrDescription(
+        commits,
+        ChangedFileCollection.from(changedFiles),
+        "openai",
+      );
       expect(result.title).toBe("Feat: 新功能");
       expect(result.description).toContain("详细描述");
     });
@@ -211,7 +226,11 @@ describe("ReviewLlmProcessor", () => {
       mockLlmProxyService.chatStream.mockReturnValue(mockStream);
       const commits = [{ sha: "abc123", commit: { message: "feat: add" } }];
       const changedFiles = [{ filename: "a.ts", status: "modified" }];
-      const result = await processor.generatePrDescription(commits, changedFiles, "openai");
+      const result = await processor.generatePrDescription(
+        commits,
+        ChangedFileCollection.from(changedFiles),
+        "openai",
+      );
       expect(result.title).toBeDefined();
     });
 
@@ -225,7 +244,7 @@ describe("ReviewLlmProcessor", () => {
       const fileContents = new Map([["a.ts", [["abc1234", "new code"]]]]) as any;
       const result = await processor.generatePrDescription(
         commits,
-        changedFiles,
+        ChangedFileCollection.from(changedFiles),
         "openai",
         fileContents,
       );
@@ -245,7 +264,10 @@ describe("ReviewLlmProcessor", () => {
         { filename: "b.ts", status: "modified" },
         { filename: "c.ts", status: "deleted" },
       ];
-      const result = await processor.buildBasicDescription(commits, changedFiles);
+      const result = await processor.buildBasicDescription(
+        commits,
+        ChangedFileCollection.from(changedFiles),
+      );
       expect(result.description).toContain("提交记录");
       expect(result.description).toContain("文件变更");
       expect(result.description).toContain("新增 1");
@@ -258,7 +280,7 @@ describe("ReviewLlmProcessor", () => {
         yield { type: "text", content: "Feat: empty" };
       })();
       mockLlmProxyService.chatStream.mockReturnValue(mockStream);
-      const result = await processor.buildBasicDescription([], []);
+      const result = await processor.buildBasicDescription([], ChangedFileCollection.empty());
       expect(result.title).toBeDefined();
     });
   });

@@ -19,6 +19,7 @@ import type {
   PrDataResult,
   CommitsAndFiles,
 } from "./types/review-source-resolver";
+import { ChangedFileCollection } from "./changed-file-collection";
 
 export type {
   SourceData,
@@ -73,7 +74,12 @@ export class ReviewSourceResolver {
 
     if (isLocalMode) {
       const local = this.resolveLocalFiles(localMode as "uncommitted" | "staged", verbose);
-      if (local.earlyReturn) return { ...local.earlyReturn, isDirectFileMode: false };
+      if (local.earlyReturn)
+        return {
+          ...local.earlyReturn,
+          changedFiles: ChangedFileCollection.from(local.earlyReturn.changedFiles),
+          isDirectFileMode: false,
+        };
       isLocalMode = local.isLocalMode;
       changedFiles = local.changedFiles;
       effectiveBaseRef = local.effectiveBaseRef ?? effectiveBaseRef;
@@ -90,7 +96,13 @@ export class ReviewSourceResolver {
     } else if (prNumber) {
       const prData = await this.resolvePrData(context);
       if (prData.earlyReturn) {
-        return { ...prData, headSha: prData.headSha!, isLocalMode, isDirectFileMode };
+        return {
+          ...prData,
+          changedFiles: ChangedFileCollection.from(prData.changedFiles),
+          headSha: prData.headSha!,
+          isLocalMode,
+          isDirectFileMode,
+        };
       }
       prModel = prData.prModel;
       commits = prData.commits;
@@ -126,7 +138,14 @@ export class ReviewSourceResolver {
     ));
 
     const headSha = prModel ? await prModel.getHeadSha() : context.headRef || "HEAD";
-    return { prModel, commits, changedFiles, headSha, isLocalMode, isDirectFileMode };
+    return {
+      prModel,
+      commits,
+      changedFiles: ChangedFileCollection.from(changedFiles),
+      headSha,
+      isLocalMode,
+      isDirectFileMode,
+    };
   }
 
   // ─── 数据获取子方法 ──────────────────────────────────────
@@ -276,10 +295,11 @@ export class ReviewSourceResolver {
   private async applyPreFilters(
     context: ReviewContext,
     commits: PullRequestCommit[],
-    changedFiles: ChangedFile[],
+    rawChangedFiles: ChangedFile[],
     isDirectFileMode: boolean,
   ): Promise<CommitsAndFiles> {
     const { owner, repo, prNumber, verbose, includes, files, commits: filterCommits } = context;
+    let changedFiles = ChangedFileCollection.from(rawChangedFiles);
 
     // 0. 过滤掉 merge commit
     {
@@ -296,7 +316,7 @@ export class ReviewSourceResolver {
     // 1. 按指定的 files 过滤
     if (files && files.length > 0) {
       const before = changedFiles.length;
-      changedFiles = changedFiles.filter((f) => files.includes(f.filename || ""));
+      changedFiles = changedFiles.filterByFilenames(files);
       if (shouldLog(verbose, 1)) {
         console.log(`   Files 过滤文件: ${before} -> ${changedFiles.length} 个文件`);
       }
@@ -322,7 +342,7 @@ export class ReviewSourceResolver {
         );
         commitFiles.forEach((f) => commitFilenames.add(f));
       }
-      changedFiles = changedFiles.filter((f) => commitFilenames.has(f.filename || ""));
+      changedFiles = changedFiles.filterByCommitFiles(commitFilenames);
       if (shouldLog(verbose, 1)) {
         console.log(`   按 Commits 过滤文件: ${beforeFiles} -> ${changedFiles.length} 个文件`);
       }
@@ -340,7 +360,9 @@ export class ReviewSourceResolver {
           `[resolveSourceData] filterFilesByIncludes: before=${JSON.stringify(changedFiles.map((f) => ({ filename: f.filename, status: f.status })))}, includes=${JSON.stringify(includes)}`,
         );
       }
-      changedFiles = filterFilesByIncludes(changedFiles, includes);
+      changedFiles = ChangedFileCollection.from(
+        filterFilesByIncludes(changedFiles.toArray(), includes),
+      );
       if (shouldLog(verbose, 1)) {
         console.log(`   Includes 过滤文件: ${beforeFiles} -> ${changedFiles.length} 个文件`);
       }
@@ -372,7 +394,7 @@ export class ReviewSourceResolver {
       }
     }
 
-    return { commits, changedFiles };
+    return { commits, changedFiles: changedFiles.toArray() };
   }
 
   // ─── 重复 workflow 检查 ──────────────────────────────────

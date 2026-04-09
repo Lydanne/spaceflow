@@ -1,7 +1,6 @@
 import {
   GitProviderService,
   PullRequestCommit,
-  ChangedFile,
   type LLMMode,
   LlmProxyService,
   type VerboseLevel,
@@ -17,6 +16,7 @@ import {
   ReviewSpec,
   FileContentsMap,
 } from "./review-spec";
+import { ChangedFileCollection } from "./changed-file-collection";
 import { MarkdownFormatter, ReviewReportService } from "./review-report";
 import { ReviewOptions } from "./review.config";
 import { IssueVerifyService } from "./issue-verify.service";
@@ -119,7 +119,7 @@ export class ReviewService {
         `[execute] loadSpecs: loaded ${specs.length} specs from sources: ${JSON.stringify(specSources)}`,
       );
       console.log(
-        `[execute] filterApplicableSpecs: ${specs.length} applicable out of ${allSpecs.length}, changedFiles=${JSON.stringify(source.changedFiles.map((f) => f.filename))}`,
+        `[execute] filterApplicableSpecs: ${specs.length} applicable out of ${allSpecs.length}, changedFiles=${JSON.stringify(source.changedFiles.filenames())}`,
       );
     }
     if (shouldLog(verbose, 1)) {
@@ -133,7 +133,7 @@ export class ReviewService {
     const fileContents = await this.issueFilter.getFileContents(
       context.owner,
       context.repo,
-      source.changedFiles,
+      source.changedFiles.toArray(),
       source.commits,
       source.headSha,
       context.prNumber,
@@ -195,8 +195,6 @@ export class ReviewService {
     return finalModel.result;
   }
 
-  // ─── 提取的子方法 ──────────────────────────────────────
-
   /**
    * 运行 LLM 审查并构建过滤后的 ReviewResult：
    * - 调用 LLM 生成问题列表
@@ -211,7 +209,7 @@ export class ReviewService {
     source: {
       specs: ReviewSpec[];
       fileContents: FileContentsMap;
-      changedFiles: ChangedFile[];
+      changedFiles: ChangedFileCollection;
       commits: PullRequestCommit[];
       isDirectFileMode: boolean;
     },
@@ -284,7 +282,7 @@ export class ReviewService {
     opts: {
       commits: PullRequestCommit[];
       fileContents: any;
-      changedFiles: ChangedFile[];
+      changedFiles: ChangedFileCollection;
       isDirectFileMode: boolean;
       context: ReviewContext;
     },
@@ -330,7 +328,10 @@ export class ReviewService {
       );
     }
 
-    filtered = this.reviewSpecService.formatIssues(filtered, { specs, changedFiles });
+    filtered = this.reviewSpecService.formatIssues(filtered, {
+      specs,
+      changedFiles: changedFiles.toArray(),
+    });
     if (shouldLog(verbose, 1)) {
       console.log(`   应用格式化后: ${filtered.length} 个问题`);
     }
@@ -587,24 +588,23 @@ export class ReviewService {
     // 获取 commits 和 changedFiles 用于生成描述
     let prModel: PullRequestModel | undefined;
     let commits: PullRequestCommit[] = [];
-    let changedFiles: ChangedFile[] = [];
+    let changedFiles: ChangedFileCollection = ChangedFileCollection.empty();
     if (prNumber) {
       prModel = new PullRequestModel(this.gitProvider, owner, repo, prNumber);
       commits = await prModel.getCommits();
-      changedFiles = await prModel.getFiles();
+      changedFiles = ChangedFileCollection.from(await prModel.getFiles());
     } else if (baseRef && headRef) {
-      changedFiles = await this.issueFilter.getChangedFilesBetweenRefs(
-        owner,
-        repo,
-        baseRef,
-        headRef,
+      changedFiles = ChangedFileCollection.from(
+        await this.issueFilter.getChangedFilesBetweenRefs(owner, repo, baseRef, headRef),
       );
       commits = await this.issueFilter.getCommitsBetweenRefs(baseRef, headRef);
     }
 
     // 使用 includes 过滤文件（支持 added|/modified|/deleted| 前缀语法）
     if (context.includes && context.includes.length > 0) {
-      changedFiles = filterFilesByIncludes(changedFiles, context.includes);
+      changedFiles = ChangedFileCollection.from(
+        filterFilesByIncludes(changedFiles.toArray(), context.includes),
+      );
     }
 
     const prDesc = context.generateDescription
@@ -657,7 +657,7 @@ export class ReviewService {
   private async handleNoApplicableSpecs(
     context: ReviewContext,
     applicableSpecs: any[],
-    changedFiles: ChangedFile[],
+    changedFiles: ChangedFileCollection,
     commits: PullRequestCommit[],
   ): Promise<ReviewResult> {
     const { ci, prNumber, verbose, dryRun, llmMode, autoApprove } = context;
@@ -676,14 +676,12 @@ export class ReviewService {
     const currentRound = (existingResultModel?.round ?? 0) + 1;
 
     // 即使没有适用的规则，也为每个变更文件生成摘要
-    const summary: FileSummary[] = changedFiles
-      .filter((f) => f.filename && f.status !== "deleted")
-      .map((f) => ({
-        file: f.filename!,
-        resolved: 0,
-        unresolved: 0,
-        summary: applicableSpecs.length === 0 ? "无适用的审查规则" : "已跳过",
-      }));
+    const summary: FileSummary[] = changedFiles.nonDeletedFiles().map((f) => ({
+      file: f.filename!,
+      resolved: 0,
+      unresolved: 0,
+      summary: applicableSpecs.length === 0 ? "无适用的审查规则" : "已跳过",
+    }));
     const prDesc =
       context.generateDescription && llmMode
         ? await this.llmProcessor.generatePrDescription(
