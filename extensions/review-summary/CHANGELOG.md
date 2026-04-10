@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.52.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.51.0...@spaceflow/review-summary@0.52.0) (2026-04-10)
+
+### 代码重构
+
+* **review:** 在 showAll=false 时过滤 merge commit 并屏蔽非本次 PR 的变更行 hash ([4edd6e2](https://github.com/Lydanne/spaceflow/commit/4edd6e285085c5fe22238eff273e7a3a683e4dc0))
+
+### 其他修改
+
+* **review:** released version 0.83.0 [no ci] ([ef6b019](https://github.com/Lydanne/spaceflow/commit/ef6b019a5c7dec99959390b7eb66c1ff4de91f8a))
+
 ## [0.51.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.50.0...@spaceflow/review-summary@0.51.0) (2026-04-09)
 
 ### 代码重构
