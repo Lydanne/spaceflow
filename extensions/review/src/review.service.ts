@@ -496,7 +496,13 @@ export class ReviewService {
     }
 
     // 2. 获取 commits 并填充 author 信息
-    const commits = await prModel.getCommits();
+    const allCommits = await prModel.getCommits();
+    const commits = context.showAll
+      ? allCommits
+      : allCommits.filter((c) => !/^merge\b/i.test(c.commit?.message || ""));
+    if (allCommits.length !== commits.length && shouldLog(verbose, 1)) {
+      console.log(`   跳过 Merge Commits: ${allCommits.length} -> ${commits.length} 个`);
+    }
     resultModel.issues = await this.contextBuilder.fillIssueAuthors(
       resultModel.issues,
       commits,
@@ -525,6 +531,7 @@ export class ReviewService {
           headSha,
           prNumber,
           false,
+          context.showAll,
           verbose,
         );
         resultModel.issues = await this.issueFilter.verifyAndUpdateIssues(

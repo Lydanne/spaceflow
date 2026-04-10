@@ -86,6 +86,7 @@ describe("ReviewIssueFilter", () => {
       getCommitsBetweenRefs: vi.fn().mockResolvedValue([]),
       getDiffBetweenRefs: vi.fn().mockResolvedValue([]),
       getFileContent: vi.fn().mockResolvedValue(""),
+      getFileBlame: vi.fn().mockResolvedValue(new Map()),
       getFilesForCommit: vi.fn().mockResolvedValue([]),
       getWorkingFileContent: vi.fn().mockReturnValue(""),
       getCommitDiff: vi.fn().mockReturnValue([]),
@@ -264,6 +265,7 @@ describe("ReviewIssueFilter", () => {
         "abc",
         1,
         false,
+        undefined,
         3,
       );
       expect(result.has("test.ts")).toBe(true);
@@ -278,6 +280,56 @@ describe("ReviewIssueFilter", () => {
       const lines = result.get("new.ts");
       expect(lines![0][0]).toBe("abc1234");
       expect(lines![1][0]).toBe("abc1234");
+    });
+
+    it("should mask merge commit line hash when showAll is false", async () => {
+      gitProvider.getFileContent.mockResolvedValue("line1\nnew line");
+      mockGitSdkService.getFileBlame.mockResolvedValue(new Map([[2, "merge12"]]));
+      const changedFiles = [
+        { filename: "test.ts", status: "modified", patch: "@@ -1,1 +1,2 @@\n line1\n+new line" },
+      ];
+      const commits = [{ sha: "abc1234567890", commit: { message: "feat: add line" } }];
+
+      const result = await resolver.getFileContents(
+        "o",
+        "r",
+        changedFiles,
+        commits,
+        "abc",
+        1,
+        false,
+        false,
+        undefined,
+      );
+
+      const lines = result.get("test.ts");
+      expect(lines).toBeDefined();
+      expect(lines![1][0]).toBe("-------");
+    });
+
+    it("should keep merge commit line hash when showAll is true", async () => {
+      gitProvider.getFileContent.mockResolvedValue("line1\nnew line");
+      mockGitSdkService.getFileBlame.mockResolvedValue(new Map([[2, "merge12"]]));
+      const changedFiles = [
+        { filename: "test.ts", status: "modified", patch: "@@ -1,1 +1,2 @@\n line1\n+new line" },
+      ];
+      const commits = [{ sha: "abc1234567890", commit: { message: "feat: add line" } }];
+
+      const result = await resolver.getFileContents(
+        "o",
+        "r",
+        changedFiles,
+        commits,
+        "abc",
+        1,
+        false,
+        true,
+        undefined,
+      );
+
+      const lines = result.get("test.ts");
+      expect(lines).toBeDefined();
+      expect(lines![1][0]).toBe("merge12");
     });
   });
 

@@ -650,6 +650,50 @@ describe("ReviewService", () => {
       expect(result.issues).toHaveLength(1);
       expect(result.stats).toBeDefined();
     });
+
+    it("should filter merge commits before getFileContents when verifyFixes enabled", async () => {
+      const existingResult = { issues: [{ file: "a.ts", line: "1", ruleId: "R1" }], summary: [] };
+      service._reviewReportService.formatStatsTerminal = vi.fn().mockReturnValue("stats") as any;
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
+      gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "head1234" } } as any);
+      gitProvider.getPullRequestFiles.mockResolvedValue([
+        { filename: "a.ts", status: "modified" },
+      ] as any);
+      gitProvider.getPullRequestCommits.mockResolvedValue([
+        { sha: "merge1111", commit: { message: "Merge branch 'main' into feature" } },
+        { sha: "feat22222", commit: { message: "feat: add logic" } },
+      ] as any);
+
+      vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(
+        ReviewResultModel.create(
+          new PullRequestModel(gitProvider as any, "o", "r", 1),
+          existingResult as any,
+          service._resultModelDeps,
+        ),
+      );
+      const getFileContentsSpy = vi
+        .spyOn(service._sourceResolver, "getFileContents")
+        .mockResolvedValue(new Map() as any);
+
+      const context = {
+        owner: "o",
+        repo: "r",
+        prNumber: 1,
+        ci: false,
+        dryRun: false,
+        verifyFixes: true,
+        specSources: ["/spec/dir"],
+        showAll: false,
+      };
+
+      await service.executeCollectOnly(context);
+
+      expect(getFileContentsSpy).toHaveBeenCalled();
+      const passedCommits = getFileContentsSpy.mock.calls[0][3] as any[];
+      expect(passedCommits).toHaveLength(1);
+      expect(passedCommits[0].sha).toBe("feat22222");
+    });
   });
 
   describe("ReviewService.execute - flush mode", () => {

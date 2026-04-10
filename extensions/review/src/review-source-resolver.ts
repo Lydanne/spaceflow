@@ -150,6 +150,7 @@ export class ReviewSourceResolver {
       headSha,
       context.prNumber,
       isLocalMode,
+      context.showAll,
       context.verbose,
     );
     return {
@@ -313,19 +314,30 @@ export class ReviewSourceResolver {
     rawChangedFiles: ChangedFile[],
     isDirectFileMode: boolean,
   ): Promise<CommitsAndFiles> {
-    const { owner, repo, prNumber, verbose, includes, files, commits: filterCommits } = context;
+    const {
+      owner,
+      repo,
+      prNumber,
+      verbose,
+      includes,
+      files,
+      commits: filterCommits,
+      showAll,
+    } = context;
     let changedFiles = ChangedFileCollection.from(rawChangedFiles);
 
-    // 0. 过滤掉 merge commit
-    {
+    // 0. 过滤掉 merge commit（showAll=false 时启用）
+    if (!showAll) {
       const before = commits.length;
       commits = commits.filter((c) => {
         const message = c.commit?.message || "";
-        return !message.startsWith("Merge ");
+        return !/^merge\b/i.test(message);
       });
       if (before !== commits.length && shouldLog(verbose, 1)) {
         console.log(`   跳过 Merge Commits: ${before} -> ${commits.length} 个`);
       }
+    } else if (shouldLog(verbose, 2)) {
+      console.log(`   showAll=true，跳过 Merge Commit 过滤`);
     }
 
     // 1. 按指定的 files 过滤
@@ -426,10 +438,13 @@ export class ReviewSourceResolver {
     ref: string,
     prNumber?: number,
     isLocalMode?: boolean,
+    showAll?: boolean,
     verbose?: VerboseLevel,
   ): Promise<FileContentsMap> {
     const contents: FileContentsMap = new Map();
     const latestCommitHash = commits[commits.length - 1]?.sha?.slice(0, 7) || "+local+";
+    const validCommitHashes = new Set(commits.map((c) => c.sha?.slice(0, 7)).filter(Boolean));
+    const shouldMaskUnknownChangedLines = !showAll && validCommitHashes.size > 0;
 
     if (shouldLog(verbose, 1)) {
       console.log(`📊 正在构建行号到变更的映射...`);
@@ -503,6 +518,9 @@ export class ReviewSourceResolver {
               return ["-------", line];
             }
             const hash = blameMap?.get(lineNum) ?? latestCommitHash;
+            if (shouldMaskUnknownChangedLines && !validCommitHashes.has(hash)) {
+              return ["-------", line];
+            }
             return [hash, line];
           });
           contents.set(file.filename, contentLines);
