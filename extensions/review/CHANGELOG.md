@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@1.0.0...@spaceflow/review@2.0.0) (2026-04-13)
+
+### 代码重构
+
+* **review:** 优化 Example 标题和描述解析逻辑 ([decb54f](https://github.com/Lydanne/spaceflow/commit/decb54f6832acaeddd83ccfb6a3439c47294f11d))
+
+### 其他修改
+
+* **review-summary:** released version 1.0.0 [no ci] ([742d53e](https://github.com/Lydanne/spaceflow/commit/742d53efb7f16e33c50d9b1c4b9e31a7c0e8da21))
+
 ## [1.0.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@0.83.0...@spaceflow/review@1.0.0) (2026-04-13)
 
 ### ⚠ BREAKING CHANGES
