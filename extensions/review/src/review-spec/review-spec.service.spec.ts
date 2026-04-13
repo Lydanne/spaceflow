@@ -1674,8 +1674,8 @@ const bad_name = 1;
     });
   });
 
-  describe("filterIssuesByIncludes - rule-level includes", () => {
-    it("should use rule-level includes for filtering", () => {
+  describe("filterIssuesByIncludes - includes priority", () => {
+    it("should use rule-level includes over file-level includes", () => {
       const specs = [
         {
           filename: "nest.md",
@@ -1706,12 +1706,301 @@ const bad_name = 1;
       ];
       const issues = [
         { file: "user.model.ts", ruleId: "JsTs.Nest.Model" },
+        { file: "order.model.ts", ruleId: "JsTs.Nest.Model" },
         { file: "user.controller.ts", ruleId: "JsTs.Nest" },
+        { file: "order.controller.ts", ruleId: "JsTs.Nest" },
+        { file: "user.service.ts", ruleId: "JsTs.Nest" },
+        { file: "user.module.ts", ruleId: "JsTs.Nest" },
+        { file: "user.model.ts", ruleId: "JsTs.Nest" }, // model 文件但 ruleId 是 Nest（文件级）
       ];
       const result = service.filterIssuesByIncludes(issues, specs);
-      // spec.includes 是 *.controller.ts，user.model.ts 不匹配
-      expect(result).toHaveLength(1);
-      expect(result[0].file).toBe("user.controller.ts");
+      // JsTs.Nest.Model → 规则级 *.model.ts，user.model.ts / order.model.ts 匹配 → 保留
+      // JsTs.Nest → 文件级 *.controller.ts，user.controller.ts / order.controller.ts 匹配 → 保留
+      // user.service.ts / user.module.ts 不匹配文件级 *.controller.ts → 过滤
+      // user.model.ts(ruleId=Nest) → 文件级 *.controller.ts，不匹配 → 过滤
+      expect(result).toHaveLength(4);
+      expect(result.map((i) => i.file)).toEqual([
+        "user.model.ts",
+        "order.model.ts",
+        "user.controller.ts",
+        "order.controller.ts",
+      ]);
+    });
+
+    it("should fall back to file-level includes when rule has no includes", () => {
+      const specs = [
+        {
+          filename: "nest.md",
+          extensions: ["ts"],
+          type: "nest",
+          content: "",
+          overrides: [],
+          severity: "error" as const,
+          includes: ["*.controller.ts"],
+          rules: [
+            {
+              id: "JsTs.Nest",
+              title: "Nest",
+              description: "",
+              examples: [],
+              overrides: [],
+            },
+            {
+              id: "JsTs.Nest.DirStructure",
+              title: "DirStructure",
+              description: "",
+              examples: [],
+              overrides: [],
+              // 无 rule.includes → 回退到 spec.includes
+            },
+          ],
+        },
+      ];
+      const issues = [
+        { file: "user.controller.ts", ruleId: "JsTs.Nest.DirStructure" },
+        { file: "order.controller.ts", ruleId: "JsTs.Nest.DirStructure" },
+        { file: "user.service.ts", ruleId: "JsTs.Nest.DirStructure" },
+        { file: "user.module.ts", ruleId: "JsTs.Nest.DirStructure" },
+        { file: "user.controller.ts", ruleId: "JsTs.Nest" },
+        { file: "user.service.ts", ruleId: "JsTs.Nest" },
+      ];
+      const result = service.filterIssuesByIncludes(issues, specs);
+      // DirStructure 无规则级 includes → 回退文件级 *.controller.ts
+      // user.controller.ts / order.controller.ts 匹配 → 保留
+      // user.service.ts / user.module.ts 不匹配 → 过滤
+      // JsTs.Nest 同样回退文件级，user.controller.ts 匹配 → 保留，user.service.ts 不匹配 → 过滤
+      expect(result).toHaveLength(3);
+      expect(result.map((i) => i.file)).toEqual([
+        "user.controller.ts",
+        "order.controller.ts",
+        "user.controller.ts",
+      ]);
+    });
+
+    it("should use rule-level includes even when it narrows the file-level scope", () => {
+      const specs = [
+        {
+          filename: "js&ts.md",
+          extensions: ["ts"],
+          type: "base",
+          content: "",
+          overrides: [],
+          severity: "error" as const,
+          includes: ["*.ts"], // 文件级：所有 ts 文件
+          rules: [
+            {
+              id: "JsTs.Base",
+              title: "Base",
+              description: "",
+              examples: [],
+              overrides: [],
+            },
+            {
+              id: "JsTs.Base.TestRule",
+              title: "TestRule",
+              description: "",
+              examples: [],
+              overrides: [],
+              includes: ["*.spec.ts"], // 规则级：仅 spec 文件（收窄）
+            },
+          ],
+        },
+      ];
+      const issues = [
+        { file: "app.spec.ts", ruleId: "JsTs.Base.TestRule" },
+        { file: "utils.spec.ts", ruleId: "JsTs.Base.TestRule" },
+        { file: "app.ts", ruleId: "JsTs.Base.TestRule" },
+        { file: "utils.ts", ruleId: "JsTs.Base.TestRule" },
+        { file: "app.ts", ruleId: "JsTs.Base" },
+        { file: "utils.ts", ruleId: "JsTs.Base" },
+        { file: "app.spec.ts", ruleId: "JsTs.Base" },
+      ];
+      const result = service.filterIssuesByIncludes(issues, specs);
+      // JsTs.Base.TestRule → 规则级 *.spec.ts，app.spec.ts / utils.spec.ts 匹配 → 保留
+      // app.ts / utils.ts 不匹配 *.spec.ts → 过滤
+      // JsTs.Base → 文件级 *.ts，app.ts / utils.ts / app.spec.ts 匹配 → 保留
+      expect(result).toHaveLength(5);
+      expect(result.map((i) => i.file)).toEqual([
+        "app.spec.ts",
+        "utils.spec.ts",
+        "app.ts",
+        "utils.ts",
+        "app.spec.ts",
+      ]);
+    });
+
+    it("should use rule-level includes even when it widens the file-level scope", () => {
+      const specs = [
+        {
+          filename: "nest.md",
+          extensions: ["ts"],
+          type: "nest",
+          content: "",
+          overrides: [],
+          severity: "error" as const,
+          includes: ["*.controller.ts"], // 文件级：仅 controller
+          rules: [
+            {
+              id: "JsTs.Nest",
+              title: "Nest",
+              description: "",
+              examples: [],
+              overrides: [],
+            },
+            {
+              id: "JsTs.Nest.AllFiles",
+              title: "AllFiles",
+              description: "",
+              examples: [],
+              overrides: [],
+              includes: ["*.ts"], // 规则级：所有 ts 文件（放宽）
+            },
+          ],
+        },
+      ];
+      const issues = [
+        { file: "user.service.ts", ruleId: "JsTs.Nest.AllFiles" },
+        { file: "user.controller.ts", ruleId: "JsTs.Nest.AllFiles" },
+        { file: "user.module.ts", ruleId: "JsTs.Nest.AllFiles" },
+        { file: "user.controller.ts", ruleId: "JsTs.Nest" },
+        { file: "order.controller.ts", ruleId: "JsTs.Nest" },
+        { file: "user.service.ts", ruleId: "JsTs.Nest" },
+        { file: "user.module.ts", ruleId: "JsTs.Nest" },
+      ];
+      const result = service.filterIssuesByIncludes(issues, specs);
+      // JsTs.Nest.AllFiles → 规则级 *.ts，全部匹配 → 保留 3 个
+      // JsTs.Nest → 文件级 *.controller.ts，user.controller.ts / order.controller.ts 匹配 → 保留
+      // user.service.ts / user.module.ts 不匹配 → 过滤
+      expect(result).toHaveLength(5);
+      expect(result.map((i) => i.file)).toEqual([
+        "user.service.ts",
+        "user.controller.ts",
+        "user.module.ts",
+        "user.controller.ts",
+        "order.controller.ts",
+      ]);
+    });
+
+    it("should support status prefix in rule-level includes", () => {
+      const specs = [
+        {
+          filename: "nest.md",
+          extensions: ["ts"],
+          type: "nest",
+          content: "",
+          overrides: [],
+          severity: "error" as const,
+          includes: ["*.controller.ts"], // 文件级：无前缀
+          rules: [
+            {
+              id: "JsTs.Nest",
+              title: "Nest",
+              description: "",
+              examples: [],
+              overrides: [],
+            },
+            {
+              id: "JsTs.Nest.Model",
+              title: "Model",
+              description: "",
+              examples: [],
+              overrides: [],
+              includes: ["added|*.model.ts", "modified|*.dto.ts"], // 规则级：added 的 model + modified 的 dto
+            },
+          ],
+        },
+      ];
+      const changedFiles = {
+        getStatus: (file: string) => {
+          if (file === "user.model.ts") return "added";
+          if (file === "order.model.ts") return "modified";
+          if (file === "user.dto.ts") return "modified";
+          if (file === "order.dto.ts") return "added";
+          return "modified";
+        },
+      } as any;
+      const issues = [
+        { file: "user.model.ts", ruleId: "JsTs.Nest.Model" }, // added + *.model.ts → 匹配
+        { file: "order.model.ts", ruleId: "JsTs.Nest.Model" }, // modified + *.model.ts → 不匹配 added|
+        { file: "user.dto.ts", ruleId: "JsTs.Nest.Model" }, // modified + *.dto.ts → 匹配 modified|
+        { file: "order.dto.ts", ruleId: "JsTs.Nest.Model" }, // added + *.dto.ts → 不匹配 modified|
+        { file: "user.controller.ts", ruleId: "JsTs.Nest" }, // 文件级 *.controller.ts → 匹配
+        { file: "user.service.ts", ruleId: "JsTs.Nest" }, // 文件级 *.controller.ts → 不匹配
+      ];
+      const result = service.filterIssuesByIncludes(issues, specs, changedFiles);
+      expect(result).toHaveLength(3);
+      expect(result.map((i) => i.file)).toEqual([
+        "user.model.ts",
+        "user.dto.ts",
+        "user.controller.ts",
+      ]);
+
+      // 全部 modified 时，added|*.model.ts 不匹配，modified|*.dto.ts 匹配
+      const changedFiles2 = {
+        getStatus: () => "modified",
+      } as any;
+      const result2 = service.filterIssuesByIncludes(issues, specs, changedFiles2);
+      // user.model.ts: modified, added|*.model.ts 不匹配 → 过滤
+      // order.model.ts: modified, added|*.model.ts 不匹配 → 过滤
+      // user.dto.ts: modified, modified|*.dto.ts 匹配 → 保留
+      // order.dto.ts: modified, modified|*.dto.ts 匹配 → 保留
+      // user.controller.ts: 文件级匹配 → 保留
+      // user.service.ts: 文件级不匹配 → 过滤
+      expect(result2).toHaveLength(3);
+      expect(result2.map((i) => i.file)).toEqual([
+        "user.dto.ts",
+        "order.dto.ts",
+        "user.controller.ts",
+      ]);
+    });
+
+    it("should use empty rule-level includes to remove file-level restriction", () => {
+      const specs = [
+        {
+          filename: "nest.md",
+          extensions: ["ts"],
+          type: "nest",
+          content: "",
+          overrides: [],
+          severity: "error" as const,
+          includes: ["*.controller.ts"], // 文件级：仅 controller
+          rules: [
+            {
+              id: "JsTs.Nest",
+              title: "Nest",
+              description: "",
+              examples: [],
+              overrides: [],
+            },
+            {
+              id: "JsTs.Nest.Global",
+              title: "Global",
+              description: "",
+              examples: [],
+              overrides: [],
+              includes: [], // 规则级：空数组 = 无限制（覆盖文件级）
+            },
+          ],
+        },
+      ];
+      const issues = [
+        { file: "user.service.ts", ruleId: "JsTs.Nest.Global" },
+        { file: "user.controller.ts", ruleId: "JsTs.Nest.Global" },
+        { file: "user.module.ts", ruleId: "JsTs.Nest.Global" },
+        { file: "user.service.ts", ruleId: "JsTs.Nest" },
+        { file: "user.controller.ts", ruleId: "JsTs.Nest" },
+        { file: "user.module.ts", ruleId: "JsTs.Nest" },
+      ];
+      const result = service.filterIssuesByIncludes(issues, specs);
+      // JsTs.Nest.Global → 规则级 includes=[] (空=无限制)，全部保留 3 个
+      // JsTs.Nest → 文件级 *.controller.ts，仅 user.controller.ts 匹配 → 保留
+      expect(result).toHaveLength(4);
+      expect(result.map((i) => i.file)).toEqual([
+        "user.service.ts",
+        "user.controller.ts",
+        "user.module.ts",
+        "user.controller.ts",
+      ]);
     });
   });
 

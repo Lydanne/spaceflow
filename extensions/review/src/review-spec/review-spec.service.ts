@@ -799,12 +799,12 @@ export class ReviewSpecService {
     specs: ReviewSpec[],
     changedFiles?: ChangedFileCollection,
   ): T[] {
-    // 构建 spec filename -> includes 的映射
+    // 构建 rule.id -> includes 的映射（规则级优先，文件级兜底）
     const specIncludesMap = new Map<string, string[]>();
     for (const spec of specs) {
-      // 从规则 ID 前缀推断 spec filename
       for (const rule of spec.rules) {
-        specIncludesMap.set(rule.id, spec.includes);
+        // 规则级 includes 覆盖文件级 includes，与 severity 优先级一致
+        specIncludesMap.set(rule.id, rule.includes ?? spec.includes);
       }
     }
 
