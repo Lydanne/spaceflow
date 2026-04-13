@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.0.1](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@4.0.0...@spaceflow/review-summary@4.0.1) (2026-04-13)
+
+### 新特性
+
+* **publish:** 限制 Bumper 仅分析当前包目录的 commit ([f01166e](https://github.com/Lydanne/spaceflow/commit/f01166e8da38c836660e61e8456958df4e0cffef))
+
+### 修复BUG
+
+* **review:** 补充审查规范格式、流程、问题生命周期和输出格式文档 ([0c6987e](https://github.com/Lydanne/spaceflow/commit/0c6987ee7eb7f3c5996a5eeb50f6d672cc5f328a))
+
+### 其他修改
+
+* **publish:** released version 1.1.0 [no ci] ([5542404](https://github.com/Lydanne/spaceflow/commit/5542404cb3bb3b3bb57ac9eabeed5f442b41e005))
+* **review:** released version 4.0.1 [no ci] ([1bd48d9](https://github.com/Lydanne/spaceflow/commit/1bd48d9741062952c3a4c67280ba46a370fe9e2c))
+
 ## [4.0.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@3.0.0...@spaceflow/review-summary@4.0.0) (2026-04-13)
 
 ### ⚠ BREAKING CHANGES
