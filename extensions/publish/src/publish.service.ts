@@ -306,6 +306,12 @@ export class PublishService {
                   prefix: tagPrefix,
                   skipUnstable: !prerelease,
                 },
+                // 传入 commitsOpts 限制只分析当前包目录的 commit
+                // 否则 Bumper 会分析 tag..HEAD 之间所有 commit（包括其他包的 BREAKING CHANGE）
+                // 导致其他包的 feat!:/BREAKING CHANGE 被误判为当前包的 major bump
+                commitsOpts: {
+                  path: ".",
+                },
               },
             }
           : {}),
