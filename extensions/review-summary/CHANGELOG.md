@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.0.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@2.0.0...@spaceflow/review-summary@3.0.0) (2026-04-13)
+
+### 代码重构
+
+* **review:** 规则级 includes 优先于文件级 includes,与 severity 优先级保持一致 ([1b03415](https://github.com/Lydanne/spaceflow/commit/1b0341587f4fcf6913b072a1b4731c8eb92114a2))
+
+### 其他修改
+
+* **review:** released version 3.0.0 [no ci] ([226b91d](https://github.com/Lydanne/spaceflow/commit/226b91d23fcbbe94c0742b9f71427bafecc88bc9))
+
 ## [2.0.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@1.0.0...@spaceflow/review-summary@2.0.0) (2026-04-13)
 
 ### 代码重构
