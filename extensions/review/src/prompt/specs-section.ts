@@ -31,7 +31,7 @@ export function buildSpecsSection(specs: ReviewSpec[]): string {
 function formatExample(example: RuleExample): string {
   let text = "";
   if (example.title) {
-    text += `##### ${example.title}\n`;
+    text += `##### Example: ${example.title}\n`;
   }
   if (example.description) {
     text += `${example.description}\n`;

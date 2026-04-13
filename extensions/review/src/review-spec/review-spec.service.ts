@@ -694,13 +694,18 @@ export class ReviewSpecService {
       const trimmedGroup = groupSection.trim();
       if (!trimmedGroup) continue;
 
-      // 提取分组描述，如 "### Example: 命名规则说明"
+      // 提取分组标题和描述，如 "### Example: 函数行数"
       let exampleTitle = "";
       let exampleDescription = "";
       const groupMatch = trimmedGroup.match(/^###\s+Example\s*[:：]\s*(.+)/i);
       if (groupMatch) {
-        exampleTitle = "Example";
-        exampleDescription = groupMatch[1].trim();
+        exampleTitle = groupMatch[1].trim();
+        // 提取标题行和第一个 #### 之间的文本作为 description
+        const afterTitle = trimmedGroup.slice(trimmedGroup.indexOf("\n")).trim();
+        const firstSubIdx = afterTitle.search(/(?:^|\n)####\s+/);
+        if (firstSubIdx > 0) {
+          exampleDescription = afterTitle.slice(0, firstSubIdx).trim();
+        }
       }
 
       // 在分组内按 #### 提取 Good/Bad

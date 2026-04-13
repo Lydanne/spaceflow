@@ -1821,18 +1821,55 @@ const statusActive = "active";
       expect(spec!.rules[1].examples).toHaveLength(2);
 
       // 第一组
-      expect(spec!.rules[1].examples[0].title).toBe("Example");
-      expect(spec!.rules[1].examples[0].description).toBe("下面的明明规则说明");
+      expect(spec!.rules[1].examples[0].title).toBe("下面的明明规则说明");
+      expect(spec!.rules[1].examples[0].description).toBe("");
       expect(spec!.rules[1].examples[0].content).toHaveLength(2);
       expect(spec!.rules[1].examples[0].content[0].type).toBe("good");
       expect(spec!.rules[1].examples[0].content[1].type).toBe("bad");
 
       // 第二组
-      expect(spec!.rules[1].examples[1].title).toBe("Example");
-      expect(spec!.rules[1].examples[1].description).toBe("另一种场景");
+      expect(spec!.rules[1].examples[1].title).toBe("另一种场景");
+      expect(spec!.rules[1].examples[1].description).toBe("");
       expect(spec!.rules[1].examples[1].content).toHaveLength(2);
       expect(spec!.rules[1].examples[1].content[0].type).toBe("good");
       expect(spec!.rules[1].examples[1].content[1].type).toBe("bad");
+    });
+
+    it("should parse Example with title and description paragraph", () => {
+      const mockContent = `# 基础代码规范 \`[JsTs.Base]\`
+
+## 函数行数限制 \`[JsTs.Base.FuncLines]\`
+
+- 函数不能太长
+
+### Example: 函数行数
+
+例子说明 desc
+
+#### Good: 函数不超过 200 行
+
+\`\`\`javascript
+function getUserInfo() {
+  // ... 小于等于 200
+}
+\`\`\`
+
+#### Bad: 函数超过 200 行
+
+\`\`\`javascript
+function getUserInfo() {
+  // ... 大于 200
+}
+\`\`\``;
+
+      const spec = service.parseSpecFile("js&ts.base.md", mockContent);
+      expect(spec).not.toBeNull();
+      expect(spec!.rules[1].examples).toHaveLength(1);
+      expect(spec!.rules[1].examples[0].title).toBe("函数行数");
+      expect(spec!.rules[1].examples[0].description).toBe("例子说明 desc");
+      expect(spec!.rules[1].examples[0].content).toHaveLength(2);
+      expect(spec!.rules[1].examples[0].content[0].type).toBe("good");
+      expect(spec!.rules[1].examples[0].content[0].title).toBe("函数不超过 200 行");
     });
   });
 });
