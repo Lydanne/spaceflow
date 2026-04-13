@@ -299,6 +299,13 @@ export class PublishService {
                   name: changelogConf.preset?.name || "conventionalcommits",
                   types: changelogConf.preset?.type || [],
                 },
+                // 传入 tagOpts 让 Bumper 能正确匹配 monorepo 格式的 tag（如 @scope/pkg@1.0.0）
+                // 否则 Bumper 的 getSemverTags() 不带 prefix，无法识别 @scope/pkg@version 格式
+                // 导致 getLastSemverTag() 返回 null，从仓库开头分析所有 commit，触发错误的 major bump
+                tagOpts: {
+                  prefix: tagPrefix,
+                  skipUnstable: !prerelease,
+                },
               },
             }
           : {}),
