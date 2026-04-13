@@ -159,6 +159,225 @@ spaceflow review -p 123 --fail-on-issues -l openai
 
 规则搜索目录包括：`review.references` 配置路径、`.claude/skills`、`.cursor/skills`、`review-specs`。
 
+## 审查规范格式
+
+审查规范使用 Markdown 文件定义，文件名格式为 `<extensions>.<type>.md`，放置在 `references/` 目录或远程仓库中。
+
+### 文件名约定
+
+```
+<extensions>.<type>.md
+```
+
+- **extensions** — 适用的文件扩展名，多个用 `&` 连接（如 `js&ts`、`vue`）
+- **type** — 规范类别（如 `base`、`file-name`、`nest`）
+
+示例：`js&ts.base.md` → 适用于 `.js` 和 `.ts` 文件的基础规范
+
+### 规则定义格式
+
+每条规则使用 `##` 或 `###` 标题，后跟规则 ID（用反引号方括号包裹）：
+
+```markdown
+## 规则标题 `[RuleId]`
+
+规则描述文本...
+
+> - severity `warn`
+> - override `[OverriddenRuleId]`
+> - includes `*.service.ts` `*.controller.ts`
+
+### Example: 示例标题
+
+#### Good: 正确示例
+
+```typescript
+const MAX_COUNT = 100;
+```
+
+#### Bad: 错误示例
+
+```typescript
+const maxCount = 100;
+```
+```
+
+### 规则配置项
+
+在规则描述中使用引用块（`>`）声明配置：
+
+| 配置项       | 格式                          | 说明                                                         |
+| ------------ | ----------------------------- | ------------------------------------------------------------ |
+| `severity`   | `> - severity \`warn\``       | 严重级别（`off` / `warn` / `error`），默认 `error`          |
+| `override`   | `> - override \`[RuleId]\``   | 覆盖指定规则（前缀匹配），被覆盖的规则问题会被过滤         |
+| `includes`   | `> - includes \`*.ts\` \`*.js\`` | 文件匹配模式，仅对匹配的文件生效，支持 `status|glob` 前缀 |
+
+### Override 机制
+
+Override 允许高优先级规则覆盖低优先级规则，避免重复报告：
+
+- 使用前缀匹配：`override [JsTs.FileName]` 会覆盖 `JsTs.FileName` 及其子规则（如 `JsTs.FileName.UpperCamel`）
+- 作用域感知：只有当 issue 文件匹配 override 所在 spec 的 `includes` 时才生效
+- 文件级 override 写在规范文件头部（第一个 `##` 规则之前），对所有规则生效
+
+### 远程规范引用
+
+`references` 支持以下格式：
+
+```json
+{
+  "review": {
+    "references": [
+      "./references",                                    // 本地目录
+      "https://github.com/org/repo/tree/main/specs",     // GitHub 仓库目录
+      "https://gitea.example.com/org/repo/src/branch/main/specs"  // Gitea 仓库目录
+    ]
+  }
+}
+```
+
+拉取优先级：Git Provider API → tea CLI → git clone 回退 → 本地缓存
+
+## 审查流程
+
+```
+1. 解析上下文（PR/分支/本地模式） → ReviewContext
+2. 加载审查规范（本地 + 远程） → ReviewSpec[]
+3. 获取变更文件和代码内容
+4. 系统规则检查（静态，不依赖 LLM）
+5. LLM 并行审查（按文件分发，注入匹配的规范）
+6. 问题过滤（去重、includes、override、非变更行）
+7. 历史问题验证（可选，verifyFixes）
+8. 删除代码分析（可选，analyzeDeletions）
+9. AI 生成 PR 描述（可选，generateDescription）
+10. 输出结果（PR 评论 / 终端 / JSON）
+```
+
+### 参数优先级
+
+命令行 > PR 标题参数 > 配置文件 > 默认值
+
+## 问题生命周期
+
+每个审查问题（Issue）有以下状态流转：
+
+```
+发现 → 待处理 → 已修复 / 已解决 / 无效
+```
+
+| 状态       | 标记        | 说明                                   |
+| ---------- | ----------- | -------------------------------------- |
+| 待处理     | 🔴/🟡       | 新发现的问题，尚未处理                 |
+| 已修复     | 🟢          | AI 验证代码已修改，问题不再存在         |
+| 已解决     | ⚪          | 用户手动点击 resolve                    |
+| 无效       | ❌          | AI 验证或用户标记为误报                 |
+
+严重级别对应的 Emoji：
+
+| 级别   | Emoji | 说明         |
+| ------ | ----- | ------------ |
+| error  | 🔴    | 必须修复     |
+| warn   | 🟡    | 建议修复     |
+| off    | ⚪    | 规则已关闭   |
+
+### 增量审查
+
+多次运行 review 时自动追踪问题状态：
+
+- **轮次（round）** — 每次审查递增，记录问题在哪一轮发现
+- **去重** — 相同文件+行号+规则的问题不会重复报告
+- **行号追踪** — 代码变更导致行号移动时自动更新 `originalLine`
+- **变更文件处理** — `invalidateChangedFiles` 控制变更文件的历史问题是否标记为无效
+
+## Includes 模式语法
+
+`includes` 配置支持 glob 模式和变更类型前缀：
+
+### 基本语法
+
+```json
+{
+  "includes": ["**/*.ts", "!**/*.spec.ts", "!**/*.config.ts"]
+}
+```
+
+- `!` 前缀表示排除模式
+- 使用 [micromatch](https://github.com/micromatch/micromatch) 匹配
+
+### 变更类型前缀
+
+`<status>|<glob>` 语法，仅匹配指定变更类型的文件：
+
+| 前缀        | 说明   | 示例                      |
+| ----------- | ------ | ------------------------- |
+| `added\|`    | 新增文件 | `added\|**/*.ts`           |
+| `modified\|` | 修改文件 | `modified\|**/*.ts`        |
+| `deleted\|`  | 删除文件 | `deleted\|**/*.ts`         |
+
+无前缀则不限变更类型。
+
+> 注意：文件的 status 是相对 base 分支的全量 diff 结果。例如在当前分支首次引入的文件，无论后续多少次 commit 修改，其 status 始终为 `added`。
+
+### whenModifiedCode 过滤
+
+`whenModifiedCode` 配置可进一步缩小审查范围，只关注特定代码结构：
+
+```json
+{
+  "whenModifiedCode": ["function", "class"]
+}
+```
+
+支持的类型：`function`、`class`、`interface`、`type`、`method`
+
+配置后，LLM 只会收到匹配代码块范围内的代码，其余代码被裁剪。
+
+## 输出格式
+
+### markdown（默认 PR 模式）
+
+发布为 PR Review Comment，包含：
+
+- 按文件分组的问题列表（含严重级别 Emoji）
+- 每个问题的规则 ID、发现时间、开发人员
+- 修复建议代码片段
+- 文件摘要和统计信息
+- 隐藏的 JSON 数据区（用于增量审查状态追踪）
+
+### terminal
+
+终端彩色输出，适合本地审查：
+
+- 🟢 已修复 / 🔴 待处理 error / 🟡 待处理 warn / ⚪ 已解决
+- 按文件分组的摘要和问题详情
+
+### json
+
+原始 `ReviewResult` JSON 结构化输出，适合程序化处理：
+
+```json
+{
+  "success": true,
+  "title": "AI 生成的 PR 标题",
+  "description": "PR 功能总结",
+  "issues": [...],
+  "summary": [...],
+  "deletionImpact": {...},
+  "round": 2,
+  "headSha": "abc1234",
+  "stats": {
+    "total": 10,
+    "validTotal": 8,
+    "fixed": 3,
+    "resolved": 2,
+    "invalid": 2,
+    "pending": 3,
+    "fixRate": 37.5,
+    "resolveRate": 25
+  }
+}
+```
+
 ## PR 标题参数
 
 支持在 PR 标题末尾添加参数覆盖默认配置：
