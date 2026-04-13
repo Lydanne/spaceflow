@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.0.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/publish@0.56.0...@spaceflow/publish@1.0.0) (2026-04-13)
+
+### ⚠ BREAKING CHANGES
+
+* **publish:** 修复 monorepo 格式 tag 识别问题,避免错误的 major bump
+* **review:** 重构 example 数据结构,支持 `### Example:` 分组和 `#### Good:/Bad:` 标题语法
+
+### 新特性
+
+* **publish:** 修复 monorepo 格式 tag 识别问题,避免错误的 major bump ([6379b71](https://github.com/Lydanne/spaceflow/commit/6379b71f5694a814f40866020bc8dd7614399e83))
+* **review:** 新增 includes 变更类型前缀语法支持 ([2f5655f](https://github.com/Lydanne/spaceflow/commit/2f5655fc414828ea3a0269fba04611d2bf2591a9))
+* **review:** 重构 example 数据结构,支持 `### Example:` 分组和 `#### Good:/Bad:` 标题语法 ([e45bd5a](https://github.com/Lydanne/spaceflow/commit/e45bd5aab5e317b8f70a8b107c17aab6548c3296))
+
+### 代码重构
+
+* **review:** 优化 Example 标题和描述解析逻辑 ([decb54f](https://github.com/Lydanne/spaceflow/commit/decb54f6832acaeddd83ccfb6a3439c47294f11d))
+* **review:** 在 showAll=false 时过滤 merge commit 并屏蔽非本次 PR 的变更行 hash ([4edd6e2](https://github.com/Lydanne/spaceflow/commit/4edd6e285085c5fe22238eff273e7a3a683e4dc0))
+* **review:** 规则级 includes 优先于文件级 includes,与 severity 优先级保持一致 ([1b03415](https://github.com/Lydanne/spaceflow/commit/1b0341587f4fcf6913b072a1b4731c8eb92114a2))
+
+### 其他修改
+
+* **review-summary:** released version 0.51.0 [no ci] ([a76f9a4](https://github.com/Lydanne/spaceflow/commit/a76f9a4e0de05f209318fa3527532c5a54ada2bc))
+* **review-summary:** released version 0.52.0 [no ci] ([1d0cdac](https://github.com/Lydanne/spaceflow/commit/1d0cdacdbe12db98399e69fd53bbfdd23825cc10))
+* **review-summary:** released version 1.0.0 [no ci] ([742d53e](https://github.com/Lydanne/spaceflow/commit/742d53efb7f16e33c50d9b1c4b9e31a7c0e8da21))
+* **review-summary:** released version 2.0.0 [no ci] ([4dbf0dd](https://github.com/Lydanne/spaceflow/commit/4dbf0dd37be9137e9b1a38163300be00b2ae851a))
+* **review-summary:** released version 3.0.0 [no ci] ([b344696](https://github.com/Lydanne/spaceflow/commit/b344696ffaaef7957cf04e34fec5ae838982aeb8))
+* **review:** released version 0.82.0 [no ci] ([8b1d3bf](https://github.com/Lydanne/spaceflow/commit/8b1d3bfef9b52c0bc18447a35111eb544a319216))
+* **review:** released version 0.83.0 [no ci] ([ef6b019](https://github.com/Lydanne/spaceflow/commit/ef6b019a5c7dec99959390b7eb66c1ff4de91f8a))
+* **review:** released version 1.0.0 [no ci] ([47a8455](https://github.com/Lydanne/spaceflow/commit/47a84550c321d0739243cc01baab1df4270d6178))
+* **review:** released version 2.0.0 [no ci] ([3afa855](https://github.com/Lydanne/spaceflow/commit/3afa855109cca03173e44c795d6583bc9334b6ee))
+* **review:** released version 3.0.0 [no ci] ([226b91d](https://github.com/Lydanne/spaceflow/commit/226b91d23fcbbe94c0742b9f71427bafecc88bc9))
+* **scripts:** released version 0.34.0 [no ci] ([9bb3509](https://github.com/Lydanne/spaceflow/commit/9bb35096a2b1c42d6dd9b1836128249c622d22d6))
+* **shell:** released version 0.34.0 [no ci] ([6a1638f](https://github.com/Lydanne/spaceflow/commit/6a1638fe69b0f086ddde4075bee2a76604f27ccb))
+
 ## [0.56.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/publish@0.55.0...@spaceflow/publish@0.56.0) (2026-04-09)
 
 ### 代码重构
