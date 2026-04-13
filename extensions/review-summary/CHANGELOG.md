@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.0.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.52.0...@spaceflow/review-summary@1.0.0) (2026-04-13)
+
+### ⚠ BREAKING CHANGES
+
+* **review:** 重构 example 数据结构,支持 `### Example:` 分组和 `#### Good:/Bad:` 标题语法
+
+### 新特性
+
+* **review:** 新增 includes 变更类型前缀语法支持 ([2f5655f](https://github.com/Lydanne/spaceflow/commit/2f5655fc414828ea3a0269fba04611d2bf2591a9))
+* **review:** 重构 example 数据结构,支持 `### Example:` 分组和 `#### Good:/Bad:` 标题语法 ([e45bd5a](https://github.com/Lydanne/spaceflow/commit/e45bd5aab5e317b8f70a8b107c17aab6548c3296))
+
+### 其他修改
+
+* **review:** released version 1.0.0 [no ci] ([47a8455](https://github.com/Lydanne/spaceflow/commit/47a84550c321d0739243cc01baab1df4270d6178))
+
 ## [0.52.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@0.51.0...@spaceflow/review-summary@0.52.0) (2026-04-10)
 
 ### 代码重构
