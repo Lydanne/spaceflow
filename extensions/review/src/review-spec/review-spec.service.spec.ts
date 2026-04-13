@@ -566,6 +566,92 @@ const MAX_COUNT = 100;
 
       expect(result).toHaveLength(2);
     });
+
+    it("should filter issues by spec includes with added| prefix when fileStatusMap provided", () => {
+      const specs = [
+        {
+          filename: "js.models.md",
+          extensions: ["js"],
+          type: "models",
+          content: "",
+          overrides: [],
+          severity: "error" as const,
+          includes: ["added|*.model.js"],
+          rules: [
+            { id: "Js.Models", title: "Models", description: "", examples: [], overrides: [] },
+          ],
+        },
+      ];
+
+      const issues = [
+        { file: "user/models/user.model.js", ruleId: "Js.Models.Rule1", reason: "test" },
+        { file: "user/models/product.model.js", ruleId: "Js.Models.Rule2", reason: "test" },
+      ];
+
+      // added 文件保留，modified 文件被 added| 前缀过滤
+      const changedFiles = ChangedFileCollection.from([
+        { filename: "user/models/user.model.js", status: "added" },
+        { filename: "user/models/product.model.js", status: "modified" },
+      ]);
+      const result = service.filterIssuesByIncludes(issues, specs, changedFiles);
+      expect(result).toHaveLength(1);
+      expect(result[0].file).toBe("user/models/user.model.js");
+    });
+
+    it("should fall back to pure glob matching when fileStatusMap not provided", () => {
+      const specs = [
+        {
+          filename: "js.models.md",
+          extensions: ["js"],
+          type: "models",
+          content: "",
+          overrides: [],
+          severity: "error" as const,
+          includes: ["added|*.model.js"],
+          rules: [
+            { id: "Js.Models", title: "Models", description: "", examples: [], overrides: [] },
+          ],
+        },
+      ];
+
+      const issues = [
+        { file: "user/models/user.model.js", ruleId: "Js.Models.Rule1", reason: "test" },
+        { file: "src/app.js", ruleId: "Js.Models.Rule2", reason: "test" },
+      ];
+
+      // 无 status map 时，added| 前缀降级为纯 glob 匹配
+      const result = service.filterIssuesByIncludes(issues, specs);
+      expect(result).toHaveLength(1);
+      expect(result[0].file).toBe("user/models/user.model.js");
+    });
+
+    it("should filter issues by spec includes with modified| prefix", () => {
+      const specs = [
+        {
+          filename: "js.nest.md",
+          extensions: ["ts"],
+          type: "nest",
+          content: "",
+          overrides: [],
+          severity: "error" as const,
+          includes: ["modified|*.controller.ts"],
+          rules: [{ id: "JsTs.Nest", title: "Nest", description: "", examples: [], overrides: [] }],
+        },
+      ];
+
+      const issues = [
+        { file: "user.controller.ts", ruleId: "JsTs.Nest.Rule1", reason: "test" },
+        { file: "app.controller.ts", ruleId: "JsTs.Nest.Rule2", reason: "test" },
+      ];
+
+      const changedFiles = ChangedFileCollection.from([
+        { filename: "user.controller.ts", status: "modified" },
+        { filename: "app.controller.ts", status: "added" },
+      ]);
+      const result = service.filterIssuesByIncludes(issues, specs, changedFiles);
+      expect(result).toHaveLength(1);
+      expect(result[0].file).toBe("user.controller.ts");
+    });
   });
 
   describe("matchRuleId", () => {
@@ -1163,7 +1249,7 @@ const MAX_COUNT = 100;
       ];
       const issues = [{ ruleId: "JsTs.FileName", file: "src/app.ts", line: "10" }];
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const result = service.filterIssuesByOverrides(issues, specs, 1);
+      const result = service.filterIssuesByOverrides(issues, specs, undefined, 1);
       expect(result).toHaveLength(0);
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
@@ -1192,7 +1278,7 @@ const MAX_COUNT = 100;
       ];
       const issues = [{ ruleId: "Other.Rule", file: "src/app.ts" }];
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      service.filterIssuesByOverrides(issues, specs, 3);
+      service.filterIssuesByOverrides(issues, specs, undefined, 3);
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });

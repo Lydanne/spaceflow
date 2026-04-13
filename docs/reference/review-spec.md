@@ -63,7 +63,7 @@ vue.base.md             # Vue 基础规范
 
 ### `includes`
 
-指定规范适用的文件路径模式（glob）。
+指定规范适用的文件路径模式（glob），支持变更类型前缀语法。
 
 ```markdown
 > - includes `**/*.controller.ts` `**/*.service.ts`
@@ -71,6 +71,23 @@ vue.base.md             # Vue 基础规范
 
 - 支持 `*`（任意字符）和 `**`（任意层级）
 - 多个模式用空格分隔，包裹在反引号中
+- 支持变更类型前缀：`added|`、`modified|`、`deleted|`，按文件变更状态过滤
+
+```markdown
+> - includes `added|*.model.js`
+```
+
+| 前缀 | 匹配的变更类型 | 示例 |
+|------|---------------|------|
+| `added\|` | 新增文件 | `added\|*.model.js` 仅审查新增的模型文件 |
+| `modified\|` | 修改文件 | `modified\|*.controller.ts` 仅审查修改的控制器 |
+| `deleted\|` | 删除文件（含 `removed`） | `deleted\|*.config.ts` 仅审查删除的配置 |
+
+前缀可与排除模式组合：
+
+```markdown
+> - includes `added|**/*.ts` `added|!**/*.spec.ts`
+```
 
 ### `severity`
 

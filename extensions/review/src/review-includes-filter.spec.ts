@@ -4,6 +4,7 @@ import {
   filterFilesByIncludes,
   extractGlobsFromIncludes,
   extractCodeBlockTypes,
+  matchIncludes,
 } from "./review-includes-filter";
 
 describe("review-includes-filter", () => {
@@ -279,6 +280,88 @@ describe("review-includes-filter", () => {
 
     it("空数组返回空数组", () => {
       expect(extractCodeBlockTypes([])).toEqual([]);
+    });
+  });
+
+  describe("matchIncludes", () => {
+    const glob = "**/*.ts";
+
+    it("includes 为空时返回 true", () => {
+      expect(matchIncludes([], "src/foo.ts")).toBe(true);
+    });
+
+    it("filename 为空时返回 false", () => {
+      expect(matchIncludes([glob], "")).toBe(false);
+    });
+
+    it("不传 fileStatus 时降级为纯 glob 匹配", () => {
+      expect(matchIncludes([glob], "src/foo.ts")).toBe(true);
+      expect(matchIncludes([glob], "src/foo.vue")).toBe(false);
+    });
+
+    it("不传 fileStatus 时 status 前缀降级为纯 glob 匹配", () => {
+      // added|**/*.ts 在无 status 信息时，降级为 glob **/*.ts 匹配
+      expect(matchIncludes([`added|${glob}`], "src/foo.ts")).toBe(true);
+      expect(matchIncludes([`added|${glob}`], "src/foo.vue")).toBe(false);
+    });
+
+    it("无前缀 glob 不限 status，匹配所有符合的文件", () => {
+      expect(matchIncludes([glob], "src/foo.ts", "added")).toBe(true);
+      expect(matchIncludes([glob], "src/foo.ts", "modified")).toBe(true);
+      expect(matchIncludes([glob], "src/foo.ts", "removed")).toBe(true);
+    });
+
+    it("added| 前缀只匹配 added 状态文件", () => {
+      expect(matchIncludes([`added|${glob}`], "src/foo.ts", "added")).toBe(true);
+      expect(matchIncludes([`added|${glob}`], "src/foo.ts", "modified")).toBe(false);
+    });
+
+    it("modified| 前缀只匹配 modified 状态文件", () => {
+      expect(matchIncludes([`modified|${glob}`], "src/foo.ts", "modified")).toBe(true);
+      expect(matchIncludes([`modified|${glob}`], "src/foo.ts", "added")).toBe(false);
+    });
+
+    it("deleted| 前缀匹配 removed 和 deleted 状态文件", () => {
+      expect(matchIncludes([`deleted|${glob}`], "src/old.ts", "removed")).toBe(true);
+      expect(matchIncludes([`deleted|${glob}`], "src/old.ts", "deleted")).toBe(true);
+      expect(matchIncludes([`deleted|${glob}`], "src/old.ts", "modified")).toBe(false);
+    });
+
+    it("排除模式 ! 优先过滤", () => {
+      expect(matchIncludes([glob, "!**/*.spec.ts"], "src/foo.spec.ts", "added")).toBe(false);
+      expect(matchIncludes([glob, "!**/*.spec.ts"], "src/foo.ts", "added")).toBe(true);
+    });
+
+    it("多个 status 前缀之间是 OR 关系", () => {
+      expect(matchIncludes([`added|${glob}`, `modified|${glob}`], "src/foo.ts", "added")).toBe(
+        true,
+      );
+      expect(matchIncludes([`added|${glob}`, `modified|${glob}`], "src/foo.ts", "modified")).toBe(
+        true,
+      );
+    });
+
+    it("无前缀 glob 与 status 前缀混用时任一命中即保留", () => {
+      expect(matchIncludes([glob, "added|**/*.vue"], "src/foo.ts", "modified")).toBe(true);
+      expect(matchIncludes([glob, "added|**/*.vue"], "src/foo.vue", "added")).toBe(true);
+      expect(matchIncludes([glob, "added|**/*.vue"], "src/foo.vue", "modified")).toBe(false);
+    });
+
+    it("status 内排除语法 added|!**/*.spec.ts", () => {
+      expect(matchIncludes([`added|${glob}`, "added|!**/*.spec.ts"], "src/foo.ts", "added")).toBe(
+        true,
+      );
+      expect(
+        matchIncludes([`added|${glob}`, "added|!**/*.spec.ts"], "src/foo.spec.ts", "added"),
+      ).toBe(false);
+    });
+
+    it("fileStatus 为 undefined 时走降级路径（纯 glob 匹配）", () => {
+      // matchIncludes 中 undefined 表示无 status 信息，降级为纯 glob 匹配
+      // 这与 filterFilesByIncludes 中 status=undefined fallback 为 modified 不同
+      // 因为 matchIncludes 用于 spec includes 场景，无 status 时应宽松匹配
+      expect(matchIncludes([`modified|${glob}`], "src/foo.ts")).toBe(true);
+      expect(matchIncludes([`added|${glob}`], "src/foo.ts")).toBe(true);
     });
   });
 });

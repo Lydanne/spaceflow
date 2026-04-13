@@ -181,6 +181,86 @@ export function extractGlobsFromIncludes(includes: string[]): string[] {
 }
 
 /**
+ * 检查单个文件是否匹配 includes 模式列表，支持 `status|glob` 前缀语法。
+ *
+ * - 当 `fileStatus` 未提供时，status 前缀的 includes 降级为纯 glob 匹配（向后兼容）
+ * - 当 `fileStatus` 提供时，完整支持 `added|`/`modified|`/`deleted|` 前缀语义
+ *
+ * 算法与 `filterFilesByIncludes` 一致，但针对单文件场景优化：
+ * 1. 排除模式(`!`) 优先过滤
+ * 2. 无前缀正向 glob 匹配
+ * 3. 有 status 前缀的 glob 按文件实际 status 过滤
+ *
+ * @param includes    include 模式列表
+ * @param filename    待匹配的文件名
+ * @param fileStatus  文件变更状态（如 "added"/"modified"/"removed"），不提供时降级为纯 glob
+ * @returns           是否匹配
+ */
+export function matchIncludes(includes: string[], filename: string, fileStatus?: string): boolean {
+  if (!includes || includes.length === 0) return true;
+  if (!filename) return false;
+
+  const parsed = includes.map(parseIncludePattern);
+
+  // 无 status 信息时降级为纯 glob 匹配（向后兼容）
+  if (!fileStatus) {
+    const globs = extractGlobsFromIncludes(includes);
+    if (globs.length === 0) return true;
+    return micromatch.isMatch(filename, globs, { matchBase: true });
+  }
+
+  const normalizedStatus = STATUS_ALIAS[fileStatus.toLowerCase()] ?? "modified";
+
+  // 排除模式（以 ! 开头），用于最终全局过滤
+  const negativeGlobs = parsed
+    .filter((p) => p.status === undefined && p.glob.startsWith("!"))
+    .map((p) => p.glob.slice(1));
+  // 无前缀的正向 globs
+  const plainGlobs = parsed
+    .filter((p) => p.status === undefined && !p.glob.startsWith("!"))
+    .map((p) => p.glob);
+  // 有 status 前缀的 patterns
+  const statusPatterns = parsed.filter((p) => p.status !== undefined);
+
+  // 最终排除：命中排除模式的文件直接过滤掉
+  if (
+    negativeGlobs.length > 0 &&
+    micromatch.isMatch(filename, negativeGlobs, { matchBase: true })
+  ) {
+    return false;
+  }
+
+  // 正向匹配：无前缀 glob
+  if (plainGlobs.length > 0 && micromatch.isMatch(filename, plainGlobs, { matchBase: true })) {
+    return true;
+  }
+
+  // 正向匹配：有 status 前缀的 glob，按文件实际 status 过滤
+  if (statusPatterns.length > 0) {
+    const matchingStatusGlobs = statusPatterns
+      .filter(({ status }) => status === normalizedStatus)
+      .map(({ glob }) => glob);
+    if (matchingStatusGlobs.length > 0) {
+      const positiveGlobs = matchingStatusGlobs.filter((g) => !g.startsWith("!"));
+      const negativeStatusGlobs = matchingStatusGlobs
+        .filter((g) => g.startsWith("!"))
+        .map((g) => g.slice(1));
+      if (positiveGlobs.length > 0) {
+        const matchesPositive = micromatch.isMatch(filename, positiveGlobs, { matchBase: true });
+        const matchesNegative =
+          negativeStatusGlobs.length > 0 &&
+          micromatch.isMatch(filename, negativeStatusGlobs, { matchBase: true });
+        if (matchesPositive && !matchesNegative) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * 从 whenModifiedCode 配置中解析代码结构过滤类型。
  * 只接受简单的类型名称，如 "function"、"class"、"interface"、"type"、"method"
  */

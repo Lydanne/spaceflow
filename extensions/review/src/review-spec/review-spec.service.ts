@@ -12,9 +12,8 @@ import { readdir, readFile, mkdir, access, writeFile, unlink } from "fs/promises
 import { join, basename } from "path";
 import { homedir } from "os";
 import { execSync, execFileSync } from "child_process";
-import micromatch from "micromatch";
 import { ReviewSpec, ReviewRule, RuleExample, Severity } from "./types";
-import { extractGlobsFromIncludes } from "../review-includes-filter";
+import { matchIncludes } from "../review-includes-filter";
 
 export class ReviewSpecService {
   constructor(protected readonly gitProvider?: GitProviderService) {}
@@ -748,10 +747,12 @@ export class ReviewSpecService {
    * 根据 spec 的 includes 配置过滤 issues
    * 只保留文件名匹配对应 spec includes 模式的 issues
    * 如果 spec 没有 includes 配置，则保留该 spec 的所有 issues
+   * 支持 `added|`/`modified|`/`deleted|` 前缀语法
    */
   filterIssuesByIncludes<T extends { file: string; ruleId: string }>(
     issues: T[],
     specs: ReviewSpec[],
+    changedFiles?: ChangedFileCollection,
   ): T[] {
     // 构建 spec filename -> includes 的映射
     const specIncludesMap = new Map<string, string[]>();
@@ -771,14 +772,9 @@ export class ReviewSpecService {
         return true;
       }
 
-      // 检查文件是否匹配 includes 模式（转换为纯 glob，避免 status| 前缀和 code-* 空串传入 micromatch）
-      const globs = extractGlobsFromIncludes(includes);
-      if (globs.length === 0) return true;
-      const matches = micromatch.isMatch(issue.file, globs, { matchBase: true });
-      if (!matches) {
-        // console.log(`   Issue [${issue.ruleId}] 在文件 ${issue.file} 不匹配 includes 模式，跳过`);
-      }
-      return matches;
+      // 使用 matchIncludes 检查文件是否匹配 includes 模式（支持 status|glob 前缀）
+      const fileStatus = changedFiles?.getStatus(issue.file);
+      return matchIncludes(includes, issue.file, fileStatus);
     });
   }
 
@@ -816,6 +812,7 @@ export class ReviewSpecService {
   filterIssuesByOverrides<T extends { ruleId: string; file?: string }>(
     issues: T[],
     specs: ReviewSpec[],
+    changedFiles?: ChangedFileCollection,
     verbose?: VerboseLevel,
   ): T[] {
     // ========== 阶段1: 收集 spec -> overrides 的映射（保留作用域信息） ==========
@@ -887,10 +884,9 @@ export class ReviewSpecService {
         if (scoped.includes.length === 0) {
           return true;
         }
-        // 使用 micromatch 检查文件是否匹配 includes 模式（转换为纯 glob）
-        const globs = extractGlobsFromIncludes(scoped.includes);
-        if (globs.length === 0) return true;
-        return issueFile && micromatch.isMatch(issueFile, globs, { matchBase: true });
+        // 使用 matchIncludes 检查文件是否匹配 includes 模式（支持 status|glob 前缀）
+        const fileStatus = changedFiles?.getStatus(issueFile);
+        return matchIncludes(scoped.includes, issueFile, fileStatus);
       });
 
       if (matched) {

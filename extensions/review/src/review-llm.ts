@@ -19,11 +19,10 @@ import {
 } from "./review-spec";
 import { readdir } from "fs/promises";
 import { dirname, extname } from "path";
-import micromatch from "micromatch";
 import type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./types/review-llm";
 import { buildLinesWithNumbers, buildCommitsSection, extractCodeBlocks } from "./utils/review-llm";
 import { ChangedFileCollection } from "./changed-file-collection";
-import { extractCodeBlockTypes, extractGlobsFromIncludes } from "./review-includes-filter";
+import { matchIncludes, extractCodeBlockTypes } from "./review-includes-filter";
 import {
   REVIEW_SCHEMA,
   buildFileReviewPrompt,
@@ -63,8 +62,9 @@ export class ReviewLlmProcessor {
    * 根据文件过滤 specs，只返回与该文件匹配的规则
    * - 如果 spec 有 includes 配置，只有当文件名匹配 includes 模式时才包含该 spec
    * - 如果 spec 没有 includes 配置，则按扩展名匹配
+   * - 支持 `added|`/`modified|`/`deleted|` 前缀语法，需传入 fileStatus
    */
-  filterSpecsForFile(specs: ReviewSpec[], filename: string): ReviewSpec[] {
+  filterSpecsForFile(specs: ReviewSpec[], filename: string, fileStatus?: string): ReviewSpec[] {
     const ext = extname(filename).slice(1).toLowerCase();
     if (!ext) return [];
 
@@ -75,11 +75,9 @@ export class ReviewLlmProcessor {
       }
 
       // 如果有 includes 配置，检查文件名是否匹配 includes 模式
-      // 需先提取纯 glob（去掉 added|/modified| 前缀，过滤 code-* 空串），避免 micromatch 报错
+      // 使用 matchIncludes 支持 status|glob 前缀语法
       if (spec.includes.length > 0) {
-        const globs = extractGlobsFromIncludes(spec.includes);
-        if (globs.length === 0) return true;
-        return micromatch.isMatch(filename, globs, { matchBase: true });
+        return matchIncludes(spec.includes, filename, fileStatus);
       }
 
       // 没有 includes 配置，扩展名匹配即可
@@ -124,7 +122,7 @@ export class ReviewLlmProcessor {
           const fileDirectoryInfo = await this.getFileDirectoryInfo(filename);
 
           // 根据文件过滤 specs，只注入与当前文件匹配的规则
-          const fileSpecs = this.filterSpecsForFile(specs, filename);
+          const fileSpecs = this.filterSpecsForFile(specs, filename, file.status);
 
           // 从全局 whenModifiedCode 配置中解析代码结构过滤类型
           const codeBlockTypes = whenModifiedCode ? extractCodeBlockTypes(whenModifiedCode) : [];

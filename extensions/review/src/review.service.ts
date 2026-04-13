@@ -3,7 +3,6 @@ import {
   PullRequestCommit,
   type LLMMode,
   LlmProxyService,
-  type VerboseLevel,
   shouldLog,
   GitSdkService,
 } from "@spaceflow/core";
@@ -281,7 +280,7 @@ export class ReviewService {
     const { commits, fileContents, changedFiles, isDirectFileMode, context } = opts;
     const { verbose } = context;
 
-    let filtered = this.reviewSpecService.filterIssuesByIncludes(issues, specs);
+    let filtered = this.reviewSpecService.filterIssuesByIncludes(issues, specs, changedFiles);
     if (shouldLog(verbose, 1)) {
       console.log(`   应用 includes 过滤后: ${filtered.length} 个问题`);
     }
@@ -291,7 +290,12 @@ export class ReviewService {
       console.log(`   应用规则存在性过滤后: ${filtered.length} 个问题`);
     }
 
-    filtered = this.reviewSpecService.filterIssuesByOverrides(filtered, specs, verbose);
+    filtered = this.reviewSpecService.filterIssuesByOverrides(
+      filtered,
+      specs,
+      changedFiles,
+      verbose,
+    );
 
     // 变更行过滤
     if (shouldLog(verbose, 3)) {

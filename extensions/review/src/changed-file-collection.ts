@@ -59,6 +59,17 @@ export class ChangedFileCollection implements Iterable<ChangedFile> {
     return this._files.map(fn);
   }
 
+  /**
+   * 获取指定文件的变更状态
+   */
+  getStatus(filename: string): string | undefined {
+    if (!filename) return undefined;
+    for (const f of this._files) {
+      if (f.filename === filename) return f.status;
+    }
+    return undefined;
+  }
+
   countByStatus(): FileStatusCount {
     let added = 0,
       modified = 0,

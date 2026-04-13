@@ -2,7 +2,7 @@ import { t, z, type SpaceflowContext, type GitProviderService } from "@spaceflow
 import { ReviewSpecService } from "../review-spec";
 import { ChangedFileCollection } from "../changed-file-collection";
 import type { ReviewConfig } from "../review.config";
-import { extractGlobsFromIncludes } from "../review-includes-filter";
+import { matchIncludes } from "../review-includes-filter";
 import { join } from "path";
 import { existsSync } from "fs";
 
@@ -115,16 +115,11 @@ export const tools = [
         allSpecs,
         ChangedFileCollection.from([{ filename: filePath }]),
       );
-      const micromatchModule = await import("micromatch");
-      const micromatch = micromatchModule.default || micromatchModule;
       const rules = applicableSpecs.flatMap((spec) =>
         spec.rules
           .filter((rule) => {
             const includes = rule.includes || spec.includes;
-            if (includes.length === 0) return true;
-            const globs = extractGlobsFromIncludes(includes);
-            if (globs.length === 0) return true;
-            return micromatch.isMatch(filePath, globs, { matchBase: true });
+            return matchIncludes(includes, filePath);
           })
           .map((rule) => ({
             id: rule.id,
