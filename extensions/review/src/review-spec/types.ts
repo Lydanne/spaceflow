@@ -24,9 +24,15 @@ export interface ReviewSpec {
 }
 
 export interface RuleExample {
-  lang: string;
-  code: string;
+  title: string;
+  description: string;
+  content: RuleContent[];
+}
+
+export interface RuleContent {
+  title: string;
   type: "good" | "bad";
+  description: string;
 }
 
 export interface ReviewRule {

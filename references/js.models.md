@@ -10,7 +10,9 @@
 - 文件名使用小写加下划线命名（如 `user_extends.js`）,或者使用小写加横线命名（如 `user-extends.js`）
 - 文件名应与模型名称对应
 
-### Good
+### Example: 模型文件命名规范
+
+#### Good: 合理的命名
 
 ```txt
 user.js
@@ -18,7 +20,7 @@ user_extends.js
 user-profile.js
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```txt
 User.js
@@ -33,7 +35,9 @@ UserProfile.js
 - 要补充字段注释
 - 要补充字段类型
 
-### Good
+### Example: Schema 字段命名规范
+
+#### Good: 合理的命名
 
 ```javascript
 const userSchema = new Schema({
@@ -43,7 +47,7 @@ const userSchema = new Schema({
 });
 ```
 
-### Bad
+#### Bad: 使用驼峰命名
 
 ```javascript
 const userSchema = new Schema({
@@ -59,7 +63,9 @@ const userSchema = new Schema({
 - 必要时添加 `required`、`default` 等属性
 - 复杂类型应使用嵌套 Schema 或引用
 
-### Good
+### Example: Schema 定义规范
+
+#### Good: 符合规范
 
 ```javascript
 const userSchema = new Schema({
@@ -71,7 +77,7 @@ const userSchema = new Schema({
 });
 ```
 
-### Bad
+#### Bad: 未指定字段类型对象
 
 ```javascript
 const userSchema = new Schema({
@@ -88,7 +94,9 @@ const userSchema = new Schema({
 - 需要添加注释说明索引用途
 - 不能在 Schema 定义中直接添加索引，添加到索引要注释掉
 
-### Good
+### Example: 索引定义规范
+
+#### Good: 符合规范
 
 ```javascript
 const orderSchema = new Schema({
@@ -103,7 +111,7 @@ const orderSchema = new Schema({
 // orderSchema.index({ order_no: 1 }, { unique: true });
 ```
 
-### Bad
+#### Bad: Schema 中直接添加索引
 
 ```javascript
 const orderSchema = new Schema({
@@ -119,7 +127,9 @@ const orderSchema = new Schema({
 - 虚拟字段应在 Schema 定义后声明
 - 需要添加注释说明虚拟字段用途
 
-### Good
+### Example: 虚拟字段规范
+
+#### Good: 符合规范
 
 ```javascript
 const userSchema = new Schema({
@@ -133,7 +143,7 @@ userSchema.virtual("full_name").get(function () {
 });
 ```
 
-### Bad
+#### Bad: 存储可计算的字段
 
 ```javascript
 const userSchema = new Schema({
@@ -149,7 +159,9 @@ const userSchema = new Schema({
 - 需要添加注释说明中间件用途
 - 避免在中间件中执行耗时操作
 
-### Good
+### Example: 中间件/钩子规范
+
+#### Good: 符合规范
 
 ```javascript
 const userSchema = new Schema({
@@ -172,7 +184,7 @@ userSchema.pre("save", async function (next) {
 });
 ```
 
-### Bad
+#### Bad: 缺少注释且使用同步方法
 
 ```javascript
 const userSchema = new Schema({
@@ -192,7 +204,9 @@ userSchema.pre("save", function (next) {
 - 静态方法应在 Schema 定义后声明
 - 需要添加注释说明方法用途
 
-### Good
+### Example: 静态方法规范
+
+#### Good: 符合规范
 
 ```javascript
 const userSchema = new Schema({
@@ -211,7 +225,7 @@ userSchema.statics.findActiveUsers = function () {
 };
 ```
 
-### Bad
+#### Bad: 方法名使用下划线
 
 ```javascript
 const userSchema = new Schema({
@@ -231,7 +245,9 @@ userSchema.statics.find_by_email = function (email) {
 - 需要添加注释说明方法用途
 - 实例方法内部使用 `this` 访问文档属性
 
-### Good
+### Example: 实例方法规范
+
+#### Good: 符合规范
 
 ```javascript
 const userSchema = new Schema({
@@ -251,7 +267,7 @@ userSchema.methods.incrementLoginCount = function () {
 };
 ```
 
-### Bad
+#### Bad: 方法名使用下划线
 
 ```javascript
 const userSchema = new Schema({
@@ -270,7 +286,9 @@ userSchema.methods.compare_password = function (candidatePassword) {
 - 必须指定 `ref` 属性
 - 需要添加注释说明关联关系
 
-### Good
+### Example: 关联引用规范
+
+#### Good: 符合规范
 
 ```javascript
 const orderSchema = new Schema({
@@ -281,7 +299,7 @@ const orderSchema = new Schema({
 });
 ```
 
-### Bad
+#### Bad: 缺少 ref 且命名不规范
 
 ```javascript
 const orderSchema = new Schema({
@@ -296,7 +314,9 @@ const orderSchema = new Schema({
 - 禁止使用简写形式（如 `field: String`）
 - 不允许使用 Object 等模糊类型
 
-### Good
+### Example: 必须写明字段的类型
+
+#### Good: 推荐做法
 
 ```javascript
 const userSchema = new Schema({
@@ -311,7 +331,7 @@ const userSchema = new Schema({
 });
 ```
 
-### Bad
+#### Bad: 使用简写形式和模糊类型
 
 ```javascript
 const userSchema = new Schema({

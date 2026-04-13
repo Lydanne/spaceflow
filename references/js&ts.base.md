@@ -7,13 +7,15 @@
 - 不检查 nodejs 的导包定义，比如 `const fs = require("fs")`
 - 常量检查只需检查 `const` 声明的静态值，但是不包含对象和函数
 
-### Good
+### Example: 常量名使用大写加下划线命名
+
+#### Good: 合理的命名
 
 ```javascript
 const MAX_COUNT = 100;
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```javascript
 const maxCount = 100;
@@ -23,7 +25,9 @@ const maxCount = 100;
 
 > - severity `warn`
 
-### Good
+### Example: 函数名使用小驼峰命名
+
+#### Good: 合理的命名
 
 ```javascript
 function getUserInfo() {
@@ -31,7 +35,7 @@ function getUserInfo() {
 }
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```javascript
 function getuserinfo() {
@@ -56,13 +60,15 @@ function getuserinfo() {
 - console.trace 的错误信息无需审查
 - 无需考虑类型是否合理匹配
 
-### Good
+### Example: 禁止使用字面量魔法字符串和魔法数字
+
+#### Good: 推荐做法
 
 ```javascript
 const MAX_COUNT = 100;
 ```
 
-### Bad
+#### Bad: 使用魔法值
 
 ```javascript
 const maxCount = 100;
@@ -73,7 +79,9 @@ const userStatus = "active";
 
 > - severity `warn`
 
-### Good
+### Example: class 和 interface 命名使用大驼峰命名
+
+#### Good: 合理的命名
 
 ```javascript
 class UserInfo {
@@ -81,7 +89,7 @@ class UserInfo {
 }
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```javascript
 class userinfo {
@@ -95,13 +103,15 @@ class userinfo {
 
 - 需要注意的是从 require 导入的变量不受检查
 
-### Good
+### Example: 变量名使用小驼峰命名
+
+#### Good: 合理的命名
 
 ```javascript
 let userName = "John";
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```javascript
 let username = "John";
@@ -109,13 +119,15 @@ let username = "John";
 
 ## 单文件代码不超过 700 行 `[JsTs.Base.CodeNotMoreThan700Lines]`
 
-### Good
+### Example: 单文件代码不超过 700 行
+
+#### Good: 符合限制
 
 ```javascript
 // 代码不超过 700 行
 ```
 
-### Bad
+#### Bad: 超出限制
 
 ```javascript
 // 代码超过 700 行
@@ -123,7 +135,9 @@ let username = "John";
 
 ## 单个函数或方法不能超出 200 行 `[JsTs.Base.FuncNotMoreThan200Lines]`
 
-### Good
+### Example: 单个函数或方法不能超出 200 行
+
+#### Good: 符合限制
 
 ```javascript
 function getUserInfo() {
@@ -131,7 +145,7 @@ function getUserInfo() {
 }
 ```
 
-### Bad
+#### Bad: 超出限制
 
 ```javascript
 function getUserInfo() {
@@ -145,7 +159,9 @@ function getUserInfo() {
 
 - 逻辑判断的复杂度超过 2 个的要添加注释
 
-### Good
+### Example: 复杂的逻辑判断要添加注释
+
+#### Good: 添加了注释
 
 ```javascript
 // 逻辑判断复杂度超过 2 个
@@ -154,7 +170,7 @@ if (a && b || c) {
 }
 ```
 
-### Bad
+#### Bad: 缺少注释
 
 ```javascript
 if (a && b && c && d) {
@@ -166,7 +182,9 @@ if (a && b && c && d) {
 
 > - severity `warn`
 
-### Good
+### Example: 复杂的函数要添加注释
+
+#### Good: 添加了注释
 
 ```javascript
 /**
@@ -177,7 +195,7 @@ function complexFunc() {
 }
 ```
 
-### Bad
+#### Bad: 缺少注释
 
 ```javascript
 function complexFunc() {

@@ -35,7 +35,7 @@ describe("ReviewSpecService", () => {
 - 排除配置文件
 - 排除测试文件
 
-### Good
+#### Good: 合理的常量命名
 \`\`\`js
 const MAX_COUNT = 100;
 \`\`\``;
@@ -59,10 +59,13 @@ const MAX_COUNT = 100;
       expect(specs[0].rules[1].description).toContain("排除配置文件");
       expect(specs[0].rules[1].description).toContain("排除测试文件");
       expect(specs[0].rules[1].examples).toHaveLength(1);
-      expect(specs[0].rules[1].examples[0]).toEqual({
-        lang: "js",
-        code: "const MAX_COUNT = 100;",
+      expect(specs[0].rules[1].examples[0].title).toBe("");
+      expect(specs[0].rules[1].examples[0].description).toBe("");
+      expect(specs[0].rules[1].examples[0].content).toHaveLength(1);
+      expect(specs[0].rules[1].examples[0].content[0]).toEqual({
+        title: "合理的常量命名",
         type: "good",
+        description: "const MAX_COUNT = 100;",
       });
 
       expect(specs[1].filename).toBe("vue.file-name.md");
@@ -309,7 +312,7 @@ const MAX_COUNT = 100;
 
 > - severity \`warn\`
 
-### Good
+#### Good: 合理的常量命名
 \`\`\`js
 const MAX_COUNT = 100;
 \`\`\``;
@@ -800,7 +803,13 @@ const MAX_COUNT = 100;
               id: "JsTs.Base.Rule1",
               title: "Rule1",
               description: "rule desc",
-              examples: [{ lang: "ts", code: "const x = 1;", type: "good" as const }],
+              examples: [
+                {
+                  title: "",
+                  description: "",
+                  content: [{ title: "", type: "good" as const, description: "const x = 1;" }],
+                },
+              ],
               overrides: [],
             },
           ],
@@ -809,7 +818,7 @@ const MAX_COUNT = 100;
       const result = service.buildSpecsSection(specs);
       expect(result).toContain("基础规范");
       expect(result).toContain("Rule1");
-      expect(result).toContain("推荐做法");
+      expect(result).toContain("good");
     });
 
     it("should handle rules without examples", () => {
@@ -1644,14 +1653,16 @@ const MAX_COUNT = 100;
 
   describe("extractExamples - bad type", () => {
     it("should extract bad examples", () => {
-      const content = `### Bad
+      const content = `#### Bad: 不合理的命名
 
 \`\`\`ts
 const bad_name = 1;
 \`\`\``;
       const examples = (service as any).extractExamples(content);
       expect(examples).toHaveLength(1);
-      expect(examples[0].type).toBe("bad");
+      expect(examples[0].content).toHaveLength(1);
+      expect(examples[0].content[0].type).toBe("bad");
+      expect(examples[0].content[0].title).toBe("不合理的命名");
     });
   });
 
@@ -1701,6 +1712,127 @@ const bad_name = 1;
       // spec.includes 是 *.controller.ts，user.model.ts 不匹配
       expect(result).toHaveLength(1);
       expect(result[0].file).toBe("user.controller.ts");
+    });
+  });
+
+  describe("extractExamples - #### level with colon", () => {
+    it("should extract examples from #### Good: / #### Bad: format without group", () => {
+      const content = `#### Good: 合理的常量命名
+
+\`\`\`javascript
+const MAX_COUNT = 100;
+\`\`\`
+
+#### Bad: 不合理的常量命名
+
+\`\`\`javascript
+const maxCount = 100;
+\`\`\``;
+      const examples = (service as any).extractExamples(content);
+      expect(examples).toHaveLength(1);
+      expect(examples[0].title).toBe("");
+      expect(examples[0].description).toBe("");
+      expect(examples[0].content).toHaveLength(2);
+      expect(examples[0].content[0]).toEqual({
+        title: "合理的常量命名",
+        type: "good",
+        description: "const MAX_COUNT = 100;",
+      });
+      expect(examples[0].content[1]).toEqual({
+        title: "不合理的常量命名",
+        type: "bad",
+        description: "const maxCount = 100;",
+      });
+    });
+
+    it("should parse full rule with #### examples", () => {
+      const mockContent = `# 基础代码规范 \`[JsTs.Base]\`
+
+## 常量名使用大写加下划线命名 \`[JsTs.Base.ConstUpperCase]\`
+
+- 不检查 nodejs 的导包定义
+- 常量检查只需检查 const 声明的静态值
+
+#### Good: 合理的常量命名
+
+\`\`\`javascript
+const MAX_COUNT = 100;
+\`\`\`
+
+#### Bad: 不合理的常量命名
+
+\`\`\`javascript
+const maxCount = 100;
+\`\`\``;
+
+      const spec = service.parseSpecFile("js&ts.base.md", mockContent);
+      expect(spec).not.toBeNull();
+      expect(spec!.rules).toHaveLength(2);
+      expect(spec!.rules[1].id).toBe("JsTs.Base.ConstUpperCase");
+      expect(spec!.rules[1].description).toContain("不检查 nodejs");
+      expect(spec!.rules[1].description).not.toContain("Good");
+      expect(spec!.rules[1].examples).toHaveLength(1);
+      expect(spec!.rules[1].examples[0].content).toHaveLength(2);
+      expect(spec!.rules[1].examples[0].content[0].type).toBe("good");
+      expect(spec!.rules[1].examples[0].content[1].type).toBe("bad");
+    });
+
+    it("should parse multiple example groups with ### Example:", () => {
+      const mockContent = `# 基础代码规范 \`[JsTs.Base]\`
+
+## 常量名使用大写加下划线命名 \`[JsTs.Base.ConstUpperCase]\`
+
+- 不检查 nodejs 的导包定义
+- 常量检查只需检查 const 声明的静态值
+
+### Example: 下面的明明规则说明
+
+#### Good: 合理的常量命名
+
+\`\`\`javascript
+const MAX_COUNT = 100;
+\`\`\`
+
+#### Bad: 不合理的常量命名
+
+\`\`\`javascript
+const maxCount = 100;
+\`\`\`
+
+### Example: 另一种场景
+
+#### Good: 枚举值命名
+
+\`\`\`javascript
+const STATUS_ACTIVE = "active";
+\`\`\`
+
+#### Bad: 枚举值小驼峰
+
+\`\`\`javascript
+const statusActive = "active";
+\`\`\``;
+
+      const spec = service.parseSpecFile("js&ts.base.md", mockContent);
+      expect(spec).not.toBeNull();
+      expect(spec!.rules[1].id).toBe("JsTs.Base.ConstUpperCase");
+      expect(spec!.rules[1].description).toContain("不检查 nodejs");
+      expect(spec!.rules[1].description).not.toContain("Example");
+      expect(spec!.rules[1].examples).toHaveLength(2);
+
+      // 第一组
+      expect(spec!.rules[1].examples[0].title).toBe("Example");
+      expect(spec!.rules[1].examples[0].description).toBe("下面的明明规则说明");
+      expect(spec!.rules[1].examples[0].content).toHaveLength(2);
+      expect(spec!.rules[1].examples[0].content[0].type).toBe("good");
+      expect(spec!.rules[1].examples[0].content[1].type).toBe("bad");
+
+      // 第二组
+      expect(spec!.rules[1].examples[1].title).toBe("Example");
+      expect(spec!.rules[1].examples[1].description).toBe("另一种场景");
+      expect(spec!.rules[1].examples[1].content).toHaveLength(2);
+      expect(spec!.rules[1].examples[1].content[0].type).toBe("good");
+      expect(spec!.rules[1].examples[1].content[1].type).toBe("bad");
     });
   });
 });

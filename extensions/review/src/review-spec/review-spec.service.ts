@@ -12,8 +12,9 @@ import { readdir, readFile, mkdir, access, writeFile, unlink } from "fs/promises
 import { join, basename } from "path";
 import { homedir } from "os";
 import { execSync, execFileSync } from "child_process";
-import { ReviewSpec, ReviewRule, RuleExample, Severity } from "./types";
+import { ReviewSpec, ReviewRule, RuleExample, RuleContent, Severity } from "./types";
 import { matchIncludes } from "../review-includes-filter";
+import { buildSpecsSection as buildSpecsSectionPrompt } from "../prompt/specs-section";
 
 export class ReviewSpecService {
   constructor(protected readonly gitProvider?: GitProviderService) {}
@@ -605,7 +606,9 @@ export class ReviewSpecService {
 
       // 提取描述：在第一个例子之前的文本
       let description = ruleContent;
-      const firstExampleIndex = ruleContent.search(/(?:^|\n)###\s+(?:good|bad)/i);
+      const firstExampleIndex = ruleContent.search(
+        /(?:^|\n)(?:####\s+(?:good|bad)|###\s+Example:)/i,
+      );
       if (firstExampleIndex !== -1) {
         description = ruleContent.slice(0, firstExampleIndex).trim();
       } else {
@@ -683,27 +686,64 @@ export class ReviewSpecService {
 
   protected extractExamples(content: string): RuleExample[] {
     const examples: RuleExample[] = [];
-    const sections = content.split(/(?:^|\n)###\s+/);
 
-    for (const section of sections) {
-      const trimmedSection = section.trim();
-      if (!trimmedSection) continue;
+    // 按 ### Example: 分组
+    const groupSections = content.split(/(?:^|\n)(?=###\s+Example:)/);
 
-      let type: "good" | "bad" | null = null;
-      if (/^good\b/i.test(trimmedSection)) {
-        type = "good";
-      } else if (/^bad\b/i.test(trimmedSection)) {
-        type = "bad";
+    for (const groupSection of groupSections) {
+      const trimmedGroup = groupSection.trim();
+      if (!trimmedGroup) continue;
+
+      // 提取分组描述，如 "### Example: 命名规则说明"
+      let exampleTitle = "";
+      let exampleDescription = "";
+      const groupMatch = trimmedGroup.match(/^###\s+Example\s*[:：]\s*(.+)/i);
+      if (groupMatch) {
+        exampleTitle = "Example";
+        exampleDescription = groupMatch[1].trim();
       }
 
-      if (!type) continue;
+      // 在分组内按 #### 提取 Good/Bad
+      const ruleContents: RuleContent[] = [];
+      const sections = trimmedGroup.split(/(?:^|\n)####\s+/);
 
-      const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
-      let codeMatch;
-      while ((codeMatch = codeBlockRegex.exec(trimmedSection)) !== null) {
-        const lang = codeMatch[1] || "text";
-        const code = codeMatch[2].trim();
-        examples.push({ lang, code, type });
+      for (const section of sections) {
+        const trimmedSection = section.trim();
+        if (!trimmedSection) continue;
+
+        let type: "good" | "bad" | null = null;
+        let contentTitle = "";
+        if (/^good:/i.test(trimmedSection)) {
+          type = "good";
+          contentTitle = trimmedSection.match(/^good:\s*(.+)/i)?.[1]?.trim() ?? "";
+        } else if (/^bad:/i.test(trimmedSection)) {
+          type = "bad";
+          contentTitle = trimmedSection.match(/^bad:\s*(.+)/i)?.[1]?.trim() ?? "";
+        }
+
+        if (!type) continue;
+
+        // 提取代码块作为 description
+        const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
+        let codeMatch;
+        const codeParts: string[] = [];
+        while ((codeMatch = codeBlockRegex.exec(trimmedSection)) !== null) {
+          codeParts.push(codeMatch[2].trim());
+        }
+
+        ruleContents.push({
+          title: contentTitle,
+          type,
+          description: codeParts.join("\n\n"),
+        });
+      }
+
+      if (ruleContents.length > 0) {
+        examples.push({
+          title: exampleTitle,
+          description: exampleDescription,
+          content: ruleContents,
+        });
       }
     }
 
@@ -1007,29 +1047,7 @@ export class ReviewSpecService {
    * 构建 specs 的 prompt 部分
    */
   buildSpecsSection(specs: ReviewSpec[]): string {
-    return specs
-      .map((spec) => {
-        const firstRule = spec.rules[0];
-        const rulesText = spec.rules
-          .slice(1)
-          .map((rule) => {
-            let text = `#### [${rule.id}] ${rule.title}\n`;
-            if (rule.description) {
-              text += `${rule.description}\n`;
-            }
-            if (rule.examples.length > 0) {
-              for (const example of rule.examples) {
-                text += `##### ${example.type === "good" ? "推荐做法 (Good)" : "不推荐做法 (Bad)"}\n`;
-                text += `\`\`\`${example.lang}\n${example.code}\n\`\`\`\n`;
-              }
-            }
-            return text;
-          })
-          .join("\n");
-
-        return `### ${firstRule.title}\n- 规范文件: ${spec.filename}\n- 适用扩展名: ${spec.extensions.join(", ")}\n\n${rulesText}`;
-      })
-      .join("\n\n-------------------\n\n");
+    return buildSpecsSectionPrompt(specs);
   }
 
   /**

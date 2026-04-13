@@ -6,7 +6,9 @@
 
 必须使用大驼峰命名并且使用的时候也是，并且至少两个单词。
 
-### Good
+### Example: Vue 自定义组件命名规则
+
+#### Good: 合理的命名
 
 ```vue
 <!-- UserInfo.vue -->
@@ -22,7 +24,7 @@ export default {
 </script>
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```vue
 <!-- userinfo.vue -->

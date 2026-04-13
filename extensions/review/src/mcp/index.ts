@@ -130,9 +130,13 @@ export const tools = [
             ...(includeExamples && rule.examples.length > 0
               ? {
                   examples: rule.examples.map((ex) => ({
-                    type: ex.type,
-                    lang: ex.lang,
-                    code: ex.code,
+                    title: ex.title,
+                    description: ex.description,
+                    content: ex.content.map((c) => ({
+                      title: c.title,
+                      type: c.type,
+                      description: c.description,
+                    })),
                   })),
                 }
               : {}),
@@ -165,9 +169,13 @@ export const tools = [
         includes: spec.includes,
         overrides: rule.overrides,
         examples: rule.examples.map((ex) => ({
-          type: ex.type,
-          lang: ex.lang,
-          code: ex.code,
+          title: ex.title,
+          description: ex.description,
+          content: ex.content.map((c) => ({
+            title: c.title,
+            type: c.type,
+            description: c.description,
+          })),
         })),
       };
     },
@@ -204,9 +212,13 @@ export const tools = [
           ...(includeExamples && rule.examples.length > 0
             ? {
                 examples: rule.examples.map((ex) => ({
-                  type: ex.type,
-                  lang: ex.lang,
-                  code: ex.code,
+                  title: ex.title,
+                  description: ex.description,
+                  content: ex.content.map((c) => ({
+                    title: c.title,
+                    type: c.type,
+                    description: c.description,
+                  })),
                 })),
               }
             : { hasExamples: rule.examples.length > 0 }),

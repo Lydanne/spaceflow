@@ -16,7 +16,9 @@
 - 每个模块的目录下可以包含 `interceptor` 目录，用于存放拦截器
 - 每个模块的目录下可以包含 `filter` 目录，用于存放异常过滤器
 
-### Good
+### Example: 目录框架规范
+
+#### Good: 符合规范
 
 ```txt
 src/
@@ -43,7 +45,7 @@ src/
 └── main.ts          # 应用入口
 ```
 
-### Bad
+#### Bad: 扁平目录结构
 
 ```txt
 src/
@@ -63,13 +65,15 @@ src/
 - 文件名必须加 `.controller.ts` 后缀
 - 注解和装饰器上的静态值无需进行魔法值的提炼 `[JsTs.Base.NoMagicStringsAndNumbers]`
 
-### Good
+### Example: 控制器命名规范
+
+#### Good: 合理的命名
 
 ```txt
 user-extends.controller.ts
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```txt
 userController.ts
@@ -83,13 +87,15 @@ userController.ts
 - 文件名使用小写加横线命名（如 `user-extends.service.ts`）
 - 文件名必须加 `.service.ts` 后缀
 
-### Good
+### Example: 服务命名规范
+
+#### Good: 合理的命名
 
 ```txt
 user-extends.service.ts
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```txt
 userService.ts
@@ -100,13 +106,15 @@ userService.ts
 - 文件名使用小写加横线命名（如 `user-extends.module.ts`）
 - 文件名必须加 `.module.ts` 后缀
 
-### Good
+### Example: 模块命名规范
+
+#### Good: 合理的命名
 
 ```txt
 user-extends.module.ts
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```txt
 userModule.ts
@@ -121,13 +129,15 @@ userModule.ts
 - dto 目录下必须包含 `dto.ts` 文件
 - dto 里的类的属性可以使用小驼峰或者下划线命名
 
-### Good
+### Example: Dto 命名规范
+
+#### Good: 合理的命名
 
 ```txt
 user-extends.dto.ts
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```txt
 userDto.ts
@@ -141,7 +151,9 @@ userDto.ts
 - 内部只能写使用 syncService 调用的逻辑
 - SyncService 只能在 proxy.ts 中使用
 
-### Good
+### Example: Proxy 编写规范
+
+#### Good: 符合规范
 
 ```typescript
 // user.proxy.ts
@@ -159,7 +171,7 @@ export class UserProxy {
 }
 ```
 
-### Bad
+#### Bad: Proxy 中直接查询数据库
 
 ```typescript
 // user.proxy.ts
@@ -187,7 +199,9 @@ export class UserProxy {
 - 文件名使用小写加横线命名（如 `user.model.ts`）
 - 文件名必须加 `.model.ts` 后缀
 
-### Good
+### Example: Model 编写规范
+
+#### Good: 符合规范
 
 ```typescript
 // user.model.ts
@@ -206,7 +220,7 @@ export class UserProxy {
 }
 ```
 
-### Bad
+#### Bad: Model 中调用 SyncService
 
 ```typescript
 // user.model.ts
@@ -229,7 +243,9 @@ export class UserProxy {
 
 - 目前所有的新代码都应该写在 nest 里
 
-### Good
+### Example: 业务代码编写规范
+
+#### Good: 符合规范
 
 ```typescript
 // nest-src/apps/app/src/user/user.controller.ts
@@ -243,7 +259,7 @@ export class UserProxy {
 // nest-src/apps/app/src/user/user.module.ts
 ```
 
-### Bad
+#### Bad: 新代码写在旧项目目录
 
 ```typescript
 // proxy/user.js

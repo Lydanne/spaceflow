@@ -4,7 +4,9 @@
 
 ## Vue 组件文件使用大驼峰命名 `[Vue.FileName.UpperCamel]`
 
-### Good
+### Example: Vue 组件文件使用大驼峰命名
+
+#### Good: 合理的命名
 
 ```vue
 <!-- UserInfo.vue -->
@@ -20,7 +22,7 @@ export default {
 </script>
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```vue
 <!-- userinfo.vue -->

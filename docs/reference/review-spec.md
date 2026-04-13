@@ -46,13 +46,15 @@ vue.base.md             # Vue 基础规范
 
 规则描述...
 
-### Good
+### Example: 示例说明
+
+#### Good: 推荐做法描述
 
 ```typescript
 // 推荐代码示例
 ```
 
-### Bad
+#### Bad: 不推荐做法描述
 
 ```typescript
 // 不推荐代码示例
@@ -176,7 +178,9 @@ vue.base.md             # Vue 基础规范
 
 控制器文件不能包含业务逻辑，只能调用 service 方法。
 
-### Good
+### Example: 控制器只调用 service
+
+#### Good: 控制器只调用 service
 
 ```typescript
 @Controller("user")
@@ -190,7 +194,7 @@ export class UserController {
 }
 ```
 
-### Bad
+#### Bad: 控制器包含数据库查询
 
 ```typescript
 @Controller("user")
@@ -209,7 +213,9 @@ export class UserController {
 
 > - severity `warn`
 
-### Good
+### Example: 服务通过 model 访问数据库
+
+#### Good: 通过 model 访问数据库
 
 ```typescript
 @Injectable()
@@ -226,7 +232,7 @@ export class UserService {
 ## 最佳实践
 
 - **规则 ID 命名** — 使用有意义的层级结构，如 `语言.类型.规则名`
-- **代码示例** — 提供清晰的 Good/Bad 示例
+- **代码示例** — 使用 `### Example:` 分组，`#### Good:` / `#### Bad:` 展示推荐和不推荐的做法
 - **严重程度** — 合理设置 severity，避免过多 error 阻塞开发
 - **文件组织** — 按功能或类型组织规则文件，避免单个文件过大
 - **includes 精确** — 使用精确的文件路径匹配，避免误匹配

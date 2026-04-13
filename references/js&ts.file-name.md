@@ -7,7 +7,9 @@
 - 文件名必须与主导类或接口名称完全一致。
 - 适用于定义单一主要实体的文件。
 
-### Good
+### Example: class 和 interface 文件使用大驼峰命名
+
+#### Good: 合理的命名
 
 ```javascript
 // UserInfo.js
@@ -16,7 +18,7 @@ class UserInfo {
 }
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```javascript
 // userinfo.js
@@ -30,7 +32,9 @@ class userinfo {
 - 适用于导出一个或多个工具函数的文件。
 - 文件名应反映其包含的核心功能。
 
-### Good
+### Example: 函数文件使用小驼峰命名
+
+#### Good: 合理的命名
 
 ```javascript
 // getUserInfo.js
@@ -39,7 +43,7 @@ function getUserInfo() {
 }
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```javascript
 // getuserinfo.js

@@ -7,7 +7,9 @@
 - 必须以 `.test.js` 或 `.test.ts`（或 `.spec.ts`）结尾。
 - 前缀部分应与被测试源文件名保持一致。
 
-### Good
+### Example: 测试文件命名
+
+#### Good: 合理的命名
 
 ```javascript
 // userInfo.js
@@ -17,7 +19,7 @@ describe("UserInfo", () => {
 });
 ```
 
-### Bad
+#### Bad: 不合理的命名
 
 ```javascript
 // userInfo.js
@@ -32,7 +34,9 @@ describe("userinfo", () => {
 - 测试代码命名结构：`describe(文件名)` -> `describe(函数名/类名.方法名)` -> `it(场景描述)`。
 - 场景描述应使用 "should ..." 格式，描述预期行为。
 
-### Good
+### Example: 测试代码块命名
+
+#### Good: 合理的命名
 
 ```javascript
 // uUerInfo.js
@@ -68,7 +72,7 @@ describe("userInfo", () => {
 });
 ```
 
-### Bad
+#### Bad: 缺少 describe 层级
 
 ```javascript
 // userInfo.js
