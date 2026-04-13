@@ -1,5 +1,24 @@
 # Changelog
 
+## [4.0.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@3.0.0...@spaceflow/review-summary@4.0.0) (2026-04-13)
+
+### ⚠ BREAKING CHANGES
+
+* **publish:** 修复 monorepo 格式 tag 识别问题,避免错误的 major bump
+
+### 新特性
+
+* **publish:** 修复 monorepo 格式 tag 识别问题,避免错误的 major bump ([6379b71](https://github.com/Lydanne/spaceflow/commit/6379b71f5694a814f40866020bc8dd7614399e83))
+
+### 修复BUG
+
+* **review:** 更新 README,补充本地审查、MCP 工具、系统规则等新功能说明 ([ee6942f](https://github.com/Lydanne/spaceflow/commit/ee6942fe9043aff479f0ae4d6cff1623cc8df80f))
+
+### 其他修改
+
+* **publish:** released version 1.0.0 [no ci] ([ef8afbf](https://github.com/Lydanne/spaceflow/commit/ef8afbf82aae414555b8923e068ae3f7702d30e8))
+* **review:** released version 4.0.0 [no ci] ([3d10beb](https://github.com/Lydanne/spaceflow/commit/3d10bebb621da9cfb671e3b4d270c467b33747f2))
+
 ## [3.0.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@2.0.0...@spaceflow/review-summary@3.0.0) (2026-04-13)
 
 ### 代码重构
