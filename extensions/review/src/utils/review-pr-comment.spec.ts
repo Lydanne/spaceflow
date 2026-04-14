@@ -27,9 +27,7 @@ describe("utils/review-pr-comment", () => {
 
   describe("extractIssueKeyFromBody", () => {
     it("提取标准格式的 issue key", () => {
-      expect(extractIssueKeyFromBody("<!-- issue-key: src/a.ts:10:R1 -->")).toBe(
-        "src/a.ts:10:R1",
-      );
+      expect(extractIssueKeyFromBody("<!-- issue-key: src/a.ts:10:R1 -->")).toBe("src/a.ts:10:R1");
     });
 
     it("body 不含 issue-key 时返回 null", () => {
@@ -69,9 +67,9 @@ describe("utils/review-pr-comment", () => {
 
   describe("generateIssueKey", () => {
     it("拼接 file:line:ruleId", () => {
-      expect(
-        generateIssueKey({ file: "src/a.ts", line: "10", ruleId: "R1" } as any),
-      ).toBe("src/a.ts:10:R1");
+      expect(generateIssueKey({ file: "src/a.ts", line: "10", ruleId: "R1" } as any)).toBe(
+        "src/a.ts:10:R1",
+      );
     });
   });
 
@@ -129,21 +127,20 @@ describe("utils/review-pr-comment", () => {
     });
 
     it("resolved（非 fixed）计入 resolved，不计入 pending", () => {
-      const issues = [
-        { file: "a.ts", line: "1", ruleId: "R1", resolved: "2024-01-01" },
-      ] as any[];
+      const issues = [{ file: "a.ts", line: "1", ruleId: "R1", resolved: "2024-01-01" }] as any[];
       const stats = calculateIssueStats(issues);
       expect(stats.resolved).toBe(1);
       expect(stats.pending).toBe(0);
     });
 
-    it("fixed 同时有 resolved 时只计入 fixed", () => {
+    it("fixed 和 resolved 同时存在时各自独立计数，pending 不重复减", () => {
       const issues = [
         { file: "a.ts", line: "1", ruleId: "R1", fixed: "2024-01-01", resolved: "2024-01-01" },
       ] as any[];
       const stats = calculateIssueStats(issues);
       expect(stats.fixed).toBe(1);
-      expect(stats.resolved).toBe(0);
+      expect(stats.resolved).toBe(1);
+      expect(stats.pending).toBe(0);
     });
 
     it("fixRate 计算正确（2/4 = 50%）", () => {

@@ -1069,12 +1069,12 @@ export class ReviewResultModel {
     if (round > 1) {
       const prevIssues = allIssues.filter((i) => i.round === round - 1);
       if (prevIssues.length > 0) {
-        const prevFixed = prevIssues.filter((i) => i.fixed).length;
-        const prevResolved = prevIssues.filter((i) => i.resolved && !i.fixed).length;
-        const prevInvalid = prevIssues.filter(
-          (i) => i.valid === "false" && !i.fixed && !i.resolved,
-        ).length;
-        const prevPending = prevIssues.length - prevFixed - prevResolved - prevInvalid;
+        const {
+          fixed: prevFixed,
+          resolved: prevResolved,
+          invalid: prevInvalid,
+          pending: prevPending,
+        } = calculateIssueStats(prevIssues);
         parts.push("");
         parts.push(
           `<details><summary>📊 Round ${round - 1} 回顾 (${prevIssues.length} 个问题)</summary>\n`,

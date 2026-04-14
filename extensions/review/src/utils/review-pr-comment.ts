@@ -179,7 +179,7 @@ export function calculateIssueStats(issues: ReviewIssue[]): ReviewStats {
   const fixed = validIssue.filter((i) => i.fixed).length;
   const resolved = validIssue.filter((i) => i.resolved).length;
   const invalid = total - validTotal;
-  const pending = validTotal - fixed - resolved;
+  const pending = validTotal - validIssue.filter((i) => i.fixed || i.resolved).length;
   const fixRate = validTotal > 0 ? Math.round((fixed / validTotal) * 100 * 10) / 10 : 0;
   const resolveRate = validTotal > 0 ? Math.round((resolved / validTotal) * 100 * 10) / 10 : 0;
   return { total, validTotal, fixed, resolved, invalid, pending, fixRate, resolveRate };
