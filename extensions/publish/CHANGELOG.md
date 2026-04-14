@@ -1,5 +1,22 @@
 # Changelog
 
+## [5.0.1](https://github.com/Lydanne/spaceflow/compare/@spaceflow/publish@5.0.0...@spaceflow/publish@5.0.1) (2026-04-14)
+
+### 修复BUG
+
+* **review:** 修正已解决问题统计逻辑,避免与已修复问题重复计数 ([6d191bb](https://github.com/Lydanne/spaceflow/commit/6d191bbd71b8ce6194ce56a8d008dd966173541b))
+
+### 代码重构
+
+* **shared:** 移除 Claude Code 相关配置和文档,统一使用 OpenAI/Gemini/OpenCode ([b0754d6](https://github.com/Lydanne/spaceflow/commit/b0754d64f8991a10708730c191cf0f335e8aa6ca))
+
+### 其他修改
+
+* **cli:** released version 5.0.1 [no ci] ([f3009ea](https://github.com/Lydanne/spaceflow/commit/f3009eaaf26759d708541f54e707882b4927ebbd))
+* **core:** released version 5.0.1 [no ci] ([7904b9b](https://github.com/Lydanne/spaceflow/commit/7904b9bbc619c91a3a4fa1c8ea04d9dc548495ad))
+* **core:** 移除 @anthropic-ai/claude-agent-sdk 依赖及相关 sharp 图像处理包 ([7b50e06](https://github.com/Lydanne/spaceflow/commit/7b50e066df97d408eb63707eb27273592a28d34d))
+* **shared:** released version 5.0.1 [no ci] ([f70cd93](https://github.com/Lydanne/spaceflow/commit/f70cd930b01ffa09187f66522c8d6b18f835ec53))
+
 ## [1.1.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/publish@1.0.0...@spaceflow/publish@1.1.0) (2026-04-13)
 
 ### 新特性
