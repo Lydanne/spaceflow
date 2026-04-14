@@ -1,22 +1,8 @@
 import { vi, type Mocked } from "vitest";
 import { LlmProxyService, ChatOptions } from "./llm-proxy.service";
-import type { ClaudeCodeAdapter } from "./adapters/claude-code.adapter";
 import type { OpenAIAdapter } from "./adapters/openai.adapter";
 import type { OpenCodeAdapter } from "./adapters/open-code.adapter";
 
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
-  query: vi.fn(),
-}));
-vi.mock("../../claude-setup", () => ({
-  ClaudeSetupService: class MockClaudeSetupService {
-    configure = vi.fn().mockResolvedValue(undefined);
-  },
-}));
-
-vi.mock("./adapters/claude-code.adapter", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./adapters/claude-code.adapter")>();
-  return { ...actual };
-});
 vi.mock("./adapters/openai.adapter", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./adapters/openai.adapter")>();
   return { ...actual };
@@ -28,13 +14,11 @@ vi.mock("./adapters/open-code.adapter", async (importOriginal) => {
 
 describe("LlmProxyService", () => {
   let service: LlmProxyService;
-  let claudeAdapter: Mocked<ClaudeCodeAdapter>;
   let openaiAdapter: Mocked<OpenAIAdapter>;
   let opencodeAdapter: Mocked<OpenCodeAdapter>;
 
   const mockConfig = {
-    defaultAdapter: "claude-code" as const,
-    claudeCode: { model: "claude-3-5-sonnet" },
+    defaultAdapter: "openai" as const,
     openai: { apiKey: "test-key", model: "gpt-4o" },
     openCode: { apiKey: "test-key" },
   };
@@ -43,7 +27,6 @@ describe("LlmProxyService", () => {
     vi.clearAllMocks();
     service = new LlmProxyService(mockConfig as any);
     // 获取内部适配器的引用（通过 getAdapter）
-    claudeAdapter = (service as any).adapters.get("claude-code");
     openaiAdapter = (service as any).adapters.get("openai");
     opencodeAdapter = (service as any).adapters.get("open-code");
   });
@@ -56,7 +39,7 @@ describe("LlmProxyService", () => {
     it("should create a session with default adapter", () => {
       const session = service.createSession();
       expect(session).toBeDefined();
-      expect(session.adapterName).toBe("claude-code");
+      expect(session.adapterName).toBe("openai");
     });
 
     it("should create a session with specified adapter", () => {
@@ -66,8 +49,8 @@ describe("LlmProxyService", () => {
     });
 
     it("should throw error if adapter is not configured", () => {
-      const spy = vi.spyOn(claudeAdapter, "isConfigured").mockReturnValue(false);
-      expect(() => service.createSession("claude-code")).toThrow('适配器 "claude-code" 未配置');
+      const spy = vi.spyOn(openaiAdapter, "isConfigured").mockReturnValue(false);
+      expect(() => service.createSession("openai")).toThrow('适配器 "openai" 未配置');
       spy.mockRestore();
     });
   });
@@ -76,7 +59,7 @@ describe("LlmProxyService", () => {
     it("should call adapter.chat and return response", async () => {
       const messages = [{ role: "user", content: "hello" }] as any;
       const mockResponse = { content: "hi", role: "assistant" };
-      const chatSpy = vi.spyOn(claudeAdapter, "chat").mockResolvedValue(mockResponse as any);
+      const chatSpy = vi.spyOn(openaiAdapter, "chat").mockResolvedValue(mockResponse as any);
 
       const result = await service.chat(messages);
 
@@ -87,18 +70,18 @@ describe("LlmProxyService", () => {
 
     it("should use specified adapter", async () => {
       const messages = [{ role: "user", content: "hello" }] as any;
-      const options: ChatOptions = { adapter: "openai" };
-      const openaiChatSpy = vi
-        .spyOn(openaiAdapter, "chat")
+      const options: ChatOptions = { adapter: "open-code" };
+      const opencodeChatSpy = vi
+        .spyOn(opencodeAdapter, "chat")
         .mockResolvedValue({ content: "hi" } as any);
-      const claudeChatSpy = vi.spyOn(claudeAdapter, "chat");
+      const openaiChatSpy = vi.spyOn(openaiAdapter, "chat");
 
       await service.chat(messages, options);
 
-      expect(openaiChatSpy).toHaveBeenCalled();
-      expect(claudeChatSpy).not.toHaveBeenCalled();
+      expect(opencodeChatSpy).toHaveBeenCalled();
+      expect(openaiChatSpy).not.toHaveBeenCalled();
+      opencodeChatSpy.mockRestore();
       openaiChatSpy.mockRestore();
-      claudeChatSpy.mockRestore();
     });
 
     it("should handle jsonSchema and parse output", async () => {
@@ -110,7 +93,7 @@ describe("LlmProxyService", () => {
       };
       const options = { jsonSchema: mockJsonSchema };
       const mockResponse = { content: '{"foo":"bar"}', role: "assistant" };
-      const chatSpy = vi.spyOn(claudeAdapter, "chat").mockResolvedValue(mockResponse as any);
+      const chatSpy = vi.spyOn(openaiAdapter, "chat").mockResolvedValue(mockResponse as any);
 
       const result = await service.chat(messages, options as any);
 
@@ -127,7 +110,7 @@ describe("LlmProxyService", () => {
         yield { type: "text", content: "hi" };
       })();
       const chatStreamSpy = vi
-        .spyOn(claudeAdapter, "chatStream")
+        .spyOn(openaiAdapter, "chatStream")
         .mockReturnValue(mockStream as any);
 
       const stream = service.chatStream(messages);
@@ -144,9 +127,9 @@ describe("LlmProxyService", () => {
 
   describe("chat with jsonSchema fallback", () => {
     it("should append jsonSchema prompt when adapter does not support jsonSchema", async () => {
-      const jsonSchemaSpy = vi.spyOn(claudeAdapter, "isSupportJsonSchema").mockReturnValue(false);
+      const jsonSchemaSpy = vi.spyOn(openaiAdapter, "isSupportJsonSchema").mockReturnValue(false);
       const chatSpy = vi
-        .spyOn(claudeAdapter, "chat")
+        .spyOn(openaiAdapter, "chat")
         .mockResolvedValue({ content: '{"foo":"bar"}' } as any);
       const mockJsonSchema = {
         parse: vi.fn().mockResolvedValue({ foo: "bar" }),
@@ -166,8 +149,8 @@ describe("LlmProxyService", () => {
     });
 
     it("should not append jsonSchema prompt if already matched", async () => {
-      const jsonSchemaSpy = vi.spyOn(claudeAdapter, "isSupportJsonSchema").mockReturnValue(false);
-      const chatSpy = vi.spyOn(claudeAdapter, "chat").mockResolvedValue({ content: "{}" } as any);
+      const jsonSchemaSpy = vi.spyOn(openaiAdapter, "isSupportJsonSchema").mockReturnValue(false);
+      const chatSpy = vi.spyOn(openaiAdapter, "chat").mockResolvedValue({ content: "{}" } as any);
       const mockJsonSchema = {
         parse: vi.fn().mockResolvedValue({}),
         getSchema: vi.fn(),
@@ -182,8 +165,8 @@ describe("LlmProxyService", () => {
     });
 
     it("should add system message if none exists", async () => {
-      const jsonSchemaSpy = vi.spyOn(claudeAdapter, "isSupportJsonSchema").mockReturnValue(false);
-      const chatSpy = vi.spyOn(claudeAdapter, "chat").mockResolvedValue({ content: "{}" } as any);
+      const jsonSchemaSpy = vi.spyOn(openaiAdapter, "isSupportJsonSchema").mockReturnValue(false);
+      const chatSpy = vi.spyOn(openaiAdapter, "chat").mockResolvedValue({ content: "{}" } as any);
       const mockJsonSchema = {
         parse: vi.fn().mockResolvedValue({}),
         getSchema: vi.fn(),
@@ -199,7 +182,7 @@ describe("LlmProxyService", () => {
     });
 
     it("should not parse if response has no content", async () => {
-      const chatSpy = vi.spyOn(claudeAdapter, "chat").mockResolvedValue({ content: "" } as any);
+      const chatSpy = vi.spyOn(openaiAdapter, "chat").mockResolvedValue({ content: "" } as any);
       const mockJsonSchema = {
         parse: vi.fn(),
         getSchema: vi.fn(),
@@ -214,7 +197,7 @@ describe("LlmProxyService", () => {
     });
 
     it("should not parse if structuredOutput already exists", async () => {
-      const chatSpy = vi.spyOn(claudeAdapter, "chat").mockResolvedValue({
+      const chatSpy = vi.spyOn(openaiAdapter, "chat").mockResolvedValue({
         content: "{}",
         structuredOutput: { existing: true },
       } as any);
@@ -242,7 +225,7 @@ describe("LlmProxyService", () => {
         yield { type: "result", response: { content: '{"parsed":true}' } };
       })();
       const chatStreamSpy = vi
-        .spyOn(claudeAdapter, "chatStream")
+        .spyOn(openaiAdapter, "chatStream")
         .mockReturnValue(mockStream as any);
       const chunks: any[] = [];
       for await (const chunk of service.chatStream(
@@ -264,7 +247,7 @@ describe("LlmProxyService", () => {
         yield { type: "result", response: { content: "invalid json" } };
       })();
       const chatStreamSpy = vi
-        .spyOn(claudeAdapter, "chatStream")
+        .spyOn(openaiAdapter, "chatStream")
         .mockReturnValue(mockStream as any);
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const chunks: any[] = [];
@@ -285,11 +268,11 @@ describe("LlmProxyService", () => {
         yield { type: "text", content: "hi" };
       })();
       const chatStreamSpy = vi
-        .spyOn(openaiAdapter, "chatStream")
+        .spyOn(opencodeAdapter, "chatStream")
         .mockReturnValue(mockStream as any);
       const chunks: any[] = [];
       for await (const chunk of service.chatStream([{ role: "user", content: "hello" }] as any, {
-        adapter: "openai",
+        adapter: "open-code",
       })) {
         chunks.push(chunk);
       }
@@ -300,21 +283,19 @@ describe("LlmProxyService", () => {
 
   describe("getAvailableAdapters", () => {
     it("should return list of configured adapters", () => {
-      const claudeSpy = vi.spyOn(claudeAdapter, "isConfigured").mockReturnValue(true);
-      const openaiSpy = vi.spyOn(openaiAdapter, "isConfigured").mockReturnValue(false);
+      const openaiSpy = vi.spyOn(openaiAdapter, "isConfigured").mockReturnValue(true);
       const opencodeSpy = vi.spyOn(opencodeAdapter, "isConfigured").mockReturnValue(false);
 
       const available = service.getAvailableAdapters();
 
-      expect(available).toEqual(["claude-code"]);
-      claudeSpy.mockRestore();
+      expect(available).toEqual(["openai"]);
       openaiSpy.mockRestore();
       opencodeSpy.mockRestore();
     });
 
     it("should return all adapters when all configured", () => {
       const available = service.getAvailableAdapters();
-      expect(available).toEqual(["claude-code", "openai", "open-code"]);
+      expect(available).toEqual(["openai", "open-code"]);
     });
   });
 

@@ -35,10 +35,10 @@ describe("parseTitleOptions", () => {
 
   describe("LLM 模式参数", () => {
     it("应该解析 -l 短参数", () => {
-      const title = "fix: bug [/ai-review -l claude-code]";
+      const title = "fix: bug [/ai-review -l openai]";
       const options = parseTitleOptions(title);
 
-      expect(options.llmMode).toBe("claude-code");
+      expect(options.llmMode).toBe("openai");
     });
 
     it("应该解析 --llm-mode 长参数", () => {
@@ -193,10 +193,10 @@ describe("parseTitleOptions", () => {
     });
 
     it("应该解析 --deletion-analysis-mode", () => {
-      const title = "fix: bug [/ai-review --deletion-analysis-mode claude-code]";
+      const title = "fix: bug [/ai-review --deletion-analysis-mode open-code]";
       const options = parseTitleOptions(title);
 
-      expect(options.deletionAnalysisMode).toBe("claude-code");
+      expect(options.deletionAnalysisMode).toBe("open-code");
     });
   });
 

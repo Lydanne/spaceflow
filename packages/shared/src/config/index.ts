@@ -5,7 +5,7 @@ import stringify from "json-stringify-pretty-compact";
 import { config as dotenvConfig } from "dotenv";
 
 /** 默认编辑器 */
-export const DEFAULT_SUPPORT_EDITOR = "claudeCode";
+export const DEFAULT_SUPPORT_EDITOR = "agents";
 
 /** 配置文件名 */
 export const CONFIG_FILE_NAME = "spaceflow.json";

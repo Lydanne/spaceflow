@@ -37,7 +37,7 @@ export interface ReviewContext extends ReviewOptions {
   retryDelay?: number;
   /** 仅执行删除代码分析，跳过常规代码审查 */
   deletionOnly?: boolean;
-  /** 删除代码分析模式：openai 使用标准模式，claude-agent 使用 Agent 模式 */
+  /** 删除代码分析模式：openai 使用标准模式，open-code 使用 Agent 模式 */
   deletionAnalysisMode?: LLMMode;
   /** 输出格式：markdown, terminal, json。不指定则智能选择 */
   outputFormat?: ReportFormat;

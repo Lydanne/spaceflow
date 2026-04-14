@@ -17,8 +17,6 @@ const ENV_MAPPINGS: Record<string, string | string[]> = {
   // Gemini
   "llm.gemini.apiKey": "GEMINI_API_KEY",
   "llm.gemini.model": "GEMINI_MODEL",
-  // Claude
-  "llm.claudeCode.authToken": "ANTHROPIC_API_KEY",
 };
 
 /**

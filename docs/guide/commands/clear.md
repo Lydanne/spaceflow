@@ -25,7 +25,6 @@ spaceflow clear -g
 | 目录 | 说明 |
 |------|------|
 | `.spaceflow/deps/` | 本地依赖安装目录 |
-| `.claude/skills/` | Claude Code 技能文件 |
 | `.windsurf/skills/` | Windsurf 技能文件 |
 | `.cursor/skills/` | Cursor 技能文件 |
 

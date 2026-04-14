@@ -37,7 +37,7 @@ export interface DeletionAnalysisContext {
   headRef?: string;
   /** diff 来源：provider-api 使用 Git Provider API，git-diff 使用本地 git 命令（两点语法） */
   diffSource?: DeletionDiffSource;
-  /** 分析模式：openai 使用标准模式，claude-agent 使用 Agent 模式（可使用工具） */
+  /** 分析模式：openai 使用标准模式，open-code 使用 Agent 模式（可使用工具） */
   analysisMode?: LLMMode;
   /** 文件过滤 glob 模式，与 review.includes 一致 */
   includes?: string[];
@@ -156,8 +156,8 @@ export class DeletionImpactService {
     const analysisMode = context.analysisMode ?? "openai";
     let result: DeletionImpactResult;
 
-    if (["claude-code", "open-code"].includes(analysisMode)) {
-      // Claude Agent 模式：使用工具主动探索代码库
+    if (analysisMode === "open-code") {
+      // Agent 模式：使用工具主动探索代码库
       result = await this.analyzeWithAgent(analysisMode, deletedBlocks, references, verbose);
     } else {
       // OpenAI 模式：标准 chat completion
@@ -584,8 +584,8 @@ export class DeletionImpactService {
   }
 
   /**
-   * 使用 Claude Agent 模式分析删除代码的影响
-   * Claude Agent 可以使用工具主动探索代码库，分析更深入
+   * 使用 Agent 模式分析删除代码的影响
+   * Agent 可以使用工具主动探索代码库，分析更深入
    */
   protected async analyzeWithAgent(
     analysisMode: LLMMode,

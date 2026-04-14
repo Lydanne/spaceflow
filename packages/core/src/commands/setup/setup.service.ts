@@ -34,7 +34,7 @@ export class SetupService {
       this.schemaGenerator.generate();
       const defaultConfig: Partial<SpaceflowConfig> = {
         $schema: "./config-schema.json",
-        support: ["claudeCode"],
+        support: [],
       };
       writeFileSync(configPath, stringify(defaultConfig, { indent: 2 }) + "\n");
       console.log(t("setup:configGenerated", { path: configPath }));

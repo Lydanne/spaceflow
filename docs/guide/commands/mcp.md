@@ -74,21 +74,6 @@ Inspector 会自动下载并启动 `@modelcontextprotocol/inspector`，提供：
 }
 ```
 
-### Claude Desktop
-
-在 `claude_desktop_config.json` 中添加：
-
-```json
-{
-  "mcpServers": {
-    "spaceflow": {
-      "command": "npx",
-      "args": ["-y", "@spaceflow/cli", "mcp"]
-    }
-  }
-}
-```
-
 ### Cursor
 
 在项目根目录 `.cursor/mcp.json` 或全局配置中添加：

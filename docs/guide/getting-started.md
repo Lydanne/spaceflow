@@ -35,7 +35,7 @@ spaceflow setup
 ```json
 {
   "$schema": ".spaceflow/config-schema.json",
-  "support": ["claudeCode"],
+  "support": ["cursor"],
   "dependencies": {
     "@spaceflow/review": "latest"
   }

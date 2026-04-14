@@ -4,9 +4,6 @@ import type { ReviewPrompt } from "./review.service";
 import { ChangedFileCollection } from "./changed-file-collection";
 
 vi.mock("c12");
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
-  query: vi.fn(),
-}));
 vi.mock("@opencode-ai/sdk", () => ({
   createOpencodeClient: vi.fn().mockReturnValue({
     session: {
@@ -72,7 +69,7 @@ describe("ReviewLlmProcessor", () => {
       chat: vi.fn(),
       chatStream: vi.fn(),
       createSession: vi.fn(),
-      getAvailableAdapters: vi.fn().mockReturnValue(["claude-code", "openai"]),
+      getAvailableAdapters: vi.fn().mockReturnValue(["openai", "open-code"]),
     };
 
     processor = new ReviewLlmProcessor(mockLlmProxyService as any, mockReviewSpecService as any);
@@ -83,20 +80,6 @@ describe("ReviewLlmProcessor", () => {
   });
 
   describe("runLLMReview", () => {
-    it("should call callLLM when llmMode is claude", async () => {
-      const callLLMSpy = vi
-        .spyOn(processor, "callLLM")
-        .mockResolvedValue({ issues: [], summary: [] } as any);
-
-      const mockPrompt: ReviewPrompt = {
-        filePrompts: [{ filename: "test.ts", systemPrompt: "system", userPrompt: "user" }],
-      };
-
-      await processor.runLLMReview("claude-code", mockPrompt);
-
-      expect(callLLMSpy).toHaveBeenCalledWith("claude-code", mockPrompt, {});
-    });
-
     it("should call callLLM when llmMode is openai", async () => {
       const callLLMSpy = vi
         .spyOn(processor, "callLLM")

@@ -1,10 +1,3 @@
-export interface ClaudeAdapterConfig {
-  model?: string;
-  baseUrl?: string;
-  authToken?: string;
-  hasCompletedOnboarding?: boolean;
-}
-
 export interface OpenAIAdapterConfig {
   model: string;
   baseUrl?: string;
@@ -21,7 +14,7 @@ export interface OpenCodeAdapterConfig {
   providerID?: string;
 }
 
-export type LLMMode = "claude-code" | "openai" | "gemini" | "open-code";
+export type LLMMode = "openai" | "gemini" | "open-code";
 
 export interface GeminiAdapterConfig {
   model?: string;
@@ -31,7 +24,6 @@ export interface GeminiAdapterConfig {
 
 export interface LlmProxyConfig {
   defaultAdapter?: LLMMode;
-  claudeCode?: ClaudeAdapterConfig;
   openai?: OpenAIAdapterConfig;
   openCode?: OpenCodeAdapterConfig;
   gemini?: GeminiAdapterConfig;

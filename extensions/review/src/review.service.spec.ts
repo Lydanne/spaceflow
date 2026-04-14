@@ -29,9 +29,6 @@ function mockSummary(overrides: Partial<FileSummary> = {}): FileSummary {
 }
 
 vi.mock("c12");
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
-  query: vi.fn(),
-}));
 vi.mock("fs/promises");
 vi.mock("child_process");
 vi.mock("@opencode-ai/sdk", () => ({
@@ -97,9 +94,6 @@ class TestReviewService extends ReviewService {
   }
   executeDeletionOnly(context: Partial<ReviewContext>) {
     return super.executeDeletionOnly(context as ReviewContext);
-  }
-  ensureClaudeCli(ci?: boolean) {
-    return super.ensureClaudeCli(ci);
   }
   resolveSourceData(context: Partial<ReviewContext>) {
     return super.resolveSourceData(context as ReviewContext);
@@ -208,7 +202,7 @@ describe("ReviewService", () => {
       chat: vi.fn(),
       chatStream: vi.fn(),
       createSession: vi.fn(),
-      getAvailableAdapters: vi.fn().mockReturnValue(["claude-code", "openai"]),
+      getAvailableAdapters: vi.fn().mockReturnValue(["openai", "open-code"]),
     };
 
     service = new TestReviewService(
@@ -292,7 +286,7 @@ describe("ReviewService", () => {
         specSources: ["/spec/dir"],
         dryRun: true,
         ci: false,
-        llmMode: "claude-code" as const,
+        llmMode: "openai" as const,
       };
 
       const mockPR = {
@@ -358,7 +352,7 @@ describe("ReviewService", () => {
         specSources: ["/spec/dir"],
         dryRun: false,
         ci: true,
-        llmMode: "claude-code" as const,
+        llmMode: "openai" as const,
       } as ReviewContext;
 
       const mockPR = {
@@ -408,7 +402,7 @@ describe("ReviewService", () => {
         specSources: ["/spec/dir"],
         dryRun: false,
         ci: false,
-        llmMode: "claude-code",
+        llmMode: "openai",
       };
 
       gitProvider.getPullRequest.mockRejectedValue(new Error("Gitea API Error"));
@@ -922,13 +916,6 @@ describe("ReviewService", () => {
     });
   });
 
-  describe("ReviewService.ensureClaudeCli", () => {
-    it("should not throw when claude is installed", async () => {
-      vi.spyOn(require("child_process"), "execSync").mockImplementation(() => Buffer.from("1.0.0"));
-      await expect(service.ensureClaudeCli()).resolves.toBeUndefined();
-    });
-  });
-
   describe("ReviewService.resolveSourceData - direct file mode", () => {
     it("should bypass local uncommitted scanning when files are specified", async () => {
       const context: ReviewContext = {
@@ -1271,48 +1258,6 @@ describe("ReviewService", () => {
       const result = await service.executeCollectOnly(context);
       expect(result.issues).toHaveLength(1);
       expect(gitProvider.updateIssueComment).toHaveBeenCalled();
-    });
-  });
-
-  describe("ReviewService.ensureClaudeCli", () => {
-    it("should do nothing when claude is already installed", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      // execSync is already mocked globally
-
-      await service.ensureClaudeCli();
-      expect(consoleSpy).not.toHaveBeenCalledWith("🔧 Claude CLI 未安装，正在安装...");
-      consoleSpy.mockRestore();
-    });
-
-    it("should install claude when not found", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      // Mock execSync to throw then succeed
-      const execSyncMock = vi.mocked(await import("child_process"));
-      execSyncMock.execSync
-        .mockImplementationOnce(() => {
-          throw new Error("command not found");
-        })
-        .mockImplementationOnce(() => Buffer.from(""));
-
-      await service.ensureClaudeCli();
-      expect(consoleSpy).toHaveBeenCalledWith("🔧 Claude CLI 未安装，正在安装...");
-      expect(consoleSpy).toHaveBeenCalledWith("✅ Claude CLI 安装完成");
-      consoleSpy.mockRestore();
-    });
-
-    it("should throw error when installation fails", async () => {
-      const execSyncMock = vi.mocked(await import("child_process"));
-      execSyncMock.execSync
-        .mockImplementationOnce(() => {
-          throw new Error("command not found");
-        })
-        .mockImplementationOnce(() => {
-          throw new Error("install failed");
-        });
-
-      await expect(service.ensureClaudeCli()).rejects.toThrow(
-        "Claude CLI 安装失败: install failed",
-      );
     });
   });
 });

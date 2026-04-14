@@ -25,7 +25,7 @@ spaceflow schema
 ```json
 {
   "$schema": "./.spaceflow/config-schema.json",
-  "support": ["claudeCode"],
+  "support": ["cursor"],
   "review": {
     "references": ["./references"]
   }

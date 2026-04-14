@@ -56,7 +56,7 @@ import {
 | ------------ | ----------------------------------------- |
 | Git Provider | Git 平台适配器（GitHub / Gitea / GitLab） |
 | Git SDK      | Git 命令操作封装                          |
-| LLM Proxy    | 多 LLM 统一代理（OpenAI、Claude）         |
+| LLM Proxy    | 多 LLM 统一代理（OpenAI、Gemini、OpenCode） |
 | Logger       | 日志系统（TUI / Plain 双模式）            |
 | Feishu SDK   | 飞书 API 操作封装                         |
 | Storage      | 通用存储服务（支持 TTL）                  |

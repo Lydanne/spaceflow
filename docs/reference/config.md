@@ -19,7 +19,7 @@
 {
   "$schema": ".spaceflow/config-schema.json",
   "lang": "zh-CN",
-  "support": ["claudeCode", "windsurf", "cursor"],
+  "support": ["cursor", "windsurf", "opencode"],
   "gitProvider": {
     "provider": "github",
     "serverUrl": "https://api.github.com"
@@ -98,9 +98,9 @@
 ### `support`
 
 - **类型**：`string[]`
-- **默认值**：`["claudeCode"]`
+- **默认值**：`["cursor"]`
 - **说明**：需要关联的 AI 编辑器列表
-- **可选值**：`"claudeCode"` | `"windsurf"` | `"cursor"` | `"opencode"`
+- **可选值**：`"windsurf"` | `"cursor"` | `"opencode"`
 
 ### `dependencies`
 

@@ -34,7 +34,6 @@
     "@spaceflow/review": "workspace:*",
     "@spaceflow/publish": "workspace:*"
   },
-  "support": ["claudeCode"],
   "publish": {
     "monorepo": { "enabled": true, "propagateDeps": true },
     "changelog": {

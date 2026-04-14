@@ -57,20 +57,6 @@ Spaceflow 使用的所有环境变量参考。
 | `OPENAI_BASE_URL` | OpenAI API Base URL | `https://api.openai.com/v1` |
 | `OPENAI_MODEL`    | 模型名称            | `gpt-4o`                    |
 
-### Claude
-
-| 变量                | 说明              | 默认值 |
-| ------------------- | ----------------- | ------ |
-| `ANTHROPIC_API_KEY` | Anthropic API Key | —      |
-
-### Claude Code
-
-| 变量                     | 说明                       | 默认值            |
-| ------------------------ | -------------------------- | ----------------- |
-| `CLAUDE_CODE_BASE_URL`   | Claude Code Agent Base URL | —                 |
-| `CLAUDE_CODE_AUTH_TOKEN` | Claude Code Auth Token     | —                 |
-| `CLAUDE_CODE_MODEL`      | 模型名称                   | `ark-code-latest` |
-
 ### OpenCode
 
 | 变量               | 说明             | 默认值 |

@@ -23,7 +23,7 @@ review/src/
 review extension
 ├── GitProviderService     # Git 平台适配器
 ├── GitSdkService          # Git 命令封装
-├── LlmProxyService        # LLM 统一代理（OpenAI / Claude）
+├── LlmProxyService        # LLM 统一代理（OpenAI / OpenCode）
 ├── LoggerService          # 日志系统
 ├── StorageService         # 缓存存储
 └── ParallelService        # 并行执行
@@ -44,7 +44,7 @@ CLI 命令入口，支持以下参数：
 | `--head <ref>`                    |      | 目标分支/tag                          |
 | `--verbose [level]`               | `-v` | 详细输出 (1: 过程日志, 2: 含提示词)   |
 | `--includes <patterns...>`        | `-i` | 文件 glob 过滤模式                    |
-| `--llm-mode <mode>`               | `-l` | LLM 模式: claude-code, openai, gemini |
+| `--llm-mode <mode>`               | `-l` | LLM 模式: openai, gemini, open-code |
 | `--files <files...>`              | `-f` | 仅审查指定文件                        |
 | `--commits <commits...>`          |      | 仅审查指定 commits                    |
 | `--verify-fixes`                  |      | 验证历史问题是否已修复                |
@@ -52,7 +52,7 @@ CLI 命令入口，支持以下参数：
 | `--verify-concurrency <n>`        |      | 验证并发数（默认 10）                 |
 | `--analyze-deletions`             |      | 分析删除代码影响                      |
 | `--deletion-only`                 |      | 仅执行删除代码分析                    |
-| `--deletion-analysis-mode <mode>` |      | 删除分析模式: openai, claude-code     |
+| `--deletion-analysis-mode <mode>` |      | 删除分析模式: openai, open-code     |
 | `--output-format <format>`        | `-o` | 输出格式: markdown, terminal, json    |
 | `--generate-description`          |      | 使用 AI 生成 PR 功能描述              |
 
@@ -176,7 +176,7 @@ analyzeDeletionImpact()
 │ 2. 查找代码引用关系 (git grep)       │
 │ 3. 调用 LLM 分析影响                 │
 │    - OpenAI 模式：标准 chat          │
-│    - Claude Agent 模式：可用工具     │
+│    - OpenCode 模式：可用工具        │
 └─────────────────────────────────────┘
 ```
 

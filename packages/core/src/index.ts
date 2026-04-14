@@ -17,9 +17,6 @@ export * from "./shared/feishu-sdk";
 // Storage - 存储服务
 export * from "./shared/storage";
 
-// Claude Setup - Claude Agent 配置
-export * from "./shared/claude-setup";
-
 // Parallel - 并行执行工具
 export * from "./shared/parallel";
 

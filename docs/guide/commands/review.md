@@ -291,8 +291,6 @@ PR 关闭事件（`closed`）也会自动触发此模式。
 | 模式          | 说明                                   | 环境变量                                            |
 | ------------- | -------------------------------------- | --------------------------------------------------- |
 | `openai`      | OpenAI 兼容 API（GPT-4o、DeepSeek 等） | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` |
-| `claude`      | Anthropic Claude API                   | `ANTHROPIC_API_KEY`                                 |
-| `claude-code` | Claude Code Agent                      | `CLAUDE_CODE_BASE_URL`, `CLAUDE_CODE_AUTH_TOKEN`    |
 | `open-code`   | OpenCode SDK                           | `OPENCODE_API_KEY`                                  |
 | `gemini`      | Google Gemini API                      | `GEMINI_API_KEY`                                    |
 

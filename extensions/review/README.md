@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@spaceflow/review?color=blue)](https://www.npmjs.com/package/@spaceflow/review)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-> Spaceflow AI 代码审查扩展，使用 LLM 对 PR 代码进行自动审查。支持 OpenAI、Claude Code、Gemini、Open Code 等多种 LLM 模式。
+> Spaceflow AI 代码审查扩展，使用 LLM 对 PR 代码进行自动审查。支持 OpenAI、Gemini、Open Code 等多种 LLM 模式。
 
 ## 安装
 
@@ -13,7 +13,7 @@ pnpm spaceflow install @spaceflow/review
 
 ## 功能特性
 
-- **多 LLM 支持** — OpenAI、Claude Code、Gemini、Open Code 可选
+- **多 LLM 支持** — OpenAI、Gemini、Open Code 可选
 - **行级评论** — 在 PR 中精确定位问题代码行
 - **增量审查** — 多次运行时自动去重，追踪问题修复状态
 - **删除代码分析** — 评估删除代码可能带来的风险
@@ -63,7 +63,7 @@ spaceflow review -p 123 --fail-on-issues -l openai
 | `--pr-number <number>`            | `-p` | PR 编号                                                      |
 | `--base <ref>`                    | `-b` | 基准分支/tag                                                 |
 | `--head <ref>`                    |      | 目标分支/tag                                                 |
-| `--llm-mode <mode>`               | `-l` | LLM 模式（`openai` / `claude-code` / `gemini` / `open-code`） |
+| `--llm-mode <mode>`               | `-l` | LLM 模式（`openai` / `gemini` / `open-code`） |
 | `--files <files...>`              | `-f` | 仅审查指定文件                                               |
 | `--commits <commits...>`          |      | 仅审查指定 commits                                           |
 | `--includes <patterns...>`        | `-i` | 文件 glob 过滤模式                                           |
@@ -74,7 +74,7 @@ spaceflow review -p 123 --fail-on-issues -l openai
 | `--no-verify-fixes`               |      | 禁用历史问题验证                                             |
 | `--analyze-deletions`             |      | 分析删除代码影响                                             |
 | `--deletion-only`                 |      | 仅执行删除代码分析                                           |
-| `--deletion-analysis-mode <mode>` |      | 删除分析 LLM 模式（`openai` / `claude-code`）               |
+| `--deletion-analysis-mode <mode>` |      | 删除分析 LLM 模式（`openai` / `open-code`）                 |
 | `--generate-description`          |      | 使用 AI 生成 PR 功能描述                                     |
 | `--output-format <format>`        | `-o` | 输出格式（`markdown` / `terminal` / `json`）                 |
 | `--local [mode]`                  |      | 本地审查模式（`uncommitted` / `staged`，默认 `uncommitted`） |
@@ -157,7 +157,7 @@ spaceflow review -p 123 --fail-on-issues -l openai
 | `get_rule_detail`      | 获取单条规则的详细信息                     | `ruleId`                                        |
 | `get_rules_from_dir`   | 从指定目录加载审查规则                     | `dirPath`, `includeExamples?`                   |
 
-规则搜索目录包括：`review.references` 配置路径、`.claude/skills`、`.cursor/skills`、`review-specs`。
+规则搜索目录包括：`review.references` 配置路径、`.cursor/skills`、`review-specs`。
 
 ## 审查规范格式
 
@@ -436,12 +436,6 @@ jobs:
 | `OPENAI_BASE_URL` | OpenAI API 地址 |
 | `OPENAI_API_KEY`  | OpenAI API Key  |
 | `OPENAI_MODEL`    | OpenAI 模型名称 |
-
-### Claude Code
-
-| 变量                | 说明             |
-| ------------------- | ---------------- |
-| `ANTHROPIC_API_KEY` | Anthropic API Key |
 
 ### Gemini
 

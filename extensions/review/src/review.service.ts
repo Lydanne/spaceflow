@@ -20,7 +20,6 @@ import { MarkdownFormatter, ReviewReportService } from "./review-report";
 import { ReviewOptions } from "./review.config";
 import { IssueVerifyService } from "./issue-verify.service";
 import { DeletionImpactService } from "./deletion-impact.service";
-import { execSync } from "child_process";
 import { ReviewContextBuilder, type ReviewContext } from "./review-context";
 import { ReviewIssueFilter } from "./review-issue-filter";
 import { filterFilesByIncludes } from "./review-includes-filter";
@@ -729,31 +728,5 @@ export class ReviewService {
     }
 
     return result;
-  }
-
-  /**
-   * 确保 Claude CLI 已安装
-   */
-  protected async ensureClaudeCli(ci?: boolean): Promise<void> {
-    try {
-      execSync("claude --version", { stdio: "ignore" });
-    } catch {
-      if (ci) {
-        throw new Error(
-          "Claude CLI 未安装。CI 环境请在 workflow 中预装: npm install -g @anthropic-ai/claude-code",
-        );
-      }
-      console.log("🔧 Claude CLI 未安装，正在安装...");
-      try {
-        execSync("npm install -g @anthropic-ai/claude-code", {
-          stdio: "inherit",
-        });
-        console.log("✅ Claude CLI 安装完成");
-      } catch (installError) {
-        throw new Error(
-          `Claude CLI 安装失败: ${installError instanceof Error ? installError.message : String(installError)}`,
-        );
-      }
-    }
   }
 }

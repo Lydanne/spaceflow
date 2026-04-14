@@ -16,7 +16,7 @@ hero:
 features:
   - icon: 🤖
     title: AI 代码审查
-    details: 基于 LLM 的自动化代码审查，支持 OpenAI、Claude 等多种模型，自动生成行内评论和 PR 描述。
+    details: 基于 LLM 的自动化代码审查，支持 OpenAI、Gemini、OpenCode 等多种模型，自动生成行内评论和 PR 描述。
   - icon: 🔌
     title: Extension 扩展系统
     details: 基于 defineExtension 的纯函数式扩展体系，支持 npm 包、本地路径和 Git 仓库安装。
@@ -25,7 +25,7 @@ features:
     details: 提供 install、build、dev、commit、setup、mcp 等 13 个开箱即用的内置命令。
   - icon: 🖥️
     title: 多编辑器集成
-    details: 一键将技能和命令关联到 Claude Code、Windsurf、Cursor、OpenCode 等 AI 编程工具。
+    details: 一键将技能和命令关联到 Windsurf、Cursor、OpenCode 等 AI 编程工具。
   - icon: 📦
     title: CI/CD 自动化
     details: 预配置 GitHub Actions 工作流，支持自动 PR 审查、版本发布、自定义脚本执行。

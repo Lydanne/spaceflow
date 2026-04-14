@@ -22,7 +22,7 @@ export interface TitleOptions {
  * 支持的格式：标题末尾 [/review -l openai -v 2]
  *
  * 支持的参数：
- * - `-l, --llm-mode <mode>`: LLM 模式 (claude-code, openai, gemini)
+ * - `-l, --llm-mode <mode>`: LLM 模式 (openai, gemini, open-code)
  * - `-v, --verbose [level]`: 详细输出级别 (1 或 2)
  * - `-d, --dry-run`: 仅打印不执行
  * - `-i, --includes <pattern>`: 文件过滤模式
@@ -167,11 +167,11 @@ function parseArgs(argsString: string): string[] {
 }
 
 function isValidLLMMode(value: string): value is LLMMode {
-  return ["claude-code", "openai", "gemini"].includes(value);
+  return ["openai", "gemini", "open-code"].includes(value);
 }
 
 function isValidDeletionAnalysisMode(value: string): value is LLMMode {
-  return ["openai", "claude-code"].includes(value);
+  return ["openai", "open-code"].includes(value);
 }
 
 function isValidAnalyzeDeletionsMode(value: string): boolean {

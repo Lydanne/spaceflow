@@ -79,7 +79,7 @@ const status = await gitSdk.status();
 
 ## LLM Proxy
 
-多 LLM 统一代理，支持 OpenAI 和 Claude。
+多 LLM 统一代理，支持 OpenAI、Gemini、OpenCode。
 
 ```typescript
 import { LlmProxyService } from "@spaceflow/core";
@@ -100,7 +100,6 @@ console.log(result.content);
 | 模式     | 环境变量                                | 说明       |
 | -------- | --------------------------------------- | ---------- |
 | `openai` | `OPENAI_API_KEY`, `OPENAI_API_BASE_URL` | OpenAI API |
-| `claude` | `ANTHROPIC_API_KEY`                     | Claude API |
 
 通过 `LLM_PROVIDER` 环境变量或命令行 `-l` 参数指定模式。
 

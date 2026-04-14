@@ -4,7 +4,7 @@
  * value: 编辑器配置目录名（以 . 开头）
  */
 export const EDITOR_DIR_MAPPING: Record<string, string> = {
-  claudeCode: ".claude",
+  agents: ".agents",
   windsurf: ".windsurf",
   cursor: ".cursor",
   opencode: ".opencode",
@@ -13,7 +13,7 @@ export const EDITOR_DIR_MAPPING: Record<string, string> = {
 /**
  * 默认支持的编辑器
  */
-export const DEFAULT_EDITOR = "claudeCode";
+export const DEFAULT_EDITOR = "agents";
 
 /**
  * 根据编辑器名称获取配置目录名

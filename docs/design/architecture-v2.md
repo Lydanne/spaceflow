@@ -172,7 +172,6 @@ interface SpaceflowContext {
    * - "llmProxy"    → LlmProxyService
    * - "feishuSdk"   → FeishuSdkService
    * - "gitSdk"      → GitSdkService
-   * - "claudeSetup" → ClaudeSetupService
    *
    * 扩展服务 key 约定："{extConfigKey}.{serviceName}"
    * 如 "review.specService" → ReviewSpecService
@@ -1143,7 +1142,7 @@ export const mcpCommand: CommandDefinition = {
                           │
                           ▼
               ┌───────────────────────┐
-              │   Claude / Cursor     │
+              │   Cursor              │
               │   (MCP Client)        │
               └───────────────────────┘
 ```

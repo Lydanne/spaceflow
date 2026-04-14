@@ -100,8 +100,8 @@ export class InstallService {
    * 将插件关联到各个编辑器的目录
    * pluginConfig 包含 flows/commands/skills/mcps 四种类型
    * - flows: CLI 子命令，不需要复制到编辑器目录
-   * - commands: 编辑器命令，复制到 .claude/commands/ 等目录
-   * - skills: 技能文件，复制到 .claude/skills/ 等目录
+   * - commands: 编辑器命令，复制到 .cursor/commands/ 等目录
+   * - skills: 技能文件，复制到 .cursor/skills/ 等目录
    * - mcps: MCP Server，注册到编辑器的 mcp.json 配置
    */
   protected async linkPluginToEditors(options: {
@@ -495,7 +495,7 @@ export class InstallService {
   }
 
   /**
-   * 将扩展链接到 .claude/skills 目录
+   * 将扩展链接到编辑器 skills 目录
    */
   protected async linkExtensionToTarget(
     sourcePath: string,
@@ -530,7 +530,7 @@ export class InstallService {
   }
 
   /**
-   * 将扩展复制到 .claude/skills 目录
+   * 将扩展复制到编辑器 skills 目录
    */
   protected async copyExtensionToTarget(
     sourcePath: string,
@@ -1256,8 +1256,8 @@ export class InstallService {
   }
 
   /**
-   * 生成 command 文档到 .claude/commands/xxx.md
-   * 格式遵循 Claude Code 的 slash commands 规范
+   * 生成 command 文档到编辑器 commands 目录
+   * 格式遵循 slash commands 规范
    */
   protected async generateCommandMd(
     commandPath: string,
@@ -1319,7 +1319,7 @@ export class InstallService {
       // 获取 help 失败，忽略
     }
 
-    // 生成 command md 内容（遵循 Claude Code 规范）
+    // 生成 command md 内容
     let content = `---
 name: ${name}
 description: ${pkgDescription || t("install:commandDefault", { name })}

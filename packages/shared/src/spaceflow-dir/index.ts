@@ -239,7 +239,7 @@ export async function loadExtensionsFromDir(spaceflowDir: string, names: string[
 
 /**
  * 确保编辑器目录有 .gitignore 文件，并将生成的文件加入忽略列表
- * @param editorRoot 编辑器根目录（如 .claude）
+ * @param editorRoot 编辑器根目录（如 .cursor）
  * @param itemType 项目类型 (skills 或 commands)
  * @param itemName 项目名称
  */

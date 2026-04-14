@@ -46,7 +46,7 @@ function registerServiceFactories(container: ServiceContainer): void {
   // LlmProxy - 依赖配置（环境变量已在 UnifiedConfigReader 中合并）
   container.registerFactory("llmProxy", (c) => {
     const config = c.config.get<any>("llm");
-    if (!config || (!config.openai && !config.gemini && !config.claudeCode && !config.openCode)) {
+    if (!config || (!config.openai && !config.gemini && !config.openCode)) {
       throw new Error("缺少 llm 配置，请在 spaceflow.json 中配置或设置 OPENAI_API_KEY 环境变量");
     }
     return new LlmProxyService(config);

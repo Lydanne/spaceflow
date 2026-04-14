@@ -3,10 +3,6 @@ import { DeletionImpactService } from "./deletion-impact.service";
 import * as child_process from "child_process";
 import { EventEmitter } from "events";
 
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
-  query: vi.fn(),
-}));
-
 vi.mock("child_process");
 
 describe("DeletionImpactService", () => {
@@ -520,7 +516,7 @@ diff --git a/file2.ts b/file2.ts
 
       const blocks = [{ file: "test.ts", startLine: 1, endLine: 1, content: "const x = 1;" }];
       const refs = new Map<string, string[]>();
-      const result = await (service as any).analyzeWithAgent("claude-code", blocks, refs);
+      const result = await (service as any).analyzeWithAgent("open-code", blocks, refs);
       expect(result.summary).toBe("agent ok");
     });
 
@@ -533,7 +529,7 @@ diff --git a/file2.ts b/file2.ts
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const blocks = [{ file: "test.ts", startLine: 1, endLine: 1, content: "const x = 1;" }];
       const refs = new Map<string, string[]>();
-      const result = await (service as any).analyzeWithAgent("claude-code", blocks, refs);
+      const result = await (service as any).analyzeWithAgent("open-code", blocks, refs);
       expect(result.impacts).toHaveLength(0);
       consoleSpy.mockRestore();
     });
@@ -546,7 +542,7 @@ diff --git a/file2.ts b/file2.ts
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const blocks = [{ file: "test.ts", startLine: 1, endLine: 1, content: "const x = 1;" }];
       const refs = new Map<string, string[]>();
-      const result = await (service as any).analyzeWithAgent("claude-code", blocks, refs);
+      const result = await (service as any).analyzeWithAgent("open-code", blocks, refs);
       expect(result.summary).toBe("Agent 调用失败");
       consoleSpy.mockRestore();
     });
@@ -559,7 +555,7 @@ diff --git a/file2.ts b/file2.ts
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const blocks = [{ file: "test.ts", startLine: 1, endLine: 1, content: "const x = 1;" }];
       const refs = new Map<string, string[]>();
-      const result = await (service as any).analyzeWithAgent("claude-code", blocks, refs);
+      const result = await (service as any).analyzeWithAgent("open-code", blocks, refs);
       expect(result.summary).toBe("Agent 调用失败");
       consoleSpy.mockRestore();
     });
@@ -572,7 +568,7 @@ diff --git a/file2.ts b/file2.ts
 
       const blocks = [{ file: "test.ts", startLine: 1, endLine: 1, content: "const x = 1;" }];
       const refs = new Map<string, string[]>();
-      const result = await (service as any).analyzeWithAgent("claude-code", blocks, refs);
+      const result = await (service as any).analyzeWithAgent("open-code", blocks, refs);
       expect(result.summary).toBe("分析返回格式无效");
     });
 
@@ -587,7 +583,7 @@ diff --git a/file2.ts b/file2.ts
 
       const blocks = [{ file: "test.ts", startLine: 1, endLine: 1, content: "const x = 1;" }];
       const refs = new Map<string, string[]>();
-      const result = await (service as any).analyzeWithAgent("claude-code", blocks, refs, 2);
+      const result = await (service as any).analyzeWithAgent("open-code", blocks, refs, 2);
       expect(result.summary).toBe("ok");
     });
   });
@@ -898,8 +894,8 @@ diff --git a/file2.ts b/file2.ts
   });
 
   describe("analyzeDeletionImpact - agent mode", () => {
-    it("should use agent mode for claude-code", async () => {
-      const context = { owner: "o", repo: "r", prNumber: 1, analysisMode: "claude-code" as const };
+    it("should use agent mode for open-code", async () => {
+      const context = { owner: "o", repo: "r", prNumber: 1, analysisMode: "open-code" as const };
       gitProvider.getPullRequestFiles.mockResolvedValue([
         {
           filename: "test.ts",

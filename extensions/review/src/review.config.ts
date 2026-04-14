@@ -3,7 +3,7 @@ import type { LLMMode, VerboseLevel, LocalReviewMode } from "@spaceflow/core";
 import type { ReportFormat } from "./review-report";
 
 /** LLM 模式 schema（与 core 中的 LLMMode 保持一致） */
-const llmModeSchema = z.enum(["claude-code", "openai", "gemini", "open-code"]);
+const llmModeSchema = z.enum(["openai", "gemini", "open-code"]);
 
 /** 删除代码分析模式 schema */
 const analyzeDeletionsModeSchema = z.union([z.boolean(), z.enum(["ci", "pr", "terminal"])]);
@@ -69,7 +69,7 @@ export interface ReviewOptions {
   analyzeDeletions?: AnalyzeDeletionsMode;
   /** 仅执行删除代码分析，跳过常规代码审查 */
   deletionOnly?: boolean;
-  /** 删除代码分析模式：openai 使用标准模式，claude-agent 使用 Agent 模式 */
+  /** 删除代码分析模式：openai 使用标准模式，open-code 使用 Agent 模式 */
   deletionAnalysisMode?: LLMMode;
   /** 输出格式：markdown, terminal, json。不指定则智能选择 */
   outputFormat?: ReportFormat;

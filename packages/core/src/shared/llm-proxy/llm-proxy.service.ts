@@ -1,5 +1,4 @@
 import type { LlmAdapter } from "./adapters";
-import { ClaudeCodeAdapter } from "./adapters/claude-code.adapter";
 import { OpenAIAdapter } from "./adapters/openai.adapter";
 import { OpenCodeAdapter } from "./adapters/open-code.adapter";
 import { LlmSessionImpl } from "./llm-session";
@@ -23,10 +22,8 @@ export class LlmProxyService {
 
   constructor(private readonly config: LlmProxyConfig) {
     // 适配器接收完整配置，内部自行读取所需部分
-    const claudeCodeAdapter = new ClaudeCodeAdapter(config);
     const openaiAdapter = new OpenAIAdapter(config);
     const openCodeAdapter = new OpenCodeAdapter(config);
-    this.adapters.set("claude-code", claudeCodeAdapter);
     this.adapters.set("openai", openaiAdapter);
     this.adapters.set("open-code", openCodeAdapter);
   }

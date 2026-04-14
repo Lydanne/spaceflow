@@ -31,7 +31,7 @@ spaceflow setup
 ```json
 {
   "$schema": "./config-schema.json",
-  "support": ["claudeCode"]
+  "support": ["cursor"]
 }
 ```
 

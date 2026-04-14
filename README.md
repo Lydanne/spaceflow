@@ -6,10 +6,10 @@
 
 ## 功能特性
 
-- **AI 代码审查**：基于 LLM（OpenAI、Claude、Gemini）的自动化 PR 审查，支持行级评论和增量审查
+- **AI 代码审查**：基于 LLM（OpenAI、Gemini、OpenCode）的自动化 PR 审查，支持行级评论和增量审查
 - **自动化发布**：基于 Conventional Commits 的版本管理，支持 Monorepo 拓扑排序发布
 - **扩展系统**：基于 `defineExtension` 的纯函数式扩展体系，支持 npm 包、本地路径和 Git 仓库安装
-- **多编辑器集成**：自动关联扩展到 Claude Code、Windsurf、Cursor、OpenCode 等编辑器
+- **多编辑器集成**：自动关联扩展到 Windsurf、Cursor、OpenCode 等编辑器
 - **多平台适配**：支持 GitHub、Gitea、GitLab 等 Git 托管平台
 - **CI 流程编排**：分支锁定保护下执行 Shell 命令或 JS 脚本
 
@@ -96,7 +96,7 @@ spaceflow/
 
 ```json
 {
-  "support": ["claudeCode", "windsurf", "cursor"],
+  "support": ["cursor", "windsurf", "opencode"],
   "dependencies": {
     "@spaceflow/review": "latest",
     "@spaceflow/publish": "latest"
@@ -121,12 +121,11 @@ spaceflow/
 
 通过 `support` 字段配置，`spaceflow install` 会自动将扩展关联到对应编辑器目录：
 
-| 编辑器      | 配置目录     |
-| ----------- | ------------ |
-| Claude Code | `.claude/`   |
-| Windsurf    | `.windsurf/` |
-| Cursor      | `.cursor/`   |
-| OpenCode    | `.opencode/` |
+| 编辑器   | 配置目录     |
+| -------- | ------------ |
+| Windsurf | `.windsurf/` |
+| Cursor   | `.cursor/`   |
+| OpenCode | `.opencode/` |
 
 ## 环境变量
 

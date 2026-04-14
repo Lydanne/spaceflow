@@ -50,11 +50,7 @@ async function getSpecDirs(cwd: string, ctx: SpaceflowContext): Promise<string[]
   } catch {
     // 忽略配置读取错误
   }
-  const defaultDirs = [
-    join(cwd, ".claude", "skills"),
-    join(cwd, ".cursor", "skills"),
-    join(cwd, "review-specs"),
-  ];
+  const defaultDirs = [join(cwd, ".cursor", "skills"), join(cwd, "review-specs")];
   for (const dir of defaultDirs) {
     if (existsSync(dir)) {
       dirs.push(dir);

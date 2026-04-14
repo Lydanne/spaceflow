@@ -16,7 +16,7 @@ Spaceflow 支持 `spaceflow.json` 和 `.spaceflowrc` 两种配置文件格式，
 ```json
 {
   "$schema": ".spaceflow/config-schema.json",
-  "support": ["claudeCode"],
+  "support": ["cursor"],
   "dependencies": {
     "@spaceflow/review": "latest"
   },
@@ -33,18 +33,17 @@ Spaceflow 支持 `spaceflow.json` 和 `.spaceflowrc` 两种配置文件格式，
 
 ```json
 {
-  "support": ["claudeCode", "windsurf", "cursor"]
+  "support": ["cursor", "windsurf", "opencode"]
 }
 ```
 
-| 值           | 编辑器目录   |
-| ------------ | ------------ |
-| `claudeCode` | `.claude/`   |
-| `windsurf`   | `.windsurf/` |
-| `cursor`     | `.cursor/`   |
-| `opencode`   | `.opencode/` |
+| 值         | 编辑器目录   |
+| ---------- | ------------ |
+| `windsurf` | `.windsurf/` |
+| `cursor`   | `.cursor/`   |
+| `opencode` | `.opencode/` |
 
-默认值为 `["claudeCode"]`。
+默认值为 `["cursor"]`。
 
 ### `dependencies`
 

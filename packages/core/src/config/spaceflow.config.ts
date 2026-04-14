@@ -54,23 +54,6 @@ const CiConfigSchema = z.object({
     .describe("当前操作者"),
 });
 
-/** Claude Code 适配器配置 Schema */
-const ClaudeCodeConfigSchema = z.object({
-  baseUrl: z
-    .string()
-    .default(process.env.CLAUDE_CODE_BASE_URL || "")
-    .describe("API 基础 URL"),
-  authToken: z
-    .string()
-    .default(process.env.CLAUDE_CODE_AUTH_TOKEN || "")
-    .describe("认证令牌"),
-  model: z
-    .string()
-    .default(process.env.CLAUDE_CODE_MODEL || "claude-sonnet-4-5")
-    .describe("模型名称"),
-  hasCompletedOnboarding: z.boolean().optional().describe("是否已完成 Claude Code 引导流程"),
-});
-
 /** OpenAI 适配器配置 Schema */
 const OpenAIConfigSchema = z.object({
   baseUrl: z
@@ -129,9 +112,6 @@ const GeminiConfigSchema = z.object({
 
 /** LLM 配置 Schema */
 const LlmConfigSchema = z.object({
-  claudeCode: z
-    .preprocess((v) => v ?? {}, ClaudeCodeConfigSchema)
-    .describe("Claude Code 适配器配置"),
   openai: z.preprocess((v) => v ?? {}, OpenAIConfigSchema).describe("OpenAI 适配器配置"),
   openCode: z.preprocess((v) => v ?? {}, OpenCodeConfigSchema).describe("OpenCode 适配器配置"),
   gemini: z.preprocess((v) => v ?? {}, GeminiConfigSchema).describe("Gemini 适配器配置"),
@@ -214,9 +194,6 @@ export type CiConfig = z.infer<typeof CiConfigSchema>;
 
 /** LLM 系统配置类型 */
 export type LlmConfig = z.infer<typeof LlmConfigSchema>;
-
-/** Claude Code 适配器配置类型 */
-export type ClaudeCodeConfig = z.infer<typeof ClaudeCodeConfigSchema>;
 
 /** OpenAI 适配器配置类型 */
 export type OpenAIConfig = z.infer<typeof OpenAIConfigSchema>;

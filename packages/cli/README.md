@@ -80,12 +80,11 @@ export default defineExtension({
 
 通过配置文件中的 `support` 字段，`spaceflow install` 会自动将扩展关联到对应编辑器目录：
 
-| 编辑器      | 配置目录     |
-| ----------- | ------------ |
-| Claude Code | `.claude/`   |
-| Windsurf    | `.windsurf/` |
-| Cursor      | `.cursor/`   |
-| OpenCode    | `.opencode/` |
+| 编辑器   | 配置目录     |
+| -------- | ------------ |
+| Windsurf | `.windsurf/` |
+| Cursor   | `.cursor/`   |
+| OpenCode | `.opencode/` |
 
 ## 许可证
 

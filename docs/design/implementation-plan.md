@@ -143,7 +143,6 @@ export function loadEnvFiles(paths: string[]): void {
 | `shared/llm-proxy/llm-proxy.service.ts`       | 移除 `@Injectable()`、`@Inject()`，构造函数改为接收 config |
 | `shared/llm-proxy/adapters/*.adapter.ts`      | 移除 `@Injectable()`                                       |
 | `shared/feishu-sdk/feishu-sdk.service.ts`     | 移除 `@Injectable()`、`@Inject()`                          |
-| `shared/claude-setup/claude-setup.service.ts` | 移除 `@Injectable()`                                       |
 | `config/schema-generator.service.ts`          | 移除 `@Injectable()`                                       |
 
 ### 2.4 移除 NestJS 模块
@@ -156,7 +155,6 @@ export function loadEnvFiles(paths: string[]): void {
 - `shared/git-sdk/git-sdk.module.ts`
 - `shared/llm-proxy/llm-proxy.module.ts`
 - `shared/feishu-sdk/feishu-sdk.module.ts`
-- `shared/claude-setup/claude-setup.module.ts`
 - `config/config-reader.module.ts`
 - `app.module.ts`
 

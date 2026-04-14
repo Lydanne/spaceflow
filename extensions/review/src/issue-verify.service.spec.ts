@@ -2,10 +2,6 @@ import { vi } from "vitest";
 import { ReviewIssue, FileContentsMap } from "./review-spec";
 import { IssueVerifyService } from "./issue-verify.service";
 
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
-  query: vi.fn(),
-}));
-
 describe("IssueVerifyService", () => {
   let service: IssueVerifyService;
   let llmProxyService: any;

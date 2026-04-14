@@ -26,8 +26,8 @@ export type ExtensionDependencies = Record<string, string>;
 /**
  * Spaceflow 导出类型
  * - flow: 子命令（默认），需要构建，注册为 CLI 子命令
- * - command: 编辑器命令，复制到 .claude/commands/ 等目录
- * - skill: 技能包，复制到 .claude/skills/ 等目录
+ * - command: 编辑器命令，复制到 .cursor/commands/ 等目录
+ * - skill: 技能包，复制到 .cursor/skills/ 等目录
  * - mcp: MCP Server，注册到编辑器的 mcp.json 配置
  */
 export type SpaceflowExportType = "flow" | "command" | "skill" | "mcp";
