@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.0.3](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.2...@spaceflow/review-summary@5.0.3) (2026-04-14)
+
+### 代码重构
+
+* **review:** 增强 reactions 空值检查并优化 PR 状态缓存复用 ([b4deb5d](https://github.com/Lydanne/spaceflow/commit/b4deb5d4a6a756ceeadb8958b7cf922c8d95926f))
+
+### 其他修改
+
+* **review:** released version 5.0.3 [no ci] ([5697e98](https://github.com/Lydanne/spaceflow/commit/5697e9846d7e938da1b9572129bff23d4357d917))
+
 ## [5.0.2](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.1...@spaceflow/review-summary@5.0.2) (2026-04-14)
 
 ### 代码重构
