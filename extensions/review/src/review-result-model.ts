@@ -368,7 +368,7 @@ export class ReviewResultModel {
         }
         try {
           const reactions = await this.pr.getReviewCommentReactions(comment.id);
-          if (reactions.length === 0 || !matchedIssue) continue;
+          if (!reactions || reactions.length === 0 || !matchedIssue) continue;
           // 按 content 分组，收集每种 reaction 的用户列表
           const reactionMap = new Map<string, string[]>();
           for (const r of reactions) {
@@ -585,8 +585,10 @@ export class ReviewResultModel {
       ci: true,
     });
 
-    // 获取 PR 信息以获取 head commit SHA
-    const commitId = await this.pr.getHeadSha();
+    // 获取 PR 信息以获取 head commit SHA（同时缓存 PR 状态，供后续 closed 检查复用）
+    const prInfo = await this.pr.getInfo().catch(() => null);
+    const prIsClosed = prInfo?.state === "closed" || !!prInfo?.merged;
+    const commitId = prInfo?.head?.sha || "HEAD";
 
     // 1. 发布或更新主评论（使用 Issue Comment API，支持删除和更新）
     try {
@@ -612,6 +614,12 @@ export class ReviewResultModel {
     }
 
     // 2. 发布本轮新发现的行级评论（使用 PR Review API）
+    // PR 已关闭/合并时无法提交行级 Review，直接跳过
+    if (prIsClosed) {
+      console.log(`ℹ️  PR #${this.pr.number} 已关闭/合并，跳过行级 Review 提交`);
+      return;
+    }
+
     // 保留旧轮次的 review 历史，但清理同轮次的旧 AI review（重复触发场景）
     // 如果启用 autoApprove 且所有问题已解决，使用 APPROVE event 合并发布
     await this.cleanupDuplicateRoundReviews(this._result.round, verbose);
