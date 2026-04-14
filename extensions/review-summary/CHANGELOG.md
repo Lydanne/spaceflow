@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.0.2](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.1...@spaceflow/review-summary@5.0.2) (2026-04-14)
+
+### 代码重构
+
+* **review:** 重构问题统计逻辑,修正 pending 计算并复用 calculateIssueStats ([23ddcac](https://github.com/Lydanne/spaceflow/commit/23ddcac7f4d8cf59b295b9b370e15d3a7058eecf))
+
+### 其他修改
+
+* **review:** released version 5.0.2 [no ci] ([935745c](https://github.com/Lydanne/spaceflow/commit/935745ce33fe7a89e294955bdf4181a97c04cdf9))
+
 ## [5.0.1](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.0...@spaceflow/review-summary@5.0.1) (2026-04-14)
 
 ### 修复BUG
