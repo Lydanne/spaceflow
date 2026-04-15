@@ -4,6 +4,7 @@ import { ReviewContextBuilder } from "./review-context";
 
 vi.mock("fs", () => ({
   globSync: vi.fn(),
+  statSync: vi.fn(),
 }));
 
 vi.mock("fs/promises");
@@ -135,10 +136,13 @@ describe("ReviewContextBuilder", () => {
 
   describe("getContextFromEnv - includes 直接文件模式", () => {
     let globSync: Mock;
+    let statSync: Mock;
 
     beforeEach(async () => {
       const fs = await import("fs");
       globSync = fs.globSync as unknown as Mock;
+      statSync = fs.statSync as unknown as Mock;
+      statSync.mockReturnValue({ isFile: () => true });
       mockGitSdkService.getRemoteUrl.mockReturnValue("https://github.com/owner/repo.git");
       mockGitSdkService.parseRepositoryFromRemoteUrl.mockReturnValue({
         owner: "owner",
@@ -231,6 +235,21 @@ describe("ReviewContextBuilder", () => {
       });
 
       expect(ctx.files).toEqual([]);
+    });
+
+    it("glob 展开结果中包含目录 → 目录被过滤，只保留文件", async () => {
+      globSync.mockReturnValue(["src/a.ts", "src/subdir", "src/b.ts"]);
+      statSync.mockImplementation((p: string) => ({
+        isFile: () => !p.endsWith("subdir"),
+      }));
+
+      const ctx = await builder.getContextFromEnv({
+        dryRun: false,
+        ci: false,
+        includes: ["src/**/*"],
+      });
+
+      expect(ctx.files).toEqual(["src/a.ts", "src/b.ts"]);
     });
 
     it("无 includes → globSync 不被调用，files 为 undefined", async () => {

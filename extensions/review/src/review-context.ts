@@ -14,7 +14,7 @@ import { ReviewOptions } from "./review.config";
 import { parseTitleOptions } from "./parse-title-options";
 import { type ReviewIssue, type UserInfo } from "./review-spec";
 import { readFile } from "fs/promises";
-import { globSync } from "fs";
+import { globSync, statSync } from "fs";
 import { join } from "path";
 import { isAbsolute, normalize, relative } from "path";
 import { homedir } from "os";
@@ -148,7 +148,13 @@ export class ReviewContextBuilder {
       const cwd = process.cwd();
       const expandedFiles = options.includes!.flatMap((pattern) => {
         try {
-          return Array.from(globSync(pattern, { cwd }));
+          return Array.from(globSync(pattern, { cwd })).filter((f) => {
+            try {
+              return statSync(isAbsolute(f) ? f : join(cwd, f)).isFile();
+            } catch {
+              return false;
+            }
+          });
         } catch {
           return [pattern];
         }
