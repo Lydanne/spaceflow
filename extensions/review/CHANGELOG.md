@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.2.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.1.0...@spaceflow/review@5.2.0) (2026-04-15)
+
+### 新特性
+
+* **review:** 添加 includes 直接文件模式的测试用例并实现 glob 展开逻辑 ([a7719da](https://github.com/Lydanne/spaceflow/commit/a7719daf1025f9121562be52dd8be25076a78570))
+
+### 其他修改
+
+* **core:** released version 5.1.0 [no ci] ([227773e](https://github.com/Lydanne/spaceflow/commit/227773e1a366e492ed23eb4ed223766b5ff8ab94))
+* **publish:** released version 5.0.2 [no ci] ([254686e](https://github.com/Lydanne/spaceflow/commit/254686e79da07ebea2ed192189566063b9a2903d))
+* **review-summary:** released version 5.0.4 [no ci] ([a6bdd5d](https://github.com/Lydanne/spaceflow/commit/a6bdd5de322185a08afabf0ee7cf6ecd7fa630ae))
+
 ## [5.1.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.0.3...@spaceflow/review@5.1.0) (2026-04-15)
 
 ### 新特性
