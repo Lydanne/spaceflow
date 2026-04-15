@@ -14,7 +14,7 @@ import { ReviewOptions } from "./review.config";
 import { parseTitleOptions } from "./parse-title-options";
 import { type ReviewIssue, type UserInfo } from "./review-spec";
 import { readFile } from "fs/promises";
-import { globSync } from "fs";
+import { globSync, existsSync } from "fs";
 import { join } from "path";
 import { isAbsolute, normalize, relative } from "path";
 import { homedir } from "os";
@@ -127,10 +127,7 @@ export class ReviewContextBuilder {
       }
     }
 
-    const specSources = [
-      join(homedir(), ".spaceflow", "deps"),
-      join(process.cwd(), ".spaceflow", "deps"),
-    ];
+    const specSources = [];
     if (options.references?.length) {
       specSources.push(...options.references);
     }
