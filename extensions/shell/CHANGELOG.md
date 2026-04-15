@@ -1,5 +1,26 @@
 # Changelog
 
+## [5.0.4](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@5.0.3...@spaceflow/shell@5.0.4) (2026-04-15)
+
+### 修复BUG
+
+* **review:** 优化 glob 文件过滤逻辑，使用 withFileTypes 替代 statSync ([8acfa38](https://github.com/Lydanne/spaceflow/commit/8acfa385d868fa6491bbf5ee03d41604c674bbf6))
+* **review:** 移除默认的 spec 源目录配置 ([9697f62](https://github.com/Lydanne/spaceflow/commit/9697f62370ac029b8acfbf26b026646ab29fe4e8))
+
+### 代码重构
+
+* **cli:** 使用 spawn 替代 execSync 执行 index.js ([7c08104](https://github.com/Lydanne/spaceflow/commit/7c08104064e06190e97903c2725cbd146a8a243c))
+
+### 其他修改
+
+* **cli:** released version 5.0.2 [no ci] ([9c1ed83](https://github.com/Lydanne/spaceflow/commit/9c1ed834349a5214b318a76a23511233b3597166))
+* **publish:** released version 5.0.4 [no ci] ([8aaecdd](https://github.com/Lydanne/spaceflow/commit/8aaecdd0663522317445c23a5bf55baaa0fb7cea))
+* **review-summary:** released version 5.0.6 [no ci] ([1b28dd9](https://github.com/Lydanne/spaceflow/commit/1b28dd93741c8ceeab54e6820c9f7e5deef6eb22))
+* **review-summary:** released version 5.0.7 [no ci] ([c18d123](https://github.com/Lydanne/spaceflow/commit/c18d123dc5ee13ea27e7865dc09e734980fd094b))
+* **review:** released version 5.2.2 [no ci] ([8850fa2](https://github.com/Lydanne/spaceflow/commit/8850fa27382c17c9eaa25baa56c1a142c2d73d0b))
+* **review:** released version 5.2.3 [no ci] ([c1c19b0](https://github.com/Lydanne/spaceflow/commit/c1c19b04846f5462aaebf7ef4cb3889b62c8e920))
+* **scripts:** released version 5.0.4 [no ci] ([714e7b8](https://github.com/Lydanne/spaceflow/commit/714e7b8aba7235d5c4de501f9c2fdc63682287f2))
+
 ## [5.0.3](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@5.0.2...@spaceflow/shell@5.0.3) (2026-04-15)
 
 ### 新特性
