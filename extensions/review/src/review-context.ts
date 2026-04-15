@@ -14,6 +14,7 @@ import { ReviewOptions } from "./review.config";
 import { parseTitleOptions } from "./parse-title-options";
 import { type ReviewIssue, type UserInfo } from "./review-spec";
 import { readFile } from "fs/promises";
+import { globSync } from "fs";
 import { join } from "path";
 import { isAbsolute, normalize, relative } from "path";
 import { homedir } from "os";
@@ -137,7 +138,24 @@ export class ReviewContextBuilder {
       specSources.push(...reviewConf.references);
     }
 
-    const normalizedFiles = this.normalizeFilePaths(options.files);
+    let normalizedFiles = this.normalizeFilePaths(options.files);
+
+    // 当命令行传了 includes 且没有 PR/base/head 上下文时，展开 includes patterns 为文件列表
+    // 使得 includes 在直接文件模式下可以指定文件夹和 glob，并对结果全量审查（不受 diff 限制）
+    const isDirectIncludesMode =
+      !!options.includes?.length && !prNumber && !options.base && !options.head && !options.ci;
+    if (isDirectIncludesMode) {
+      const cwd = process.cwd();
+      const expandedFiles = options.includes!.flatMap((pattern) => {
+        try {
+          return Array.from(globSync(pattern, { cwd }));
+        } catch {
+          return [pattern];
+        }
+      });
+      const normalizedExpanded = this.normalizeFilePaths(expandedFiles) ?? [];
+      normalizedFiles = [...(normalizedFiles ?? []), ...normalizedExpanded];
+    }
 
     // 解析本地模式：非 CI、非 PR、无 base/head 时默认启用 uncommitted 模式
     // 当显式指定 files 时，强制走“按文件审查模式”，不进入本地未提交模式

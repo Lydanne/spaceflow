@@ -2,6 +2,10 @@ import { vi, type Mock } from "vitest";
 import { readFile } from "fs/promises";
 import { ReviewContextBuilder } from "./review-context";
 
+vi.mock("fs", () => ({
+  globSync: vi.fn(),
+}));
+
 vi.mock("fs/promises");
 
 describe("ReviewContextBuilder", () => {
@@ -126,6 +130,119 @@ describe("ReviewContextBuilder", () => {
     it("should keep relative paths as-is", () => {
       const result = builder.normalizeFilePaths(["src/app.ts", "lib/util.ts"]);
       expect(result).toEqual(["src/app.ts", "lib/util.ts"]);
+    });
+  });
+
+  describe("getContextFromEnv - includes 直接文件模式", () => {
+    let globSync: Mock;
+
+    beforeEach(async () => {
+      const fs = await import("fs");
+      globSync = fs.globSync as unknown as Mock;
+      mockGitSdkService.getRemoteUrl.mockReturnValue("https://github.com/owner/repo.git");
+      mockGitSdkService.parseRepositoryFromRemoteUrl.mockReturnValue({
+        owner: "owner",
+        repo: "repo",
+      });
+    });
+
+    it("无 PR/base/head 上下文 + 有 includes → 展开 glob 写入 files", async () => {
+      globSync.mockImplementation((pattern: string) => {
+        if (pattern === "src/**/*.ts") return ["src/a.ts", "src/b.ts"];
+        return [];
+      });
+
+      const ctx = await builder.getContextFromEnv({
+        dryRun: false,
+        ci: false,
+        includes: ["src/**/*.ts"],
+      });
+
+      expect(ctx.files).toEqual(["src/a.ts", "src/b.ts"]);
+    });
+
+    it("有 PR 上下文 + 有 includes → 不展开，files 为 undefined", async () => {
+      globSync.mockReturnValue(["src/a.ts"]);
+
+      const ctx = await builder.getContextFromEnv({
+        dryRun: false,
+        ci: false,
+        includes: ["src/**/*.ts"],
+        prNumber: 42,
+      });
+
+      expect(ctx.files).toBeUndefined();
+      expect(globSync).not.toHaveBeenCalled();
+    });
+
+    it("有 base/head + 有 includes → 不展开，files 为 undefined", async () => {
+      globSync.mockReturnValue(["src/a.ts"]);
+
+      const ctx = await builder.getContextFromEnv({
+        dryRun: false,
+        ci: false,
+        includes: ["src/**/*.ts"],
+        base: "main",
+        head: "feature",
+      });
+
+      expect(ctx.files).toBeUndefined();
+      expect(globSync).not.toHaveBeenCalled();
+    });
+
+    it("ci 模式 + 有 includes → 不展开，files 为 undefined", async () => {
+      globSync.mockReturnValue(["src/a.ts"]);
+      gitProvider.validateConfig = vi.fn();
+      configService.get.mockReturnValue({ repository: "owner/repo" });
+
+      const ctx = await builder.getContextFromEnv({
+        dryRun: false,
+        ci: true,
+        includes: ["src/**/*.ts"],
+      });
+
+      expect(ctx.files).toBeUndefined();
+      expect(globSync).not.toHaveBeenCalled();
+    });
+
+    it("includes + 同时指定 files → 合并展开结果与 files", async () => {
+      globSync.mockImplementation((pattern: string) => {
+        if (pattern === "src/**/*.ts") return ["src/a.ts"];
+        return [];
+      });
+
+      const ctx = await builder.getContextFromEnv({
+        dryRun: false,
+        ci: false,
+        files: ["lib/util.ts"],
+        includes: ["src/**/*.ts"],
+      });
+
+      expect(ctx.files).toEqual(["lib/util.ts", "src/a.ts"]);
+    });
+
+    it("includes glob 展开为空列表 → files 为空数组", async () => {
+      globSync.mockReturnValue([]);
+
+      const ctx = await builder.getContextFromEnv({
+        dryRun: false,
+        ci: false,
+        includes: ["src/**/*.ts"],
+      });
+
+      expect(ctx.files).toEqual([]);
+    });
+
+    it("无 includes → globSync 不被调用，files 为 undefined", async () => {
+      const ctx = await builder.getContextFromEnv({
+        dryRun: false,
+        ci: false,
+        base: "main",
+        head: "feature",
+      });
+
+      expect(globSync).not.toHaveBeenCalled();
+      expect(ctx.files).toBeUndefined();
     });
   });
 

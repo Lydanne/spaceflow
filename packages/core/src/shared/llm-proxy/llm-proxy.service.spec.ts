@@ -90,6 +90,8 @@ describe("LlmProxyService", () => {
       const mockJsonSchema = {
         parse: vi.fn().mockResolvedValue(mockParsed),
         getSchema: vi.fn().mockReturnValue({ type: "object" }),
+        isMatched: vi.fn().mockReturnValue(false),
+        jsonFormatInstruction: "",
       };
       const options = { jsonSchema: mockJsonSchema };
       const mockResponse = { content: '{"foo":"bar"}', role: "assistant" };
@@ -186,6 +188,8 @@ describe("LlmProxyService", () => {
       const mockJsonSchema = {
         parse: vi.fn(),
         getSchema: vi.fn(),
+        isMatched: vi.fn().mockReturnValue(false),
+        jsonFormatInstruction: "",
       };
       const result = await service.chat(
         [{ role: "user", content: "hello" }] as any,
@@ -204,6 +208,8 @@ describe("LlmProxyService", () => {
       const mockJsonSchema = {
         parse: vi.fn(),
         getSchema: vi.fn(),
+        isMatched: vi.fn().mockReturnValue(false),
+        jsonFormatInstruction: "",
       };
       const result = await service.chat(
         [{ role: "user", content: "hello" }] as any,
@@ -220,6 +226,8 @@ describe("LlmProxyService", () => {
       const mockJsonSchema = {
         parse: vi.fn().mockResolvedValue({ parsed: true }),
         getSchema: vi.fn(),
+        isMatched: vi.fn().mockReturnValue(false),
+        jsonFormatInstruction: "",
       };
       const mockStream = (async function* () {
         yield { type: "result", response: { content: '{"parsed":true}' } };
@@ -242,6 +250,8 @@ describe("LlmProxyService", () => {
       const mockJsonSchema = {
         parse: vi.fn().mockRejectedValue(new Error("parse error")),
         getSchema: vi.fn(),
+        isMatched: vi.fn().mockReturnValue(false),
+        jsonFormatInstruction: "",
       };
       const mockStream = (async function* () {
         yield { type: "result", response: { content: "invalid json" } };
