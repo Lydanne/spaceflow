@@ -113,6 +113,37 @@ describe("ReviewLlmProcessor", () => {
       expect(normalized[1].line).toBe("12");
       expect(normalized[1].suggestion).toContain("参考 test.ts:10");
     });
+
+    it("should filter issues with blank line", () => {
+      const issues = [
+        {
+          file: "test.ts",
+          line: "   ",
+          ruleId: "R1",
+          specFile: "s1.md",
+          reason: "r1",
+        } as any,
+      ];
+
+      expect(processor.normalizeIssues(issues)).toEqual([]);
+    });
+
+    it("should filter blank parts in comma separated lines", () => {
+      const issues = [
+        {
+          file: "test.ts",
+          line: "10, , 12, ",
+          ruleId: "R1",
+          specFile: "s1.md",
+          reason: "r1",
+          suggestion: "fix",
+        } as any,
+      ];
+
+      const normalized = processor.normalizeIssues(issues);
+      expect(normalized).toHaveLength(2);
+      expect(normalized.map((issue) => issue.line)).toEqual(["10", "12"]);
+    });
   });
 
   describe("buildReviewPrompt", () => {

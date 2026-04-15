@@ -413,18 +413,24 @@ export class ReviewLlmProcessor {
     const now = new Date().toISOString();
     return issues.flatMap((issue) => {
       // 确保 line 是字符串（LLM 可能返回数字）
-      const lineStr = String(issue.line ?? "");
+      const lineStr = String(issue.line ?? "").trim();
+      if (!lineStr) {
+        return [];
+      }
       const baseIssue = { ...issue, line: lineStr, date: issue.date ?? now };
 
       if (!lineStr.includes(",")) {
         return baseIssue;
       }
 
-      const lines = lineStr.split(",");
+      const lines = lineStr.split(",").map((linePart) => linePart.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        return [];
+      }
 
       return lines.map((linePart, index) => ({
         ...baseIssue,
-        line: linePart.trim(),
+        line: linePart,
         suggestion: index === 0 ? issue.suggestion : `参考 ${issue.file}:${lines[0]}`,
       }));
     });
