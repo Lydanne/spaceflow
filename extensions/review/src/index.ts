@@ -1,4 +1,5 @@
 import "./locales";
+import pkg from "../package.json" with { type: "json" };
 export * from "./review-spec";
 export * from "./review-report";
 export { PullRequestModel } from "./pull-request-model";
@@ -23,7 +24,7 @@ import { tools } from "./mcp";
 
 export const extension = defineExtension({
   name: "review",
-  version: "1.0.0",
+  version: pkg.version,
   description: t("review:extensionDescription"),
   configKey: "review",
   configSchema: reviewSchema,
