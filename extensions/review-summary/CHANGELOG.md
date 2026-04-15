@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.0.7](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.6...@spaceflow/review-summary@5.0.7) (2026-04-15)
+
+### 修复BUG
+
+* **review:** 优化 glob 文件过滤逻辑，使用 withFileTypes 替代 statSync ([8acfa38](https://github.com/Lydanne/spaceflow/commit/8acfa385d868fa6491bbf5ee03d41604c674bbf6))
+
+### 其他修改
+
+* **review:** released version 5.2.2 [no ci] ([8850fa2](https://github.com/Lydanne/spaceflow/commit/8850fa27382c17c9eaa25baa56c1a142c2d73d0b))
+
 ## [5.0.6](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.5...@spaceflow/review-summary@5.0.6) (2026-04-15)
 
 ### 新特性
