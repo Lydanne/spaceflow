@@ -6,6 +6,7 @@
   "options.head": "Head branch/tag for diff comparison",
   "options.includes": "File glob patterns to review, e.g. *.ts *.js (can be specified multiple times). Supports change-type prefixes: added|*.ts (new files only), modified|*.ts (modified only), deleted|*.ts (deleted only)",
   "options.llmMode": "LLM mode: openai, gemini, open-code",
+  "options.llmModel": "Override the LLM model name from config (e.g. gpt-4o, claude-3-5-sonnet-20241022)",
   "options.files": "Only review specified files (space-separated)",
   "options.commits": "Only review specified commits (space-separated)",
   "options.verifyFixes": "Verify if historical issues are fixed (default from config)",

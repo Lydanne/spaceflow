@@ -18,4 +18,6 @@ export interface LLMReviewOptions {
   timeout?: number;
   retries?: number;
   retryDelay?: number;
+  /** 指定使用的 LLM 模型名称，覆盖适配器默认 model */
+  model?: string;
 }

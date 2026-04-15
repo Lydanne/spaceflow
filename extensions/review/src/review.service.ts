@@ -212,6 +212,7 @@ export class ReviewService {
       timeout: context.timeout,
       retries: context.retries,
       retryDelay: context.retryDelay,
+      model: context.llmModel,
     });
 
     // 填充 PR 功能描述和标题

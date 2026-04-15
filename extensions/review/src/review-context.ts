@@ -179,6 +179,7 @@ export class ReviewContextBuilder {
       includes: ctxIncludes,
       whenModifiedCode: options.whenModifiedCode ?? reviewConf.whenModifiedCode,
       llmMode: options.llmMode ?? titleOptions.llmMode ?? reviewConf.llmMode,
+      llmModel: options.llmModel,
       files: normalizedFiles,
       commits: options.commits,
       verifyFixes:

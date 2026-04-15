@@ -279,7 +279,7 @@ export class ReviewLlmProcessor {
     reviewPrompt: ReviewPrompt,
     options: LLMReviewOptions = {},
   ): Promise<{ issues: ReviewIssue[]; summary: FileSummary[] } | null> {
-    const { verbose, concurrency = 5, timeout, retries = 0, retryDelay = 1000 } = options;
+    const { verbose, concurrency = 5, timeout, retries = 0, retryDelay = 1000, model } = options;
     const fileCount = reviewPrompt.filePrompts.length;
     console.log(
       `📂 开始并行审查 ${fileCount} 个文件 (并发: ${concurrency}, 重试: ${retries}, 超时: ${timeout ?? "无"}ms)`,
@@ -304,7 +304,7 @@ export class ReviewLlmProcessor {
 
     const results = await executor.map(
       reviewPrompt.filePrompts,
-      (filePrompt) => this.reviewSingleFile(llmMode, filePrompt, verbose),
+      (filePrompt) => this.reviewSingleFile(llmMode, filePrompt, model, verbose),
       (filePrompt) => filePrompt.filename,
     );
 
@@ -337,6 +337,7 @@ export class ReviewLlmProcessor {
   async reviewSingleFile(
     llmMode: LLMMode,
     filePrompt: FileReviewPrompt,
+    model?: string,
     verbose?: VerboseLevel,
   ): Promise<{ issues: ReviewIssue[]; summary: FileSummary }> {
     if (shouldLog(verbose, 3)) {
@@ -355,6 +356,7 @@ export class ReviewLlmProcessor {
         adapter: llmMode,
         jsonSchema: this.llmJsonPut,
         verbose,
+        model,
         allowedTools: [
           "Read",
           "Glob",

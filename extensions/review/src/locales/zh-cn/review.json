@@ -6,6 +6,7 @@
   "options.head": "目标分支/tag，用于比较差异",
   "options.includes": "要审查的文件 glob 模式，如 *.ts *.js（可多次指定）。支持变更类型前缀: added|*.ts（仅新增）、modified|*.ts（仅修改）、deleted|*.ts（仅删除）",
   "options.llmMode": "使用的 LLM 模式: openai, gemini, open-code",
+  "options.llmModel": "指定使用的 LLM 模型名称，覆盖配置文件中的默认 model（如 gpt-4o, claude-3-5-sonnet-20241022）",
   "options.files": "仅审查指定的文件（空格分隔）",
   "options.commits": "仅审查指定的 commits（空格分隔）",
   "options.verifyFixes": "是否验证历史问题是否已修复（默认从配置文件读取）",

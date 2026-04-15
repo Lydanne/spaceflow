@@ -62,6 +62,8 @@ export interface ReviewOptions {
    */
   whenModifiedCode?: string[];
   llmMode?: LLMMode;
+  /** 指定使用的 LLM 模型名称，覆盖 llm 配置中的默认 model */
+  llmModel?: string;
   files?: string[];
   commits?: string[];
   verifyFixes?: boolean;
