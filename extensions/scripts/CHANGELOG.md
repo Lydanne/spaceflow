@@ -1,5 +1,31 @@
 # Changelog
 
+## [5.0.3](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@5.0.2...@spaceflow/scripts@5.0.3) (2026-04-15)
+
+### 新特性
+
+* **core:** 优化 CLI 版本信息显示逻辑，支持子命令扩展版本 ([f11d8fa](https://github.com/Lydanne/spaceflow/commit/f11d8faf801faea006a0ef914bfe8882828600e9))
+
+### 修复BUG
+
+* **review:** 添加目录过滤测试并实现 glob 展开结果的文件类型过滤 ([c351747](https://github.com/Lydanne/spaceflow/commit/c351747f91c8a602e3327ffed5e98d8dc7c4d70d))
+
+### 代码重构
+
+* **scripts:** 从 package.json 动态读取扩展版本号 ([483e0f6](https://github.com/Lydanne/spaceflow/commit/483e0f651fd1d6dd29cb139df2c4e11bb2983a1d))
+
+### 其他修改
+
+* **core:** released version 5.2.0 [no ci] ([8e60ede](https://github.com/Lydanne/spaceflow/commit/8e60ede699bdda560568d8f1bc0c99e089e3b46c))
+* **publish:** released version 5.0.3 [no ci] ([50e7284](https://github.com/Lydanne/spaceflow/commit/50e72844e748a15ddf4fb79aa9e23251cda9f792))
+* **publish:** 从 package.json 动态获取插件版本号 ([17b77fb](https://github.com/Lydanne/spaceflow/commit/17b77fb5d50f14a476be152d0a50cf0a91560ed9))
+* **review-summary:** released version 5.0.5 [no ci] ([3a7466f](https://github.com/Lydanne/spaceflow/commit/3a7466faad29b224811b8f4ed0fe87dbdb2a4baf))
+* **review-summary:** 从 package.json 动态获取扩展版本号 ([83773b5](https://github.com/Lydanne/spaceflow/commit/83773b530fd3b26eddd5cd6b86375fe03406ac49))
+* **review:** released version 5.2.1 [no ci] ([a00d907](https://github.com/Lydanne/spaceflow/commit/a00d907aadd7e46bd3775b79d77926f5d10b90ca))
+* **review:** 从 package.json 动态获取扩展版本号 ([8bf6129](https://github.com/Lydanne/spaceflow/commit/8bf61294264160815c139afef1565d99fc9d1524))
+* **shell:** released version 5.0.2 [no ci] ([ff94371](https://github.com/Lydanne/spaceflow/commit/ff943717b1eae3143fb7f856dbcc04d2e5aaf40b))
+* **shell:** 从 package.json 中读取插件版本号 ([0b23fc6](https://github.com/Lydanne/spaceflow/commit/0b23fc62cf9130cf2cfc71913b66afa1fe62c718))
+
 ## [5.0.2](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@5.0.1...@spaceflow/scripts@5.0.2) (2026-04-15)
 
 ### 新特性
