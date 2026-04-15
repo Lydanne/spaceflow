@@ -1,11 +1,12 @@
 import "./locales";
+import pkg from "../package.json" with { type: "json" };
 import { defineExtension, t } from "@spaceflow/core";
 import type { GitProviderService } from "@spaceflow/core";
 import { ShellService } from "./shell.service";
 
 export const extension = defineExtension({
   name: "shell",
-  version: "1.0.0",
+  version: pkg.version,
   description: t("shell:extensionDescription"),
   configKey: "shell",
   commands: [
