@@ -3,7 +3,7 @@ declare const __CLI_VERSION__: string;
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
 import { join, resolve } from "path";
-import { execSync } from "child_process";
+import { spawn } from "child_process";
 import {
   SPACEFLOW_DIR,
   findProjectRoot,
@@ -203,16 +203,18 @@ function generateBinFile(spaceflowDir: string, extensions: string[], version: st
  * 执行生成的 index.js
  */
 function executeIndexFile(indexPath: string, projectRoot: string): void {
-  try {
-    execSync(`node "${indexPath}" ${process.argv.slice(2).join(" ")}`, {
-      stdio: "inherit",
-      env: { ...process.env, SPACEFLOW_CWD: projectRoot },
-    });
-  } catch (error: any) {
-    // execSync 在子进程非零退出时抛出错误
-    // 子进程的 stdout/stderr 已通过 stdio: "inherit" 输出
-    process.exit(error.status || 1);
-  }
+  const args = process.argv.slice(2);
+  const child = spawn("node", [indexPath, ...args], {
+    stdio: "inherit",
+    env: { ...process.env, SPACEFLOW_CWD: projectRoot },
+  });
+  child.on("close", (code) => {
+    process.exit(code ?? 1);
+  });
+  child.on("error", (err) => {
+    console.error(`Failed to execute: ${err.message}`);
+    process.exit(1);
+  });
 }
 
 /**
