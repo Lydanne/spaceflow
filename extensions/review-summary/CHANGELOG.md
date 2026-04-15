@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.0.9](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.8...@spaceflow/review-summary@5.0.9) (2026-04-15)
+
+### 修复BUG
+
+* **review:** 修复空行号问题过滤逻辑 ([d98765f](https://github.com/Lydanne/spaceflow/commit/d98765f0e1bc8e4b20af8aefb0e4b03d04274e53))
+
+### 其他修改
+
+* **review:** released version 5.2.4 [no ci] ([3df1c19](https://github.com/Lydanne/spaceflow/commit/3df1c192a170a6cc9980ea1f6f904e97475c161a))
+
 ## [5.0.8](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.7...@spaceflow/review-summary@5.0.8) (2026-04-15)
 
 ### 修复BUG
