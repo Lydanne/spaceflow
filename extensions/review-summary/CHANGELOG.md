@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.0.4](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.3...@spaceflow/review-summary@5.0.4) (2026-04-15)
+
+### 新特性
+
+* **review:** 添加 --llm-model 选项支持覆盖配置文件中的模型名称 ([54e2c6d](https://github.com/Lydanne/spaceflow/commit/54e2c6d5ebf8c66890097c25bedf23aa393d2f08))
+
+### 其他修改
+
+* **review:** released version 5.1.0 [no ci] ([a651d28](https://github.com/Lydanne/spaceflow/commit/a651d28901b4aa4d868196f8dc989f4de5310c50))
+
 ## [5.0.3](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.2...@spaceflow/review-summary@5.0.3) (2026-04-14)
 
 ### 代码重构
