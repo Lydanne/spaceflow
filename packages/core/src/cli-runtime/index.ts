@@ -53,10 +53,17 @@ export async function exec(
   const coreVersion = typeof __CORE_VERSION__ !== "undefined" ? __CORE_VERSION__ : "0.0.0";
   const versionOutput = `spaceflow/${cliVersion} core/${coreVersion}`;
 
-  program
-    .name("spaceflow")
-    .description("Spaceflow CLI")
-    .version(versionOutput, "-V, --version", "显示版本信息");
+  program.name("spaceflow").description("Spaceflow CLI");
+
+  // 在路由子命令之前处理根级 -V/--version（不注册 .version() 以免拦截子命令的 -V）
+  const rawArgs = process.argv.slice(2);
+  const hasVersionFlag = rawArgs.includes("-V") || rawArgs.includes("--version");
+  const firstSubCmd = rawArgs.find((a) => !a.startsWith("-"));
+  if (hasVersionFlag && !firstSubCmd) {
+    console.log(versionOutput);
+    await container.destroy();
+    process.exit(0);
+  }
 
   // 定义全局 verbose 选项（支持计数：-v, -vv, -vvv）
   program.option(
@@ -70,9 +77,31 @@ export async function exec(
   const globalOptions = ["-h, --help", "-V, --version", "-v, --verbose"];
 
   // 8. 注册所有命令
+  // 建立命令名 -> 扩展版本的映射（用于给子命令注入 --version）
+  const cmdVersionMap = new Map<string, string>();
+  for (const ext of extensionLoader.getExtensions()) {
+    if (ext.version) {
+      for (const cmd of ext.commands) {
+        cmdVersionMap.set(cmd.name, `${ext.name}/${ext.version}`);
+      }
+    }
+  }
+
   const commands = extensionLoader.getCommands();
   for (const cmd of commands) {
     const command = new Command(cmd.name).description(cmd.description);
+
+    // 注入扩展版本（pnpm space review --version）
+    const extVersion = cmdVersionMap.get(cmd.name);
+    if (extVersion) {
+      command.option("-V, --version", "显示扩展版本");
+      command.hook("preAction", (thisCommand) => {
+        if (thisCommand.opts().version) {
+          console.log(extVersion);
+          process.exit(0);
+        }
+      });
+    }
 
     // 添加别名
     if (cmd.aliases) {
