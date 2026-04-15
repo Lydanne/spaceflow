@@ -1,4 +1,5 @@
 import "./locales";
+import pkg from "../package.json" with { type: "json" };
 import { defineExtension } from "@spaceflow/core";
 import { t } from "@spaceflow/core";
 import type { GitProviderService } from "@spaceflow/core";
@@ -8,7 +9,7 @@ import type { PeriodSummaryOptions, TimePreset, OutputTarget } from "./types";
 
 export const extension = defineExtension({
   name: "review-summary",
-  version: "1.0.0",
+  version: pkg.version,
   description: t("review-summary:extensionDescription"),
   configKey: "review-summary",
   commands: [
