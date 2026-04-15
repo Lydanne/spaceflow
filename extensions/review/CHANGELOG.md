@@ -1,5 +1,21 @@
 # Changelog
 
+## [5.2.3](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.2.2...@spaceflow/review@5.2.3) (2026-04-15)
+
+### 修复BUG
+
+* **review:** 移除默认的 spec 源目录配置 ([9697f62](https://github.com/Lydanne/spaceflow/commit/9697f62370ac029b8acfbf26b026646ab29fe4e8))
+
+### 代码重构
+
+* **cli:** 使用 spawn 替代 execSync 执行 index.js ([7c08104](https://github.com/Lydanne/spaceflow/commit/7c08104064e06190e97903c2725cbd146a8a243c))
+
+### 其他修改
+
+* **cli:** released version 5.0.2 [no ci] ([9c1ed83](https://github.com/Lydanne/spaceflow/commit/9c1ed834349a5214b318a76a23511233b3597166))
+* **publish:** released version 5.0.4 [no ci] ([8aaecdd](https://github.com/Lydanne/spaceflow/commit/8aaecdd0663522317445c23a5bf55baaa0fb7cea))
+* **review-summary:** released version 5.0.7 [no ci] ([c18d123](https://github.com/Lydanne/spaceflow/commit/c18d123dc5ee13ea27e7865dc09e734980fd094b))
+
 ## [5.2.2](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.2.1...@spaceflow/review@5.2.2) (2026-04-15)
 
 ### 修复BUG
