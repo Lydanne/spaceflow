@@ -4,7 +4,6 @@ import { ReviewContextBuilder } from "./review-context";
 
 vi.mock("fs", () => ({
   globSync: vi.fn(),
-  statSync: vi.fn(),
 }));
 
 vi.mock("fs/promises");
@@ -136,13 +135,19 @@ describe("ReviewContextBuilder", () => {
 
   describe("getContextFromEnv - includes 直接文件模式", () => {
     let globSync: Mock;
-    let statSync: Mock;
+
+    const makeEntries = (paths: string[]) =>
+      paths.map((p) => {
+        const parts = p.split("/");
+        const name = parts.pop()!;
+        const parentPath = parts.join("/");
+        const isFile = name.includes(".");
+        return { name, parentPath, isFile: () => isFile };
+      });
 
     beforeEach(async () => {
       const fs = await import("fs");
       globSync = fs.globSync as unknown as Mock;
-      statSync = fs.statSync as unknown as Mock;
-      statSync.mockReturnValue({ isFile: () => true });
       mockGitSdkService.getRemoteUrl.mockReturnValue("https://github.com/owner/repo.git");
       mockGitSdkService.parseRepositoryFromRemoteUrl.mockReturnValue({
         owner: "owner",
@@ -152,7 +157,7 @@ describe("ReviewContextBuilder", () => {
 
     it("无 PR/base/head 上下文 + 有 includes → 展开 glob 写入 files", async () => {
       globSync.mockImplementation((pattern: string) => {
-        if (pattern === "src/**/*.ts") return ["src/a.ts", "src/b.ts"];
+        if (pattern === "src/**/*.ts") return makeEntries(["src/a.ts", "src/b.ts"]);
         return [];
       });
 
@@ -166,7 +171,7 @@ describe("ReviewContextBuilder", () => {
     });
 
     it("有 PR 上下文 + 有 includes → 不展开，files 为 undefined", async () => {
-      globSync.mockReturnValue(["src/a.ts"]);
+      globSync.mockReturnValue(makeEntries(["src/a.ts"]));
 
       const ctx = await builder.getContextFromEnv({
         dryRun: false,
@@ -180,7 +185,7 @@ describe("ReviewContextBuilder", () => {
     });
 
     it("有 base/head + 有 includes → 不展开，files 为 undefined", async () => {
-      globSync.mockReturnValue(["src/a.ts"]);
+      globSync.mockReturnValue(makeEntries(["src/a.ts"]));
 
       const ctx = await builder.getContextFromEnv({
         dryRun: false,
@@ -195,7 +200,7 @@ describe("ReviewContextBuilder", () => {
     });
 
     it("ci 模式 + 有 includes → 不展开，files 为 undefined", async () => {
-      globSync.mockReturnValue(["src/a.ts"]);
+      globSync.mockReturnValue(makeEntries(["src/a.ts"]));
       gitProvider.validateConfig = vi.fn();
       configService.get.mockReturnValue({ repository: "owner/repo" });
 
@@ -211,7 +216,7 @@ describe("ReviewContextBuilder", () => {
 
     it("includes + 同时指定 files → 合并展开结果与 files", async () => {
       globSync.mockImplementation((pattern: string) => {
-        if (pattern === "src/**/*.ts") return ["src/a.ts"];
+        if (pattern === "src/**/*.ts") return makeEntries(["src/a.ts"]);
         return [];
       });
 
@@ -226,7 +231,7 @@ describe("ReviewContextBuilder", () => {
     });
 
     it("includes glob 展开为空列表 → files 为空数组", async () => {
-      globSync.mockReturnValue([]);
+      globSync.mockReturnValue([] as any);
 
       const ctx = await builder.getContextFromEnv({
         dryRun: false,
@@ -238,10 +243,7 @@ describe("ReviewContextBuilder", () => {
     });
 
     it("glob 展开结果中包含目录 → 目录被过滤，只保留文件", async () => {
-      globSync.mockReturnValue(["src/a.ts", "src/subdir", "src/b.ts"]);
-      statSync.mockImplementation((p: string) => ({
-        isFile: () => !p.endsWith("subdir"),
-      }));
+      globSync.mockReturnValue(makeEntries(["src/a.ts", "src/subdir", "src/b.ts"]));
 
       const ctx = await builder.getContextFromEnv({
         dryRun: false,
