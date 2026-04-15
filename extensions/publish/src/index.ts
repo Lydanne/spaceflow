@@ -1,4 +1,5 @@
 import "./locales";
+import pkg from "../package.json" with { type: "json" };
 import { defineExtension, t } from "@spaceflow/core";
 import type { GitProviderService } from "@spaceflow/core";
 import { publishSchema } from "./publish.config";
@@ -7,7 +8,7 @@ import { MonorepoService } from "./monorepo.service";
 
 export const extension = defineExtension({
   name: "publish",
-  version: "1.0.0",
+  version: pkg.version,
   description: t("publish:extensionDescription"),
   configKey: "publish",
   configSchema: () => publishSchema,
