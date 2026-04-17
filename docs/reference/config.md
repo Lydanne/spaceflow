@@ -128,9 +128,21 @@
 | `verifyFixes`          | `boolean`  | `false`       | 验证修复建议                           |
 | `analyzeDeletions`     | `boolean`  | `false`       | 分析删除代码影响                       |
 | `deletionAnalysisMode` | `string`   | `"open-code"` | 删除分析模式                           |
+| `fastMode`             | `object`   | —             | 快速模式（条件触发 + 行为策略）        |
 | `concurrency`          | `number`   | `10`          | 并发审查文件数                         |
 | `retries`              | `number`   | `3`           | 失败重试次数                           |
 | `retryDelay`           | `number`   | `1000`        | 重试间隔（毫秒）                       |
+
+### `fastMode` 结构
+
+| 字段 | 类型 | 默认值 | 说明 |
+| ---- | ---- | ------ | ---- |
+| `enabled` | `boolean` | `false` | 是否启用快速模式 |
+| `descriptionMode` | `string` | `"commit-classified"` | 功能描述策略：`off` / `commit-classified` |
+| `when.op` | `string` | `"and"` | 条件组合方式：`and` / `or` |
+| `when.rules` | `object[]` | — | 触发条件规则，支持 `lt/lte/gt/gte/eq` |
+
+`when.rules[].field` 支持 `added`、`modified`、`deleted`、`total`、`round`（当前轮次，从 1 开始）。
 
 ### `references` 支持的格式
 

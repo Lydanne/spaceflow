@@ -19,6 +19,7 @@
   "options.generateDescription": "使用 AI 生成 PR 功能描述",
   "options.showAll": "显示所有发现的问题，不过滤非变更行的问题",
   "options.flush": "仅刷新状态（同步 reactions、resolved conversations、replies），不执行 LLM 审查",
+  "options.fast": "启用快速模式：首轮只跑静态规则，后续轮次仅执行 flush",
   "options.eventAction": "PR 事件类型（opened, synchronize, closed 等），closed 时仅收集统计不进行 AI 审查",
   "options.local": "审查本地未提交的代码。模式: 'uncommitted'（默认，暂存区+工作区）或 'staged'（仅暂存区）",
   "options.noLocal": "禁用本地模式，使用分支比较",

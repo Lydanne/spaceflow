@@ -13,6 +13,42 @@ const severitySchema = z.enum(["off", "warn", "error"]);
 
 /** 变更文件处理策略 schema */
 const invalidateChangedFilesSchema = z.enum(["invalidate", "keep", "off"]);
+/** 快速模式描述策略 schema */
+const fastDescriptionModeSchema = z.enum(["off", "commit-classified"]);
+/** 快速模式阈值字段 schema */
+const fastMetricFieldSchema = z.enum(["added", "modified", "deleted", "total", "round"]);
+/** 快速模式条件逻辑 schema */
+const fastConditionOpSchema = z.enum(["and", "or"]);
+/** 快速模式单条条件规则 schema */
+const fastConditionRuleSchema = z
+  .object({
+    field: fastMetricFieldSchema,
+    lt: z.number().optional(),
+    lte: z.number().optional(),
+    gt: z.number().optional(),
+    gte: z.number().optional(),
+    eq: z.number().optional(),
+  })
+  .refine(
+    (rule) =>
+      rule.lt !== undefined ||
+      rule.lte !== undefined ||
+      rule.gt !== undefined ||
+      rule.gte !== undefined ||
+      rule.eq !== undefined,
+    { message: "快速模式条件规则至少需要一个比较操作符" },
+  );
+/** 快速模式条件 schema */
+const fastConditionSchema = z.object({
+  op: fastConditionOpSchema.default("and").optional(),
+  rules: z.array(fastConditionRuleSchema).min(1),
+});
+/** 快速模式 schema */
+const fastModeSchema = z.object({
+  enabled: z.boolean().default(false).optional(),
+  when: fastConditionSchema.optional(),
+  descriptionMode: fastDescriptionModeSchema.default("commit-classified").optional(),
+});
 
 /**
  * 删除代码分析模式
@@ -43,6 +79,44 @@ export interface SystemRules {
  * - 'off': 关闭此功能
  */
 export type InvalidateChangedFilesMode = z.infer<typeof invalidateChangedFilesSchema>;
+/** 快速模式描述策略 */
+export type FastDescriptionMode = z.infer<typeof fastDescriptionModeSchema>;
+/** 快速模式阈值字段 */
+export type FastMetricField = z.infer<typeof fastMetricFieldSchema>;
+
+/** 快速模式单条条件规则 */
+export interface FastConditionRule {
+  /** 指标字段（added/modified/deleted/total/round） */
+  field: FastMetricField;
+  /** 小于 */
+  lt?: number;
+  /** 小于等于 */
+  lte?: number;
+  /** 大于 */
+  gt?: number;
+  /** 大于等于 */
+  gte?: number;
+  /** 等于 */
+  eq?: number;
+}
+
+/** 快速模式条件 */
+export interface FastCondition {
+  /** 规则之间组合关系，默认 and */
+  op?: "and" | "or";
+  /** 条件规则列表 */
+  rules: FastConditionRule[];
+}
+
+/** 快速模式配置 */
+export interface FastModeConfig {
+  /** 是否启用快速模式（仅作为开关，不代表一定触发） */
+  enabled?: boolean;
+  /** 自动触发条件，不配置时表示 enabled=true 即总是进入快速模式 */
+  when?: FastCondition;
+  /** 快速模式下功能描述策略 */
+  descriptionMode?: FastDescriptionMode;
+}
 
 /**
  * Review 命令选项
@@ -118,6 +192,8 @@ export interface ReviewOptions {
   failOnIssues?: "off" | "warn" | "error" | "warn+error";
   /** 系统规则配置，不依赖 LLM，直接在检查阶段生成系统问题 */
   systemRules?: SystemRules;
+  /** 快速模式（命令行强制开启） */
+  fast?: boolean;
 }
 
 /** review 命令配置 schema（LLM 敏感配置由系统 llm.config.ts 管理） */
@@ -143,6 +219,7 @@ export const reviewSchema = () =>
     duplicateWorkflowResolved: z.enum(["off", "skip", "delete"]).default("delete").optional(),
     autoApprove: z.boolean().default(false).optional(),
     failOnIssues: z.enum(["off", "warn", "error", "warn+error"]).default("off").optional(),
+    fastMode: fastModeSchema.optional(),
     systemRules: z
       .object({
         maxLinesPerFile: z

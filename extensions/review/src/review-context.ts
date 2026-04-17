@@ -9,7 +9,7 @@ import {
   GitSdkService,
 } from "@spaceflow/core";
 import type { IConfigReader, LocalReviewMode } from "@spaceflow/core";
-import { type AnalyzeDeletionsMode, type ReviewConfig } from "./review.config";
+import { type AnalyzeDeletionsMode, type ReviewConfig, type FastModeConfig } from "./review.config";
 import { ReviewOptions } from "./review.config";
 import { parseTitleOptions } from "./parse-title-options";
 import { type ReviewIssue, type UserInfo } from "./review-spec";
@@ -55,6 +55,8 @@ export interface ReviewContext extends ReviewOptions {
    * - false: 禁用本地模式
    */
   localMode?: LocalReviewMode;
+  /** 快速模式配置（来自 review.fastMode） */
+  fastMode?: FastModeConfig;
 }
 
 export class ReviewContextBuilder {
@@ -230,6 +232,8 @@ export class ReviewContextBuilder {
         options.duplicateWorkflowResolved ?? reviewConf.duplicateWorkflowResolved ?? "delete",
       autoApprove: options.autoApprove ?? reviewConf.autoApprove ?? false,
       systemRules: options.systemRules ?? reviewConf.systemRules,
+      fast: options.fast ?? titleOptions.fast,
+      fastMode: reviewConf.fastMode,
     };
   }
 

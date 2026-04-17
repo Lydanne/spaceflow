@@ -56,6 +56,7 @@ export const extension = defineExtension({
         { flags: "--generate-description", description: t("review:options.generateDescription") },
         { flags: "--show-all", description: t("review:options.showAll") },
         { flags: "--flush", description: t("review:options.flush") },
+        { flags: "--fast", description: t("review:options.fast") },
         { flags: "--event-action <action>", description: t("review:options.eventAction") },
         { flags: "--local [mode]", description: t("review:options.local") },
         { flags: "--no-local", description: t("review:options.noLocal") },
@@ -63,19 +64,17 @@ export const extension = defineExtension({
       ],
       run: async (_args, options, ctx) => {
         const isFlush = !!options?.flush;
+        const isFast = !!options?.fast;
+        const hasLlmProxy = ctx.hasService("llmProxy");
         if (!ctx.hasService("gitProvider")) {
           ctx.output.error(
             "review 命令需要配置 Git Provider，请在 spaceflow.json 中配置 gitProvider 字段",
           );
           process.exit(1);
         }
-        if (!isFlush && !ctx.hasService("llmProxy")) {
-          ctx.output.error("review 命令需要配置 LLM 服务，请在 spaceflow.json 中配置 llm 字段");
-          process.exit(1);
-        }
 
         const gitProvider = ctx.getService<GitProviderService>("gitProvider");
-        const llmProxy = ctx.hasService("llmProxy")
+        const llmProxy = hasLlmProxy
           ? ctx.getService<LlmProxyService>("llmProxy")
           : (undefined as unknown as LlmProxyService);
         const gitSdk = ctx.hasService("gitSdk")
@@ -118,6 +117,7 @@ export const extension = defineExtension({
           generateDescription: options?.generateDescription ? true : undefined,
           showAll: !!options?.showAll,
           flush: isFlush,
+          fast: options?.fast ? true : undefined,
           eventAction: options?.eventAction as string,
           local: parseLocalOption(options?.local),
           failOnIssues: parseFailOnIssues(options?.failOnIssues),
@@ -141,6 +141,19 @@ export const extension = defineExtension({
 
         try {
           const context = await reviewService.getContextFromEnv(reviewOptions);
+          if (!hasLlmProxy) {
+            const canPossiblyRunWithoutLlm =
+              context.fast || context.flush || context.eventAction === "closed" || !!context.fastMode?.enabled;
+            const definitelyNeedsLlm =
+              !!context.deletionOnly ||
+              !!context.analyzeDeletions ||
+              ((context.flush || context.eventAction === "closed") && !!context.verifyFixes);
+
+            if (definitelyNeedsLlm || !canPossiblyRunWithoutLlm) {
+              ctx.output.error("review 命令需要配置 LLM 服务，请在 spaceflow.json 中配置 llm 字段");
+              process.exit(1);
+            }
+          }
           const result = await reviewService.execute(context);
           const effectiveFailOnIssues: "off" | "warn" | "error" | "warn+error" =
             reviewOptions.failOnIssues ??

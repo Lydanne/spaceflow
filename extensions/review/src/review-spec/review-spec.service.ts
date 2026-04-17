@@ -12,9 +12,18 @@ import { readdir, readFile, mkdir, access, writeFile, unlink } from "fs/promises
 import { join, basename } from "path";
 import { homedir } from "os";
 import { execSync, execFileSync } from "child_process";
-import { ReviewSpec, ReviewRule, RuleExample, RuleContent, Severity } from "./types";
+import { ReviewSpec, ReviewRule, RuleExample, Severity } from "./types";
 import { matchIncludes } from "../review-includes-filter";
 import { buildSpecsSection as buildSpecsSectionPrompt } from "../prompt/specs-section";
+import {
+  deduplicateSpecs,
+  extractConfigValues,
+  extractExamples,
+  extractIncludes,
+  extractOverrides,
+  extractRules,
+  extractSeverity,
+} from "./review-spec-parser";
 
 export class ReviewSpecService {
   constructor(protected readonly gitProvider?: GitProviderService) {}
@@ -581,56 +590,12 @@ export class ReviewSpecService {
   }
 
   protected extractRules(content: string): ReviewRule[] {
-    const rules: ReviewRule[] = [];
-    const ruleRegex = /^(#{1,3})\s+(.+?)\s+`\[([^\]]+)\]`/gm;
-
-    const matches: { index: number; length: number; title: string; id: string }[] = [];
-    let match;
-    while ((match = ruleRegex.exec(content)) !== null) {
-      matches.push({
-        index: match.index,
-        length: match[0].length,
-        title: match[2].trim(),
-        id: match[3],
-      });
-    }
-
-    for (let i = 0; i < matches.length; i++) {
-      const current = matches[i];
-      const startIndex = current.index + current.length;
-      const endIndex = i + 1 < matches.length ? matches[i + 1].index : content.length;
-
-      const ruleContent = content.slice(startIndex, endIndex).trim();
-      const examples = this.extractExamples(ruleContent);
-      const overrides = this.extractOverrides(ruleContent);
-
-      // 提取描述：在第一个例子之前的文本
-      let description = ruleContent;
-      const firstExampleIndex = ruleContent.search(
-        /(?:^|\n)(?:####\s+(?:good|bad)|###\s+Example:)/i,
-      );
-      if (firstExampleIndex !== -1) {
-        description = ruleContent.slice(0, firstExampleIndex).trim();
-      } else {
-        // 如果没有例子，则整个 ruleContent 都是描述
-        description = ruleContent;
-      }
-
-      const severity = this.extractSeverity(ruleContent);
-      const includes = this.extractConfigValues(ruleContent, "includes");
-
-      rules.push({
-        id: current.id,
-        title: current.title,
-        description,
-        examples,
-        overrides,
-        severity,
-        includes: includes.length > 0 ? includes : undefined,
-      });
-    }
-
-    return rules;
+    return extractRules(content, {
+      extractExamplesFromContent: this.extractExamples.bind(this),
+      extractOverridesFromContent: this.extractOverrides.bind(this),
+      extractSeverityFromContent: this.extractSeverity.bind(this),
+      extractConfigValuesFromContent: this.extractConfigValues.bind(this),
+    });
   }
 
   /**
@@ -639,120 +604,23 @@ export class ReviewSpecService {
    * 同名配置项后面的覆盖前面的
    */
   protected extractConfigValues(content: string, configName: string): string[] {
-    const configRegex = new RegExp(`^>\\s*-\\s*${configName}\\s+(.+)$`, "gm");
-    let values: string[] = [];
-    let match;
-
-    while ((match = configRegex.exec(content)) !== null) {
-      const valuesStr = match[1];
-      const valueRegex = /`([^`]+)`/g;
-      let valueMatch;
-      const lineValues: string[] = [];
-      while ((valueMatch = valueRegex.exec(valuesStr)) !== null) {
-        lineValues.push(valueMatch[1]);
-      }
-      // 同名配置项覆盖
-      values = lineValues;
-    }
-
-    return values;
+    return extractConfigValues(content, configName);
   }
 
   protected extractOverrides(content: string): string[] {
-    // override 的值格式是 `[RuleId]`，需要去掉方括号
-    return this.extractConfigValues(content, "override").map((v) =>
-      v.startsWith("[") && v.endsWith("]") ? v.slice(1, -1) : v,
-    );
+    return extractOverrides(content);
   }
 
   protected extractSeverity(content: string): Severity | undefined {
-    const values = this.extractConfigValues(content, "severity");
-    if (values.length > 0) {
-      const value = values[values.length - 1];
-      if (value === "off" || value === "warn" || value === "error") {
-        return value;
-      }
-    }
-    return undefined;
+    return extractSeverity(content);
   }
 
   protected extractIncludes(content: string): string[] {
-    // 只提取文件开头（第一个 ## 规则标题之前）的 includes 配置
-    // 避免规则级的 includes 覆盖文件级的 includes
-    const firstRuleIndex = content.indexOf("\n## ");
-    const headerContent = firstRuleIndex > 0 ? content.slice(0, firstRuleIndex) : content;
-    return this.extractConfigValues(headerContent, "includes");
+    return extractIncludes(content);
   }
 
   protected extractExamples(content: string): RuleExample[] {
-    const examples: RuleExample[] = [];
-
-    // 按 ### Example: 分组
-    const groupSections = content.split(/(?:^|\n)(?=###\s+Example:)/);
-
-    for (const groupSection of groupSections) {
-      const trimmedGroup = groupSection.trim();
-      if (!trimmedGroup) continue;
-
-      // 提取分组标题和描述，如 "### Example: 函数行数"
-      let exampleTitle = "";
-      let exampleDescription = "";
-      const groupMatch = trimmedGroup.match(/^###\s+Example\s*[:：]\s*(.+)/i);
-      if (groupMatch) {
-        exampleTitle = groupMatch[1].trim();
-        // 提取标题行和第一个 #### 之间的文本作为 description
-        const afterTitle = trimmedGroup.slice(trimmedGroup.indexOf("\n")).trim();
-        const firstSubIdx = afterTitle.search(/(?:^|\n)####\s+/);
-        if (firstSubIdx > 0) {
-          exampleDescription = afterTitle.slice(0, firstSubIdx).trim();
-        }
-      }
-
-      // 在分组内按 #### 提取 Good/Bad
-      const ruleContents: RuleContent[] = [];
-      const sections = trimmedGroup.split(/(?:^|\n)####\s+/);
-
-      for (const section of sections) {
-        const trimmedSection = section.trim();
-        if (!trimmedSection) continue;
-
-        let type: "good" | "bad" | null = null;
-        let contentTitle = "";
-        if (/^good:/i.test(trimmedSection)) {
-          type = "good";
-          contentTitle = trimmedSection.match(/^good:\s*(.+)/i)?.[1]?.trim() ?? "";
-        } else if (/^bad:/i.test(trimmedSection)) {
-          type = "bad";
-          contentTitle = trimmedSection.match(/^bad:\s*(.+)/i)?.[1]?.trim() ?? "";
-        }
-
-        if (!type) continue;
-
-        // 提取代码块作为 description
-        const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
-        let codeMatch;
-        const codeParts: string[] = [];
-        while ((codeMatch = codeBlockRegex.exec(trimmedSection)) !== null) {
-          codeParts.push(codeMatch[2].trim());
-        }
-
-        ruleContents.push({
-          title: contentTitle,
-          type,
-          description: codeParts.join("\n\n"),
-        });
-      }
-
-      if (ruleContents.length > 0) {
-        examples.push({
-          title: exampleTitle,
-          description: exampleDescription,
-          content: ruleContents,
-        });
-      }
-    }
-
-    return examples;
+    return extractExamples(content);
   }
 
   /**
@@ -1090,52 +958,7 @@ export class ReviewSpecService {
    * @returns 去重后的 specs 数组
    */
   deduplicateSpecs(specs: ReviewSpec[]): ReviewSpec[] {
-    // 记录 ruleId -> { specIndex, ruleIndex } 的映射，用于检测重复
-    const ruleIdMap = new Map<string, { specIndex: number; ruleIndex: number }>();
-    // 记录需要从每个 spec 中移除的 rule 索引
-    const rulesToRemove = new Map<number, Set<number>>();
-
-    for (let specIndex = 0; specIndex < specs.length; specIndex++) {
-      const spec = specs[specIndex];
-      for (let ruleIndex = 0; ruleIndex < spec.rules.length; ruleIndex++) {
-        const rule = spec.rules[ruleIndex];
-        const existing = ruleIdMap.get(rule.id);
-
-        if (existing) {
-          // 标记先前的规则为待移除（后加载的覆盖先加载的）
-          if (!rulesToRemove.has(existing.specIndex)) {
-            rulesToRemove.set(existing.specIndex, new Set());
-          }
-          rulesToRemove.get(existing.specIndex)!.add(existing.ruleIndex);
-        }
-
-        // 更新映射为当前规则
-        ruleIdMap.set(rule.id, { specIndex, ruleIndex });
-      }
-    }
-
-    // 如果没有重复，直接返回原数组
-    if (rulesToRemove.size === 0) {
-      return specs;
-    }
-
-    // 构建去重后的 specs
-    const result: ReviewSpec[] = [];
-    for (let specIndex = 0; specIndex < specs.length; specIndex++) {
-      const spec = specs[specIndex];
-      const removeSet = rulesToRemove.get(specIndex);
-
-      if (!removeSet || removeSet.size === 0) {
-        result.push(spec);
-      } else {
-        const filteredRules = spec.rules.filter((_, ruleIndex) => !removeSet.has(ruleIndex));
-        if (filteredRules.length > 0) {
-          result.push({ ...spec, rules: filteredRules });
-        }
-      }
-    }
-
-    return result;
+    return deduplicateSpecs(specs);
   }
 
   /**

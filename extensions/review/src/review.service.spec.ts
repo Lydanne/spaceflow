@@ -5,6 +5,7 @@ import type { ReviewOptions } from "./review.config";
 import { PullRequestModel } from "./pull-request-model";
 import { ReviewResultModel } from "./review-result-model";
 import type { ReviewResult, ReviewIssue, FileSummary } from "./review-spec/types";
+import { ChangedFileCollection } from "./changed-file-collection";
 
 function mockResult(overrides: Partial<ReviewResult> = {}): ReviewResult {
   return { success: true, description: "", issues: [], summary: [], round: 1, ...overrides };
@@ -720,6 +721,150 @@ describe("ReviewService", () => {
     });
   });
 
+  describe("ReviewService.execute - fast mode", () => {
+    it("should run static-only flow on round 1 when fast mode is enabled", async () => {
+      const llmSpy = vi.spyOn(service._llmProcessor, "runLLMReview");
+      const resolveSourceDataSpy = vi.spyOn(service as any, "resolveSourceData");
+      const buildFinalModelSpy = vi.spyOn(service as any, "buildFinalModel");
+      const saveAndOutputSpy = vi.spyOn(service as any, "saveAndOutput");
+
+      resolveSourceDataSpy.mockResolvedValue({
+        prModel: undefined,
+        commits: [
+          {
+            sha: "c1",
+            commit: {
+              message: "feat: add login api",
+              author: { date: "2026-04-01T08:00:00.000Z" },
+            },
+          },
+        ],
+        changedFiles: ChangedFileCollection.from([
+          { filename: "src/a.ts", status: "modified", additions: 10, deletions: 2 },
+        ]),
+        headSha: "abc1234",
+        isLocalMode: false,
+        isDirectFileMode: false,
+        fileContents: new Map([
+          [
+            "src/a.ts",
+            [
+              ["abc1234", "line 1"],
+              ["abc1234", "line 2"],
+              ["abc1234", "line 3"],
+            ],
+          ],
+        ]),
+      } as any);
+      buildFinalModelSpy.mockResolvedValue(
+        {
+          result: mockResult({
+            round: 1,
+            title: "Feat add login api",
+            issues: [mockIssue({ file: "src/a.ts", ruleId: "system:max-lines-per-file" })],
+          }),
+        } as any,
+      );
+      saveAndOutputSpy.mockResolvedValue(undefined);
+
+      const result = await service.execute({
+        owner: "o",
+        repo: "r",
+        dryRun: true,
+        ci: false,
+        fast: true,
+        specSources: ["/spec/dir"],
+        systemRules: {
+          maxLinesPerFile: [2, "warn"],
+        },
+      } as ReviewContext);
+
+      expect(llmSpy).not.toHaveBeenCalled();
+      expect(buildFinalModelSpy).toHaveBeenCalledTimes(1);
+      const fastResult = buildFinalModelSpy.mock.calls[0][1] as ReviewResult;
+      expect(fastResult.title).toBe("Feat add login api");
+      expect(fastResult.issues).toHaveLength(1);
+      expect(fastResult.description).toContain("快速模式");
+      expect(saveAndOutputSpy).toHaveBeenCalledTimes(1);
+      expect(result.round).toBe(1);
+    });
+
+    it("should fallback to collect-only when fast mode enters round 2+", async () => {
+      const llmSpy = vi.spyOn(service._llmProcessor, "runLLMReview");
+      const resolveSourceDataSpy = vi.spyOn(service as any, "resolveSourceData");
+      const collectOnlySpy = vi.spyOn(service as any, "executeCollectOnly");
+
+      resolveSourceDataSpy.mockResolvedValue({
+        prModel: new PullRequestModel(gitProvider as any, "o", "r", 1),
+        commits: [],
+        changedFiles: ChangedFileCollection.from([]),
+        headSha: "abc1234",
+        isLocalMode: false,
+        isDirectFileMode: false,
+        fileContents: new Map(),
+      } as any);
+      vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue({ round: 1 } as any);
+      collectOnlySpy.mockResolvedValue(mockResult({ round: 1 }));
+
+      await service.execute({
+        owner: "o",
+        repo: "r",
+        prNumber: 1,
+        dryRun: true,
+        ci: true,
+        fast: true,
+        verifyFixes: true,
+        specSources: ["/spec/dir"],
+      } as ReviewContext);
+
+      expect(llmSpy).not.toHaveBeenCalled();
+      expect(collectOnlySpy).toHaveBeenCalledTimes(1);
+      const fastCollectContext = collectOnlySpy.mock.calls[0][0] as ReviewContext;
+      expect(fastCollectContext.flush).toBe(true);
+      expect(fastCollectContext.verifyFixes).toBe(false);
+    });
+
+    it("should enter fast mode when round condition matches and fallback to collect-only", async () => {
+      const llmSpy = vi.spyOn(service._llmProcessor, "runLLMReview");
+      const resolveSourceDataSpy = vi.spyOn(service as any, "resolveSourceData");
+      const collectOnlySpy = vi.spyOn(service as any, "executeCollectOnly");
+
+      resolveSourceDataSpy.mockResolvedValue({
+        prModel: new PullRequestModel(gitProvider as any, "o", "r", 1),
+        commits: [],
+        changedFiles: ChangedFileCollection.from([]),
+        headSha: "abc1234",
+        isLocalMode: false,
+        isDirectFileMode: false,
+        fileContents: new Map(),
+      } as any);
+      vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue({ round: 2 } as any);
+      collectOnlySpy.mockResolvedValue(mockResult({ round: 2 }));
+
+      await service.execute({
+        owner: "o",
+        repo: "r",
+        prNumber: 1,
+        dryRun: true,
+        ci: true,
+        verifyFixes: true,
+        specSources: ["/spec/dir"],
+        fastMode: {
+          enabled: true,
+          when: {
+            rules: [{ field: "round", gt: 2 }],
+          },
+        },
+      } as ReviewContext);
+
+      expect(llmSpy).not.toHaveBeenCalled();
+      expect(collectOnlySpy).toHaveBeenCalledTimes(1);
+      const fastCollectContext = collectOnlySpy.mock.calls[0][0] as ReviewContext;
+      expect(fastCollectContext.flush).toBe(true);
+      expect(fastCollectContext.verifyFixes).toBe(false);
+    });
+  });
+
   describe("ReviewService.executeDeletionOnly", () => {
     it("should throw when no llmMode", async () => {
       const context = { owner: "o", repo: "r", prNumber: 1, ci: false, dryRun: false };
@@ -913,6 +1058,14 @@ describe("ReviewService", () => {
       const options = { dryRun: false, ci: true, prNumber: 1 };
       const context = await service.getContextFromEnv(options as any);
       expect(context.dryRun).toBe(true);
+    });
+
+    it("should parse fast option from PR title in CI mode", async () => {
+      configService.get.mockReturnValue({ repository: "owner/repo", refName: "main" });
+      gitProvider.getPullRequest.mockResolvedValue({ title: "feat: test [/review --fast]" } as any);
+      const options = { dryRun: false, ci: true, prNumber: 1 };
+      const context = await service.getContextFromEnv(options as any);
+      expect(context.fast).toBe(true);
     });
   });
 

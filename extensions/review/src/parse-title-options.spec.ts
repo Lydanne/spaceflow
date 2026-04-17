@@ -110,6 +110,15 @@ describe("parseTitleOptions", () => {
     });
   });
 
+  describe("fast 参数", () => {
+    it("应该解析 --fast", () => {
+      const title = "feat: 快速审查 [/ai-review --fast]";
+      const options = parseTitleOptions(title);
+
+      expect(options.fast).toBe(true);
+    });
+  });
+
   describe("includes 参数", () => {
     it("应该解析 -i 短参数", () => {
       const title = "fix: bug [/ai-review -i *.ts]";

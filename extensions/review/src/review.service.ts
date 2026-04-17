@@ -27,6 +27,8 @@ import { ReviewLlmProcessor } from "./review-llm";
 import { PullRequestModel } from "./pull-request-model";
 import { ReviewResultModel, type ReviewResultModelDeps } from "./review-result-model";
 import { ReviewSourceResolver, type SourceData } from "./review-source-resolver";
+import { applyStaticRules } from "./system-rules";
+import { ReviewFastModeService } from "./review-fast-mode.service";
 
 export type { ReviewContext } from "./review-context";
 export type { FileReviewPrompt, ReviewPrompt, LLMReviewOptions } from "./review-llm";
@@ -38,6 +40,7 @@ export class ReviewService {
   protected readonly llmProcessor: ReviewLlmProcessor;
   protected readonly resultModelDeps: ReviewResultModelDeps;
   protected readonly sourceResolver: ReviewSourceResolver;
+  protected readonly fastModeService: ReviewFastModeService;
 
   constructor(
     protected readonly gitProvider: GitProviderService,
@@ -59,12 +62,23 @@ export class ReviewService {
     );
     this.llmProcessor = new ReviewLlmProcessor(llmProxyService, reviewSpecService);
     this.sourceResolver = new ReviewSourceResolver(gitProvider, gitSdk, this.issueFilter);
+    this.fastModeService = new ReviewFastModeService();
     this.resultModelDeps = {
       gitProvider,
       config,
       reviewSpecService,
       reviewReportService,
     };
+  }
+
+  protected ensureLlmProxyAvailable(scene: string): void {
+    const llmProxy = this.llmProxyService as unknown as {
+      chat?: unknown;
+      chatStream?: unknown;
+    };
+    if (typeof llmProxy?.chat !== "function" || typeof llmProxy?.chatStream !== "function") {
+      throw new Error(`当前流程需要 LLM 服务（${scene}），请在 spaceflow.json 中配置 llm`);
+    }
   }
 
   async getContextFromEnv(options: ReviewOptions): Promise<ReviewContext> {
@@ -102,6 +116,45 @@ export class ReviewService {
     const source = await this.resolveSourceData(context);
     if (source.earlyReturn) return source.earlyReturn;
 
+    // 获取上一次的审查结果（用于轮次推进、快速模式判断）
+    const existingResultModel =
+      context.ci && source.prModel
+        ? await ReviewResultModel.loadFromPr(source.prModel, this.resultModelDeps)
+        : null;
+    if (existingResultModel && shouldLog(verbose, 1)) {
+      console.log(`📋 获取到上一次审查结果，包含 ${existingResultModel.issues.length} 个问题`);
+    }
+    const currentRound = (existingResultModel?.round ?? 0) + 1;
+    if (shouldLog(verbose, 1)) {
+      console.log(`🔄 当前审查轮次: ${currentRound}`);
+    }
+
+    // 快速模式：首轮仅静态检查，后续轮次仅 flush
+    const fastDecision = this.fastModeService.resolveDecision(
+      context,
+      source.changedFiles,
+      currentRound,
+    );
+    if (fastDecision.enabled) {
+      if (shouldLog(verbose, 1)) {
+        const reason = fastDecision.reason ? ` (${fastDecision.reason})` : "";
+        console.log(`⚡ 已启用快速模式${reason}`);
+      }
+
+      if (currentRound > 1) {
+        if (shouldLog(verbose, 1)) {
+          console.log(`⏭️  快速模式第 ${currentRound} 轮：仅执行 flush，同步状态后退出`);
+        }
+        return this.executeCollectOnly({
+          ...context,
+          flush: true,
+          verifyFixes: false,
+        });
+      }
+
+      return this.executeFastFirstRound(context, source, existingResultModel, fastDecision);
+    }
+
     const effectiveWhenModifiedCode = source.isDirectFileMode
       ? undefined
       : context.whenModifiedCode;
@@ -130,21 +183,6 @@ export class ReviewService {
     // 3. LLM 审查
     const { fileContents } = source;
     if (!llmMode) throw new Error("必须指定 LLM 类型");
-
-    // 获取上一次的审查结果（用于提示词优化和轮次推进）
-    let existingResultModel: ReviewResultModel | null = null;
-    if (context.ci && source.prModel) {
-      existingResultModel = await ReviewResultModel.loadFromPr(
-        source.prModel,
-        this.resultModelDeps,
-      );
-      if (existingResultModel && shouldLog(verbose, 1)) {
-        console.log(`📋 获取到上一次审查结果，包含 ${existingResultModel.issues.length} 个问题`);
-      }
-    }
-    if (shouldLog(verbose, 1)) {
-      console.log(`🔄 当前审查轮次: ${(existingResultModel?.round ?? 0) + 1}`);
-    }
 
     const reviewPrompt = await this.llmProcessor.buildReviewPrompt(
       specs,
@@ -205,6 +243,7 @@ export class ReviewService {
   ): Promise<ReviewResult> {
     const { verbose } = context;
     const { specs, fileContents, changedFiles, commits, isDirectFileMode } = source;
+    this.ensureLlmProxyAvailable("LLM 审查");
 
     const result = await this.llmProcessor.runLLMReview(llmMode, reviewPrompt, {
       verbose,
@@ -260,6 +299,69 @@ export class ReviewService {
    */
   protected async resolveSourceData(context: ReviewContext): Promise<SourceData> {
     return this.sourceResolver.resolve(context);
+  }
+
+  /**
+   * 快速模式首轮：仅执行静态规则，不调用 LLM。
+   */
+  protected async executeFastFirstRound(
+    context: ReviewContext,
+    source: SourceData,
+    existingResultModel: ReviewResultModel | null,
+    decision: ReturnType<ReviewFastModeService["resolveDecision"]>,
+  ): Promise<ReviewResult> {
+    const { staticIssues } = applyStaticRules(
+      source.changedFiles.toArray(),
+      source.fileContents,
+      context.systemRules,
+      1,
+      context.verbose,
+    );
+
+    const title = this.fastModeService.buildTitle(source.commits);
+    const description = this.fastModeService.buildDescription(
+      source.commits,
+      source.changedFiles,
+      decision.descriptionMode,
+    );
+    const summary: FileSummary[] = source.changedFiles.nonDeletedFiles().map((file) => {
+      const filename = file.filename ?? "";
+      const unresolved = staticIssues.filter((issue) => issue.file === filename).length;
+      return {
+        file: filename,
+        resolved: 0,
+        unresolved,
+        summary: unresolved > 0 ? "命中静态规则" : "快速模式静态检查通过",
+      };
+    });
+
+    if (shouldLog(context.verbose, 1)) {
+      console.log(`⚙️  快速模式首轮静态检查完成，发现 ${staticIssues.length} 个系统问题`);
+    }
+
+    const result: ReviewResult = {
+      success: true,
+      title,
+      description,
+      issues: staticIssues,
+      summary,
+      round: 1,
+    };
+
+    const finalModel = await this.buildFinalModel(
+      context,
+      result,
+      {
+        prModel: source.prModel,
+        commits: source.commits,
+        headSha: source.headSha,
+        specs: [],
+        fileContents: source.fileContents,
+      },
+      existingResultModel,
+    );
+    await this.saveAndOutput(context, finalModel, source.commits);
+    return finalModel.result;
   }
 
   /**
@@ -370,6 +472,7 @@ export class ReviewService {
 
       // 验证历史问题是否已修复
       if (context.verifyFixes) {
+        this.ensureLlmProxyAvailable("历史问题修复验证");
         existingResultModel.issues = await this.issueFilter.verifyAndUpdateIssues(
           context,
           existingResultModel.issues,
@@ -430,6 +533,7 @@ export class ReviewService {
 
     // 删除代码影响分析（在 save 之前完成，避免多次 save 产生重复的 Round 评论）
     if (context.analyzeDeletions && llmMode) {
+      this.ensureLlmProxyAvailable("删除代码影响分析");
       const deletionImpact = await this.deletionImpactService.analyzeDeletionImpact(
         {
           owner,
@@ -524,6 +628,7 @@ export class ReviewService {
     // 5. LLM 验证历史问题是否已修复
     if (context.verifyFixes && context.specSources?.length) {
       try {
+        this.ensureLlmProxyAvailable("flush/closed 模式的历史问题修复验证");
         const changedFiles = await prModel.getFiles();
         const headSha = await prModel.getHeadSha();
         const verifySpecs = await this.issueFilter.loadSpecs(context.specSources, verbose);
@@ -585,6 +690,7 @@ export class ReviewService {
     if (!llmMode) {
       throw new Error("必须指定 LLM 类型");
     }
+    this.ensureLlmProxyAvailable("删除代码分析模式");
 
     const deletionImpact = await this.deletionImpactService.analyzeDeletionImpact(
       {

@@ -19,6 +19,7 @@
   "options.generateDescription": "Generate PR description using AI",
   "options.showAll": "Show all issues found, including those on unchanged lines",
   "options.flush": "Only sync status (reactions, resolved conversations, replies), skip LLM review",
+  "options.fast": "Enable fast mode: static checks only for round 1, flush only for later rounds",
   "options.eventAction": "PR event type (opened, synchronize, closed, etc.), closed only collects stats without AI review",
   "options.local": "Review local uncommitted code. Mode: 'uncommitted' (default, staged + working) or 'staged' (only staged)",
   "options.noLocal": "Disable local mode, use branch comparison instead",

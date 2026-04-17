@@ -14,6 +14,7 @@ export interface TitleOptions {
   analyzeDeletions?: AnalyzeDeletionsMode;
   deletionOnly?: boolean;
   deletionAnalysisMode?: LLMMode;
+  fast?: boolean;
 }
 
 /**
@@ -31,6 +32,7 @@ export interface TitleOptions {
  * - `--analyze-deletions`: 分析删除代码
  * - `--deletion-only`: 仅执行删除代码分析
  * - `--deletion-analysis-mode <mode>`: 删除分析模式
+ * - `--fast`: 启用快速模式
  *
  * @param title PR 标题
  * @returns 解析出的命令参数，如果没有找到命令则返回空对象
@@ -124,6 +126,10 @@ export function parseTitleOptions(title: string): TitleOptions {
         }
         break;
       }
+
+      case "--fast":
+        options.fast = true;
+        break;
     }
   }
 
