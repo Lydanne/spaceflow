@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.0.10](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.9...@spaceflow/review-summary@5.0.10) (2026-04-17)
+
+### 文档更新
+
+* **review:** 添加快速模式文档和实现 ([b24f88e](https://github.com/Lydanne/spaceflow/commit/b24f88e6bb6e29a58985cd343b4a2703b258cd63))
+
+### 其他修改
+
+* **review:** released version 5.2.5 [no ci] ([a56ecf7](https://github.com/Lydanne/spaceflow/commit/a56ecf79cbea2a6baf6e262676604f22fcb54bdc))
+
 ## [5.0.9](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.8...@spaceflow/review-summary@5.0.9) (2026-04-15)
 
 ### 修复BUG
