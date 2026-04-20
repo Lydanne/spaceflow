@@ -144,6 +144,19 @@
 
 `when.rules[].field` 支持 `added`、`modified`、`deleted`、`total`、`round`（当前轮次，从 1 开始）。
 
+### LLM 配置要求
+
+默认情况下，`review` 需要配置 LLM 服务；但以下场景可以在未配置 LLM 时运行：
+
+- 快速模式首轮（`--fast`、PR 标题 `[/review --fast]`，或 `review.fastMode` 命中并进入首轮）
+- `--flush` / PR `closed` 事件且 `verifyFixes=false`
+
+以下场景仍必须配置 LLM：
+
+- 常规审查
+- 修复验证（`verifyFixes=true`）
+- 删除代码分析（`analyzeDeletions` / `deletionOnly`）
+
 ### `references` 支持的格式
 
 | 格式        | 示例                                                 |
