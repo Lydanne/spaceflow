@@ -163,7 +163,7 @@ export class ReviewLlmProcessor {
               parts.push(`**已发现的问题** (${existingFileIssues.length} 个):\n`);
               for (const issue of existingFileIssues) {
                 const status = issue.fixed
-                  ? "✅ 已修复"
+                  ? "✅ 已验收"
                   : issue.valid === "false"
                     ? "❌ 无效"
                     : "⚠️ 待处理";
@@ -423,7 +423,10 @@ export class ReviewLlmProcessor {
         return baseIssue;
       }
 
-      const lines = lineStr.split(",").map((linePart) => linePart.trim()).filter(Boolean);
+      const lines = lineStr
+        .split(",")
+        .map((linePart) => linePart.trim())
+        .filter(Boolean);
       if (lines.length === 0) {
         return [];
       }

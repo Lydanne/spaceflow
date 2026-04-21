@@ -28,7 +28,7 @@ export class TerminalFormatter implements ReviewReportFormatter {
       return "没有需要审查的文件";
     }
 
-    // 🟢 已修复 | 🔴 待处理error | 🟡 待处理warn | ⚪ 已解决(非代码修复)
+    // 🟢 已验收 | 🔴 待处理error | 🟡 待处理warn | ⚪ 已解决(非代码修复)
     const issuesByFile = new Map<
       string,
       {
@@ -86,7 +86,7 @@ export class TerminalFormatter implements ReviewReportFormatter {
       totalResolved += stats.resolved;
 
       const totalText = stats.total > 0 ? `${BOLD}${stats.total} 问题${RESET}` : "";
-      const fixedText = stats.fixed > 0 ? `${GREEN}🟢 ${stats.fixed} 已修复${RESET}` : "";
+      const fixedText = stats.fixed > 0 ? `${GREEN}🟢 ${stats.fixed} 已验收${RESET}` : "";
       const errorText = stats.errorCount > 0 ? `${RED}🔴 ${stats.errorCount} error${RESET}` : "";
       const warnText = stats.warnCount > 0 ? `${YELLOW}🟡 ${stats.warnCount} warn${RESET}` : "";
       const resolvedText = stats.resolved > 0 ? `⚪ ${stats.resolved} 已解决` : "";
@@ -105,7 +105,7 @@ export class TerminalFormatter implements ReviewReportFormatter {
     if (summaries.length > 1) {
       lines.push("");
       const summaryParts = [`${BOLD}总计: ${totalAll} 问题${RESET}`];
-      if (totalFixed > 0) summaryParts.push(`${GREEN}🟢 ${totalFixed} 已修复${RESET}`);
+      if (totalFixed > 0) summaryParts.push(`${GREEN}🟢 ${totalFixed} 已验收${RESET}`);
       if (totalPendingErrors > 0) summaryParts.push(`${RED}🔴 ${totalPendingErrors} error${RESET}`);
       if (totalPendingWarns > 0) summaryParts.push(`${YELLOW}🟡 ${totalPendingWarns} warn${RESET}`);
       if (totalResolved > 0) summaryParts.push(`⚪ ${totalResolved} 已解决`);
@@ -179,7 +179,7 @@ export class TerminalFormatter implements ReviewReportFormatter {
     const title = prNumber ? `PR #${prNumber} Review 状态统计` : "Review 状态统计";
     const lines = [`\n${BOLD}${CYAN}📊 ${title}:${RESET}`];
     lines.push(`   总问题数: ${stats.total}`);
-    lines.push(`   ${GREEN}🟢 已修复: ${stats.fixed}${RESET}`);
+    lines.push(`   ${GREEN}🟢 已验收: ${stats.fixed}${RESET}`);
     lines.push(`   ⚪ 已解决: ${stats.resolved}`);
     lines.push(`   ${RED}❌ 无效: ${stats.invalid}${RESET}`);
     lines.push(`   ${YELLOW}⚠️  待处理: ${stats.pending}${RESET}`);

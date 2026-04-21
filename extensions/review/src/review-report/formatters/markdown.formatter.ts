@@ -130,7 +130,7 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
       return "没有需要审查的文件";
     }
 
-    // 🟢 已修复 | 🔴 error数量 | 🟡 warn数量 | ⚪ 已解决(非代码修复)
+    // 🟢 已验收 | 🔴 error数量 | 🟡 warn数量 | ⚪ 已解决(非代码修复)
     const issuesByFile = new Map<
       string,
       {

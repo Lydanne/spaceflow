@@ -193,7 +193,7 @@ export class IssueVerifyService {
 
         if (result.fixed) {
           if (shouldLog(verbose, 1)) {
-            console.log(`      ✅ 已修复: ${result.reason}`);
+            console.log(`      ✅ 已验收: ${result.reason}`);
           }
           updatedIssue.fixed = new Date().toISOString();
           updatedIssue.resolved = new Date().toISOString();

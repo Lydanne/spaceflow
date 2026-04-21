@@ -19,7 +19,7 @@ export function buildAutoApproveBody(stats: ReviewStats, prAuthorLogin?: string)
   const mention = prAuthorLogin ? ` @${prAuthorLogin}` : "";
   const reason =
     stats.validTotal > 0
-      ? `所有问题都已解决 (${stats.fixed} 已修复, ${stats.resolved} 已解决)，`
+      ? `所有问题都已解决 (${stats.fixed} 已验收, ${stats.resolved} 已解决)，`
       : "代码审查通过，未发现问题，";
   return `✅ **自动批准合并**\n\n${reason}自动批准此 PR。${mention}`;
 }
@@ -30,7 +30,8 @@ export async function deleteOldReviews(pr: PrReviewIo): Promise<number> {
   try {
     const reviews = await pr.getReviews();
     const aiReviews = reviews.filter(
-      (r) => r.body?.includes(REVIEW_LINE_COMMENTS_MARKER) || r.body?.includes(REVIEW_COMMENT_MARKER),
+      (r) =>
+        r.body?.includes(REVIEW_LINE_COMMENTS_MARKER) || r.body?.includes(REVIEW_COMMENT_MARKER),
     );
     for (const review of aiReviews) {
       if (review.id) {
@@ -143,13 +144,19 @@ export function buildLineReviewBody(
   if (round > 1) {
     const prevIssues = allIssues.filter((i) => i.round === round - 1);
     if (prevIssues.length > 0) {
-      const { fixed: prevFixed, resolved: prevResolved, invalid: prevInvalid, pending: prevPending } =
-        calculateIssueStats(prevIssues);
+      const {
+        fixed: prevFixed,
+        resolved: prevResolved,
+        invalid: prevInvalid,
+        pending: prevPending,
+      } = calculateIssueStats(prevIssues);
       parts.push("");
-      parts.push(`<details><summary>📊 Round ${round - 1} 回顾 (${prevIssues.length} 个问题)</summary>\n`);
+      parts.push(
+        `<details><summary>📊 Round ${round - 1} 回顾 (${prevIssues.length} 个问题)</summary>\n`,
+      );
       parts.push(`| 状态 | 数量 |`);
       parts.push(`|------|------|`);
-      if (prevFixed > 0) parts.push(`| 🟢 已修复 | ${prevFixed} |`);
+      if (prevFixed > 0) parts.push(`| 🟢 已验收 | ${prevFixed} |`);
       if (prevResolved > 0) parts.push(`| ⚪ 已解决 | ${prevResolved} |`);
       if (prevInvalid > 0) parts.push(`| ❌ 无效 | ${prevInvalid} |`);
       if (prevPending > 0) parts.push(`| ⚠️ 待处理 | ${prevPending} |`);
