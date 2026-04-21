@@ -1,5 +1,20 @@
 # Changelog
 
+## [5.0.11](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.10...@spaceflow/review-summary@5.0.11) (2026-04-21)
+
+### 代码重构
+
+* **review-summary:** 重构问题统计计算逻辑以统一口径 ([359104a](https://github.com/Lydanne/spaceflow/commit/359104a953d5b4faf1573bc0fae136cd061044a3))
+* **review:** 统一问题状态术语为'已验收' ([22b6e95](https://github.com/Lydanne/spaceflow/commit/22b6e95c89da2f4f4acf6ed39083fd99b9372e53))
+
+### 文档更新
+
+* **review:** 更新快速模式和修复验证的 LLM 依赖说明 ([7de827b](https://github.com/Lydanne/spaceflow/commit/7de827b3e9ff70501a356f4bb86e8590c3946669))
+
+### 其他修改
+
+* **review:** released version 5.2.6 [no ci] ([0e6afae](https://github.com/Lydanne/spaceflow/commit/0e6afaedf322fc39d167fa729169166222559553))
+
 ## [5.0.10](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.9...@spaceflow/review-summary@5.0.10) (2026-04-17)
 
 ### 文档更新
