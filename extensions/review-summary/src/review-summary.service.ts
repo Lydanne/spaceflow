@@ -1,7 +1,7 @@
 import { GitProviderService, shouldLog, normalizeVerbose } from "@spaceflow/core";
 import type { IConfigReader } from "@spaceflow/core";
 import type { PullRequest, Issue, CiConfig } from "@spaceflow/core";
-import { MarkdownFormatter, type ReviewIssue } from "@spaceflow/review";
+import { MarkdownFormatter, type ReviewResult } from "@spaceflow/review";
 import micromatch from "micromatch";
 import { writeFileSync } from "fs";
 import { join } from "path";
@@ -226,7 +226,7 @@ export class PeriodSummaryService {
         const body = comment.body ?? "";
         const parsed = formatter.parse(body);
         if (parsed?.result?.issues) {
-          return this.computeIssueStatsFromReviewIssues(parsed.result.issues);
+          return this.computeIssueStatsFromReviewResult(parsed.result);
         }
       }
       // 回退：没有结构化数据时，从评论文本正则提取（兼容旧数据）
@@ -237,9 +237,13 @@ export class PeriodSummaryService {
   }
 
   /**
-   * 从 ReviewIssue 列表中精确计算各类问题统计
+   * 从 ReviewResult 中精确计算各类问题统计
+   * - 口径与 review 插件 `calculateIssueStats` 保持一致：
+   *   1) 仅统计有效问题（valid !== "false"）
+   *   2) 已关闭 = fixed 或 resolved 的问题数（对齐 pending = validTotal - closed）
+   *   3) 若 ReviewResult 携带 stats 聚合值，则 issueCount 直接取 stats.validTotal
    */
-  protected computeIssueStatsFromReviewIssues(issues: ReviewIssue[]): {
+  protected computeIssueStatsFromReviewResult(result: ReviewResult): {
     issueCount: number;
     fixedCount: number;
     errorCount: number;
@@ -247,13 +251,24 @@ export class PeriodSummaryService {
     fixedErrors: number;
     fixedWarns: number;
   } {
-    const errorCount = issues.filter((i) => i.severity === "error").length;
-    const warnCount = issues.filter((i) => i.severity === "warn").length;
-    const fixedErrors = issues.filter((i) => i.severity === "error" && i.fixed).length;
-    const fixedWarns = issues.filter((i) => i.severity === "warn" && i.fixed).length;
+    const validIssues = result.issues.filter((i) => i.valid !== "false");
+    const stats = result.stats;
+    const issueCount = stats?.validTotal ?? validIssues.length;
+    // 已关闭口径：fixed 或 resolved；stats 存在时用 validTotal - pending 避免双重计数
+    const fixedCount = stats
+      ? Math.max(0, stats.validTotal - stats.pending)
+      : validIssues.filter((i) => i.fixed || i.resolved).length;
+    const errorCount = validIssues.filter((i) => i.severity === "error").length;
+    const warnCount = validIssues.filter((i) => i.severity === "warn").length;
+    const fixedErrors = validIssues.filter(
+      (i) => i.severity === "error" && (i.fixed || i.resolved),
+    ).length;
+    const fixedWarns = validIssues.filter(
+      (i) => i.severity === "warn" && (i.fixed || i.resolved),
+    ).length;
     return {
-      issueCount: issues.length,
-      fixedCount: fixedErrors + fixedWarns,
+      issueCount,
+      fixedCount,
       errorCount,
       warnCount,
       fixedErrors,
@@ -263,6 +278,8 @@ export class PeriodSummaryService {
 
   /**
    * 回退：从评论文本正则提取问题统计（兼容无结构化数据的旧评论）
+   * - 优先匹配新版文案：`| 有效问题 | N (🟢已验收 X, ⚪已解决 Y, ⚠️待处理 Z) |`
+   * - 退而匹配更老版本文案：`发现 N 个问题` / `🟢已修复 X` / `🔴a...🟡b`
    */
   protected extractIssueStatsFromText(comments: { body?: string }[]): {
     issueCount: number;
@@ -278,13 +295,28 @@ export class PeriodSummaryService {
     let warnCount = 0;
     for (const comment of comments) {
       const body = comment.body ?? "";
+      // 新版：有效问题汇总行
+      const validTotalMatch = body.match(/有效问题\s*\|\s*(\d+)/);
+      if (validTotalMatch) {
+        issueCount = Math.max(issueCount, parseInt(validTotalMatch[1], 10));
+      }
+      // 新版（"已验收"）/ 过渡版（"已修复"）两种文案都匹配
+      const fixedNewMatch = body.match(/🟢已(?:验收|修复)\s*(\d+)/);
+      const resolvedNewMatch = body.match(/⚪已解决\s*(\d+)/);
+      if (fixedNewMatch || resolvedNewMatch) {
+        const fixed = fixedNewMatch ? parseInt(fixedNewMatch[1], 10) : 0;
+        const resolved = resolvedNewMatch ? parseInt(resolvedNewMatch[1], 10) : 0;
+        // 文本口径无法区分 fixed 与 resolved 是否作用于同一问题，近似相加
+        fixedCount = Math.max(fixedCount, fixed + resolved);
+      }
+      // 老版本兼容
       const issueMatch = body.match(/发现\s*(\d+)\s*个问题/);
       if (issueMatch) {
         issueCount = Math.max(issueCount, parseInt(issueMatch[1], 10));
       }
-      const fixedMatch = body.match(/已修复[：:]\s*(\d+)/);
-      if (fixedMatch) {
-        fixedCount = Math.max(fixedCount, parseInt(fixedMatch[1], 10));
+      const oldFixedMatch = body.match(/已验收[：:]\s*(\d+)/);
+      if (oldFixedMatch) {
+        fixedCount = Math.max(fixedCount, parseInt(oldFixedMatch[1], 10));
       }
       const statsMatch = body.match(/🔴\s*(\d+).*🟡\s*(\d+)/);
       if (statsMatch) {
@@ -293,7 +325,7 @@ export class PeriodSummaryService {
         issueCount = Math.max(issueCount, errorCount + warnCount);
       }
     }
-    // 文本模式无法区分修复类型，统一设为 0
+    // 文本模式无法区分修复类型（error/warn），统一设为 0
     return { issueCount, fixedCount, errorCount, warnCount, fixedErrors: 0, fixedWarns: 0 };
   }
 
