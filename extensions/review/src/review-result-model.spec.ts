@@ -637,7 +637,7 @@ describe("ReviewResultModel", () => {
       const model = ReviewResultModel.empty(createPr(gitProvider), deps);
       const body = model.buildLineReviewBody(newIssues, 2, allIssues);
       expect(body).toContain("Round 1 回顾");
-      expect(body).toContain("已修复");
+      expect(body).toContain("已验收");
     });
   });
 
