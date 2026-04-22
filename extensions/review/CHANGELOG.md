@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.2.8](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.2.7...@spaceflow/review@5.2.8) (2026-04-22)
+
+### 测试用例
+
+* **review:** 更新单元测试以匹配'已验收'状态术语 ([f1dfd28](https://github.com/Lydanne/spaceflow/commit/f1dfd28a62580e2de16c4720ec407bca3ea7c63a))
+
+### 其他修改
+
+* **review-summary:** released version 5.0.12 [no ci] ([8a15fcb](https://github.com/Lydanne/spaceflow/commit/8a15fcb2973162236e61cb5bfab93d74dd70f926))
+
 ## [5.2.7](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.2.6...@spaceflow/review@5.2.7) (2026-04-22)
 
 ### 代码重构
