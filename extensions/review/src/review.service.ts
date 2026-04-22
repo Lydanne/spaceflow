@@ -149,6 +149,7 @@ export class ReviewService {
           ...context,
           flush: true,
           verifyFixes: false,
+          collectOnlyRound: currentRound,
         });
       }
 
@@ -574,7 +575,7 @@ export class ReviewService {
    * 仅收集 review 状态模式（用于 PR 关闭或 --flush 指令）
    */
   protected async executeCollectOnly(context: ReviewContext): Promise<ReviewResult> {
-    const { owner, repo, prNumber, verbose, ci, dryRun, autoApprove } = context;
+    const { owner, repo, prNumber, verbose, ci, dryRun, autoApprove, collectOnlyRound } = context;
 
     if (shouldLog(verbose, 1)) {
       console.log(`📊 仅收集 review 状态模式`);
@@ -654,6 +655,14 @@ export class ReviewService {
       }
     } else if (!context.verifyFixes && shouldLog(verbose, 1)) {
       console.log(`   ⏭️  跳过历史问题验证 (verifyFixes=false)`);
+    }
+
+    // 快速模式后续轮次回退到 collect-only 时，显式推进 round
+    if (typeof collectOnlyRound === "number" && collectOnlyRound > resultModel.round) {
+      if (shouldLog(verbose, 1)) {
+        console.log(`🔄 collect-only 轮次推进: ${resultModel.round} -> ${collectOnlyRound}`);
+      }
+      resultModel.update({ round: collectOnlyRound });
     }
 
     // 6. 统计问题状态并设置到 result

@@ -28,7 +28,7 @@ export class TerminalFormatter implements ReviewReportFormatter {
       return "没有需要审查的文件";
     }
 
-    // 🟢 已验收 | 🔴 待处理error | 🟡 待处理warn | ⚪ 已解决(非代码修复)
+    // 🟢 已验收 | ⚪ 已解决(可与已验收重叠) | 🔴 待处理error | 🟡 待处理warn
     const issuesByFile = new Map<
       string,
       {
@@ -55,10 +55,14 @@ export class TerminalFormatter implements ReviewReportFormatter {
       if (issue.resolved) {
         stats.resolved++;
       }
-      if (issue.severity === "error") {
-        stats.errorCount++;
-      } else {
-        stats.warnCount++;
+      // 🔴/🟡 只统计待处理问题，避免与已验收/已解决重复造成误解
+      const isPending = !issue.fixed && !issue.resolved;
+      if (isPending) {
+        if (issue.severity === "error") {
+          stats.errorCount++;
+        } else {
+          stats.warnCount++;
+        }
       }
       issuesByFile.set(issue.file, stats);
     }
@@ -90,7 +94,7 @@ export class TerminalFormatter implements ReviewReportFormatter {
       const errorText = stats.errorCount > 0 ? `${RED}🔴 ${stats.errorCount} error${RESET}` : "";
       const warnText = stats.warnCount > 0 ? `${YELLOW}🟡 ${stats.warnCount} warn${RESET}` : "";
       const resolvedText = stats.resolved > 0 ? `⚪ ${stats.resolved} 已解决` : "";
-      const statsText = [totalText, fixedText, errorText, warnText, resolvedText]
+      const statsText = [totalText, fixedText, resolvedText, errorText, warnText]
         .filter(Boolean)
         .join(" / ");
 
@@ -106,9 +110,9 @@ export class TerminalFormatter implements ReviewReportFormatter {
       lines.push("");
       const summaryParts = [`${BOLD}总计: ${totalAll} 问题${RESET}`];
       if (totalFixed > 0) summaryParts.push(`${GREEN}🟢 ${totalFixed} 已验收${RESET}`);
+      if (totalResolved > 0) summaryParts.push(`⚪ ${totalResolved} 已解决`);
       if (totalPendingErrors > 0) summaryParts.push(`${RED}🔴 ${totalPendingErrors} error${RESET}`);
       if (totalPendingWarns > 0) summaryParts.push(`${YELLOW}🟡 ${totalPendingWarns} warn${RESET}`);
-      if (totalResolved > 0) summaryParts.push(`⚪ ${totalResolved} 已解决`);
       lines.push(summaryParts.join(" / "));
     }
 

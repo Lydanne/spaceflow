@@ -646,6 +646,43 @@ describe("ReviewService", () => {
       expect(result.stats).toBeDefined();
     });
 
+    it("should promote round when collectOnlyRound is provided", async () => {
+      const existingResult = {
+        round: 3,
+        issues: [{ file: "a.ts", line: "1", ruleId: "R1", round: 3 }],
+        summary: [],
+      };
+      service._reviewReportService.formatStatsTerminal = vi.fn().mockReturnValue("stats") as any;
+      gitProvider.listPullReviews.mockResolvedValue([] as any);
+      gitProvider.listPullReviewComments.mockResolvedValue([] as any);
+      gitProvider.getPullRequestCommits.mockResolvedValue([] as any);
+      gitProvider.getPullRequest.mockResolvedValue({ head: { sha: "abc1234" } } as any);
+      gitProvider.createIssueComment.mockResolvedValue({} as any);
+
+      const loadedModel = ReviewResultModel.create(
+        new PullRequestModel(gitProvider as any, "o", "r", 1),
+        existingResult as any,
+        service._resultModelDeps,
+      );
+      const loadFromPrSpy = vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(loadedModel);
+      const saveSpy = vi.spyOn(loadedModel, "save").mockResolvedValue(undefined as any);
+
+      const context = {
+        owner: "o",
+        repo: "r",
+        prNumber: 1,
+        ci: true,
+        dryRun: false,
+        collectOnlyRound: 4,
+        verifyFixes: false,
+      };
+      const result = await service.executeCollectOnly(context as any);
+
+      expect(loadFromPrSpy).toHaveBeenCalledTimes(1);
+      expect(saveSpy).toHaveBeenCalledTimes(1);
+      expect(result.round).toBe(4);
+    });
+
     it("should filter merge commits before getFileContents when verifyFixes enabled", async () => {
       const existingResult = { issues: [{ file: "a.ts", line: "1", ruleId: "R1" }], summary: [] };
       service._reviewReportService.formatStatsTerminal = vi.fn().mockReturnValue("stats") as any;
@@ -822,6 +859,7 @@ describe("ReviewService", () => {
       const fastCollectContext = collectOnlySpy.mock.calls[0][0] as ReviewContext;
       expect(fastCollectContext.flush).toBe(true);
       expect(fastCollectContext.verifyFixes).toBe(false);
+      expect(fastCollectContext.collectOnlyRound).toBe(2);
     });
 
     it("should enter fast mode when round condition matches and fallback to collect-only", async () => {
@@ -862,6 +900,7 @@ describe("ReviewService", () => {
       const fastCollectContext = collectOnlySpy.mock.calls[0][0] as ReviewContext;
       expect(fastCollectContext.flush).toBe(true);
       expect(fastCollectContext.verifyFixes).toBe(false);
+      expect(fastCollectContext.collectOnlyRound).toBe(3);
     });
   });
 

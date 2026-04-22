@@ -57,6 +57,8 @@ export interface ReviewContext extends ReviewOptions {
   localMode?: LocalReviewMode;
   /** 快速模式配置（来自 review.fastMode） */
   fastMode?: FastModeConfig;
+  /** 内部字段：collect-only 模式需要推进到的目标轮次 */
+  collectOnlyRound?: number;
 }
 
 export class ReviewContextBuilder {

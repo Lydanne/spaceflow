@@ -130,7 +130,7 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
       return "没有需要审查的文件";
     }
 
-    // 🟢 已验收 | 🔴 error数量 | 🟡 warn数量 | ⚪ 已解决(非代码修复)
+    // 🟢 已验收 | ⚪ 已解决(可与已验收重叠) | 🔴 待处理error | 🟡 待处理warn
     const issuesByFile = new Map<
       string,
       {
@@ -157,17 +157,21 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
       if (issue.resolved) {
         stats.resolved++;
       }
-      if (issue.severity === "error") {
-        stats.errorCount++;
-      } else {
-        stats.warnCount++;
+      // 🔴/🟡 只统计待处理问题，避免与已验收/已解决重复造成误解
+      const isPending = !issue.fixed && !issue.resolved;
+      if (isPending) {
+        if (issue.severity === "error") {
+          stats.errorCount++;
+        } else {
+          stats.warnCount++;
+        }
       }
       issuesByFile.set(issue.file, stats);
     }
 
     const lines: string[] = [];
-    lines.push("| 文件 | 总数 | 🟢 | 🔴 | 🟡 | ⚪ |");
-    lines.push("|------|------|----|----|----|-----|");
+    lines.push("| 文件 | 总数 | 🟢 | ⚪ | 🔴 | 🟡 |");
+    lines.push("|------|------|----|-----|----|----|");
 
     // 汇总统计
     let totalAll = 0;
@@ -192,7 +196,7 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
       totalResolved += stats.resolved;
 
       lines.push(
-        `| \`${fileSummary.file}\` | ${stats.total} | ${stats.fixed} | ${stats.errorCount} | ${stats.warnCount} | ${stats.resolved} |`,
+        `| \`${fileSummary.file}\` | ${stats.total} | ${stats.fixed} | ${stats.resolved} | ${stats.errorCount} | ${stats.warnCount} |`,
       );
 
       // 收集问题总结用于折叠块展示
@@ -206,7 +210,7 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
     // 添加汇总行
     if (summaries.length > 1) {
       lines.push(
-        `| **总计** | **${totalAll}** | **${totalFixed}** | **${totalPendingErrors}** | **${totalPendingWarns}** | **${totalResolved}** |`,
+        `| **总计** | **${totalAll}** | **${totalFixed}** | **${totalResolved}** | **${totalPendingErrors}** | **${totalPendingWarns}** |`,
       );
     }
 
@@ -351,7 +355,7 @@ export class MarkdownFormatter implements ReviewReportFormatter, ReviewReportPar
     lines.push(
       `| 有效问题 | ${stats.validTotal} (🟢已验收 ${stats.fixed}, ⚪已解决 ${stats.resolved}, ⚠️待处理 ${stats.pending}) |`,
     );
-    lines.push(`| ❌ 无效问题 | ${stats.invalid} |`);
+    lines.push(`| 无效问题 | ${stats.invalid} |`);
     lines.push(`| 验收率 | ${stats.fixRate}% (${stats.fixed}/${stats.validTotal}) |`);
     lines.push(`| 解决率 | ${stats.resolveRate}% (${stats.resolved}/${stats.validTotal}) |`);
     return lines.join("\n");
