@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.2.7](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.2.6...@spaceflow/review@5.2.7) (2026-04-22)
+
+### 代码重构
+
+* **review:** 支持 collect-only 模式显式推进轮次 ([994ecae](https://github.com/Lydanne/spaceflow/commit/994ecaef85233bf781eb48ba8ea47d789e37d043))
+
+### 其他修改
+
+* **review-summary:** released version 5.0.11 [no ci] ([b52dbdd](https://github.com/Lydanne/spaceflow/commit/b52dbddd1c09565bf68d406ceaaf1f5f312c5549))
+
 ## [5.2.6](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.2.5...@spaceflow/review@5.2.6) (2026-04-21)
 
 ### 代码重构
