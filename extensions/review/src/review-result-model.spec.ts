@@ -382,6 +382,56 @@ describe("ReviewResultModel", () => {
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
+
+    it("should resolve all issues on same path:line when conversation is resolved", async () => {
+      // 场景：同一 conversation（review + path + line）下两条 AI comment，不同 issue-key。
+      // adapter 应把整组 comment 都作为 resolved thread 返回，每条 body 带自己的 issue-key。
+      gitProvider.listResolvedThreads.mockResolvedValue([
+        {
+          path: "util.js",
+          line: 78,
+          body: "正文 A\n<!-- issue-key: util.js:78:R1 -->",
+          resolvedBy: { id: 9, login: "admin" },
+        },
+        {
+          path: "util.js",
+          line: 78,
+          body: "正文 B\n<!-- issue-key: util.js:78:R2 -->",
+          resolvedBy: { id: 9, login: "admin" },
+        },
+      ]);
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const issues = [
+        { file: "util.js", line: "78", ruleId: "R1" },
+        { file: "util.js", line: "78", ruleId: "R2" },
+      ] as any[];
+      const model = ReviewResultModel.create(createPr(gitProvider), createResult({ issues }), deps);
+      await model.syncResolved();
+      expect(issues[0].resolved).toBeDefined();
+      expect(issues[0].resolvedBy?.login).toBe("admin");
+      expect(issues[1].resolved).toBeDefined();
+      expect(issues[1].resolvedBy?.login).toBe("admin");
+      consoleSpy.mockRestore();
+    });
+
+    it("should resolve distinct issues via path:line fallback without double-matching", async () => {
+      // 场景：adapter 返回两条 thread（无 issue-key），syncResolved 的 path+line 回退
+      // 不应反复命中同一 issue，而要把两条 thread 分配给两个不同的 issue。
+      gitProvider.listResolvedThreads.mockResolvedValue([
+        { path: "util.js", line: 78, resolvedBy: { id: 9, login: "admin" } },
+        { path: "util.js", line: 78, resolvedBy: { id: 9, login: "admin" } },
+      ]);
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const issues = [
+        { file: "util.js", line: "78", ruleId: "R1" },
+        { file: "util.js", line: "78", ruleId: "R2" },
+      ] as any[];
+      const model = ReviewResultModel.create(createPr(gitProvider), createResult({ issues }), deps);
+      await model.syncResolved();
+      expect(issues[0].resolved).toBeDefined();
+      expect(issues[1].resolved).toBeDefined();
+      consoleSpy.mockRestore();
+    });
   });
 
   // ─── invalidateChangedFiles ───────────────────────────

@@ -216,6 +216,9 @@ export class ReviewResultModel {
       for (const issue of this._result.issues) {
         issueByKey.set(generateIssueKey(issue), issue);
       }
+      // 记录本次同步已被某条 thread 消费掉的 issue，避免 path:line 回退
+      // 时多条 thread 反复命中同一个 issue、而其它同位置 issue 漏掉的问题。
+      const consumed = new Set<ReviewIssue>();
       const now = new Date().toISOString();
       for (const thread of resolvedThreads) {
         if (!thread.path) continue;
@@ -227,26 +230,29 @@ export class ReviewResultModel {
             matchedIssue = issueByKey.get(issueKey);
           }
         }
-        // 回退：path:line 匹配
+        // 回退：path:line 匹配（跳过已被其它 thread 消费的 issue）
         if (!matchedIssue) {
           matchedIssue = this._result.issues.find(
             (issue) =>
-              issue.file === thread.path && this.lineMatchesPosition(issue.line, thread.line),
+              !consumed.has(issue) &&
+              issue.file === thread.path &&
+              this.lineMatchesPosition(issue.line, thread.line),
           );
         }
-        if (matchedIssue && !matchedIssue.resolved) {
-          matchedIssue.resolved = now;
-          if (thread.resolvedBy) {
-            matchedIssue.resolvedBy = {
-              id: thread.resolvedBy.id?.toString(),
-              login: thread.resolvedBy.login,
-            };
-          }
-          console.log(
-            `🟢 问题已标记为已解决: ${matchedIssue.file}:${matchedIssue.line}` +
-              (thread.resolvedBy?.login ? ` (by @${thread.resolvedBy.login})` : ""),
-          );
+        if (!matchedIssue) continue;
+        consumed.add(matchedIssue);
+        if (matchedIssue.resolved) continue;
+        matchedIssue.resolved = now;
+        if (thread.resolvedBy) {
+          matchedIssue.resolvedBy = {
+            id: thread.resolvedBy.id?.toString(),
+            login: thread.resolvedBy.login,
+          };
         }
+        console.log(
+          `🟢 问题已标记为已解决: ${matchedIssue.file}:${matchedIssue.line}` +
+            (thread.resolvedBy?.login ? ` (by @${thread.resolvedBy.login})` : ""),
+        );
       }
     } catch (error) {
       console.warn("⚠️ 同步已解决评论失败:", error);
