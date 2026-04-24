@@ -851,6 +851,9 @@ export class GithubAdapter implements GitProvider {
   /**
    * 通过 GraphQL 查询 PR 的 review threads resolved 状态
    * 返回 Map<commentId, resolver>（用于 listPullReviewComments 内部补充 resolver）
+   *
+   * 一个 thread 下所有 comment 都视为已解决，避免同 thread 下不同 comment（如
+   * 同 path:line 多个 ruleId 的 AI 评论）只有首条被标记。
    */
   protected async fetchResolvedThreads(
     owner: string,
@@ -861,14 +864,13 @@ export class GithubAdapter implements GitProvider {
     const resolvedMap = new Map<number, { id?: number; login?: string } | null>();
     for (const thread of threads) {
       if (!thread.isResolved) continue;
-      const firstComment = thread.comments.nodes[0];
-      if (!firstComment?.databaseId) continue;
-      resolvedMap.set(
-        firstComment.databaseId,
-        thread.resolvedBy
-          ? { id: thread.resolvedBy.databaseId, login: thread.resolvedBy.login }
-          : null,
-      );
+      const resolver = thread.resolvedBy
+        ? { id: thread.resolvedBy.databaseId, login: thread.resolvedBy.login }
+        : null;
+      for (const comment of thread.comments.nodes) {
+        if (!comment?.databaseId) continue;
+        resolvedMap.set(comment.databaseId, resolver);
+      }
     }
     return resolvedMap;
   }
@@ -878,15 +880,20 @@ export class GithubAdapter implements GitProvider {
     const result: ResolvedThread[] = [];
     for (const thread of threads) {
       if (!thread.isResolved) continue;
-      const firstComment = thread.comments.nodes[0];
-      result.push({
-        path: thread.path ?? undefined,
-        line: thread.line ?? undefined,
-        resolvedBy: thread.resolvedBy
-          ? { id: thread.resolvedBy.databaseId, login: thread.resolvedBy.login }
-          : null,
-        body: firstComment?.body,
-      });
+      const resolvedBy = thread.resolvedBy
+        ? { id: thread.resolvedBy.databaseId, login: thread.resolvedBy.login }
+        : null;
+      // 展开 thread 下所有 comment —— GitHub review thread 对应一次
+      // Resolve Conversation 操作，但 thread 内可能有多条 comment（含 reply
+      // 或同 path:line 分组），需保证每条都能被 syncResolved 匹配到 issue。
+      for (const comment of thread.comments.nodes) {
+        result.push({
+          path: thread.path ?? undefined,
+          line: thread.line ?? undefined,
+          resolvedBy,
+          body: comment?.body,
+        });
+      }
     }
     return result;
   }
@@ -909,7 +916,7 @@ export class GithubAdapter implements GitProvider {
                 resolvedBy { login databaseId }
                 path
                 line
-                comments(first: 1) {
+                comments(first: 100) {
                   nodes { databaseId body }
                 }
               }

@@ -553,17 +553,30 @@ export class GiteaAdapter implements GitProvider {
       for (const review of reviews) {
         if (!review.id) continue;
         const comments = await this.listPullReviewComments(owner, repo, index, review.id);
-        for (const comment of comments) {
-          if (!comment.resolver) continue;
-          result.push({
-            path: comment.path,
-            line: comment.position,
-            resolvedBy: {
-              id: comment.resolver.id,
-              login: comment.resolver.login,
-            },
-            body: comment.body,
-          });
+        // 按 path:position 分组 —— 同一 review 内、同一行的多条 comment
+        // 共同构成一个 "conversation"。Gitea 在 UI 上按 conversation 维度
+        // resolve，但 API 仅在其中一条 comment 上挂 resolver 字段，需要把
+        // 整组 comment 都视为已解决，避免丢失其它同位置不同 ruleId 的问题。
+        const groups = new Map<string, PullReviewComment[]>();
+        for (const c of comments) {
+          if (!c.path || c.position === undefined) continue;
+          const key = `${c.path}:${c.position}`;
+          const arr = groups.get(key) ?? [];
+          arr.push(c);
+          groups.set(key, arr);
+        }
+        for (const group of groups.values()) {
+          const resolvedComment = group.find((c) => c.resolver);
+          if (!resolvedComment?.resolver) continue;
+          const { id: resolverId, login: resolverLogin } = resolvedComment.resolver;
+          for (const c of group) {
+            result.push({
+              path: c.path,
+              line: c.position,
+              resolvedBy: { id: resolverId, login: resolverLogin },
+              body: c.body,
+            });
+          }
         }
       }
     } catch {

@@ -415,6 +415,60 @@ describe("GiteaAdapter", () => {
     });
   });
 
+  describe("listResolvedThreads", () => {
+    it("同一 review 同 path:line 的多条 comment：任一 resolver 非空则整组返回", async () => {
+      // listPullReviews 第一页（length < 50 自动 break，不需 mock 第二页）
+      fetchSpy.mockResolvedValueOnce(mockResponse([{ id: 100 }]));
+      // 该 review 下 2 条 comment，同 path+position，只有第 1 条有 resolver
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse([
+          {
+            id: 1,
+            path: "util.js",
+            position: 78,
+            body: "A",
+            resolver: { id: 9, login: "admin" },
+          },
+          { id: 2, path: "util.js", position: 78, body: "B", resolver: null },
+        ]),
+      );
+      const result = await adapter.listResolvedThreads("owner", "repo", 1);
+      expect(result).toHaveLength(2);
+      expect(result[0].body).toBe("A");
+      expect(result[1].body).toBe("B");
+      expect(result.every((r) => r.resolvedBy?.login === "admin")).toBe(true);
+      expect(result.every((r) => r.path === "util.js" && r.line === 78)).toBe(true);
+    });
+
+    it("不同 path:line 的 comment 不会被合并视为已解决", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse([{ id: 100 }]));
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse([
+          {
+            id: 1,
+            path: "a.ts",
+            position: 10,
+            body: "A",
+            resolver: { id: 9, login: "admin" },
+          },
+          { id: 2, path: "b.ts", position: 20, body: "B", resolver: null },
+        ]),
+      );
+      const result = await adapter.listResolvedThreads("owner", "repo", 1);
+      expect(result).toHaveLength(1);
+      expect(result[0].path).toBe("a.ts");
+    });
+
+    it("没有 resolver 的 comment 组应返回空", async () => {
+      fetchSpy.mockResolvedValueOnce(mockResponse([{ id: 100 }]));
+      fetchSpy.mockResolvedValueOnce(
+        mockResponse([{ id: 1, path: "a.ts", position: 10, body: "A", resolver: null }]),
+      );
+      const result = await adapter.listResolvedThreads("owner", "repo", 1);
+      expect(result).toEqual([]);
+    });
+  });
+
   // ============ Reaction ============
 
   describe("getIssueCommentReactions", () => {
