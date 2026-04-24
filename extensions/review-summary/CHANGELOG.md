@@ -1,5 +1,23 @@
 # Changelog
 
+## [5.0.14](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.13...@spaceflow/review-summary@5.0.14) (2026-04-24)
+
+### 修复BUG
+
+* **core:** 修复 Gitea/GitHub 适配器已解决评论线程的完整性问题 ([3364883](https://github.com/Lydanne/spaceflow/commit/336488342e1bcfb75a174167cb9e05ce2d9a9853))
+
+### 测试用例
+
+* **review:** 修复同位置多问题解决状态同步的匹配逻辑 ([d95e02f](https://github.com/Lydanne/spaceflow/commit/d95e02f8a0e8236bb161eaa37aca1760e23009bc))
+
+### 其他修改
+
+* **core:** released version 5.2.1 [no ci] ([986b1e1](https://github.com/Lydanne/spaceflow/commit/986b1e11cd2cc44409d0113d77440504933197af))
+* **publish:** released version 5.0.5 [no ci] ([d357843](https://github.com/Lydanne/spaceflow/commit/d3578438c798a386bbba691635acd2af15f40246))
+* **review:** released version 5.2.9 [no ci] ([815b0e3](https://github.com/Lydanne/spaceflow/commit/815b0e311e1fe15da466e8a7147e4860c8cdea4e))
+* **scripts:** released version 5.0.5 [no ci] ([9db6841](https://github.com/Lydanne/spaceflow/commit/9db68410bdbedb675a2cbde17a65c74ce6c46e97))
+* **shell:** released version 5.0.5 [no ci] ([230f7b5](https://github.com/Lydanne/spaceflow/commit/230f7b518426b300f1c994ae728fb46665f240b2))
+
 ## [5.0.13](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.12...@spaceflow/review-summary@5.0.13) (2026-04-22)
 
 ### 测试用例
