@@ -1,5 +1,21 @@
 # Changelog
 
+## [5.2.2](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@5.2.1...@spaceflow/core@5.2.2) (2026-04-27)
+
+### 代码重构
+
+* **spaceflow:** 精简冗余实现 ([b85a1a9](https://github.com/Lydanne/spaceflow/commit/b85a1a92948bb8243eae523220176d3a6e3a920b))
+
+### 其他修改
+
+* **cli:** released version 5.0.3 [no ci] ([295cae7](https://github.com/Lydanne/spaceflow/commit/295cae7f1907d686570ad2fd0483edfa93a12fd2))
+* **publish:** released version 5.0.5 [no ci] ([d357843](https://github.com/Lydanne/spaceflow/commit/d3578438c798a386bbba691635acd2af15f40246))
+* **review-summary:** released version 5.0.14 [no ci] ([1c59bb6](https://github.com/Lydanne/spaceflow/commit/1c59bb6c8ef36fab527c56c9f9a2e6c972f496f3))
+* **review:** released version 5.2.9 [no ci] ([815b0e3](https://github.com/Lydanne/spaceflow/commit/815b0e311e1fe15da466e8a7147e4860c8cdea4e))
+* **scripts:** released version 5.0.5 [no ci] ([9db6841](https://github.com/Lydanne/spaceflow/commit/9db68410bdbedb675a2cbde17a65c74ce6c46e97))
+* **shared:** released version 5.0.2 [no ci] ([ffcff0e](https://github.com/Lydanne/spaceflow/commit/ffcff0e0ff642d03c8919ef430d22795fd1b509f))
+* **shell:** released version 5.0.5 [no ci] ([230f7b5](https://github.com/Lydanne/spaceflow/commit/230f7b518426b300f1c994ae728fb46665f240b2))
+
 ## [5.2.1](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@5.2.0...@spaceflow/core@5.2.1) (2026-04-24)
 
 ### 修复BUG
