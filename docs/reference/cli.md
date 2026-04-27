@@ -134,11 +134,11 @@ spaceflow mcp --inspector          # 启动 MCP Inspector 调试模式
 
 ### `runx`
 
-全局安装并运行 Extension 命令。别名 `x`。
+临时运行带 `bin` 的 npm CLI 包。别名 `x`。
 
 ```bash
 spaceflow x <source> -- <args>     # 运行并透传参数
-spaceflow runx <source> -n name -- <args>
+spaceflow runx <source> -- <args>
 ```
 
 ### `clear`
@@ -176,7 +176,7 @@ spaceflow publish [--dry-run]
 脚本执行。详见 [scripts 命令](/guide/commands/scripts)。
 
 ```bash
-spaceflow scripts --script <path>
+spaceflow scripts "<javascript>"
 ```
 
 ### `shell`
@@ -184,7 +184,7 @@ spaceflow scripts --script <path>
 Shell 执行。详见 [shell 命令](/guide/commands/shell)。
 
 ```bash
-spaceflow shell --command <cmd>
+spaceflow shell "<command>"
 ```
 
 ### `review-summary`

@@ -11,7 +11,8 @@ export const extension = defineExtension({
   configKey: "scripts",
   commands: [
     {
-      name: "script",
+      name: "scripts",
+      aliases: ["script"],
       description: t("scripts:description"),
       arguments: "<script>",
       options: [
@@ -29,7 +30,7 @@ export const extension = defineExtension({
 
         const gitProvider = ctx.getService<GitProviderService>("gitProvider");
         if (!gitProvider) {
-          ctx.output.error("script 命令需要配置 Git Provider");
+          ctx.output.error("scripts 命令需要配置 Git Provider");
           process.exit(1);
         }
 

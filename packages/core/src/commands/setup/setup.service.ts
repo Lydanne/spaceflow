@@ -12,6 +12,7 @@ import {
   SchemaGeneratorService,
   SPACEFLOW_DIR,
   ensureSpaceflowPackageJson,
+  DEFAULT_SUPPORT_EDITOR,
 } from "@spaceflow/core";
 
 export class SetupService {
@@ -34,7 +35,7 @@ export class SetupService {
       this.schemaGenerator.generate();
       const defaultConfig: Partial<SpaceflowConfig> = {
         $schema: "./config-schema.json",
-        support: [],
+        support: [DEFAULT_SUPPORT_EDITOR],
       };
       writeFileSync(configPath, stringify(defaultConfig, { indent: 2 }) + "\n");
       console.log(t("setup:configGenerated", { path: configPath }));

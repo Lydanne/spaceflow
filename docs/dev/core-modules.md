@@ -214,4 +214,4 @@ addLocaleResources("my-ext", {
 const message = t("my-ext:greeting"); // "你好" 或 "Hello"
 ```
 
-详细说明请参考 [i18n 国际化](/advanced/i18n)。
+详细说明请参考 [i18n 国际化](/dev/i18n)。

@@ -182,4 +182,4 @@ spaceflow list
 
 ## 开发 Extension
 
-请参考 [扩展开发指南](/advanced/plugin-development) 了解如何创建自定义 Extension。
+请参考 [扩展开发指南](/dev/plugin-development) 了解如何创建自定义 Extension。

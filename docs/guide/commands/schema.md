@@ -1,6 +1,6 @@
 # schema — 生成 Schema
 
-生成 `spaceflow.json` 的 JSON Schema 文件，用于编辑器自动补全和校验。
+生成 Spaceflow 配置的 JSON Schema 文件，用于编辑器自动补全和校验。
 
 ## 基本用法
 
@@ -14,18 +14,18 @@ spaceflow schema
 
 该 Schema 文件：
 
-- 描述 `spaceflow.json` 的完整结构
+- 描述 Spaceflow 配置文件的完整结构
 - 包含所有已安装 Extension 的配置字段
 - 提供字段类型、默认值、枚举值等元信息
 
 ## 在配置文件中引用
 
-在 `spaceflow.json` 中添加 `$schema` 字段即可启用编辑器补全：
+在 `.spaceflow/spaceflow.json` 或 `.spaceflowrc` 中添加 `$schema` 字段即可启用编辑器补全：
 
 ```json
 {
   "$schema": "./.spaceflow/config-schema.json",
-  "support": ["cursor"],
+  "support": ["agents"],
   "review": {
     "references": ["./references"]
   }

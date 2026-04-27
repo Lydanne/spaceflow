@@ -18,7 +18,7 @@ const ENV_FILE_NAME = ".env";
 
 /**
  * 查找项目根目录
- * 从 cwd 向上遍历查找 .spaceflowrc，返回其所在目录；找不到则回退到 homedir()
+ * 从 cwd 向上遍历查找 Spaceflow 配置，返回其所在目录；找不到则回退到 homedir()
  * @param cwd 起始目录，默认为 process.cwd()
  */
 export function findProjectRoot(cwd?: string): string {
@@ -26,7 +26,11 @@ export function findProjectRoot(cwd?: string): string {
   const home = homedir();
 
   while (true) {
-    if (existsSync(join(current, RC_FILE_NAME))) {
+    if (
+      existsSync(join(current, RC_FILE_NAME)) ||
+      existsSync(join(current, ".spaceflow", CONFIG_FILE_NAME)) ||
+      existsSync(join(current, CONFIG_FILE_NAME))
+    ) {
       return current;
     }
     const parent = dirname(current);
@@ -90,13 +94,15 @@ export function getConfigPath(cwd?: string): string {
 
 /**
  * 获取所有配置文件路径（按优先级从低到高排列）
- * 从 cwd 逐级向上遍历查找 .spaceflowrc 和 .spaceflow/spaceflow.json，
+ * 从 cwd 逐级向上遍历查找 spaceflow.json、.spaceflow/spaceflow.json 和 .spaceflowrc，
  * 越靠近 cwd 的优先级越高。全局配置优先级最低。
  *
  * 优先级示例（从低到高）:
  *   ~/.spaceflow/spaceflow.json < ~/.spaceflowrc
- *   < /project/.spaceflow/spaceflow.json < /project/.spaceflowrc
- *   < /project/extensions/publish/.spaceflow/spaceflow.json < /project/extensions/publish/.spaceflowrc
+ *   < /project/spaceflow.json < /project/.spaceflow/spaceflow.json < /project/.spaceflowrc
+ *   < /project/extensions/publish/spaceflow.json
+ *   < /project/extensions/publish/.spaceflow/spaceflow.json
+ *   < /project/extensions/publish/.spaceflowrc
  *
  * @param cwd 工作目录，默认为 process.cwd()
  */
@@ -109,6 +115,7 @@ export function getConfigPaths(cwd?: string, options?: { local?: boolean }): str
     return [
       join(home, ".spaceflow", CONFIG_FILE_NAME),
       join(home, RC_FILE_NAME),
+      join(workDir, CONFIG_FILE_NAME),
       join(workDir, ".spaceflow", CONFIG_FILE_NAME),
       join(workDir, RC_FILE_NAME),
     ];
@@ -132,6 +139,7 @@ export function getConfigPaths(cwd?: string, options?: { local?: boolean }): str
     const dir = ancestors[i];
     // 跳过 home 目录（已在全局配置中处理）
     if (dir === home) continue;
+    paths.push(join(dir, CONFIG_FILE_NAME));
     paths.push(join(dir, ".spaceflow", CONFIG_FILE_NAME));
     paths.push(join(dir, RC_FILE_NAME));
   }
@@ -289,6 +297,7 @@ export function findConfigFileWithField(field: string, cwd?: string): string {
   const candidates = [
     join(workDir, RC_FILE_NAME),
     join(workDir, ".spaceflow", CONFIG_FILE_NAME),
+    join(workDir, CONFIG_FILE_NAME),
     join(homedir(), RC_FILE_NAME),
     join(homedir(), ".spaceflow", CONFIG_FILE_NAME),
   ];

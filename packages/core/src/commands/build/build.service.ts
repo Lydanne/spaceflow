@@ -32,6 +32,10 @@ export class BuildService {
   private findProjectRoot(): string {
     let dir = process.cwd();
     while (dir !== dirname(dir)) {
+      // 检查 .spaceflowrc
+      if (existsSync(join(dir, ".spaceflowrc"))) {
+        return dir;
+      }
       // 检查根目录下的 spaceflow.json
       if (existsSync(join(dir, "spaceflow.json"))) {
         return dir;

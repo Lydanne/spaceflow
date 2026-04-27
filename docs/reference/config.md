@@ -1,6 +1,6 @@
 # 配置参考
 
-`spaceflow.json` / `.spaceflowrc` 完整配置项参考。
+`.spaceflow/spaceflow.json` / `.spaceflowrc` 完整配置项参考，兼容项目根目录的 `spaceflow.json`。
 
 ## 配置文件位置
 
@@ -10,8 +10,9 @@
 | --------- | ----------------------------- | ------------ |
 | 1（最低） | `~/.spaceflow/spaceflow.json` | 全局配置     |
 | 2         | `~/.spaceflowrc`              | 全局 RC 文件 |
-| 3         | `.spaceflow/spaceflow.json`   | 项目配置     |
-| 4（最高） | `.spaceflowrc`                | 项目 RC 文件 |
+| 3         | `spaceflow.json`              | 项目根配置   |
+| 4         | `.spaceflow/spaceflow.json`   | 项目配置     |
+| 5（最高） | `.spaceflowrc`                | 项目 RC 文件 |
 
 ## 完整配置示例
 
@@ -19,7 +20,7 @@
 {
   "$schema": ".spaceflow/config-schema.json",
   "lang": "zh-CN",
-  "support": ["cursor", "windsurf", "opencode"],
+  "support": ["agents", "cursor", "windsurf", "opencode"],
   "gitProvider": {
     "provider": "github",
     "serverUrl": "https://api.github.com"
@@ -98,9 +99,9 @@
 ### `support`
 
 - **类型**：`string[]`
-- **默认值**：`["cursor"]`
+- **默认值**：`["agents"]`
 - **说明**：需要关联的 AI 编辑器列表
-- **可选值**：`"windsurf"` | `"cursor"` | `"opencode"`
+- **可选值**：`"agents"` | `"windsurf"` | `"cursor"` | `"opencode"`
 
 ### `dependencies`
 

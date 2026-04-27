@@ -12,10 +12,10 @@ spaceflow install @spaceflow/shell
 
 ```bash
 # 执行 Shell 命令
-spaceflow shell --command "npm test"
+spaceflow shell "npm test"
 
 # CI 模式
-spaceflow shell --command "npm run build" --ci
+spaceflow shell "npm run build" --dry-run
 ```
 
 ## 使用场景
@@ -26,9 +26,6 @@ spaceflow shell --command "npm run build" --ci
 
 ## 命令行选项
 
-| 选项              | 说明                |
-| ----------------- | ------------------- |
-| `--command <cmd>` | 要执行的 Shell 命令 |
-| `--ci`            | CI 模式             |
-| `--dry-run`       | 试运行              |
-| `--verbose`       | 详细日志            |
+| 选项        | 说明                |
+| ----------- | ------------------- |
+| `--dry-run` | 跳过 Shell 命令执行 |

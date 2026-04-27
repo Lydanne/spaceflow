@@ -24,19 +24,19 @@ spaceflow setup
 
 1. **创建 `.spaceflow/` 目录** — 包含 `package.json`（用于管理 Extension 依赖）
 2. **生成 JSON Schema** — 创建 `config-schema.json`，提供编辑器自动补全
-3. **创建配置文件** — 创建 `.spaceflowrc`（如果不存在）
+3. **创建配置文件** — 创建 `.spaceflow/spaceflow.json`（如果不存在）
 
 生成的默认配置：
 
 ```json
 {
   "$schema": "./config-schema.json",
-  "support": ["cursor"]
+  "support": ["agents"]
 }
 ```
 
 ::: tip
-如果已存在 `spaceflow.json` 或 `.spaceflowrc`，不会覆盖。
+如果已存在 `.spaceflow/spaceflow.json`、`.spaceflowrc` 或兼容的 `spaceflow.json`，不会覆盖。
 :::
 
 ## 全局初始化

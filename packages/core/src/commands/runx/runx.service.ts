@@ -56,7 +56,6 @@ export class RunxService {
     return new Promise((resolve, reject) => {
       const child = spawn("npx", [packageName, ...args], {
         stdio: "inherit",
-        shell: true,
       });
 
       child.on("close", (code) => {

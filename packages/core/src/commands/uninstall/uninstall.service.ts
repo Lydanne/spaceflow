@@ -1,12 +1,18 @@
 import { execSync } from "child_process";
-import { readFile, rm } from "fs/promises";
+import { rm } from "fs/promises";
 import { join } from "path";
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import { shouldLog, type VerboseLevel, t } from "@spaceflow/core";
 import { getEditorDirName } from "@spaceflow/core";
 import { detectPackageManager } from "@spaceflow/core";
 import { getSpaceflowDir } from "@spaceflow/core";
-import { getConfigPath, getSupportedEditors, removeDependency } from "@spaceflow/core";
+import {
+  CONFIG_FILE_NAME,
+  RC_FILE_NAME,
+  getSupportedEditors,
+  findConfigFileWithField,
+  removeDependency,
+} from "@spaceflow/core";
 
 export class UninstallService {
   /**
@@ -56,10 +62,9 @@ export class UninstallService {
     }
 
     const cwd = process.cwd();
-    const configPath = getConfigPath(cwd);
 
     // 1. 读取配置获取 source
-    const dependencies = await this.parseSkillsFromConfig(configPath);
+    const dependencies = this.parseDependenciesFromLocalConfig(cwd);
     let actualName = name;
     let config = dependencies[name];
 
@@ -144,14 +149,32 @@ export class UninstallService {
   /**
    * 从配置文件解析 dependencies
    */
-  private async parseSkillsFromConfig(configPath: string): Promise<Record<string, unknown>> {
-    try {
-      const content = await readFile(configPath, "utf-8");
-      const config = JSON.parse(content);
-      return config.dependencies || {};
-    } catch {
-      return {};
+  private parseDependenciesFromLocalConfig(cwd: string): Record<string, unknown> {
+    let dependencies: Record<string, unknown> = {};
+    const configPaths = [
+      join(cwd, CONFIG_FILE_NAME),
+      join(cwd, ".spaceflow", CONFIG_FILE_NAME),
+      join(cwd, RC_FILE_NAME),
+    ];
+
+    for (const configPath of configPaths) {
+      if (!existsSync(configPath)) {
+        continue;
+      }
+      try {
+        const config = JSON.parse(readFileSync(configPath, "utf-8"));
+        if (
+          config.dependencies &&
+          typeof config.dependencies === "object" &&
+          !Array.isArray(config.dependencies)
+        ) {
+          dependencies = config.dependencies;
+        }
+      } catch {
+        // 解析失败时跳过，保持与其它配置读取逻辑一致
+      }
     }
+    return dependencies;
   }
 
   /**
@@ -160,7 +183,9 @@ export class UninstallService {
   private removeFromConfig(name: string, cwd: string, verbose: VerboseLevel = 1): void {
     const removed = removeDependency(name, cwd);
     if (removed && shouldLog(verbose, 1)) {
-      console.log(t("uninstall:configUpdated", { path: getConfigPath(cwd) }));
+      console.log(
+        t("uninstall:configUpdated", { path: findConfigFileWithField("dependencies", cwd) }),
+      );
     }
   }
 }

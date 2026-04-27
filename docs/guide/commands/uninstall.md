@@ -14,8 +14,8 @@ spaceflow uninstall @spaceflow/review -g
 
 ## 卸载流程
 
-1. **移除依赖** — npm 包执行 `pnpm remove`；git 仓库执行 `git submodule deinit` 并删除目录
-2. **更新配置** — 从 `spaceflow.json` 的 `dependencies` 中移除
+1. **移除依赖** — 从 `.spaceflow/node_modules/` 执行包管理器卸载
+2. **更新配置** — 从本地配置文件的 `dependencies` 中移除
 3. **清理关联** — 移除编辑器目录中的关联文件
 
 ## 命令行选项

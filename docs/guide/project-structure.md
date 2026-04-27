@@ -79,7 +79,7 @@ spaceflow/
 │   ├── package.json         # Extension 依赖管理
 │   └── bin/index.js         # 生成的入口文件
 │
-├── .spaceflowrc             # 项目配置文件
+├── .spaceflowrc             # 可选项目配置文件（最高优先级）
 ├── pnpm-workspace.yaml      # pnpm Monorepo 配置
 └── package.json             # 根 package.json
 ```
@@ -145,7 +145,7 @@ CLI 壳子入口。只使用 Node.js 内置模块（`fs`/`path`/`child_process`/
 
 | 文件                                             | 说明                |
 | ------------------------------------------------ | ------------------- |
-| `.spaceflowrc` / `.spaceflow/spaceflow.json`     | 项目配置            |
+| `.spaceflowrc` / `.spaceflow/spaceflow.json` / `spaceflow.json` | 项目配置 |
 | `~/.spaceflowrc` / `~/.spaceflow/spaceflow.json` | 全局配置            |
 | `.spaceflow/package.json`                        | Extension 依赖管理  |
 | `pnpm-workspace.yaml`                            | Monorepo 工作区配置 |

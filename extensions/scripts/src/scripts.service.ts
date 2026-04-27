@@ -66,11 +66,15 @@ export class ScriptsService {
         // 包装在 async IIFE 中以支持 await
         const asyncScript = `(async () => { ${script} })()`;
 
-        // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-eval
-        const result = eval(asyncScript);
+        if (context.dryRun) {
+          console.log(`🔍 [DRY-RUN] 跳过脚本执行`);
+        } else {
+          // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-eval
+          const result = eval(asyncScript);
 
-        if (result instanceof Promise) {
-          await result;
+          if (result instanceof Promise) {
+            await result;
+          }
         }
 
         console.log("✅ 脚本执行成功");

@@ -48,7 +48,11 @@ export const extension = defineExtension({
 
         try {
           const context = publishService.getContextFromEnv(publishOptions);
-          await publishService.execute(context);
+          const result = await publishService.execute(context);
+          if (!result.success) {
+            ctx.output.error(result.message);
+            process.exit(1);
+          }
         } catch (error) {
           ctx.output.error(
             t("common.executionFailed", { error: error instanceof Error ? error.message : error }),

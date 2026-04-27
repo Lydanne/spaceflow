@@ -85,7 +85,7 @@ spaceflow/
 | `mcp`        | 启动 MCP Server      |
 | `list`       | 列出已安装扩展       |
 | `clear`      | 清理缓存             |
-| `runx` / `x` | 执行扩展命令         |
+| `runx` / `x` | 临时运行 npm CLI     |
 | `schema`     | 生成配置 JSON Schema |
 | `commit`     | AI 智能提交          |
 | `setup`      | 初始化项目配置       |
@@ -96,7 +96,7 @@ spaceflow/
 
 ```json
 {
-  "support": ["cursor", "windsurf", "opencode"],
+  "support": ["agents", "cursor", "windsurf", "opencode"],
   "dependencies": {
     "@spaceflow/review": "latest",
     "@spaceflow/publish": "latest"
@@ -123,6 +123,7 @@ spaceflow/
 
 | 编辑器   | 配置目录     |
 | -------- | ------------ |
+| Agents   | `.agents/`   |
 | Windsurf | `.windsurf/` |
 | Cursor   | `.cursor/`   |
 | OpenCode | `.opencode/` |

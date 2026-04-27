@@ -1,24 +1,10 @@
-import { readFile, rm } from "fs/promises";
+import { rm } from "fs/promises";
 import { join } from "path";
 import { existsSync, readdirSync, lstatSync } from "fs";
 import { shouldLog, type VerboseLevel, t } from "@spaceflow/core";
-import { getEditorDirName, DEFAULT_EDITOR } from "@spaceflow/core";
+import { getEditorDirName, getSupportedEditors } from "@spaceflow/core";
 
 export class ClearService {
-  /**
-   * 获取支持的编辑器列表
-   */
-  protected async getSupportedEditors(configPath: string): Promise<string[]> {
-    try {
-      if (!existsSync(configPath)) return [DEFAULT_EDITOR];
-      const content = await readFile(configPath, "utf-8");
-      const config = JSON.parse(content);
-      return config.support || [DEFAULT_EDITOR];
-    } catch {
-      return [DEFAULT_EDITOR];
-    }
-  }
-
   /**
    * 执行清理
    */
@@ -33,13 +19,12 @@ export class ClearService {
 
     const cwd = process.cwd();
     const home = process.env.HOME || process.env.USERPROFILE || "~";
-    const configPath = join(cwd, "spaceflow.json");
 
-    // 1. 清理 .spaceflow/deps 目录
+    // 1. 清理 .spaceflow 目录中的运行时产物
     await this.clearSpaceflowDeps(isGlobal, verbose);
 
     // 2. 清理各编辑器的 skills 和 commands 目录
-    const editors = await this.getSupportedEditors(configPath);
+    const editors = getSupportedEditors(isGlobal ? home : cwd);
 
     for (const editor of editors) {
       const editorDirName = getEditorDirName(editor);

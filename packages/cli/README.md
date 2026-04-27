@@ -82,6 +82,7 @@ export default defineExtension({
 
 | 编辑器   | 配置目录     |
 | -------- | ------------ |
+| Agents   | `.agents/`   |
 | Windsurf | `.windsurf/` |
 | Cursor   | `.cursor/`   |
 | OpenCode | `.opencode/` |

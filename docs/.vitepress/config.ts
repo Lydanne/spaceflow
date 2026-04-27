@@ -21,12 +21,12 @@ export default defineConfig({
         ],
       },
       {
-        text: "进阶",
+        text: "开发者",
         items: [
-          { text: "扩展开发", link: "/advanced/plugin-development" },
-          { text: "核心模块", link: "/advanced/core-modules" },
-          { text: "GitHub Actions", link: "/advanced/github-actions" },
-          { text: "i18n 国际化", link: "/advanced/i18n" },
+          { text: "开发者索引", link: "/dev/" },
+          { text: "扩展开发", link: "/dev/plugin-development" },
+          { text: "核心模块", link: "/dev/core-modules" },
+          { text: "i18n 国际化", link: "/dev/i18n" },
         ],
       },
     ],
@@ -47,6 +47,7 @@ export default defineConfig({
             { text: "配置文件", link: "/guide/configuration" },
             { text: "Extension 系统", link: "/guide/extension-system" },
             { text: "编辑器集成", link: "/guide/editor-integration" },
+            { text: "GitHub Actions", link: "/guide/github-actions" },
           ],
         },
         {
@@ -91,14 +92,23 @@ export default defineConfig({
           ],
         },
       ],
-      "/advanced/": [
+      "/dev/": [
         {
-          text: "进阶",
+          text: "开发者",
           items: [
-            { text: "扩展开发指南", link: "/advanced/plugin-development" },
-            { text: "核心模块", link: "/advanced/core-modules" },
-            { text: "GitHub Actions", link: "/advanced/github-actions" },
-            { text: "i18n 国际化", link: "/advanced/i18n" },
+            { text: "开发者索引", link: "/dev/" },
+            { text: "扩展开发指南", link: "/dev/plugin-development" },
+            { text: "核心模块", link: "/dev/core-modules" },
+            { text: "i18n 国际化", link: "/dev/i18n" },
+          ],
+        },
+      ],
+      "/spec/": [
+        {
+          text: "方案草稿",
+          items: [
+            { text: "架构重设计方案 v2", link: "/spec/architecture-v2" },
+            { text: "架构重构实施计划", link: "/spec/implementation-plan" },
           ],
         },
       ],

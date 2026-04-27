@@ -1,6 +1,6 @@
 # 配置文件
 
-Spaceflow 支持 `spaceflow.json` 和 `.spaceflowrc` 两种配置文件格式，内容完全一致。
+Spaceflow 支持 `.spaceflow/spaceflow.json`、`.spaceflowrc`，并兼容项目根目录的 `spaceflow.json`。
 
 ## 配置文件位置
 
@@ -8,15 +8,16 @@ Spaceflow 支持 `spaceflow.json` 和 `.spaceflowrc` 两种配置文件格式，
 
 1. `~/.spaceflow/spaceflow.json`（全局配置）
 2. `~/.spaceflowrc`（全局 RC 文件）
-3. `.spaceflow/spaceflow.json`（项目配置）
-4. `.spaceflowrc`（项目 RC 文件，最高优先级）
+3. `spaceflow.json`（项目根配置，兼容旧格式）
+4. `.spaceflow/spaceflow.json`（项目配置）
+5. `.spaceflowrc`（项目 RC 文件，最高优先级）
 
 ## 基本结构
 
 ```json
 {
   "$schema": ".spaceflow/config-schema.json",
-  "support": ["cursor"],
+  "support": ["agents"],
   "dependencies": {
     "@spaceflow/review": "latest"
   },
@@ -33,17 +34,18 @@ Spaceflow 支持 `spaceflow.json` 和 `.spaceflowrc` 两种配置文件格式，
 
 ```json
 {
-  "support": ["cursor", "windsurf", "opencode"]
+  "support": ["agents", "cursor", "windsurf", "opencode"]
 }
 ```
 
 | 值         | 编辑器目录   |
 | ---------- | ------------ |
+| `agents`   | `.agents/`   |
 | `windsurf` | `.windsurf/` |
 | `cursor`   | `.cursor/`   |
 | `opencode` | `.opencode/` |
 
-默认值为 `["cursor"]`。
+默认值为 `["agents"]`。
 
 ### `dependencies`
 
@@ -185,7 +187,7 @@ AI 智能提交相关配置。
 配置来源分两层理解：
 
 1. **配置文件层级**（从低到高）  
-   `~/.spaceflow/spaceflow.json` < `~/.spaceflowrc` < `.spaceflow/spaceflow.json` < `.spaceflowrc`
+   `~/.spaceflow/spaceflow.json` < `~/.spaceflowrc` < `spaceflow.json` < `.spaceflow/spaceflow.json` < `.spaceflowrc`
 2. **默认值补全**  
    在配置文件缺失字段时，系统会用环境变量和内置默认值补全（如 `gitProvider.*`、`llm.*`、`ci.*`）。
 3. **命令行参数**（命令级最高优先级）  

@@ -16,7 +16,7 @@ spaceflow clear -g
 
 执行以下清理操作：
 
-1. **删除依赖目录** — 清空 `.spaceflow/deps/` 下的所有已安装依赖
+1. **删除运行时产物** — 清理 `.spaceflow/` 下除 `spaceflow.json` 和 `package.json` 之外的文件
 2. **清理编辑器 skills** — 删除各编辑器配置目录下的 skills 关联文件
 3. **清理编辑器 commands** — 删除各编辑器配置目录下生成的 `.md` 命令文件
 
@@ -24,7 +24,8 @@ spaceflow clear -g
 
 | 目录 | 说明 |
 |------|------|
-| `.spaceflow/deps/` | 本地依赖安装目录 |
+| `.spaceflow/node_modules/` | 本地 Extension 依赖 |
+| `.agents/skills/` | Agents 技能文件 |
 | `.windsurf/skills/` | Windsurf 技能文件 |
 | `.cursor/skills/` | Cursor 技能文件 |
 

@@ -30,12 +30,12 @@ spaceflow --help
 spaceflow setup
 ```
 
-这会创建 `.spaceflow/` 目录和默认配置文件。你也可以手动创建 `.spaceflowrc` 配置文件：
+这会创建 `.spaceflow/` 目录和默认配置文件。你也可以手动创建 `.spaceflow/spaceflow.json` 或 `.spaceflowrc`：
 
 ```json
 {
   "$schema": ".spaceflow/config-schema.json",
-  "support": ["cursor"],
+  "support": ["agents"],
   "dependencies": {
     "@spaceflow/review": "latest"
   }
@@ -139,7 +139,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-详细的 CI 配置请参考 [GitHub Actions](/advanced/github-actions)。
+详细的 CI 配置请参考 [GitHub Actions](/guide/github-actions)。
 
 ## 下一步
 

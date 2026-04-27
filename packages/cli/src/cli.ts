@@ -40,7 +40,7 @@ function getEffectiveCwd(): string {
 }
 
 /**
- * 从 spaceflow.json / .spaceflowrc 读取外部扩展包名列表
+ * 从 Spaceflow 配置读取外部扩展包名列表
  */
 function readExternalExtensions(cwd: string): string[] {
   const deps = getExtensionDependencies(cwd, { local: true });
@@ -78,7 +78,7 @@ function normalizeDependencies(value: unknown): Record<string, string> {
 }
 
 /**
- * 比较 .spaceflowrc 与 .spaceflow/package.json 依赖是否一致
+ * 比较配置依赖与 .spaceflow/package.json 依赖是否一致
  * 说明：
  * - 只比较双方都存在的依赖（交集）
  * - 交集中任一依赖版本不一致即判定不一致
@@ -99,21 +99,14 @@ function isDependencyVersionConsistent(
 }
 
 /**
- * 若 .spaceflowrc 与 .spaceflow/package.json 的依赖版本不一致，删除 .spaceflow 目录
+ * 若配置依赖与 .spaceflow/package.json 的依赖版本不一致，删除 .spaceflow 目录
  */
 function resetSpaceflowDirOnDependencyMismatch(projectRoot: string, spaceflowDir: string): void {
   if (!existsSync(spaceflowDir)) {
     return;
   }
 
-  const rcPath = join(projectRoot, ".spaceflowrc");
-  const rcConfig = readJsonFile<Record<string, unknown>>(rcPath);
-  if (existsSync(rcPath) && !rcConfig) {
-    console.warn("⚠ .spaceflowrc 解析失败，跳过 .spaceflow 依赖一致性检查");
-    return;
-  }
-  const rcConfigSafe = rcConfig || {};
-  const rcDeps = normalizeDependencies(rcConfigSafe.dependencies);
+  const configDeps = getExtensionDependencies(projectRoot, { local: true });
 
   const pkgPath = join(spaceflowDir, "package.json");
   const pkg = readJsonFile<Record<string, unknown>>(pkgPath);
@@ -124,12 +117,12 @@ function resetSpaceflowDirOnDependencyMismatch(projectRoot: string, spaceflowDir
   const pkgSafe = pkg || {};
   const pkgDeps = normalizeDependencies(pkgSafe.dependencies);
 
-  if (isDependencyVersionConsistent(rcDeps, pkgDeps)) {
+  if (isDependencyVersionConsistent(configDeps, pkgDeps)) {
     return;
   }
 
   console.warn(
-    "⚠ 检测到 .spaceflowrc 与 .spaceflow/package.json 依赖版本不一致，删除 .spaceflow 目录重建",
+    "⚠ 检测到配置依赖与 .spaceflow/package.json 依赖版本不一致，删除 .spaceflow 目录重建",
   );
   try {
     rmSync(spaceflowDir, { recursive: true, force: true });
@@ -456,7 +449,7 @@ if (isMcpCommand()) {
   // 正常 CLI 流程
   // 0. 解析有效工作目录
   //    effectiveCwd: 用户实际所在目录（保持 process.cwd() 不变，build 等命令依赖它）
-  //    projectRoot:  .spaceflowrc 所在目录（决定 .spaceflow 目录位置和配置读取）
+  //    projectRoot:  Spaceflow 配置所在目录（决定 .spaceflow 目录位置和配置读取）
   const effectiveCwd = getEffectiveCwd();
   const projectRoot = findProjectRoot(effectiveCwd);
 
