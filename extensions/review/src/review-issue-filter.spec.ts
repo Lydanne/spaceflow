@@ -89,6 +89,7 @@ describe("ReviewIssueFilter", () => {
       getFileBlame: vi.fn().mockResolvedValue(new Map()),
       getFilesForCommit: vi.fn().mockResolvedValue([]),
       getWorkingFileContent: vi.fn().mockReturnValue(""),
+      getStagedFileContent: vi.fn().mockReturnValue(""),
       getCommitDiff: vi.fn().mockReturnValue([]),
     };
 
@@ -239,6 +240,33 @@ describe("ReviewIssueFilter", () => {
       const commits = [{ sha: "abc1234567890" }];
       const result = await resolver.getFileContents("o", "r", changedFiles, commits, "HEAD");
       expect(result.has("test.ts")).toBe(true);
+    });
+
+    it("暂存区模式应读取 staged 快照内容", async () => {
+      mockGitSdkService.getStagedFileContent.mockReturnValue("line1\nstaged\nline3");
+      mockGitSdkService.getWorkingFileContent.mockReturnValue("line1\nworking\nline3");
+      const changedFiles = [
+        {
+          filename: "test.ts",
+          status: "modified",
+          patch: "@@ -1,2 +1,3 @@\n line1\n+staged\n line3",
+        },
+      ];
+
+      const result = await resolver.getFileContents(
+        "o",
+        "r",
+        changedFiles,
+        [],
+        "HEAD",
+        undefined,
+        "staged",
+      );
+
+      expect(mockGitSdkService.getStagedFileContent).toHaveBeenCalledWith("test.ts");
+      expect(mockGitSdkService.getWorkingFileContent).not.toHaveBeenCalled();
+      const lines = result.get("test.ts");
+      expect(lines![1]).toEqual(["+local+", "staged"]);
     });
 
     it("should handle file content fetch error", async () => {

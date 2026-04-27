@@ -193,6 +193,8 @@ describe("ReviewService", () => {
       getCommitsBetweenRefs: vi.fn().mockResolvedValue([]),
       getDiffBetweenRefs: vi.fn().mockResolvedValue([]),
       getFileContent: vi.fn().mockResolvedValue(""),
+      getWorkingFileContent: vi.fn().mockReturnValue(""),
+      getStagedFileContent: vi.fn().mockReturnValue(""),
       getFilesForCommit: vi.fn().mockResolvedValue([]),
       getCurrentBranch: vi.fn().mockReturnValue("main"),
       getDefaultBranch: vi.fn().mockReturnValue("main"),
@@ -664,7 +666,9 @@ describe("ReviewService", () => {
         existingResult as any,
         service._resultModelDeps,
       );
-      const loadFromPrSpy = vi.spyOn(ReviewResultModel, "loadFromPr").mockResolvedValue(loadedModel);
+      const loadFromPrSpy = vi
+        .spyOn(ReviewResultModel, "loadFromPr")
+        .mockResolvedValue(loadedModel);
       const saveSpy = vi.spyOn(loadedModel, "save").mockResolvedValue(undefined as any);
 
       const context = {
@@ -793,15 +797,13 @@ describe("ReviewService", () => {
           ],
         ]),
       } as any);
-      buildFinalModelSpy.mockResolvedValue(
-        {
-          result: mockResult({
-            round: 1,
-            title: "Feat add login api",
-            issues: [mockIssue({ file: "src/a.ts", ruleId: "system:max-lines-per-file" })],
-          }),
-        } as any,
-      );
+      buildFinalModelSpy.mockResolvedValue({
+        result: mockResult({
+          round: 1,
+          title: "Feat add login api",
+          issues: [mockIssue({ file: "src/a.ts", ruleId: "system:max-lines-per-file" })],
+        }),
+      } as any);
       saveAndOutputSpy.mockResolvedValue(undefined);
 
       const result = await service.execute({

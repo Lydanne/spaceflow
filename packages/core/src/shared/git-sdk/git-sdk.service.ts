@@ -1,4 +1,4 @@
-import { spawn, execSync } from "child_process";
+import { spawn, execSync, execFileSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import type { GitCommit, GitChangedFile, GitDiffFile, GitRunOptions } from "./git-sdk.types";
@@ -119,11 +119,17 @@ export class GitSdkService {
     const lines = result.trim().split("\n").filter(Boolean);
 
     for (const line of lines) {
-      const [status, filename] = line.split("\t");
-      files.push({
-        filename,
-        status: mapGitStatus(status),
-      });
+      const [status, firstFilename, secondFilename] = line.split("\t");
+      const filename =
+        status?.startsWith("R") || status?.startsWith("C")
+          ? (secondFilename ?? firstFilename)
+          : firstFilename;
+      if (filename) {
+        files.push({
+          filename,
+          status: mapGitStatus(status),
+        });
+      }
     }
 
     return files;
@@ -225,6 +231,19 @@ export class GitSdkService {
     const cwd = options?.cwd || process.cwd();
     const filepath = path.join(cwd, filename);
     return fs.readFileSync(filepath, "utf-8");
+  }
+
+  /**
+   * 获取暂存区中文件的内容。
+   */
+  getStagedFileContent(filename: string, options?: GitRunOptions): string {
+    const opts = { ...this.defaultOptions, ...options };
+    return execFileSync("git", ["show", `:${filename}`], {
+      cwd: opts.cwd,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+      maxBuffer: opts.maxBuffer,
+    });
   }
 
   getCommitDiff(sha: string, options?: GitRunOptions): GitDiffFile[] {
@@ -367,7 +386,11 @@ export class GitSdkService {
     const files: GitChangedFile[] = [];
     const lines = output.trim().split("\n").filter(Boolean);
     for (const line of lines) {
-      const [status, filename] = line.split("\t");
+      const [status, firstFilename, secondFilename] = line.split("\t");
+      const filename =
+        status?.startsWith("R") || status?.startsWith("C")
+          ? (secondFilename ?? firstFilename)
+          : firstFilename;
       if (filename) {
         files.push({
           filename,

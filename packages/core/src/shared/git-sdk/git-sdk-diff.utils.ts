@@ -9,7 +9,7 @@ const GIT_STATUS_MAP: Record<string, string> = {
 };
 
 export function mapGitStatus(status: string): string {
-  return GIT_STATUS_MAP[status] || "modified";
+  return GIT_STATUS_MAP[status.charAt(0)] || "modified";
 }
 
 export function parseChangedLinesFromPatch(patch?: string): Set<number> {

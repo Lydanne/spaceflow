@@ -32,7 +32,7 @@ export const uninstallExtension = defineExtension({
         }
         const verbose = (options?.verbose ? 2 : 1) as VerboseLevel;
         const isGlobal = !!options?.global;
-        const uninstallService = new UninstallService();
+        const uninstallService = new UninstallService(ctx.cwd);
         await uninstallService.execute(name, isGlobal, verbose);
       },
     },

@@ -45,7 +45,7 @@ export class SchemaGeneratorService {
       target: "draft-07",
     }) as { properties?: Record<string, unknown>; [key: string]: unknown };
 
-    const properties: Record<string, unknown> = { ...(baseSchema.properties || {}) };
+    const properties: Record<string, unknown> = { ...baseSchema.properties };
 
     // 添加所有插件的 schema（扩展插件配置）
     for (const [configKey, registry] of schemaRegistry) {
@@ -89,7 +89,8 @@ export class SchemaGeneratorService {
    * 生成 JSON Schema 到默认路径 (.spaceflow/config-schema.json)
    */
   generate(): void {
-    const outputPath = path.join(process.cwd(), ".spaceflow", "config-schema.json");
+    const cwd = process.env.SPACEFLOW_CWD || process.cwd();
+    const outputPath = path.join(cwd, ".spaceflow", "config-schema.json");
     this.generateJsonSchema(outputPath);
   }
 

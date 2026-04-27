@@ -142,6 +142,7 @@ export class ReviewSourceResolver {
 
     const headSha = prModel ? await prModel.getHeadSha() : context.headRef || "HEAD";
     const collectedFiles = ChangedFileCollection.from(changedFiles);
+    const localContentMode = isDirectFileMode ? true : isLocalMode ? context.localMode : false;
     const fileContents = await this.getFileContents(
       context.owner,
       context.repo,
@@ -149,7 +150,7 @@ export class ReviewSourceResolver {
       commits,
       headSha,
       context.prNumber,
-      isLocalMode,
+      localContentMode,
       context.showAll,
       context.verbose,
     );
@@ -437,7 +438,7 @@ export class ReviewSourceResolver {
     commits: PullRequestCommit[],
     ref: string,
     prNumber?: number,
-    isLocalMode?: boolean,
+    localMode?: boolean | "uncommitted" | "staged",
     showAll?: boolean,
     verbose?: VerboseLevel,
   ): Promise<FileContentsMap> {
@@ -454,7 +455,9 @@ export class ReviewSourceResolver {
       if (file.filename && file.status !== "deleted") {
         try {
           let rawContent: string;
-          if (isLocalMode) {
+          if (localMode === "staged") {
+            rawContent = this.gitSdk.getStagedFileContent(file.filename);
+          } else if (localMode) {
             rawContent = this.gitSdk.getWorkingFileContent(file.filename);
           } else if (prNumber) {
             rawContent = await this.gitProvider.getFileContent(owner, repo, file.filename, ref);
@@ -479,7 +482,7 @@ export class ReviewSourceResolver {
           }
 
           let blameMap: Map<number, string> | undefined;
-          if (!isLocalMode) {
+          if (!localMode) {
             try {
               blameMap = await this.gitSdk.getFileBlame(ref, file.filename);
             } catch {

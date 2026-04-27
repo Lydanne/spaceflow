@@ -36,7 +36,7 @@ export const installExtension = defineExtension({
         const source = args[0];
         const verbose = (options?.verbose ? 2 : 1) as VerboseLevel;
         const schemaGenerator = new SchemaGeneratorService();
-        const installService = new InstallService(schemaGenerator);
+        const installService = new InstallService(schemaGenerator, ctx.cwd);
         // 无参数时，安装配置文件中的所有依赖
         if (!source) {
           if (options?.global) {

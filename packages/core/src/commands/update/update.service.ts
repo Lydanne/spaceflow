@@ -13,9 +13,9 @@ export interface UpdateOptions {
 }
 
 export class UpdateService {
-  protected getPackageManager(): string {
-    const cwd = process.cwd();
+  constructor(private readonly projectRoot = process.env.SPACEFLOW_CWD || process.cwd()) {}
 
+  protected getPackageManager(cwd = this.projectRoot): string {
     if (existsSync(join(cwd, "pnpm-lock.yaml"))) {
       try {
         execSync("pnpm --version", { stdio: "ignore" });
@@ -37,8 +37,8 @@ export class UpdateService {
     return "npm";
   }
 
-  protected isPnpmWorkspace(): boolean {
-    return existsSync(join(process.cwd(), "pnpm-workspace.yaml"));
+  protected isPnpmWorkspace(cwd = this.projectRoot): boolean {
+    return existsSync(join(cwd, "pnpm-workspace.yaml"));
   }
 
   isGitUrl(source: string): boolean {
@@ -83,8 +83,8 @@ export class UpdateService {
     }
   }
 
-  async getCurrentNpmVersion(packageName: string): Promise<string | null> {
-    const packageJsonPath = join(process.cwd(), "package.json");
+  async getCurrentNpmVersion(packageName: string, cwd = this.projectRoot): Promise<string | null> {
+    const packageJsonPath = join(cwd, "package.json");
 
     if (!existsSync(packageJsonPath)) {
       return null;
@@ -103,10 +103,16 @@ export class UpdateService {
     }
   }
 
-  async updateNpmPackage(packageName: string, verbose: VerboseLevel = 1): Promise<boolean> {
-    const pm = this.getPackageManager();
+  async updateNpmPackage(
+    packageName: string,
+    verbose: VerboseLevel = 1,
+    options?: { cwd?: string; dev?: boolean },
+  ): Promise<boolean> {
+    const cwd = options?.cwd ?? this.projectRoot;
+    const dev = options?.dev ?? true;
+    const pm = this.getPackageManager(cwd);
     const latestVersion = await this.getLatestNpmVersion(packageName);
-    const currentVersion = await this.getCurrentNpmVersion(packageName);
+    const currentVersion = await this.getCurrentNpmVersion(packageName, cwd);
 
     if (!latestVersion) {
       if (shouldLog(verbose, 1)) console.log(t("update:cannotGetLatest", { package: packageName }));
@@ -131,18 +137,19 @@ export class UpdateService {
 
     let cmd: string;
     if (pm === "pnpm") {
-      cmd = this.isPnpmWorkspace()
-        ? `pnpm add -wD ${packageName}@latest`
-        : `pnpm add -D ${packageName}@latest`;
+      const flags = [this.isPnpmWorkspace(cwd) ? "-w" : "", dev ? "-D" : ""]
+        .filter(Boolean)
+        .join(" ");
+      cmd = `pnpm add${flags ? ` ${flags}` : ""} ${packageName}@latest`;
     } else if (pm === "yarn") {
-      cmd = `yarn add -D ${packageName}@latest`;
+      cmd = dev ? `yarn add -D ${packageName}@latest` : `yarn add ${packageName}@latest`;
     } else {
-      cmd = `npm install -D ${packageName}@latest`;
+      cmd = dev ? `npm install -D ${packageName}@latest` : `npm install ${packageName}@latest`;
     }
 
     try {
       execSync(cmd, {
-        cwd: process.cwd(),
+        cwd,
         stdio: verbose ? "inherit" : "pipe",
       });
       return true;
@@ -275,7 +282,7 @@ export class UpdateService {
         execSync(cmd, { stdio: verbose ? "inherit" : "pipe" });
       } else {
         // 本地安装：在项目目录中更新
-        const cwd = installation.cwd || process.cwd();
+        const cwd = installation.cwd || this.projectRoot;
         let cmd: string;
 
         if (installation.pm === "pnpm") {
@@ -304,7 +311,7 @@ export class UpdateService {
   }
 
   async updateDependency(name: string, verbose: VerboseLevel = 1): Promise<boolean> {
-    const cwd = process.cwd();
+    const cwd = this.projectRoot;
     const dependencies = getExtensionDependencies(cwd);
 
     if (!dependencies[name]) {
@@ -318,7 +325,7 @@ export class UpdateService {
     if (shouldLog(verbose, 1)) console.log(t("update:updating", { name }));
 
     if (sourceType === "npm") {
-      return this.updateNpmPackage(source, verbose);
+      return this.updateNpmPackage(name, verbose, { cwd: join(cwd, ".spaceflow"), dev: false });
     } else if (sourceType === "git") {
       const depPath = join(cwd, ".spaceflow", "deps", name);
       return this.updateGitRepo(depPath, name, verbose);
@@ -329,7 +336,7 @@ export class UpdateService {
   }
 
   async updateAll(verbose: VerboseLevel = 1): Promise<void> {
-    const cwd = process.cwd();
+    const cwd = this.projectRoot;
     const dependencies = getExtensionDependencies(cwd);
 
     if (Object.keys(dependencies).length === 0) {
@@ -352,7 +359,10 @@ export class UpdateService {
 
       let success = false;
       if (sourceType === "npm") {
-        success = await this.updateNpmPackage(source, verbose);
+        success = await this.updateNpmPackage(name, verbose, {
+          cwd: join(cwd, ".spaceflow"),
+          dev: false,
+        });
       } else if (sourceType === "git") {
         const depPath = join(cwd, ".spaceflow", "deps", name);
         success = await this.updateGitRepo(depPath, name, verbose);

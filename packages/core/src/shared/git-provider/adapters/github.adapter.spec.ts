@@ -118,19 +118,21 @@ describe("GithubAdapter", () => {
 
   describe("lockBranch", () => {
     it("无白名单时应设置 restrictions", async () => {
-      fetchSpy.mockResolvedValue(mockResponse({}));
+      fetchSpy.mockResolvedValueOnce(mockResponse("Not Found", 404));
+      fetchSpy.mockResolvedValueOnce(mockResponse({}));
       await adapter.lockBranch("owner", "repo", "main");
-      const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      const body = JSON.parse(fetchSpy.mock.calls[1][1].body);
       expect(body.restrictions).toEqual({ users: [], teams: [] });
       expect(body.enforce_admins).toBe(true);
     });
 
     it("有白名单时应设置 restrictions.users", async () => {
-      fetchSpy.mockResolvedValue(mockResponse({}));
+      fetchSpy.mockResolvedValueOnce(mockResponse("Not Found", 404));
+      fetchSpy.mockResolvedValueOnce(mockResponse({}));
       await adapter.lockBranch("owner", "repo", "main", {
         pushWhitelistUsernames: ["bot"],
       });
-      const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      const body = JSON.parse(fetchSpy.mock.calls[1][1].body);
       expect(body.restrictions.users).toEqual(["bot"]);
     });
   });
@@ -150,6 +152,48 @@ describe("GithubAdapter", () => {
       fetchSpy.mockResolvedValue(mockResponse("Not Found", 404));
       const result = await adapter.unlockBranch("owner", "repo", "main");
       expect(result).toBeNull();
+    });
+
+    it("发布锁后解锁应恢复原保护规则", async () => {
+      const existing = {
+        required_status_checks: {
+          strict: true,
+          contexts: ["ci/test"],
+          checks: [{ context: "lint", app_id: 123 }],
+        },
+        enforce_admins: { enabled: false },
+        required_pull_request_reviews: {
+          required_approving_review_count: 2,
+          dismiss_stale_reviews: true,
+          require_code_owner_reviews: true,
+        },
+        restrictions: {
+          users: [{ login: "maintainer" }],
+          teams: [{ slug: "core" }],
+          apps: [{ slug: "deploy" }],
+        },
+      };
+
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(existing))
+        .mockResolvedValueOnce(mockResponse({}))
+        .mockResolvedValueOnce(mockResponse(existing));
+
+      await adapter.lockBranch("owner", "repo", "main");
+      const result = await adapter.unlockBranch("owner", "repo", "main");
+
+      expect(result).not.toBeNull();
+      expect(fetchSpy.mock.calls[2][1].method).toBe("PUT");
+      const body = JSON.parse(fetchSpy.mock.calls[2][1].body);
+      expect(body.required_status_checks.contexts).toEqual(["ci/test"]);
+      expect(body.required_status_checks.checks).toEqual([{ context: "lint", app_id: 123 }]);
+      expect(body.enforce_admins).toBe(false);
+      expect(body.required_pull_request_reviews.required_approving_review_count).toBe(2);
+      expect(body.restrictions).toEqual({
+        users: ["maintainer"],
+        teams: ["core"],
+        apps: ["deploy"],
+      });
     });
   });
 

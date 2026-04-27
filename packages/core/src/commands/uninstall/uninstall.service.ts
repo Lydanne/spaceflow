@@ -15,6 +15,8 @@ import {
 } from "@spaceflow/core";
 
 export class UninstallService {
+  constructor(private readonly projectRoot = process.env.SPACEFLOW_CWD || process.cwd()) {}
+
   /**
    * 从 .spaceflow/node_modules/ 目录卸载 Extension
    * 所有类型的 Extension 都通过 pnpm remove 卸载
@@ -24,7 +26,7 @@ export class UninstallService {
     isGlobal: boolean = false,
     verbose: VerboseLevel = 1,
   ): Promise<void> {
-    const spaceflowDir = getSpaceflowDir(isGlobal);
+    const spaceflowDir = getSpaceflowDir(isGlobal, this.projectRoot);
 
     if (shouldLog(verbose, 1)) {
       console.log(t("uninstall:uninstallingExtension", { name }));
@@ -41,7 +43,7 @@ export class UninstallService {
 
     try {
       execSync(cmd, {
-        cwd: process.cwd(),
+        cwd: this.projectRoot,
         stdio: verbose ? "inherit" : "pipe",
       });
     } catch {
@@ -61,7 +63,7 @@ export class UninstallService {
       }
     }
 
-    const cwd = process.cwd();
+    const cwd = this.projectRoot;
 
     // 1. 读取配置获取 source
     const dependencies = this.parseDependenciesFromLocalConfig(cwd);

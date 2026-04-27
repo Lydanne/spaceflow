@@ -39,12 +39,12 @@ export async function exec(
 
   // 4. 注册内部扩展
   for (const ext of internalExtensions) {
-    extensionLoader.registerExtension(ext);
+    await extensionLoader.registerExtension(ext);
   }
 
   // 5. 注册外部扩展（由 CLI 壳子加载并传入）
   for (const ext of extensions) {
-    extensionLoader.registerExtension(ext);
+    await extensionLoader.registerExtension(ext);
   }
 
   // 6. 创建 CLI 程序
@@ -61,6 +61,7 @@ export async function exec(
   const firstSubCmd = rawArgs.find((a) => !a.startsWith("-"));
   if (hasVersionFlag && !firstSubCmd) {
     console.log(versionOutput);
+    await extensionLoader.destroy();
     await container.destroy();
     process.exit(0);
   }
@@ -168,9 +169,11 @@ export async function exec(
     program.addCommand(command);
   }
 
-  // 9. 解析命令行参数
-  await program.parseAsync(process.argv);
-
-  // 10. 清理
-  await container.destroy();
+  // 9. 解析命令行参数，并在退出前清理扩展和服务
+  try {
+    await program.parseAsync(process.argv);
+  } finally {
+    await extensionLoader.destroy();
+    await container.destroy();
+  }
 }

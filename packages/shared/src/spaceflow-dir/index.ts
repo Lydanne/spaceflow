@@ -55,16 +55,18 @@ bin/
  *    读取其中声明的 @spaceflow/core 依赖版本，保证 cli 和 core 版本一致
  * 4. 兜底返回 "latest"
  */
-export function getSpaceflowCoreVersion(): string {
+export function getSpaceflowCoreVersion(cwd?: string): string {
+  const projectDir = cwd || process.cwd();
+
   // 1. 从 .spaceflowrc 的 dependencies 中读取用户显式指定的 @spaceflow/core 版本
-  const configDeps = getDependencies(undefined, { local: true });
+  const configDeps = getDependencies(projectDir, { local: true });
   const configCoreVersion = configDeps["@spaceflow/core"];
   if (configCoreVersion) {
     return configCoreVersion;
   }
 
   // 2. 读取当前目录 package.json，如果 @spaceflow/cli 是 workspace:* 则为开发模式
-  const rootPkgPath = join(process.cwd(), PACKAGE_JSON);
+  const rootPkgPath = join(projectDir, PACKAGE_JSON);
   if (existsSync(rootPkgPath)) {
     try {
       const rootPkg = JSON.parse(readFileSync(rootPkgPath, "utf-8"));
@@ -112,10 +114,10 @@ export function ensureSpaceflowPackageJson(spaceflowDir: string, cwd?: string): 
   ensureSpaceflowDir(spaceflowDir);
 
   const packageJsonPath = join(spaceflowDir, PACKAGE_JSON);
-  const coreVersion = getSpaceflowCoreVersion();
 
   // 只从当前目录级别读取扩展依赖（不向上遍历祖先目录）
   const projectDir = cwd || join(spaceflowDir, "..");
+  const coreVersion = getSpaceflowCoreVersion(projectDir);
   const extDeps = getDependencies(projectDir, { local: true });
 
   // 构建期望的 dependencies：@spaceflow/core + 所有扩展包
@@ -177,14 +179,14 @@ export function ensureDependencies(
     return;
   }
 
-  // 检查是否需要安装：node_modules 不存在，或有依赖包缺失
+  // 检查是否需要安装：node_modules 不存在，或有依赖包缺失/版本不一致
   let needsInstall = !existsSync(nodeModulesDir);
   if (!needsInstall) {
     try {
       const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
       const deps = pkg.dependencies || {};
-      for (const name of Object.keys(deps)) {
-        if (!existsSync(join(nodeModulesDir, ...name.split("/")))) {
+      for (const [name, expected] of Object.entries(deps) as [string, string][]) {
+        if (!isDependencyInstalled(nodeModulesDir, name, expected)) {
           needsInstall = true;
           break;
         }
@@ -204,6 +206,80 @@ export function ensureDependencies(
   } catch {
     console.warn(`⚠ ${pm} install 失败，部分扩展可能无法加载`);
   }
+}
+
+function isDependencyInstalled(nodeModulesDir: string, name: string, expected: string): boolean {
+  const packageDir = join(nodeModulesDir, ...name.split("/"));
+  if (!existsSync(packageDir)) {
+    return false;
+  }
+
+  if (!shouldCompareInstalledVersion(expected)) {
+    return true;
+  }
+
+  try {
+    const installedPkg = JSON.parse(readFileSync(join(packageDir, PACKAGE_JSON), "utf-8"));
+    return isVersionCompatible(installedPkg.version, expected);
+  } catch {
+    return false;
+  }
+}
+
+function shouldCompareInstalledVersion(expected: string): boolean {
+  return (
+    expected !== "latest" &&
+    !expected.startsWith("workspace:") &&
+    !expected.startsWith("link:") &&
+    !expected.startsWith("file:") &&
+    !expected.startsWith("git+")
+  );
+}
+
+function isVersionCompatible(installed: unknown, expected: string): boolean {
+  if (typeof installed !== "string" || !installed) {
+    return false;
+  }
+
+  const expectedVersion = parseSemver(expected.replace(/^[\^~\s]+/, ""));
+  const installedVersion = parseSemver(installed);
+  if (!expectedVersion || !installedVersion) {
+    return true;
+  }
+
+  if (expected.startsWith("^")) {
+    return (
+      installedVersion.major === expectedVersion.major &&
+      compareSemver(installedVersion, expectedVersion) >= 0
+    );
+  }
+  if (expected.startsWith("~")) {
+    return (
+      installedVersion.major === expectedVersion.major &&
+      installedVersion.minor === expectedVersion.minor &&
+      compareSemver(installedVersion, expectedVersion) >= 0
+    );
+  }
+  return compareSemver(installedVersion, expectedVersion) === 0;
+}
+
+function parseSemver(version: string): { major: number; minor: number; patch: number } | null {
+  const match = version.match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!match) {
+    return null;
+  }
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+  };
+}
+
+function compareSemver(
+  a: { major: number; minor: number; patch: number },
+  b: { major: number; minor: number; patch: number },
+): number {
+  return a.major - b.major || a.minor - b.minor || a.patch - b.patch;
 }
 
 /**

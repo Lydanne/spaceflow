@@ -74,10 +74,23 @@ export type PluginConfig = Record<
 };
 
 export class InstallService {
-  constructor(private readonly schemaGenerator: SchemaGeneratorService) {}
+  private readonly invocationCwd = process.cwd();
+
+  constructor(
+    private readonly schemaGenerator: SchemaGeneratorService,
+    private readonly projectRoot = process.env.SPACEFLOW_CWD || process.cwd(),
+  ) {}
+
+  private resolveInvocationPath(source: string): string {
+    return resolve(this.invocationCwd, source);
+  }
+
+  private toPosixPath(path: string): string {
+    return path.replaceAll("\\", "/");
+  }
 
   getContext(options: InstallOptions): InstallContext {
-    const cwd = process.cwd();
+    const cwd = this.projectRoot;
     const type = getSourceType(options.source);
     const name = options.name || extractName(options.source);
     const spaceflowDir = join(cwd, SPACEFLOW_DIR);
@@ -239,7 +252,7 @@ export class InstallService {
   async execute(context: InstallContext, verbose: VerboseLevel = 1): Promise<void> {
     const { source, type, depPath } = context;
     const name = context.name || extractName(source);
-    const cwd = process.cwd();
+    const cwd = this.projectRoot;
     const isGlobal = false;
 
     if (shouldLog(verbose, 1)) console.log(t("install:installingExtension", { source }));
@@ -260,7 +273,7 @@ export class InstallService {
 
     // 安装依赖和构建（对于本地路径的 Extension）
     if (type === "local") {
-      const sourcePath = resolve(cwd, source);
+      const sourcePath = this.resolveInvocationPath(normalizeSource(source));
       await this.ensureDependenciesAndBuild(sourcePath, name, verbose);
     }
 
@@ -289,18 +302,18 @@ export class InstallService {
     isGlobal: boolean = false,
     verbose: VerboseLevel = 1,
   ): Promise<void> {
-    const spaceflowDir = getSpaceflowDir(isGlobal);
+    const spaceflowDir = getSpaceflowDir(isGlobal, this.projectRoot);
 
     // 确保 .spaceflow 目录和 package.json 存在
-    ensureSpaceflowPackageJson(spaceflowDir);
+    ensureSpaceflowPackageJson(spaceflowDir, isGlobal ? undefined : this.projectRoot);
 
     // 根据类型构建 pnpm add 的参数
     let packageSpec: string;
     if (type === "local") {
       // 本地路径使用 link: 协议，相对于 .spaceflow 目录
-      const normalizedSource = normalizeSource(source);
+      const sourcePath = this.resolveInvocationPath(normalizeSource(source));
       // 计算相对于 .spaceflow 目录的路径
-      const relativePath = join("..", normalizedSource);
+      const relativePath = this.toPosixPath(relative(spaceflowDir, sourcePath));
       packageSpec = `link:${relativePath}`;
       if (shouldLog(verbose, 1)) {
         console.log(t("install:typeLocal"));
@@ -335,10 +348,10 @@ export class InstallService {
 
     try {
       execSync(cmd, {
-        cwd: process.cwd(),
+        cwd: this.invocationCwd,
         stdio: verbose ? "inherit" : "pipe",
       });
-    } catch (error) {
+    } catch {
       throw new Error(t("install:extensionInstallFailed", { source }));
     }
   }
@@ -353,11 +366,12 @@ export class InstallService {
     source: string,
     type: SourceType,
     spaceflowDir: string,
+    localBaseDir = this.projectRoot,
   ): Promise<string> {
     if (type === "local") {
       // 本地路径：读取 package.json 的 name 字段（先规范化）
       const normalizedSource = normalizeSource(source);
-      const sourcePath = resolve(process.cwd(), normalizedSource);
+      const sourcePath = resolve(localBaseDir, normalizedSource);
       const pkgJsonPath = join(sourcePath, "package.json");
       if (existsSync(pkgJsonPath)) {
         try {
@@ -483,7 +497,7 @@ export class InstallService {
     }
 
     // 计算相对路径
-    const cwd = process.cwd();
+    const cwd = this.invocationCwd;
     const depsDir = join(depPath, "..");
     const relativeSource = relative(depsDir, sourcePath);
 
@@ -567,7 +581,7 @@ export class InstallService {
       const home = process.env.HOME || process.env.USERPROFILE || "~";
       return join(home, ".spaceflow");
     }
-    return join(process.cwd(), ".spaceflow");
+    return join(this.projectRoot, ".spaceflow");
   }
 
   /**
@@ -607,14 +621,14 @@ export class InstallService {
       name: depName,
       depPath,
       pluginConfig,
-      cwd: process.cwd(),
+      cwd: this.projectRoot,
       isGlobal: true,
       verbose,
     });
 
     // 对于本地路径的 Extension，需要安装依赖和构建
     if (sourceType === "local") {
-      const sourcePath = resolve(process.cwd(), source);
+      const sourcePath = this.resolveInvocationPath(normalizeSource(source));
       await this.ensureDependenciesAndBuild(sourcePath, depName, verbose);
     }
 
@@ -628,9 +642,9 @@ export class InstallService {
    * 检查 .spaceflowrc 中声明的依赖是否有未安装的
    */
   hasMissingExtensions(): boolean {
-    const cwd = process.cwd();
+    const cwd = this.projectRoot;
     const dependencies = this.parseExtensionsFromConfig(cwd);
-    const spaceflowDir = getSpaceflowDir(false);
+    const spaceflowDir = getSpaceflowDir(false, cwd);
     const globalDir = getSpaceflowDir(true);
 
     for (const name of Object.keys(dependencies)) {
@@ -648,8 +662,8 @@ export class InstallService {
    * 先更新 .spaceflow/package.json，然后一次性安装所有依赖
    */
   async updateAllExtensions(options?: { verbose?: VerboseLevel }): Promise<void> {
-    const cwd = process.cwd();
-    const spaceflowDir = getSpaceflowDir(false);
+    const cwd = this.projectRoot;
+    const spaceflowDir = getSpaceflowDir(false, cwd);
     const verbose = options?.verbose ?? true;
 
     if (shouldLog(verbose, 1)) console.log(t("install:updatingAll"));
@@ -760,7 +774,7 @@ export class InstallService {
     verbose: VerboseLevel = 1,
   ): Promise<void> {
     // 确保目录和 package.json 存在
-    ensureSpaceflowPackageJson(spaceflowDir);
+    ensureSpaceflowPackageJson(spaceflowDir, this.projectRoot);
 
     const packageJsonPath = join(spaceflowDir, "package.json");
     const content = await readFile(packageJsonPath, "utf-8");
@@ -784,7 +798,8 @@ export class InstallService {
         packageSpec = source;
       } else if (sourceType === "local") {
         const normalizedSource = normalizeSource(source);
-        const relativePath = join("..", normalizedSource);
+        const sourcePath = resolve(this.projectRoot, normalizedSource);
+        const relativePath = this.toPosixPath(relative(spaceflowDir, sourcePath));
         packageSpec = `link:${relativePath}`;
         packageName = await this.getPackageNameFromSource(source, sourceType, spaceflowDir);
       } else if (sourceType === "git") {
@@ -1134,7 +1149,7 @@ export class InstallService {
    * 必须同时满足：命令可用 AND lock 文件存在
    */
   protected getPackageManager(): string {
-    const cwd = process.cwd();
+    const cwd = this.projectRoot;
 
     // pnpm: 命令可用 + pnpm-lock.yaml 存在
     if (existsSync(join(cwd, "pnpm-lock.yaml"))) {
@@ -1174,7 +1189,7 @@ export class InstallService {
    * 检测当前目录是否为 pnpm workspace
    */
   protected isPnpmWorkspace(): boolean {
-    const cwd = process.cwd();
+    const cwd = this.projectRoot;
     return existsSync(join(cwd, "pnpm-workspace.yaml"));
   }
 
@@ -1305,7 +1320,7 @@ export class InstallService {
     let helpContent = "";
     try {
       helpContent = execSync(`pnpm spaceflow ${name} --help 2>/dev/null`, {
-        cwd: process.cwd(),
+        cwd: this.projectRoot,
         encoding: "utf-8",
         timeout: 10000,
       }).trim();
@@ -1369,7 +1384,7 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
     // dependencies key 使用完整包名（npm 类型保留 @scope/ 前缀）
     const name =
       context.name || (type === "npm" ? extractNpmPackageName(source) : extractName(source));
-    const cwd = process.cwd();
+    const cwd = this.projectRoot;
 
     // 根据类型生成正确的 value（和 package.json 格式一致）
     let depValue: string;
@@ -1385,7 +1400,8 @@ description: ${pkgDescription || t("install:commandDefault", { name })}
       }
     } else if (type === "local") {
       // local 类型：写入 link: 格式
-      depValue = source.startsWith("link:") ? source : `link:${normalizeSource(source)}`;
+      const sourcePath = this.resolveInvocationPath(normalizeSource(source));
+      depValue = `link:${this.toPosixPath(relative(this.projectRoot, sourcePath))}`;
     } else {
       // git 类型：写入 git URL
       depValue = source.startsWith("git+") ? source : buildGitPackageSpec(source, context.ref);

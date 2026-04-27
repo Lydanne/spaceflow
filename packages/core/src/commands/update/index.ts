@@ -23,10 +23,10 @@ export const updateExtension = defineExtension({
           description: "详细输出",
         },
       ],
-      run: async (args, options, _ctx) => {
+      run: async (args, options, ctx) => {
         const name = args[0];
         const verbose = (options?.verbose ? 2 : 1) as VerboseLevel;
-        const updateService = new UpdateService();
+        const updateService = new UpdateService(ctx.cwd);
         if (options?.all) {
           await updateService.updateAll(verbose);
         } else if (name) {

@@ -162,6 +162,35 @@ describe("GiteaAdapter", () => {
       const result = await adapter.unlockBranch("owner", "repo", "main");
       expect(result).toBeNull();
     });
+
+    it("发布锁后解锁应恢复原保护规则", async () => {
+      const existing = [
+        {
+          rule_name: "main",
+          branch_name: "main",
+          enable_push: true,
+          required_approvals: 2,
+          enable_status_check: true,
+          status_check_contexts: ["ci/test"],
+        },
+      ];
+      const locked = { ...existing[0], enable_push: false };
+
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(existing))
+        .mockResolvedValueOnce(mockResponse(locked))
+        .mockResolvedValueOnce(mockResponse(existing[0]));
+
+      await adapter.lockBranch("owner", "repo", "main");
+      const result = await adapter.unlockBranch("owner", "repo", "main");
+
+      expect(result).toEqual(existing[0]);
+      expect(fetchSpy.mock.calls[2][1].method).toBe("PATCH");
+      const body = JSON.parse(fetchSpy.mock.calls[2][1].body);
+      expect(body.enable_push).toBe(true);
+      expect(body.required_approvals).toBe(2);
+      expect(body.status_check_contexts).toEqual(["ci/test"]);
+    });
   });
 
   // ============ Pull Request ============

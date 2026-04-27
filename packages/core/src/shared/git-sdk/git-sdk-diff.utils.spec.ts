@@ -8,6 +8,13 @@ import {
 } from "./git-sdk-diff.utils";
 
 describe("git-sdk-diff.utils", () => {
+  describe("mapGitStatus", () => {
+    it("should map rename and copy status with scores", () => {
+      expect(mapGitStatus("R100")).toBe("renamed");
+      expect(mapGitStatus("C75")).toBe("copied");
+    });
+  });
+
   describe("parseHunksFromPatch", () => {
     it("should parse single hunk", () => {
       const patch = `@@ -1,3 +1,4 @@

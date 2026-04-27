@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import type {
   GitProvider,
   LockBranchOptions,
@@ -47,6 +47,7 @@ interface GraphQLReviewThread {
 export class GithubAdapter implements GitProvider {
   protected readonly baseUrl: string;
   protected readonly token: string;
+  private readonly branchProtectionBackups = new Map<string, Record<string, unknown> | null>();
 
   constructor(protected readonly options: GitProviderModuleOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
@@ -123,6 +124,56 @@ export class GithubAdapter implements GitProvider {
       throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
     return response.text();
+  }
+
+  private branchProtectionKey(owner: string, repo: string, branch: string): string {
+    return `${owner}/${repo}:${branch}`;
+  }
+
+  private branchProtectionPath(owner: string, repo: string, branch: string): string {
+    return `/repos/${owner}/${repo}/branches/${encodeURIComponent(branch)}/protection`;
+  }
+
+  private async backupBranchProtection(owner: string, repo: string, branch: string): Promise<void> {
+    const key = this.branchProtectionKey(owner, repo, branch);
+    if (this.branchProtectionBackups.has(key)) return;
+
+    try {
+      const protection = await this.request<Record<string, unknown>>(
+        "GET",
+        this.branchProtectionPath(owner, repo, branch),
+      );
+      this.branchProtectionBackups.set(key, protection);
+    } catch (error) {
+      if (!this.isNotFoundError(error)) throw error;
+      this.branchProtectionBackups.set(key, null);
+    }
+  }
+
+  private isNotFoundError(error: unknown): boolean {
+    return error instanceof Error && error.message.includes("GitHub API error: 404");
+  }
+
+  private requestSync<T>(method: string, path: string, body?: unknown): T {
+    const args = [
+      "-fsS",
+      "-X",
+      method,
+      `${this.baseUrl}${path}`,
+      "-H",
+      `Authorization: Bearer ${this.token}`,
+      "-H",
+      "Accept: application/vnd.github+json",
+      "-H",
+      "Content-Type: application/json",
+      "-H",
+      "X-GitHub-Api-Version: 2022-11-28",
+    ];
+    if (body) {
+      args.push("--data", JSON.stringify(body));
+    }
+    const output = execFileSync("curl", args, { encoding: "utf-8" });
+    return output ? (JSON.parse(output) as T) : ({} as T);
   }
 
   // ============ 仓库操作 ============
@@ -207,6 +258,7 @@ export class GithubAdapter implements GitProvider {
     branch: string,
     options?: LockBranchOptions,
   ): Promise<BranchProtection> {
+    await this.backupBranchProtection(owner, repo, branch);
     const pushWhitelistUsernames = options?.pushWhitelistUsernames;
     const hasWhitelist = pushWhitelistUsernames && pushWhitelistUsernames.length > 0;
     const body: Record<string, unknown> = {
@@ -230,6 +282,30 @@ export class GithubAdapter implements GitProvider {
     repo: string,
     branch: string,
   ): Promise<BranchProtection | null> {
+    const key = this.branchProtectionKey(owner, repo, branch);
+    if (this.branchProtectionBackups.has(key)) {
+      const backup = this.branchProtectionBackups.get(key);
+      this.branchProtectionBackups.delete(key);
+
+      if (backup) {
+        const body = this.buildGithubProtectionRestoreBody(backup);
+        const result = await this.request<Record<string, unknown>>(
+          "PUT",
+          this.branchProtectionPath(owner, repo, branch),
+          body,
+        );
+        return this.mapGithubProtection(result, branch);
+      }
+
+      try {
+        const existing = await this.getBranchProtection(owner, repo, branch);
+        await this.deleteBranchProtection(owner, repo, branch);
+        return existing;
+      } catch {
+        return null;
+      }
+    }
+
     try {
       const existing = await this.getBranchProtection(owner, repo, branch);
       await this.deleteBranchProtection(owner, repo, branch);
@@ -241,10 +317,22 @@ export class GithubAdapter implements GitProvider {
 
   unlockBranchSync(owner: string, repo: string, branch: string): void {
     try {
-      execSync(
-        `curl -s -X DELETE "${this.baseUrl}/repos/${owner}/${repo}/branches/${branch}/protection" -H "Authorization: Bearer ${this.token}" -H "Accept: application/vnd.github+json"`,
-        { encoding: "utf-8" },
-      );
+      const key = this.branchProtectionKey(owner, repo, branch);
+      if (this.branchProtectionBackups.has(key)) {
+        const backup = this.branchProtectionBackups.get(key);
+        this.branchProtectionBackups.delete(key);
+        if (backup) {
+          this.requestSync<Record<string, unknown>>(
+            "PUT",
+            this.branchProtectionPath(owner, repo, branch),
+            this.buildGithubProtectionRestoreBody(backup),
+          );
+          console.log(`✅ 分支保护已恢复（同步）: ${branch}`);
+          return;
+        }
+      }
+
+      this.requestSync<void>("DELETE", this.branchProtectionPath(owner, repo, branch));
       console.log(`✅ 分支已解锁（同步）: ${branch}`);
     } catch (error) {
       console.error("⚠️ 同步解锁分支失败:", error instanceof Error ? error.message : error);
@@ -1025,6 +1113,112 @@ export class GithubAdapter implements GitProvider {
         : null,
     };
     return body;
+  }
+
+  protected buildGithubProtectionRestoreBody(
+    data: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return {
+      required_status_checks: this.buildGithubStatusChecks(data.required_status_checks),
+      enforce_admins: this.buildGithubEnforceAdmins(data.enforce_admins),
+      required_pull_request_reviews: this.buildGithubPullRequestReviews(
+        data.required_pull_request_reviews,
+      ),
+      restrictions: this.buildGithubRestrictions(data.restrictions),
+    };
+  }
+
+  private buildGithubStatusChecks(value: unknown): Record<string, unknown> | null {
+    if (!this.isRecord(value)) return null;
+
+    const contexts = this.toStringArray(value.contexts);
+    const checks = Array.isArray(value.checks)
+      ? value.checks
+          .filter((check): check is Record<string, unknown> => this.isRecord(check))
+          .map((check) => ({
+            context: typeof check.context === "string" ? check.context : "",
+            app_id: typeof check.app_id === "number" ? check.app_id : null,
+          }))
+          .filter((check) => check.context)
+      : [];
+
+    return {
+      strict: Boolean(value.strict),
+      contexts,
+      checks,
+    };
+  }
+
+  private buildGithubEnforceAdmins(value: unknown): boolean {
+    if (typeof value === "boolean") return value;
+    if (this.isRecord(value)) return Boolean(value.enabled);
+    return false;
+  }
+
+  private buildGithubPullRequestReviews(value: unknown): Record<string, unknown> | null {
+    if (!this.isRecord(value)) return null;
+
+    const result: Record<string, unknown> = {};
+    const optionalBooleans = [
+      "dismiss_stale_reviews",
+      "require_code_owner_reviews",
+      "require_last_push_approval",
+    ];
+    for (const key of optionalBooleans) {
+      if (typeof value[key] === "boolean") {
+        result[key] = value[key];
+      }
+    }
+
+    if (typeof value.required_approving_review_count === "number") {
+      result.required_approving_review_count = value.required_approving_review_count;
+    }
+
+    const dismissalRestrictions = this.buildGithubRestrictions(value.dismissal_restrictions);
+    if (dismissalRestrictions) {
+      result.dismissal_restrictions = dismissalRestrictions;
+    }
+
+    const bypassAllowances = this.buildGithubRestrictions(value.bypass_pull_request_allowances);
+    if (bypassAllowances) {
+      result.bypass_pull_request_allowances = bypassAllowances;
+    }
+
+    return result;
+  }
+
+  private buildGithubRestrictions(value: unknown): Record<string, string[]> | null {
+    if (!this.isRecord(value)) return null;
+    return {
+      users: this.pickGithubActors(value.users, "login"),
+      teams: this.pickGithubActors(value.teams, "slug"),
+      apps: this.pickGithubActors(value.apps, "slug", "name"),
+    };
+  }
+
+  private pickGithubActors(value: unknown, ...keys: string[]): string[] {
+    if (!Array.isArray(value)) return [];
+    return value.flatMap((item) => {
+      if (typeof item === "string") return [item];
+      if (!this.isRecord(item)) return [];
+      for (const key of keys) {
+        const actorName = item[key];
+        if (typeof actorName === "string" && actorName.length > 0) {
+          return [actorName];
+        }
+      }
+      return [];
+    });
+  }
+
+  private toStringArray(value: unknown): string[] {
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === "string")
+      : [];
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
   }
 
   protected mapReviewEvent(event?: string): string {

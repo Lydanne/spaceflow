@@ -1,5 +1,6 @@
 import type { ExtensionDefinition, CommandDefinition } from "@spaceflow/core";
 import type { SpaceflowContext } from "@spaceflow/core";
+import { registerPluginSchema } from "../config/schema-generator.service";
 
 /**
  * 扩展加载器
@@ -24,12 +25,18 @@ export class ExtensionLoader {
   /**
    * 注册扩展
    */
-  registerExtension(extension: ExtensionDefinition): void {
+  async registerExtension(extension: ExtensionDefinition): Promise<void> {
     this.extensions.set(extension.name, extension);
 
     // 注册配置 schema
     if (extension.configSchema && extension.configKey) {
-      this.ctx.config.registerSchema(extension.configKey, extension.configSchema());
+      const schemaFactory = extension.configSchema;
+      this.ctx.config.registerSchema(extension.configKey, schemaFactory());
+      registerPluginSchema({
+        configKey: extension.configKey,
+        schemaFactory,
+        description: extension.description,
+      });
     }
 
     // 注册命令
@@ -47,7 +54,19 @@ export class ExtensionLoader {
 
     // 调用初始化钩子
     if (extension.onInit) {
-      extension.onInit(this.ctx);
+      await extension.onInit(this.ctx);
+    }
+  }
+
+  /**
+   * 销毁已注册扩展
+   */
+  async destroy(): Promise<void> {
+    const extensions = Array.from(this.extensions.values()).reverse();
+    for (const extension of extensions) {
+      if (extension.onDestroy) {
+        await extension.onDestroy(this.ctx);
+      }
     }
   }
 

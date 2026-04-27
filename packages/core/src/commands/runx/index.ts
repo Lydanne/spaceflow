@@ -25,12 +25,12 @@ export const runxExtension = defineExtension({
           description: "详细输出",
         },
       ],
-      run: async (args, options, _ctx) => {
+      run: async (args, options, ctx) => {
         const source = args[0];
         const cmdArgs = args.slice(1);
         const verbose = (options?.verbose ? 2 : 1) as VerboseLevel;
         const schemaGenerator = new SchemaGeneratorService();
-        const installService = new InstallService(schemaGenerator);
+        const installService = new InstallService(schemaGenerator, ctx.cwd);
         const runxService = new RunxService(installService);
         await runxService.execute({
           source,

@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { parseDiffText } from "../../git-sdk/git-sdk-diff.utils";
 import type {
   GitProvider,
@@ -38,6 +38,7 @@ import {
 export class GiteaAdapter implements GitProvider {
   protected readonly baseUrl: string;
   protected readonly token: string;
+  private readonly branchProtectionBackups = new Map<string, BranchProtection | null>();
 
   constructor(protected readonly options: GitProviderModuleOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
@@ -87,6 +88,64 @@ export class GiteaAdapter implements GitProvider {
       );
     }
     return response.text();
+  }
+
+  private branchProtectionKey(owner: string, repo: string, branch: string): string {
+    return `${owner}/${repo}:${branch}`;
+  }
+
+  private cloneBranchProtection(protection: BranchProtection): BranchProtection {
+    return JSON.parse(JSON.stringify(protection)) as BranchProtection;
+  }
+
+  private async findBranchProtection(
+    owner: string,
+    repo: string,
+    branch: string,
+  ): Promise<BranchProtection | undefined> {
+    const protections = await this.listBranchProtections(owner, repo);
+    return protections.find((p) => p.rule_name === branch || p.branch_name === branch);
+  }
+
+  private async restoreBranchProtection(
+    owner: string,
+    repo: string,
+    branch: string,
+    backup: BranchProtection,
+  ): Promise<BranchProtection> {
+    const ruleName = backup.rule_name || branch;
+    try {
+      return await this.editBranchProtection(owner, repo, ruleName, backup);
+    } catch (error) {
+      if (!this.isNotFoundError(error)) throw error;
+      return this.createBranchProtection(owner, repo, {
+        ...backup,
+        rule_name: backup.rule_name || branch,
+        branch_name: backup.branch_name || branch,
+      });
+    }
+  }
+
+  private isNotFoundError(error: unknown): boolean {
+    return error instanceof Error && error.message.includes("Gitea API error: 404");
+  }
+
+  private requestSync<T>(method: string, path: string, body?: unknown): T {
+    const args = [
+      "-fsS",
+      "-X",
+      method,
+      `${this.baseUrl}/api/v1${path}`,
+      "-H",
+      `Authorization: token ${this.token}`,
+      "-H",
+      "Content-Type: application/json",
+    ];
+    if (body) {
+      args.push("--data", JSON.stringify(body));
+    }
+    const output = execFileSync("curl", args, { encoding: "utf-8" });
+    return output ? (JSON.parse(output) as T) : ({} as T);
   }
 
   // ============ 仓库操作 ============
@@ -157,6 +216,10 @@ export class GiteaAdapter implements GitProvider {
   ): Promise<BranchProtection> {
     const protections = await this.listBranchProtections(owner, repo);
     const existing = protections.find((p) => p.rule_name === branch || p.branch_name === branch);
+    const key = this.branchProtectionKey(owner, repo, branch);
+    if (!this.branchProtectionBackups.has(key)) {
+      this.branchProtectionBackups.set(key, existing ? this.cloneBranchProtection(existing) : null);
+    }
     const pushWhitelistUsernames = options?.pushWhitelistUsernames;
     const hasWhitelist = pushWhitelistUsernames && pushWhitelistUsernames.length > 0;
     const protectionOptions = hasWhitelist
@@ -187,6 +250,23 @@ export class GiteaAdapter implements GitProvider {
     repo: string,
     branch: string,
   ): Promise<BranchProtection | null> {
+    const key = this.branchProtectionKey(owner, repo, branch);
+    if (this.branchProtectionBackups.has(key)) {
+      const backup = this.branchProtectionBackups.get(key);
+      this.branchProtectionBackups.delete(key);
+
+      if (backup) {
+        return this.restoreBranchProtection(owner, repo, branch, backup);
+      }
+
+      const existing = await this.findBranchProtection(owner, repo, branch);
+      if (existing) {
+        await this.deleteBranchProtection(owner, repo, existing.rule_name || branch);
+        return existing;
+      }
+      return null;
+    }
+
     const protections = await this.listBranchProtections(owner, repo);
     const existing = protections.find((p) => p.rule_name === branch || p.branch_name === branch);
     if (existing) {
@@ -198,25 +278,37 @@ export class GiteaAdapter implements GitProvider {
 
   unlockBranchSync(owner: string, repo: string, branch: string): void {
     try {
-      const listResult = execSync(
-        `curl -s -X GET "${this.baseUrl}/api/v1/repos/${owner}/${repo}/branch_protections" -H "Authorization: token ${this.token}"`,
-        { encoding: "utf-8" },
-      );
-      const protections = JSON.parse(listResult) as Array<{
-        rule_name?: string;
-        branch_name?: string;
-      }>;
-      const existing = protections.find((p) => p.rule_name === branch || p.branch_name === branch);
-      if (existing) {
-        const ruleName = existing.rule_name || branch;
-        execSync(
-          `curl -s -X DELETE "${this.baseUrl}/api/v1/repos/${owner}/${repo}/branch_protections/${ruleName}" -H "Authorization: token ${this.token}"`,
-          { encoding: "utf-8" },
-        );
-        console.log(`✅ 分支已解锁（同步）: ${ruleName}`);
-      } else {
-        console.log(`✅ 分支本身没有保护规则，无需解锁`);
+      const key = this.branchProtectionKey(owner, repo, branch);
+      if (this.branchProtectionBackups.has(key)) {
+        const backup = this.branchProtectionBackups.get(key);
+        this.branchProtectionBackups.delete(key);
+        if (backup) {
+          const ruleName = backup.rule_name || branch;
+          this.requestSync<BranchProtection>(
+            "PATCH",
+            `/repos/${owner}/${repo}/branch_protections/${encodeURIComponent(ruleName)}`,
+            backup,
+          );
+          console.log(`✅ 分支保护已恢复（同步）: ${ruleName}`);
+          return;
+        }
       }
+
+      const protections = this.requestSync<BranchProtection[]>(
+        "GET",
+        `/repos/${owner}/${repo}/branch_protections`,
+      );
+      const existing = protections.find((p) => p.rule_name === branch || p.branch_name === branch);
+      if (!existing) {
+        console.log(`✅ 分支本身没有保护规则，无需解锁`);
+        return;
+      }
+      const ruleName = existing.rule_name || branch;
+      this.requestSync<void>(
+        "DELETE",
+        `/repos/${owner}/${repo}/branch_protections/${encodeURIComponent(ruleName)}`,
+      );
+      console.log(`✅ 分支已解锁（同步）: ${ruleName}`);
     } catch (error) {
       console.error("⚠️ 同步解锁分支失败:", error instanceof Error ? error.message : error);
     }
