@@ -264,6 +264,7 @@ export class ReviewResultModel {
    * - 存储所有 reactions 到 issue.reactions 字段
    * - 存储评论回复到 issue.replies 字段
    * - 如果评论有 ☹️ (confused) reaction，将对应的问题标记为无效
+   * - 如果评论有 👍 (+1) reaction，将对应的问题标记为已解决且已验收
    * - 如果评论有 👎 (-1) reaction，将对应的问题标记为未解决
    */
   async syncReactions(verbose?: VerboseLevel): Promise<void> {
@@ -403,6 +404,24 @@ export class ReviewResultModel {
             matchedIssue.valid = "false";
             console.log(
               `☹️ 问题已标记为无效: ${matchedIssue.file}:${matchedIssue.line} (by 评审人: ${reviewerConfused.join(", ")})`,
+            );
+          }
+          // 检查是否有评审人的 👍 (+1) reaction，标记为已解决且已验收
+          const thumbsUpUsers = reactionMap.get("+1") || [];
+          const reviewerThumbsUp = thumbsUpUsers.filter((u) => reviewers.has(u));
+          if (reviewerThumbsUp.length > 0 && (!matchedIssue.resolved || !matchedIssue.fixed)) {
+            const now = new Date().toISOString();
+            const acceptedBy = { login: reviewerThumbsUp[0] };
+            if (!matchedIssue.resolved) {
+              matchedIssue.resolved = now;
+              matchedIssue.resolvedBy = acceptedBy;
+            }
+            if (!matchedIssue.fixed) {
+              matchedIssue.fixed = now;
+              matchedIssue.fixedBy = acceptedBy;
+            }
+            console.log(
+              `👍 问题已标记为已解决并已验收: ${matchedIssue.file}:${matchedIssue.line} (by 评审人: ${reviewerThumbsUp.join(", ")})`,
             );
           }
           // 检查是否有评审人的 👎 (-1) reaction，标记为未解决
