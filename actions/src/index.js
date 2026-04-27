@@ -3,6 +3,7 @@ const exec = require("@actions/exec");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const { buildProductionArgs, resolveProviderUrl } = require("./runtime");
 
 const OUTPUT_MARKER_START = "::spaceflow-output::";
 const OUTPUT_MARKER_END = "::end::";
@@ -165,7 +166,10 @@ async function run() {
     const devMode = core.getInput("dev-mode") === "true";
 
     // Get Git Provider server url and token from input or environment variables
-    const providerUrl = core.getInput("provider-url") || process.env.GIT_PROVIDER_URL || process.env.GITEA_SERVER_URL || "";
+    const providerUrl = resolveProviderUrl({
+      inputProviderUrl: core.getInput("provider-url"),
+      env: process.env,
+    });
     const providerToken =
       core.getInput("provider-token") || process.env.GIT_PROVIDER_TOKEN || process.env.GITHUB_TOKEN || process.env.GITEA_TOKEN || "";
 
@@ -212,11 +216,7 @@ async function run() {
     } else {
       // Production mode: use npx to install and run from local path
       execCmd = "npx";
-      cmdArgs = ["-y", "@spaceflow/cli", command];
-      if (args) {
-        cmdArgs.push(...args.split(/\s+/).filter(Boolean));
-      }
-      cmdArgs.push("--ci");
+      cmdArgs = buildProductionArgs(command, args);
       execCwd = workingDirectory;
     }
 

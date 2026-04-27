@@ -163,6 +163,26 @@ describe("GiteaAdapter", () => {
       expect(result).toBeNull();
     });
 
+    it("发布锁创建临时规则后解锁应删除临时规则", async () => {
+      const locked = { rule_name: "main", branch_name: "main", enable_push: false };
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse([]))
+        .mockResolvedValueOnce(mockResponse(locked))
+        .mockResolvedValueOnce(mockResponse([locked]))
+        .mockResolvedValueOnce(mockResponse("", 204));
+
+      await adapter.lockBranch("owner", "repo", "main");
+      const result = await adapter.unlockBranch("owner", "repo", "main");
+
+      expect(result).toEqual(locked);
+      expect(fetchSpy.mock.calls.map((call) => call[1].method)).toEqual([
+        "GET",
+        "POST",
+        "GET",
+        "DELETE",
+      ]);
+    });
+
     it("发布锁后解锁应恢复原保护规则", async () => {
       const existing = [
         {
@@ -190,6 +210,67 @@ describe("GiteaAdapter", () => {
       expect(body.enable_push).toBe(true);
       expect(body.required_approvals).toBe(2);
       expect(body.status_check_contexts).toEqual(["ci/test"]);
+    });
+
+    it("恢复原保护规则时 PATCH 不存在应重新创建规则", async () => {
+      const existing = {
+        rule_name: "main",
+        branch_name: "main",
+        enable_push: true,
+        required_approvals: 2,
+      };
+      const locked = { ...existing, enable_push: false };
+
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse([existing]))
+        .mockResolvedValueOnce(mockResponse(locked))
+        .mockResolvedValueOnce(mockResponse("Not Found", 404))
+        .mockResolvedValueOnce(mockResponse(existing));
+
+      await adapter.lockBranch("owner", "repo", "main");
+      const result = await adapter.unlockBranch("owner", "repo", "main");
+
+      expect(result).toEqual(existing);
+      expect(fetchSpy.mock.calls.map((call) => call[1].method)).toEqual([
+        "GET",
+        "PATCH",
+        "PATCH",
+        "POST",
+      ]);
+      const createBody = JSON.parse(fetchSpy.mock.calls[3][1].body);
+      expect(createBody).toEqual(existing);
+    });
+
+    it("重复加锁时不应覆盖首次备份的原保护规则", async () => {
+      const existing = {
+        rule_name: "main",
+        branch_name: "main",
+        enable_push: true,
+        required_approvals: 2,
+      };
+      const locked = { ...existing, enable_push: false };
+
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse([existing]))
+        .mockResolvedValueOnce(mockResponse(locked))
+        .mockResolvedValueOnce(mockResponse([locked]))
+        .mockResolvedValueOnce(mockResponse(locked))
+        .mockResolvedValueOnce(mockResponse(existing));
+
+      await adapter.lockBranch("owner", "repo", "main");
+      await adapter.lockBranch("owner", "repo", "main");
+      await adapter.unlockBranch("owner", "repo", "main");
+
+      expect(fetchSpy.mock.calls.map((call) => call[1].method)).toEqual([
+        "GET",
+        "PATCH",
+        "GET",
+        "PATCH",
+        "PATCH",
+      ]);
+      const restoreBody = JSON.parse(fetchSpy.mock.calls[4][1].body);
+      expect(restoreBody.enable_push).toBe(true);
+      expect(restoreBody.required_approvals).toBe(2);
     });
   });
 

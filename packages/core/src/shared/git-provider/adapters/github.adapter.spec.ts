@@ -154,6 +154,25 @@ describe("GithubAdapter", () => {
       expect(result).toBeNull();
     });
 
+    it("发布锁创建临时保护后解锁应删除临时保护", async () => {
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse("Not Found", 404))
+        .mockResolvedValueOnce(mockResponse({}))
+        .mockResolvedValueOnce(mockResponse({ url: "...", restrictions: { users: [], teams: [] } }))
+        .mockResolvedValueOnce(mockResponse("", 204));
+
+      await adapter.lockBranch("owner", "repo", "main");
+      const result = await adapter.unlockBranch("owner", "repo", "main");
+
+      expect(result).not.toBeNull();
+      expect(fetchSpy.mock.calls.map((call) => call[1].method)).toEqual([
+        "GET",
+        "PUT",
+        "GET",
+        "DELETE",
+      ]);
+    });
+
     it("发布锁后解锁应恢复原保护规则", async () => {
       const existing = {
         required_status_checks: {
@@ -194,6 +213,42 @@ describe("GithubAdapter", () => {
         teams: ["core"],
         apps: ["deploy"],
       });
+    });
+
+    it("重复加锁时不应覆盖首次备份的原保护规则", async () => {
+      const existing = {
+        required_status_checks: {
+          strict: true,
+          contexts: ["ci/test"],
+        },
+        enforce_admins: { enabled: false },
+        required_pull_request_reviews: null,
+        restrictions: {
+          users: [{ login: "maintainer" }],
+          teams: [],
+          apps: [],
+        },
+      };
+
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse(existing))
+        .mockResolvedValueOnce(mockResponse({}))
+        .mockResolvedValueOnce(mockResponse({}))
+        .mockResolvedValueOnce(mockResponse(existing));
+
+      await adapter.lockBranch("owner", "repo", "main");
+      await adapter.lockBranch("owner", "repo", "main", { pushWhitelistUsernames: ["bot"] });
+      await adapter.unlockBranch("owner", "repo", "main");
+
+      expect(fetchSpy.mock.calls.map((call) => call[1].method)).toEqual([
+        "GET",
+        "PUT",
+        "PUT",
+        "PUT",
+      ]);
+      const restoreBody = JSON.parse(fetchSpy.mock.calls[3][1].body);
+      expect(restoreBody.required_status_checks.contexts).toEqual(["ci/test"]);
+      expect(restoreBody.restrictions.users).toEqual(["maintainer"]);
     });
   });
 

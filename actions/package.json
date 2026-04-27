@@ -6,7 +6,8 @@
   "license": "MIT",
   "main": "dist/index.js",
   "scripts": {
-    "build": "ncc build src/index.js -o dist --source-map --license licenses.txt"
+    "build": "ncc build src/index.js -o dist --source-map --license licenses.txt",
+    "test": "vitest run src/runtime.spec.js"
   },
   "dependencies": {
     "@actions/cache": "^5.0.1",
@@ -14,6 +15,7 @@
     "@actions/exec": "^2.0.0"
   },
   "devDependencies": {
-    "@vercel/ncc": "^0.38.3"
+    "@vercel/ncc": "^0.38.3",
+    "vitest": "catalog:"
   }
 }
