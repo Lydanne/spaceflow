@@ -1,5 +1,26 @@
 # Changelog
 
+## [5.0.3](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shared@5.0.2...@spaceflow/shared@5.0.3) (2026-04-27)
+
+### 修复BUG
+
+* **review:** 修复点赞验收同步状态 ([5dc4413](https://github.com/Lydanne/spaceflow/commit/5dc441392e2f9849de557ee297dd84a33282aa60))
+* **spaceflow:** 修复审查发现的系统逻辑问题 ([7142050](https://github.com/Lydanne/spaceflow/commit/7142050bf90d67c4c974f2beffdff4d1303d49ae))
+
+### 测试用例
+
+* **spaceflow:** 补充逻辑修复回归测试 ([885d151](https://github.com/Lydanne/spaceflow/commit/885d151059a7fb72cbffe5aeb72872796529c7b3))
+
+### 其他修改
+
+* **cli:** released version 5.0.3 [no ci] ([295cae7](https://github.com/Lydanne/spaceflow/commit/295cae7f1907d686570ad2fd0483edfa93a12fd2))
+* **core:** released version 5.2.2 [no ci] ([8bf1577](https://github.com/Lydanne/spaceflow/commit/8bf1577d1520192b53e16971ed95f7c8cb0b8131))
+* **publish:** released version 5.0.6 [no ci] ([0fc8b8c](https://github.com/Lydanne/spaceflow/commit/0fc8b8c37411a795fdb64a7d39e60fa8e47eb89f))
+* **review-summary:** released version 5.0.15 [no ci] ([33f2091](https://github.com/Lydanne/spaceflow/commit/33f209132a61d7abb5a6fe7581185d7d56cc4c9a))
+* **review:** released version 5.2.10 [no ci] ([507e62b](https://github.com/Lydanne/spaceflow/commit/507e62bbfe34d1cb98c7554442279c9f88959576))
+* **scripts:** released version 5.0.6 [no ci] ([7195c7a](https://github.com/Lydanne/spaceflow/commit/7195c7a981227d44cf965bb86d5db785c1a93971))
+* **shell:** released version 5.0.6 [no ci] ([274b884](https://github.com/Lydanne/spaceflow/commit/274b884bf963bdc1473ee6bbbd35aed6bfb24c6f))
+
 ## [5.0.2](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shared@5.0.1...@spaceflow/shared@5.0.2) (2026-04-27)
 
 ### 新特性
