@@ -13,6 +13,9 @@
   "bugs": {
     "url": "https://github.com/Lydanne/spaceflow/issues"
   },
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "setup": "pnpm --filter @spaceflow/shared build && pnpm --filter @spaceflow/core build && pnpm --filter @spaceflow/cli build && pnpm install && pnpm --filter \"!@spaceflow/shared\" --filter \"!@spaceflow/core\" --filter \"!@spaceflow/cli\" build",
     "build": "pnpm --filter @spaceflow/shared build && pnpm --filter @spaceflow/core build && pnpm --filter @spaceflow/cli build && pnpm --filter \"!@spaceflow/shared\" --filter \"!@spaceflow/core\" --filter \"!@spaceflow/cli\" build",
