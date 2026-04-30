@@ -1,5 +1,19 @@
 # Changelog
 
+## [5.2.4](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@5.2.3...@spaceflow/core@5.2.4) (2026-04-30)
+
+### 测试用例
+
+* **core:** 添加配置加载测试并优化默认值处理 ([7ce3584](https://github.com/Lydanne/spaceflow/commit/7ce35841f6588811b7715665fd6f914a461bd362))
+
+### 其他修改
+
+* **publish:** released version 5.0.7 [no ci] ([d29f585](https://github.com/Lydanne/spaceflow/commit/d29f58506e33eab369d5eafdaddb4248dda569fa))
+* **review-summary:** released version 5.0.16 [no ci] ([115d904](https://github.com/Lydanne/spaceflow/commit/115d9042af13f97025061674cb03e0fd50a7c393))
+* **review:** released version 5.2.11 [no ci] ([4476549](https://github.com/Lydanne/spaceflow/commit/4476549401cee11e08d52f09bf2f206c669b59c3))
+* **scripts:** released version 5.0.7 [no ci] ([3138f46](https://github.com/Lydanne/spaceflow/commit/3138f466279bb1b2e1a77050a184aac19c27d517))
+* **shell:** released version 5.0.7 [no ci] ([5c4d72b](https://github.com/Lydanne/spaceflow/commit/5c4d72b338125073b0aec8f59f6cb5164534fd72))
+
 ## [5.2.3](https://github.com/Lydanne/spaceflow/compare/@spaceflow/core@5.2.2...@spaceflow/core@5.2.3) (2026-04-27)
 
 ### 修复BUG
