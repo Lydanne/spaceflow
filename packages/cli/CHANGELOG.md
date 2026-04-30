@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.1.2](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@5.1.1...@spaceflow/cli@5.1.2) (2026-04-30)
+
+### 其他修改
+
+* **cli:** 优化依赖不一致时的警告提示信息 ([8d435c8](https://github.com/Lydanne/spaceflow/commit/8d435c84e09c9b62afb7bfb64113dcd6072948fd))
+* **core:** released version 5.2.5 [no ci] ([037688a](https://github.com/Lydanne/spaceflow/commit/037688ae0a2c23612329f25a030b1d7c073dcf1c))
+* **publish:** released version 5.0.10 [no ci] ([0a81b4d](https://github.com/Lydanne/spaceflow/commit/0a81b4d79fbf5be0fbea62d8c612ba613fc9c6a1))
+* **review-summary:** released version 5.0.19 [no ci] ([9785655](https://github.com/Lydanne/spaceflow/commit/9785655eb080303b51f9af882794c5d24e1b1ae7))
+* **review:** released version 5.2.14 [no ci] ([de387db](https://github.com/Lydanne/spaceflow/commit/de387db3190c92af15b4dd99bbd8e18288536332))
+* **scripts:** released version 5.0.10 [no ci] ([3ee2b13](https://github.com/Lydanne/spaceflow/commit/3ee2b133e803a61511c50411ca78ab94f4ceea18))
+* **shell:** released version 5.0.10 [no ci] ([503d7f7](https://github.com/Lydanne/spaceflow/commit/503d7f74fb6157ce39337395ea1ece96aa1510f2))
+
 ## [5.1.1](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@5.1.0...@spaceflow/cli@5.1.1) (2026-04-30)
 
 ### 代码重构
