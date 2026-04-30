@@ -1,5 +1,19 @@
 # Changelog
 
+## [5.0.18](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.17...@spaceflow/review-summary@5.0.18) (2026-04-30)
+
+### 新特性
+
+* **cli:** 改进扩展加载失败时的错误日志输出 ([fb3996b](https://github.com/Lydanne/spaceflow/commit/fb3996b4aa615e4d5033dc5412aeb10dd95c162b))
+
+### 其他修改
+
+* **cli:** released version 5.1.0 [no ci] ([dde9bcf](https://github.com/Lydanne/spaceflow/commit/dde9bcf60cb801b5b595391d811d8142fcc65fa6))
+* **publish:** released version 5.0.9 [no ci] ([6750816](https://github.com/Lydanne/spaceflow/commit/675081638c7c33c5a585e4d5d73936623bdb1ba4))
+* **review:** released version 5.2.13 [no ci] ([05d3f93](https://github.com/Lydanne/spaceflow/commit/05d3f9370604707283192418b3c016a544db8cd7))
+* **scripts:** released version 5.0.9 [no ci] ([f667c83](https://github.com/Lydanne/spaceflow/commit/f667c839ad1da93116c75bb581f18a548fa63959))
+* **shell:** released version 5.0.9 [no ci] ([e2cf708](https://github.com/Lydanne/spaceflow/commit/e2cf7080e7f9251d9ec9054a891ed7cd1acc0340))
+
 ## [5.0.17](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.16...@spaceflow/review-summary@5.0.17) (2026-04-30)
 
 ### 测试用例
