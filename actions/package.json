@@ -5,6 +5,9 @@
   "description": "Spaceflow Actions - GitHub/Gitea Actions for CI workflows",
   "license": "MIT",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "build": "ncc build src/index.js -o dist --source-map --license licenses.txt",
     "test": "vitest run src/runtime.spec.js"
