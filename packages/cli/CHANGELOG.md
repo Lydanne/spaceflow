@@ -1,5 +1,30 @@
 # Changelog
 
+## [5.1.0](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@5.0.4...@spaceflow/cli@5.1.0) (2026-04-30)
+
+### 新特性
+
+* **cli:** 改进扩展加载失败时的错误日志输出 ([fb3996b](https://github.com/Lydanne/spaceflow/commit/fb3996b4aa615e4d5033dc5412aeb10dd95c162b))
+
+### 测试用例
+
+* **core:** 添加配置加载测试并优化默认值处理 ([7ce3584](https://github.com/Lydanne/spaceflow/commit/7ce35841f6588811b7715665fd6f914a461bd362))
+
+### 其他修改
+
+* **core:** released version 5.2.3 [no ci] ([847d740](https://github.com/Lydanne/spaceflow/commit/847d7407c63ad5c76a7dde2d98d8f67bc645f402))
+* **core:** released version 5.2.4 [no ci] ([b17998f](https://github.com/Lydanne/spaceflow/commit/b17998f5611d0feb8fd5b79e21820d1f689d6deb))
+* **publish:** released version 5.0.7 [no ci] ([d29f585](https://github.com/Lydanne/spaceflow/commit/d29f58506e33eab369d5eafdaddb4248dda569fa))
+* **publish:** released version 5.0.8 [no ci] ([5e73adf](https://github.com/Lydanne/spaceflow/commit/5e73adfc0d112782aaef1b488b6925779ada8265))
+* **review-summary:** released version 5.0.16 [no ci] ([115d904](https://github.com/Lydanne/spaceflow/commit/115d9042af13f97025061674cb03e0fd50a7c393))
+* **review-summary:** released version 5.0.17 [no ci] ([3342672](https://github.com/Lydanne/spaceflow/commit/3342672dcd7fc6995772eee4bc3e0cfc63a00809))
+* **review:** released version 5.2.11 [no ci] ([4476549](https://github.com/Lydanne/spaceflow/commit/4476549401cee11e08d52f09bf2f206c669b59c3))
+* **review:** released version 5.2.12 [no ci] ([f6d902f](https://github.com/Lydanne/spaceflow/commit/f6d902f0893d72f2f47ebc6017382ce7cac1f158))
+* **scripts:** released version 5.0.7 [no ci] ([3138f46](https://github.com/Lydanne/spaceflow/commit/3138f466279bb1b2e1a77050a184aac19c27d517))
+* **scripts:** released version 5.0.8 [no ci] ([093d748](https://github.com/Lydanne/spaceflow/commit/093d7483c6edc5f0fe61538ab21b394c504e9d7d))
+* **shell:** released version 5.0.7 [no ci] ([5c4d72b](https://github.com/Lydanne/spaceflow/commit/5c4d72b338125073b0aec8f59f6cb5164534fd72))
+* **shell:** released version 5.0.8 [no ci] ([4edf035](https://github.com/Lydanne/spaceflow/commit/4edf035605ff068d5440e297858bb3f3964560c8))
+
 ## [5.0.4](https://github.com/Lydanne/spaceflow/compare/@spaceflow/cli@5.0.3...@spaceflow/cli@5.0.4) (2026-04-27)
 
 ### 修复BUG
