@@ -28,6 +28,10 @@ import { DEFAULT_SUPPORT_EDITOR, readConfigSync } from "@spaceflow/shared";
 /** 从环境自动检测的默认值 */
 const detected = detectProvider();
 
+function defaultObject<T extends z.ZodType>(schema: T) {
+  return z.preprocess((v) => v ?? {}, schema).prefault({});
+}
+
 /** Git Provider 配置 Schema */
 const GitProviderConfigSchema = z.object({
   provider: z
@@ -112,9 +116,9 @@ const GeminiConfigSchema = z.object({
 
 /** LLM 配置 Schema */
 const LlmConfigSchema = z.object({
-  openai: z.preprocess((v) => v ?? {}, OpenAIConfigSchema).describe("OpenAI 适配器配置"),
-  openCode: z.preprocess((v) => v ?? {}, OpenCodeConfigSchema).describe("OpenCode 适配器配置"),
-  gemini: z.preprocess((v) => v ?? {}, GeminiConfigSchema).describe("Gemini 适配器配置"),
+  openai: defaultObject(OpenAIConfigSchema).describe("OpenAI 适配器配置"),
+  openCode: defaultObject(OpenCodeConfigSchema).describe("OpenCode 适配器配置"),
+  gemini: defaultObject(GeminiConfigSchema).describe("Gemini 适配器配置"),
 });
 
 /** 飞书配置 Schema */
@@ -165,17 +169,15 @@ export const SpaceflowConfigSchema = z.object({
   /** 支持的编辑器列表 */
   support: z.array(z.string()).default([DEFAULT_SUPPORT_EDITOR]).describe("支持的编辑器列表"),
   /** Git Provider 配置 */
-  gitProvider: z
-    .preprocess((v) => v ?? {}, GitProviderConfigSchema)
-    .describe("Git Provider 服务配置"),
+  gitProvider: defaultObject(GitProviderConfigSchema).describe("Git Provider 服务配置"),
   /** CI 配置 */
-  ci: z.preprocess((v) => v ?? {}, CiConfigSchema).describe("CI 环境配置"),
+  ci: defaultObject(CiConfigSchema).describe("CI 环境配置"),
   /** LLM 配置 */
-  llm: z.preprocess((v) => v ?? {}, LlmConfigSchema).describe("LLM 服务配置"),
+  llm: defaultObject(LlmConfigSchema).describe("LLM 服务配置"),
   /** 飞书配置 */
-  feishu: z.preprocess((v) => v ?? {}, FeishuConfigSchema).describe("飞书 SDK 配置"),
+  feishu: defaultObject(FeishuConfigSchema).describe("飞书 SDK 配置"),
   /** Storage 配置 */
-  storage: z.preprocess((v) => v ?? {}, StorageConfigSchema).describe("存储服务配置"),
+  storage: defaultObject(StorageConfigSchema).describe("存储服务配置"),
 });
 
 // ============ 类型导出 ============
