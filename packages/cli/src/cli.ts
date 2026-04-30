@@ -142,7 +142,10 @@ function resetSpaceflowDirOnDependencyMismatch(projectRoot: string, spaceflowDir
 function generateIndexContent(extensions: string[], version: string): string {
   const dynamicImports = extensions
     .map(
-      (name) => `    import('${name}').then(m => m.default || m.extension || m).catch(() => null),`,
+      (name) => `    import('${name}').then(m => m.default || m.extension || m).catch((error) => {
+      console.error(\`Failed to load extension ${name}: \${error instanceof Error ? error.message : String(error)}\`);
+      return null;
+    }),`,
     )
     .join("\n");
 
