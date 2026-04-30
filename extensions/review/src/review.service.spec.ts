@@ -99,6 +99,9 @@ class TestReviewService extends ReviewService {
   resolveSourceData(context: Partial<ReviewContext>) {
     return super.resolveSourceData(context as ReviewContext);
   }
+  buildReviewResult(context: ReviewContext, reviewPrompt: any, llmMode: any, source: any) {
+    return super.buildReviewResult(context, reviewPrompt, llmMode, source);
+  }
 }
 
 describe("ReviewService", () => {
@@ -164,6 +167,19 @@ describe("ReviewService", () => {
       buildSpecsSection: vi.fn().mockReturnValue("mock specs section"),
       filterIssuesByRuleExistence: vi.fn().mockImplementation((issues) => issues),
       deduplicateSpecs: vi.fn().mockImplementation((specs) => specs),
+      parseLineRange: vi.fn().mockImplementation((lineStr: string) => {
+        const lines: number[] = [];
+        const rangeMatch = lineStr.match(/^(\d+)-(\d+)$/);
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = parseInt(rangeMatch[2], 10);
+          for (let i = start; i <= end; i++) lines.push(i);
+        } else {
+          const line = parseInt(lineStr, 10);
+          if (!isNaN(line)) lines.push(line);
+        }
+        return lines;
+      }),
     };
 
     const mockReviewReportService = {
@@ -762,6 +778,76 @@ describe("ReviewService", () => {
       const result = await service.execute(context as any);
       expect(result.issues).toHaveLength(1);
       expect(result.stats).toBeDefined();
+    });
+  });
+
+  describe("ReviewService.buildReviewResult", () => {
+    it("静态规则问题合并前应过滤到本次变更行", async () => {
+      vi.spyOn(service._llmProcessor, "runLLMReview").mockResolvedValue(mockResult());
+      vi.spyOn(service._llmProcessor, "buildBasicDescription").mockResolvedValue({
+        title: "Feat test",
+        description: "test",
+      });
+
+      const result = await service.buildReviewResult(
+        {
+          owner: "o",
+          repo: "r",
+          dryRun: true,
+          ci: false,
+          showAll: false,
+          specSources: ["/spec/dir"],
+          llmMode: "openai",
+        } as ReviewContext,
+        {
+          filePrompts: [],
+          staticIssues: [
+            mockIssue({
+              file: "src/large.ts",
+              line: "1",
+              ruleId: "system:max-lines-per-file",
+              specFile: "__system__",
+            }),
+            mockIssue({
+              file: "src/from-main.ts",
+              line: "1",
+              ruleId: "system:max-lines-per-file",
+              specFile: "__system__",
+            }),
+          ],
+        },
+        "openai",
+        {
+          specs: [],
+          fileContents: new Map([
+            [
+              "src/large.ts",
+              [
+                ["-------", "old line"],
+                ["abc1234", "changed line"],
+                ["-------", "old line"],
+              ],
+            ],
+            [
+              "src/from-main.ts",
+              [
+                ["-------", "old line"],
+                ["-------", "merge line"],
+              ],
+            ],
+          ]),
+          changedFiles: ChangedFileCollection.from([
+            { filename: "src/large.ts", status: "modified" },
+            { filename: "src/from-main.ts", status: "modified" },
+          ]),
+          commits: [{ sha: "abc1234567890", commit: { message: "feat: add line" } }],
+          isDirectFileMode: false,
+        },
+      );
+
+      expect(result.issues.map((issue) => ({ file: issue.file, line: issue.line }))).toEqual([
+        { file: "src/large.ts", line: "2" },
+      ]);
     });
   });
 

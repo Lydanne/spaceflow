@@ -280,11 +280,18 @@ export class ReviewService {
       context,
     });
 
-    // 静态规则产生的系统问题直接合并，不经过过滤管道
     if (reviewPrompt.staticIssues?.length) {
-      result.issues = [...reviewPrompt.staticIssues, ...result.issues];
+      const staticIssues = this.filterStaticIssues(reviewPrompt.staticIssues, {
+        commits,
+        fileContents,
+        isDirectFileMode,
+        context,
+      });
+      result.issues = [...staticIssues, ...result.issues];
       if (shouldLog(verbose, 1)) {
-        console.log(`⚙️  追加 ${reviewPrompt.staticIssues.length} 个静态规则系统问题`);
+        console.log(
+          `⚙️  追加 ${staticIssues.length}/${reviewPrompt.staticIssues.length} 个静态规则系统问题`,
+        );
       }
     }
     if (shouldLog(verbose, 1)) {
@@ -292,6 +299,38 @@ export class ReviewService {
     }
 
     return result;
+  }
+
+  protected filterStaticIssues(
+    issues: ReviewResult["issues"],
+    opts: {
+      commits: PullRequestCommit[];
+      fileContents: FileContentsMap;
+      isDirectFileMode: boolean;
+      context: ReviewContext;
+    },
+  ): ReviewResult["issues"] {
+    const { commits, fileContents, isDirectFileMode, context } = opts;
+    if (context.showAll || isDirectFileMode) {
+      return issues;
+    }
+
+    const issuesOnChangedLines = issues.map((issue) => {
+      const contentLines = fileContents.get(issue.file);
+      if (!contentLines) return issue;
+
+      const firstChangedLineIndex = contentLines.findIndex(([hash]) => hash !== "-------");
+      if (firstChangedLineIndex === -1) return issue;
+
+      return { ...issue, line: String(firstChangedLineIndex + 1) };
+    });
+
+    return this.issueFilter.filterIssuesByValidCommits(
+      issuesOnChangedLines,
+      commits,
+      fileContents,
+      context.verbose,
+    );
   }
 
   /**
