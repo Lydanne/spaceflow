@@ -1,5 +1,20 @@
 # Changelog
 
+## [5.0.21](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.20...@spaceflow/review-summary@5.0.21) (2026-04-30)
+
+### 修复BUG
+
+* **review:** 修复 blame 失败时未知行处理逻辑，避免误判为本次 PR 变更 ([29403ce](https://github.com/Lydanne/spaceflow/commit/29403ced3af7b9761e99c76aa3c8cbd2ada656d6))
+
+### 测试用例
+
+* **review:** 为静态规则问题过滤添加单元测试 ([fe38ff2](https://github.com/Lydanne/spaceflow/commit/fe38ff24ee2c345072aa83915596bbd6112d278a))
+* **review:** 增强 review-issue-filter 单元测试，覆盖 blame 失败和合并行过滤场景 ([ea13847](https://github.com/Lydanne/spaceflow/commit/ea1384791fa7f635c9c30a1420225f71f99dce8a))
+
+### 其他修改
+
+* **review:** released version 5.2.16 [no ci] ([00c596d](https://github.com/Lydanne/spaceflow/commit/00c596d6fdf4fcc3b4407a04d2b1c84319cc1321))
+
 ## [5.0.20](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.19...@spaceflow/review-summary@5.0.20) (2026-04-30)
 
 ### 其他修改
