@@ -121,9 +121,7 @@ function resetSpaceflowDirOnDependencyMismatch(projectRoot: string, spaceflowDir
     return;
   }
 
-  console.warn(
-    "⚠ 检测到配置依赖与 .spaceflow/package.json 依赖版本不一致，删除 .spaceflow 目录重建",
-  );
+  console.warn("🚀 依赖更新中...");
   try {
     rmSync(spaceflowDir, { recursive: true, force: true });
   } catch (error) {
