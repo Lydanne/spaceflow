@@ -511,7 +511,7 @@ export class ReviewSourceResolver {
             try {
               blameMap = await this.gitSdk.getFileBlame(ref, file.filename);
             } catch {
-              // blame 失败时回退到 latestCommitHash
+              // blame 失败时按未知来源处理；showAll=false 时不能把未知行归到本 PR。
             }
           }
 
@@ -545,7 +545,16 @@ export class ReviewSourceResolver {
             if (!changedLines.has(lineNum)) {
               return ["-------", line];
             }
-            const hash = blameMap?.get(lineNum) ?? latestCommitHash;
+            const blameHash = blameMap?.get(lineNum);
+            if (shouldMaskUnknownChangedLines && !localMode && !blameHash) {
+              if (shouldLog(verbose, 3)) {
+                console.log(
+                  `      行 ${lineNum}: blame 不可用或缺失，按非本次 PR 变更处理`,
+                );
+              }
+              return ["-------", line];
+            }
+            const hash = blameHash ?? latestCommitHash;
             if (shouldMaskUnknownChangedLines && !validCommitHashes.has(hash)) {
               return ["-------", line];
             }
