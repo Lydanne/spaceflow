@@ -12,6 +12,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "files": [
     "dist",
     "package.json",
