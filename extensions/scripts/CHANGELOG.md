@@ -1,5 +1,31 @@
 # Changelog
 
+## [5.0.10](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@5.0.9...@spaceflow/scripts@5.0.10) (2026-04-30)
+
+### 代码重构
+
+* **review:** 重构 review-context.spec.ts 测试用例，替换 globSync 为 readdirSync/statSync ([4ed798d](https://github.com/Lydanne/spaceflow/commit/4ed798d73a1fb41d2cf3e53ccc4a48ed6a9305e2))
+
+### 其他修改
+
+* **actions:** 在 package.json 中添加 Node.js 引擎版本要求 ([389a348](https://github.com/Lydanne/spaceflow/commit/389a3486dc4db8eea085c139f4260b59a11e8924))
+* **cli:** released version 5.1.1 [no ci] ([c6a628c](https://github.com/Lydanne/spaceflow/commit/c6a628c0e031de6d1201f8a187c44ab1cd54371c))
+* **cli:** 更新 package.json，添加 Node.js 引擎版本要求 ([aded715](https://github.com/Lydanne/spaceflow/commit/aded7154d175a5e4352b314cfbffceb1e573d8b2))
+* **core:** released version 5.2.5 [no ci] ([037688a](https://github.com/Lydanne/spaceflow/commit/037688ae0a2c23612329f25a030b1d7c073dcf1c))
+* **core:** 更新 package.json 以指定 Node.js 引擎版本要求 ([c6c2860](https://github.com/Lydanne/spaceflow/commit/c6c2860c15c59664eb15a250ada024cfc2f67dc7))
+* **docs:** 更新 GitHub Actions 和 Node.js 引擎版本要求 ([592cf52](https://github.com/Lydanne/spaceflow/commit/592cf528d47c26c30f27271adddeeb0aaac00881))
+* **publish:** released version 5.0.10 [no ci] ([0a81b4d](https://github.com/Lydanne/spaceflow/commit/0a81b4d79fbf5be0fbea62d8c612ba613fc9c6a1))
+* **publish:** 为发布插件添加 Node.js 版本引擎约束 ([793ce57](https://github.com/Lydanne/spaceflow/commit/793ce57c779306e767345c76c8632e287a561b35))
+* **review-summary:** released version 5.0.18 [no ci] ([dd44c18](https://github.com/Lydanne/spaceflow/commit/dd44c186c54d3823dcf1ed13a03b6c394b1f52ef))
+* **review-summary:** 更新 package.json 以指定 Node.js 引擎版本要求 ([e9e0724](https://github.com/Lydanne/spaceflow/commit/e9e0724ce30f37940895542184bd466264a6381f))
+* **review:** released version 5.2.14 [no ci] ([de387db](https://github.com/Lydanne/spaceflow/commit/de387db3190c92af15b4dd99bbd8e18288536332))
+* **scripts:** 在 package.json 中添加 Node.js 引擎版本要求 ([3b7df8d](https://github.com/Lydanne/spaceflow/commit/3b7df8d066b232e08fdd45b175dc069274c66bca))
+* **shared:** released version 5.0.4 [no ci] ([17f2afe](https://github.com/Lydanne/spaceflow/commit/17f2afecf6935744bb248c5b1570cfad1f9ffea5))
+* **shared:** 添加 Node.js 版本引擎约束 ([34e3612](https://github.com/Lydanne/spaceflow/commit/34e36123b247786baf23947dc88899aff558ab4b))
+* **shell:** released version 5.0.9 [no ci] ([e2cf708](https://github.com/Lydanne/spaceflow/commit/e2cf7080e7f9251d9ec9054a891ed7cd1acc0340))
+* **shell:** 更新 package.json，明确 Node.js 引擎版本要求 ([14e4e35](https://github.com/Lydanne/spaceflow/commit/14e4e354e41f9291d46fc01d797750324d2310b4))
+* 更新 package.json 添加 Node.js 版本要求 ([79e12d7](https://github.com/Lydanne/spaceflow/commit/79e12d707d7d44f224a41babd8442d35298ef3dd))
+
 ## [5.0.9](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@5.0.8...@spaceflow/scripts@5.0.9) (2026-04-30)
 
 ### 新特性
