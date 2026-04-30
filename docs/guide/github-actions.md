@@ -113,7 +113,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20.19
           registry-url: https://registry.npmjs.org
 
       - run: pnpm install --frozen-lockfile
