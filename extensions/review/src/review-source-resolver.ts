@@ -330,12 +330,27 @@ export class ReviewSourceResolver {
     // 0. 过滤掉 merge commit（showAll=false 时启用）
     if (!showAll) {
       const before = commits.length;
+      const beforeFiles = changedFiles.length;
       commits = commits.filter((c) => {
         const message = c.commit?.message || "";
         return !/^merge\b/i.test(message);
       });
       if (before !== commits.length && shouldLog(verbose, 1)) {
         console.log(`   跳过 Merge Commits: ${before} -> ${commits.length} 个`);
+      }
+      if (before !== commits.length) {
+        const commitFilenames = await this.collectCommitFilenames(
+          owner,
+          repo,
+          commits,
+          prNumber,
+        );
+        changedFiles = changedFiles.filterByCommitFiles(commitFilenames);
+        if (shouldLog(verbose, 1)) {
+          console.log(
+            `   按非 Merge Commits 过滤文件: ${beforeFiles} -> ${changedFiles.length} 个文件`,
+          );
+        }
       }
     } else if (shouldLog(verbose, 2)) {
       console.log(`   showAll=true，跳过 Merge Commit 过滤`);
@@ -359,17 +374,7 @@ export class ReviewSourceResolver {
       }
 
       const beforeFiles = changedFiles.length;
-      const commitFilenames = new Set<string>();
-      for (const commit of commits) {
-        if (!commit.sha) continue;
-        const commitFiles = await this.issueFilter.getFilesForCommit(
-          owner,
-          repo,
-          commit.sha,
-          prNumber,
-        );
-        commitFiles.forEach((f) => commitFilenames.add(f));
-      }
+      const commitFilenames = await this.collectCommitFilenames(owner, repo, commits, prNumber);
       changedFiles = changedFiles.filterByCommitFiles(commitFilenames);
       if (shouldLog(verbose, 1)) {
         console.log(`   按 Commits 过滤文件: ${beforeFiles} -> ${changedFiles.length} 个文件`);
@@ -423,6 +428,26 @@ export class ReviewSourceResolver {
     }
 
     return { commits, changedFiles: changedFiles.toArray() };
+  }
+
+  private async collectCommitFilenames(
+    owner: string,
+    repo: string,
+    commits: PullRequestCommit[],
+    prNumber?: number,
+  ): Promise<Set<string>> {
+    const commitFilenames = new Set<string>();
+    for (const commit of commits) {
+      if (!commit.sha) continue;
+      const commitFiles = await this.issueFilter.getFilesForCommit(
+        owner,
+        repo,
+        commit.sha,
+        prNumber,
+      );
+      commitFiles.forEach((f) => commitFilenames.add(f));
+    }
+    return commitFilenames;
   }
 
   // ─── 文件内容 ─────────────────────────────────────────

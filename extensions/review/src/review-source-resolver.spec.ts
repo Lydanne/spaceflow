@@ -32,5 +32,39 @@ describe("review-source-resolver", () => {
       expect(gitSdk.getWorkingFileContent).not.toHaveBeenCalled();
       expect(result.fileContents.get("test.ts")?.[1]).toEqual(["+local+", "staged"]);
     });
+
+    it("showAll=false 时应同步过滤掉仅由 merge commit 引入的文件", async () => {
+      const issueFilter = {
+        getFilesForCommit: vi.fn().mockResolvedValue(["src/pr.ts"]),
+      };
+      const resolver = new ReviewSourceResolver({} as any, {} as any, issueFilter as any);
+
+      const result = await (resolver as any).applyPreFilters(
+        {
+          owner: "owner",
+          repo: "repo",
+          prNumber: 1,
+          showAll: false,
+        },
+        [
+          { sha: "merge1111", commit: { message: "Merge branch 'main' into feature" } },
+          { sha: "feat2222", commit: { message: "feat: add pr change" } },
+        ],
+        [
+          { filename: "src/from-main.ts", status: "modified" },
+          { filename: "src/pr.ts", status: "modified" },
+        ],
+        false,
+      );
+
+      expect(result.commits.map((commit: any) => commit.sha)).toEqual(["feat2222"]);
+      expect(result.changedFiles.map((file: any) => file.filename)).toEqual(["src/pr.ts"]);
+      expect(issueFilter.getFilesForCommit).toHaveBeenCalledWith(
+        "owner",
+        "repo",
+        "feat2222",
+        1,
+      );
+    });
   });
 });

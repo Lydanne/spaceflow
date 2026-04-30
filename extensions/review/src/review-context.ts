@@ -14,11 +14,11 @@ import { ReviewOptions } from "./review.config";
 import { parseTitleOptions } from "./parse-title-options";
 import { type ReviewIssue, type UserInfo } from "./review-spec";
 import { readFile } from "fs/promises";
-import { globSync, existsSync } from "fs";
+import { readdirSync, statSync } from "fs";
 import { join } from "path";
 import { isAbsolute, normalize, relative } from "path";
-import { homedir } from "os";
 import type { ReportFormat } from "./review-report";
+import micromatch from "micromatch";
 
 export interface ReviewContext extends ReviewOptions {
   owner: string;
@@ -149,9 +149,7 @@ export class ReviewContextBuilder {
       const cwd = process.cwd();
       const expandedFiles = options.includes!.flatMap((pattern) => {
         try {
-          return Array.from(globSync(pattern, { cwd, withFileTypes: true }))
-            .filter((entry) => entry.isFile())
-            .map((entry) => join(entry.parentPath, entry.name).replaceAll("\\", "/"));
+          return this.expandIncludePattern(pattern, cwd);
         } catch {
           return [pattern];
         }
@@ -296,6 +294,44 @@ export class ReviewContextBuilder {
       ? relative(cwd, normalizedInput)
       : normalizedInput;
     return relativePath.replaceAll("\\", "/").replace(/^\.\/+/, "");
+  }
+
+  private expandIncludePattern(pattern: string, cwd: string): string[] {
+    const searchRoot = this.resolveGlobSearchRoot(pattern, cwd);
+    const files = this.walkFiles(searchRoot, cwd);
+    return micromatch(files, pattern);
+  }
+
+  private resolveGlobSearchRoot(pattern: string, cwd: string): string {
+    const normalizedPattern = pattern.replaceAll("\\", "/");
+    const firstGlobIndex = normalizedPattern.search(/[*?[{(!]/);
+    const staticPart =
+      firstGlobIndex === -1 ? normalizedPattern : normalizedPattern.slice(0, firstGlobIndex);
+    const basePart = staticPart.includes("/")
+      ? staticPart.slice(0, staticPart.lastIndexOf("/"))
+      : "";
+    return join(cwd, basePart || ".");
+  }
+
+  private walkFiles(dir: string, cwd: string): string[] {
+    const stat = statSync(dir);
+    if (stat.isFile()) {
+      return [relative(cwd, dir).replaceAll("\\", "/")];
+    }
+    if (!stat.isDirectory()) return [];
+
+    const files: string[] = [];
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name === "node_modules" || entry.name === ".git") continue;
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...this.walkFiles(fullPath, cwd));
+      } else if (entry.isFile()) {
+        files.push(relative(cwd, fullPath).replaceAll("\\", "/"));
+      }
+    }
+    return files;
   }
 
   /**

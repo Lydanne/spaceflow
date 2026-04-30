@@ -3,7 +3,8 @@ import { readFile } from "fs/promises";
 import { ReviewContextBuilder } from "./review-context";
 
 vi.mock("fs", () => ({
-  globSync: vi.fn(),
+  readdirSync: vi.fn(),
+  statSync: vi.fn(),
 }));
 
 vi.mock("fs/promises");
@@ -134,20 +135,65 @@ describe("ReviewContextBuilder", () => {
   });
 
   describe("getContextFromEnv - includes 直接文件模式", () => {
-    let globSync: Mock;
+    let readdirSync: Mock;
+    let statSync: Mock;
 
-    const makeEntries = (paths: string[]) =>
-      paths.map((p) => {
-        const parts = p.split("/");
-        const name = parts.pop()!;
-        const parentPath = parts.join("/");
-        const isFile = name.includes(".");
-        return { name, parentPath, isFile: () => isFile };
-      });
+    const makeDirent = (name: string, type: "file" | "dir") => ({
+      name,
+      isFile: () => type === "file",
+      isDirectory: () => type === "dir",
+    });
+
+    const mockFsFiles = (files: string[], emptyDirs: string[] = []) => {
+      const cwd = process.cwd();
+      const dirs = new Map<string, ReturnType<typeof makeDirent>[]>();
+      const fileSet = new Set<string>();
+
+      for (const file of files) {
+        const parts = file.split("/");
+        let current = cwd;
+        for (let i = 0; i < parts.length; i++) {
+          const part = parts[i];
+          const isFile = i === parts.length - 1;
+          if (!dirs.has(current)) dirs.set(current, []);
+          const entries = dirs.get(current)!;
+          if (!entries.some((entry) => entry.name === part)) {
+            entries.push(makeDirent(part, isFile ? "file" : "dir"));
+          }
+          current = `${current}/${part}`;
+          if (isFile) {
+            fileSet.add(current);
+          } else if (!dirs.has(current)) {
+            dirs.set(current, []);
+          }
+        }
+      }
+
+      for (const dir of emptyDirs) {
+        const parts = dir.split("/");
+        let current = cwd;
+        for (const part of parts) {
+          if (!dirs.has(current)) dirs.set(current, []);
+          const entries = dirs.get(current)!;
+          if (!entries.some((entry) => entry.name === part)) {
+            entries.push(makeDirent(part, "dir"));
+          }
+          current = `${current}/${part}`;
+          if (!dirs.has(current)) dirs.set(current, []);
+        }
+      }
+
+      statSync.mockImplementation((path: string) => ({
+        isFile: () => fileSet.has(path),
+        isDirectory: () => dirs.has(path),
+      }));
+      readdirSync.mockImplementation((path: string) => dirs.get(path) ?? []);
+    };
 
     beforeEach(async () => {
       const fs = await import("fs");
-      globSync = fs.globSync as unknown as Mock;
+      readdirSync = fs.readdirSync as unknown as Mock;
+      statSync = fs.statSync as unknown as Mock;
       mockGitSdkService.getRemoteUrl.mockReturnValue("https://github.com/owner/repo.git");
       mockGitSdkService.parseRepositoryFromRemoteUrl.mockReturnValue({
         owner: "owner",
@@ -156,10 +202,7 @@ describe("ReviewContextBuilder", () => {
     });
 
     it("无 PR/base/head 上下文 + 有 includes → 展开 glob 写入 files", async () => {
-      globSync.mockImplementation((pattern: string) => {
-        if (pattern === "src/**/*.ts") return makeEntries(["src/a.ts", "src/b.ts"]);
-        return [];
-      });
+      mockFsFiles(["src/a.ts", "src/b.ts"]);
 
       const ctx = await builder.getContextFromEnv({
         dryRun: false,
@@ -171,7 +214,7 @@ describe("ReviewContextBuilder", () => {
     });
 
     it("有 PR 上下文 + 有 includes → 不展开，files 为 undefined", async () => {
-      globSync.mockReturnValue(makeEntries(["src/a.ts"]));
+      mockFsFiles(["src/a.ts"]);
 
       const ctx = await builder.getContextFromEnv({
         dryRun: false,
@@ -181,11 +224,11 @@ describe("ReviewContextBuilder", () => {
       });
 
       expect(ctx.files).toBeUndefined();
-      expect(globSync).not.toHaveBeenCalled();
+      expect(readdirSync).not.toHaveBeenCalled();
     });
 
     it("有 base/head + 有 includes → 不展开，files 为 undefined", async () => {
-      globSync.mockReturnValue(makeEntries(["src/a.ts"]));
+      mockFsFiles(["src/a.ts"]);
 
       const ctx = await builder.getContextFromEnv({
         dryRun: false,
@@ -196,11 +239,11 @@ describe("ReviewContextBuilder", () => {
       });
 
       expect(ctx.files).toBeUndefined();
-      expect(globSync).not.toHaveBeenCalled();
+      expect(readdirSync).not.toHaveBeenCalled();
     });
 
     it("ci 模式 + 有 includes → 不展开，files 为 undefined", async () => {
-      globSync.mockReturnValue(makeEntries(["src/a.ts"]));
+      mockFsFiles(["src/a.ts"]);
       gitProvider.validateConfig = vi.fn();
       configService.get.mockReturnValue({ repository: "owner/repo" });
 
@@ -211,14 +254,11 @@ describe("ReviewContextBuilder", () => {
       });
 
       expect(ctx.files).toBeUndefined();
-      expect(globSync).not.toHaveBeenCalled();
+      expect(readdirSync).not.toHaveBeenCalled();
     });
 
     it("includes + 同时指定 files → 合并展开结果与 files", async () => {
-      globSync.mockImplementation((pattern: string) => {
-        if (pattern === "src/**/*.ts") return makeEntries(["src/a.ts"]);
-        return [];
-      });
+      mockFsFiles(["src/a.ts"]);
 
       const ctx = await builder.getContextFromEnv({
         dryRun: false,
@@ -231,7 +271,7 @@ describe("ReviewContextBuilder", () => {
     });
 
     it("includes glob 展开为空列表 → files 为空数组", async () => {
-      globSync.mockReturnValue([] as any);
+      mockFsFiles([]);
 
       const ctx = await builder.getContextFromEnv({
         dryRun: false,
@@ -243,7 +283,7 @@ describe("ReviewContextBuilder", () => {
     });
 
     it("glob 展开结果中包含目录 → 目录被过滤，只保留文件", async () => {
-      globSync.mockReturnValue(makeEntries(["src/a.ts", "src/subdir", "src/b.ts"]));
+      mockFsFiles(["src/a.ts", "src/b.ts"], ["src/subdir"]);
 
       const ctx = await builder.getContextFromEnv({
         dryRun: false,
@@ -254,7 +294,7 @@ describe("ReviewContextBuilder", () => {
       expect(ctx.files).toEqual(["src/a.ts", "src/b.ts"]);
     });
 
-    it("无 includes → globSync 不被调用，files 为 undefined", async () => {
+    it("无 includes → 不扫描文件，files 为 undefined", async () => {
       const ctx = await builder.getContextFromEnv({
         dryRun: false,
         ci: false,
@@ -262,7 +302,7 @@ describe("ReviewContextBuilder", () => {
         head: "feature",
       });
 
-      expect(globSync).not.toHaveBeenCalled();
+      expect(readdirSync).not.toHaveBeenCalled();
       expect(ctx.files).toBeUndefined();
     });
   });

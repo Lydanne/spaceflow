@@ -543,6 +543,9 @@ describe("ReviewService", () => {
       gitProvider.getPullRequestFiles.mockResolvedValue([
         { filename: "test.ts", status: "modified" },
       ]);
+      gitProvider.getCommit.mockResolvedValue({
+        files: [{ filename: "test.ts" }],
+      } as any);
       const result = await service.execute(context);
       expect(result.success).toBe(true);
     });
