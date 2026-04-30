@@ -124,6 +124,12 @@ describe("ReviewIssueFilter", () => {
       const commits = [{ sha: "abc1234567890" }];
 
       gitProvider.getFileContent.mockResolvedValue("line1\nnew line 1\nnew line 2\nline2\nline3");
+      mockGitSdkService.getFileBlame.mockResolvedValue(
+        new Map([
+          [2, "abc1234"],
+          [3, "abc1234"],
+        ]),
+      );
 
       const result = await resolver.getFileContents(
         "owner",
@@ -154,6 +160,13 @@ describe("ReviewIssueFilter", () => {
       const commits = [{ sha: "abc1234567890" }];
 
       gitProvider.getFileContent.mockResolvedValue("line1\nline2\nline3");
+      mockGitSdkService.getFileBlame.mockResolvedValue(
+        new Map([
+          [1, "abc1234"],
+          [2, "abc1234"],
+          [3, "abc1234"],
+        ]),
+      );
 
       const result = await resolver.getFileContents(
         "owner",
@@ -181,6 +194,13 @@ describe("ReviewIssueFilter", () => {
       const commits = [{ sha: "abc1234567890" }];
 
       gitProvider.getFileContent.mockResolvedValue("line1\nline2\nline3");
+      mockGitSdkService.getFileBlame.mockResolvedValue(
+        new Map([
+          [1, "abc1234"],
+          [2, "abc1234"],
+          [3, "abc1234"],
+        ]),
+      );
 
       const result = await resolver.getFileContents(
         "owner",
@@ -301,6 +321,12 @@ describe("ReviewIssueFilter", () => {
 
     it("should mark all lines as changed for new files without patch (additions only)", async () => {
       gitProvider.getFileContent.mockResolvedValue("line1\nline2" as any);
+      mockGitSdkService.getFileBlame.mockResolvedValue(
+        new Map([
+          [1, "abc1234"],
+          [2, "abc1234"],
+        ]),
+      );
       const changedFiles = [{ filename: "new.ts", status: "added", additions: 2, deletions: 0 }];
       const commits = [{ sha: "abc1234567890" }];
       const result = await resolver.getFileContents("o", "r", changedFiles, commits, "abc", 1);
@@ -333,6 +359,97 @@ describe("ReviewIssueFilter", () => {
       const lines = result.get("test.ts");
       expect(lines).toBeDefined();
       expect(lines![1][0]).toBe("-------");
+    });
+
+    it("showAll=false 且 blame 失败时应屏蔽变更行", async () => {
+      gitProvider.getFileContent.mockResolvedValue("line1\nnew line");
+      mockGitSdkService.getFileBlame.mockRejectedValue(new Error("bad ref"));
+      const changedFiles = [
+        { filename: "test.ts", status: "modified", patch: "@@ -1,1 +1,2 @@\n line1\n+new line" },
+      ];
+      const commits = [{ sha: "abc1234567890", commit: { message: "feat: add line" } }];
+
+      const result = await resolver.getFileContents(
+        "o",
+        "r",
+        changedFiles,
+        commits,
+        "abc",
+        1,
+        false,
+        false,
+        undefined,
+      );
+
+      expect(result.get("test.ts")?.[1]).toEqual(["-------", "new line"]);
+    });
+
+    it("showAll=false 且 blame 缺少行时应屏蔽该变更行", async () => {
+      gitProvider.getFileContent.mockResolvedValue("line1\nnew line");
+      mockGitSdkService.getFileBlame.mockResolvedValue(new Map());
+      const changedFiles = [
+        { filename: "test.ts", status: "modified", patch: "@@ -1,1 +1,2 @@\n line1\n+new line" },
+      ];
+      const commits = [{ sha: "abc1234567890", commit: { message: "feat: add line" } }];
+
+      const result = await resolver.getFileContents(
+        "o",
+        "r",
+        changedFiles,
+        commits,
+        "abc",
+        1,
+        false,
+        false,
+        undefined,
+      );
+
+      expect(result.get("test.ts")?.[1]).toEqual(["-------", "new line"]);
+    });
+
+    it("同一文件包含 merge 行和 PR 行时只保留 PR 行问题", async () => {
+      gitProvider.getFileContent.mockResolvedValue("line1\nfrom main\nfrom pr");
+      mockGitSdkService.getFileBlame.mockResolvedValue(
+        new Map([
+          [2, "merge12"],
+          [3, "abc1234"],
+        ]),
+      );
+      const changedFiles = [
+        {
+          filename: "test.ts",
+          status: "modified",
+          patch: "@@ -1,1 +1,3 @@\n line1\n+from main\n+from pr",
+        },
+      ];
+      const commits = [{ sha: "abc1234567890", commit: { message: "feat: add line" } }];
+
+      const fileContents = await resolver.getFileContents(
+        "o",
+        "r",
+        changedFiles,
+        commits,
+        "abc",
+        1,
+        false,
+        false,
+        undefined,
+      );
+      const result = filter.filterIssuesByValidCommits(
+        [
+          mockIssue({ file: "test.ts", line: "2", ruleId: "R1" }),
+          mockIssue({ file: "test.ts", line: "3", ruleId: "R2" }),
+        ],
+        commits,
+        fileContents,
+      );
+
+      expect(fileContents.get("test.ts")?.map(([hash]) => hash)).toEqual([
+        "-------",
+        "-------",
+        "abc1234",
+      ]);
+      expect(result.map((issue) => issue.ruleId)).toEqual(["R2"]);
     });
 
     it("should keep merge commit line hash when showAll is true", async () => {
