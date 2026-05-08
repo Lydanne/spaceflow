@@ -1,5 +1,30 @@
 # Changelog
 
+## [5.0.12](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@5.0.11...@spaceflow/shell@5.0.12) (2026-05-08)
+
+### 修复BUG
+
+* **review:** 为本地 diff 和分支 diff 审查添加变更行过滤单元测试 ([a9d7086](https://github.com/Lydanne/spaceflow/commit/a9d70867fa35a1ce9c876a493850cbe3782b1e5d))
+* **review:** 修复 blame 失败时未知行处理逻辑，避免误判为本次 PR 变更 ([29403ce](https://github.com/Lydanne/spaceflow/commit/29403ced3af7b9761e99c76aa3c8cbd2ada656d6))
+* **review:** 通过 parents 字段识别合并提交，避免遗漏非 Merge 标题的合并提交 ([87aee41](https://github.com/Lydanne/spaceflow/commit/87aee41bda60f103f84b84ea8b5dce985b99843d))
+
+### 测试用例
+
+* **review:** 为静态规则问题过滤添加单元测试 ([fe38ff2](https://github.com/Lydanne/spaceflow/commit/fe38ff24ee2c345072aa83915596bbd6112d278a))
+* **review:** 增强 review-issue-filter 单元测试，覆盖 blame 失败和合并行过滤场景 ([ea13847](https://github.com/Lydanne/spaceflow/commit/ea1384791fa7f635c9c30a1420225f71f99dce8a))
+
+### 其他修改
+
+* **core:** released version 5.2.6 [no ci] ([ef34afc](https://github.com/Lydanne/spaceflow/commit/ef34afc5841bf969bb10ef2a228b2fba932d0842))
+* **publish:** released version 5.0.12 [no ci] ([c649d46](https://github.com/Lydanne/spaceflow/commit/c649d466cf56fdf8820d97e0951cc02244c2a634))
+* **review-summary:** released version 5.0.20 [no ci] ([97da7b8](https://github.com/Lydanne/spaceflow/commit/97da7b875a57847eada24f1ac19427708d764df2))
+* **review-summary:** released version 5.0.21 [no ci] ([3aad633](https://github.com/Lydanne/spaceflow/commit/3aad63314ab205a26c08d3dbe1e68f1117a6386e))
+* **review-summary:** released version 5.0.22 [no ci] ([12fee68](https://github.com/Lydanne/spaceflow/commit/12fee683b24962c207b40ca483d2339f754c1672))
+* **review:** released version 5.2.16 [no ci] ([00c596d](https://github.com/Lydanne/spaceflow/commit/00c596d6fdf4fcc3b4407a04d2b1c84319cc1321))
+* **review:** released version 5.2.17 [no ci] ([35f5385](https://github.com/Lydanne/spaceflow/commit/35f5385b2d310b4eed418740ea824bd6db014eac))
+* **review:** released version 5.2.18 [no ci] ([67c6c39](https://github.com/Lydanne/spaceflow/commit/67c6c39170ae974375e53497b250fb824a4ccd92))
+* **scripts:** released version 5.0.12 [no ci] ([e0aa740](https://github.com/Lydanne/spaceflow/commit/e0aa7402d54bb122a62ee2967f794766b1b82146))
+
 ## [5.0.11](https://github.com/Lydanne/spaceflow/compare/@spaceflow/shell@5.0.10...@spaceflow/shell@5.0.11) (2026-04-30)
 
 ### 其他修改
