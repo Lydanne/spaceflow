@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.2.18](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.2.17...@spaceflow/review@5.2.18) (2026-05-08)
+
+### 修复BUG
+
+* **review:** 通过 parents 字段识别合并提交，避免遗漏非 Merge 标题的合并提交 ([87aee41](https://github.com/Lydanne/spaceflow/commit/87aee41bda60f103f84b84ea8b5dce985b99843d))
+
+### 其他修改
+
+* **core:** released version 5.2.6 [no ci] ([ef34afc](https://github.com/Lydanne/spaceflow/commit/ef34afc5841bf969bb10ef2a228b2fba932d0842))
+* **publish:** released version 5.0.12 [no ci] ([c649d46](https://github.com/Lydanne/spaceflow/commit/c649d466cf56fdf8820d97e0951cc02244c2a634))
+* **review-summary:** released version 5.0.22 [no ci] ([12fee68](https://github.com/Lydanne/spaceflow/commit/12fee683b24962c207b40ca483d2339f754c1672))
+
 ## [5.2.17](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.2.16...@spaceflow/review@5.2.17) (2026-05-08)
 
 ### 修复BUG
