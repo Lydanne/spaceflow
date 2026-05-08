@@ -325,8 +325,30 @@ export class ReviewService {
       return { ...issue, line: String(firstChangedLineIndex + 1) };
     });
 
+    return this.filterIssuesToReviewScope(issuesOnChangedLines, {
+      commits,
+      fileContents,
+      isDirectFileMode,
+      context,
+    });
+  }
+
+  protected filterIssuesToReviewScope(
+    issues: ReviewResult["issues"],
+    opts: {
+      commits: PullRequestCommit[];
+      fileContents: FileContentsMap;
+      isDirectFileMode: boolean;
+      context: ReviewContext;
+    },
+  ): ReviewResult["issues"] {
+    const { commits, fileContents, isDirectFileMode, context } = opts;
+    if (context.showAll || isDirectFileMode) {
+      return issues;
+    }
+
     return this.issueFilter.filterIssuesByValidCommits(
-      issuesOnChangedLines,
+      issues,
       commits,
       fileContents,
       context.verbose,
@@ -357,6 +379,12 @@ export class ReviewService {
       1,
       context.verbose,
     );
+    const filteredStaticIssues = this.filterStaticIssues(staticIssues, {
+      commits: source.commits,
+      fileContents: source.fileContents,
+      isDirectFileMode: source.isDirectFileMode,
+      context,
+    });
 
     const title = this.fastModeService.buildTitle(source.commits);
     const description = this.fastModeService.buildDescription(
@@ -366,7 +394,7 @@ export class ReviewService {
     );
     const summary: FileSummary[] = source.changedFiles.nonDeletedFiles().map((file) => {
       const filename = file.filename ?? "";
-      const unresolved = staticIssues.filter((issue) => issue.file === filename).length;
+      const unresolved = filteredStaticIssues.filter((issue) => issue.file === filename).length;
       return {
         file: filename,
         resolved: 0,
@@ -376,14 +404,16 @@ export class ReviewService {
     });
 
     if (shouldLog(context.verbose, 1)) {
-      console.log(`⚙️  快速模式首轮静态检查完成，发现 ${staticIssues.length} 个系统问题`);
+      console.log(
+        `⚙️  快速模式首轮静态检查完成，发现 ${filteredStaticIssues.length}/${staticIssues.length} 个系统问题`,
+      );
     }
 
     const result: ReviewResult = {
       success: true,
       title,
       description,
-      issues: staticIssues,
+      issues: filteredStaticIssues,
       summary,
       round: 1,
     };

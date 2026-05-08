@@ -782,6 +782,107 @@ describe("ReviewService", () => {
   });
 
   describe("ReviewService.buildReviewResult", () => {
+    it("本地未提交审查应只保留未提交 diff 变更行问题", async () => {
+      vi.spyOn(service._llmProcessor, "runLLMReview").mockResolvedValue(
+        mockResult({
+          issues: [
+            mockIssue({ file: "src/local.ts", line: "1", ruleId: "R1" }),
+            mockIssue({ file: "src/local.ts", line: "2", ruleId: "R1" }),
+          ],
+        }),
+      );
+      vi.spyOn(service._llmProcessor, "buildBasicDescription").mockResolvedValue({
+        title: "Local review",
+        description: "test",
+      });
+
+      const result = await service.buildReviewResult(
+        {
+          owner: "o",
+          repo: "r",
+          dryRun: true,
+          ci: false,
+          showAll: false,
+          specSources: ["/spec/dir"],
+          llmMode: "openai",
+        } as ReviewContext,
+        { filePrompts: [] },
+        "openai",
+        {
+          specs: [],
+          fileContents: new Map([
+            [
+              "src/local.ts",
+              [
+                ["-------", "old line"],
+                ["+local+", "changed line"],
+                ["-------", "old line"],
+              ],
+            ],
+          ]),
+          changedFiles: ChangedFileCollection.from([
+            { filename: "src/local.ts", status: "modified" },
+          ]),
+          commits: [],
+          isDirectFileMode: false,
+        },
+      );
+
+      expect(result.issues.map((issue) => issue.line)).toEqual(["2"]);
+    });
+
+    it("分支 diff 审查应只保留目标分支提交变更行问题", async () => {
+      vi.spyOn(service._llmProcessor, "runLLMReview").mockResolvedValue(
+        mockResult({
+          issues: [
+            mockIssue({ file: "src/branch.ts", line: "1", ruleId: "R1" }),
+            mockIssue({ file: "src/branch.ts", line: "2", ruleId: "R1" }),
+            mockIssue({ file: "src/branch.ts", line: "3", ruleId: "R1" }),
+          ],
+        }),
+      );
+      vi.spyOn(service._llmProcessor, "buildBasicDescription").mockResolvedValue({
+        title: "Branch review",
+        description: "test",
+      });
+
+      const result = await service.buildReviewResult(
+        {
+          owner: "o",
+          repo: "r",
+          dryRun: true,
+          ci: false,
+          baseRef: "main",
+          headRef: "feature",
+          showAll: false,
+          specSources: ["/spec/dir"],
+          llmMode: "openai",
+        } as ReviewContext,
+        { filePrompts: [] },
+        "openai",
+        {
+          specs: [],
+          fileContents: new Map([
+            [
+              "src/branch.ts",
+              [
+                ["def5678", "other branch line"],
+                ["abc1234", "feature line"],
+                ["-------", "unchanged line"],
+              ],
+            ],
+          ]),
+          changedFiles: ChangedFileCollection.from([
+            { filename: "src/branch.ts", status: "modified" },
+          ]),
+          commits: [{ sha: "abc1234567890", commit: { message: "feat: add feature line" } }],
+          isDirectFileMode: false,
+        },
+      );
+
+      expect(result.issues.map((issue) => issue.line)).toEqual(["2"]);
+    });
+
     it("静态规则问题合并前应过滤到本次变更行", async () => {
       vi.spyOn(service._llmProcessor, "runLLMReview").mockResolvedValue(mockResult());
       vi.spyOn(service._llmProcessor, "buildBasicDescription").mockResolvedValue({
@@ -862,7 +963,7 @@ describe("ReviewService", () => {
         prModel: undefined,
         commits: [
           {
-            sha: "c1",
+            sha: "abc1234567890",
             commit: {
               message: "feat: add login api",
               author: { date: "2026-04-01T08:00:00.000Z" },
@@ -915,6 +1016,74 @@ describe("ReviewService", () => {
       expect(fastResult.description).toContain("快速模式");
       expect(saveAndOutputSpy).toHaveBeenCalledTimes(1);
       expect(result.round).toBe(1);
+    });
+
+    it("快速模式首轮静态规则应复用本地 diff 变更行过滤", async () => {
+      const resolveSourceDataSpy = vi.spyOn(service as any, "resolveSourceData");
+      const buildFinalModelSpy = vi.spyOn(service as any, "buildFinalModel");
+      const saveAndOutputSpy = vi.spyOn(service as any, "saveAndOutput");
+
+      resolveSourceDataSpy.mockResolvedValue({
+        prModel: undefined,
+        commits: [],
+        changedFiles: ChangedFileCollection.from([
+          { filename: "src/local.ts", status: "modified", additions: 1, deletions: 0 },
+          { filename: "src/unchanged-scope.ts", status: "modified", additions: 1, deletions: 0 },
+        ]),
+        headSha: "HEAD",
+        isLocalMode: true,
+        isDirectFileMode: false,
+        fileContents: new Map([
+          [
+            "src/local.ts",
+            [
+              ["-------", "old line"],
+              ["+local+", "changed line"],
+              ["-------", "old line"],
+            ],
+          ],
+          [
+            "src/unchanged-scope.ts",
+            [
+              ["-------", "old line"],
+              ["-------", "old line"],
+              ["-------", "old line"],
+            ],
+          ],
+        ]),
+      } as any);
+      buildFinalModelSpy.mockImplementation(async (_context, result) => ({ result }) as any);
+      saveAndOutputSpy.mockResolvedValue(undefined);
+
+      const result = await service.execute({
+        owner: "o",
+        repo: "r",
+        dryRun: true,
+        ci: false,
+        fast: true,
+        specSources: ["/spec/dir"],
+        systemRules: {
+          maxLinesPerFile: [2, "warn"],
+        },
+      } as ReviewContext);
+
+      expect(result.issues.map((issue) => ({ file: issue.file, line: issue.line }))).toEqual([
+        { file: "src/local.ts", line: "2" },
+      ]);
+      expect(result.summary).toEqual([
+        {
+          file: "src/local.ts",
+          resolved: 0,
+          unresolved: 1,
+          summary: "命中静态规则",
+        },
+        {
+          file: "src/unchanged-scope.ts",
+          resolved: 0,
+          unresolved: 0,
+          summary: "快速模式静态检查通过",
+        },
+      ]);
     });
 
     it("should fallback to collect-only when fast mode enters round 2+", async () => {
