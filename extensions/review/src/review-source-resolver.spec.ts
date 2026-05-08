@@ -66,5 +66,70 @@ describe("review-source-resolver", () => {
         1,
       );
     });
+
+    it("showAll=false 时应通过 parents 识别标题非 Merge 的合并提交", async () => {
+      const issueFilter = {
+        getFilesForCommit: vi.fn().mockResolvedValue(["src/pr.ts"]),
+      };
+      const resolver = new ReviewSourceResolver({} as any, {} as any, issueFilter as any);
+
+      const result = await (resolver as any).applyPreFilters(
+        {
+          owner: "owner",
+          repo: "repo",
+          prNumber: 1,
+          showAll: false,
+        },
+        [
+          {
+            sha: "merge1111",
+            parents: [{ sha: "p1" }, { sha: "p2" }],
+            commit: { message: "chore: sync main" },
+          },
+          {
+            sha: "feat2222",
+            parents: [{ sha: "p3" }],
+            commit: { message: "feat: add pr change" },
+          },
+        ],
+        [
+          { filename: "src/from-main.ts", status: "modified" },
+          { filename: "src/pr.ts", status: "modified" },
+        ],
+        false,
+      );
+
+      expect(result.commits.map((commit: any) => commit.sha)).toEqual(["feat2222"]);
+      expect(result.changedFiles.map((file: any) => file.filename)).toEqual(["src/pr.ts"]);
+    });
+
+    it("showAll=false 且全部都是合并提交时不应保留变更文件", async () => {
+      const issueFilter = {
+        getFilesForCommit: vi.fn(),
+      };
+      const resolver = new ReviewSourceResolver({} as any, {} as any, issueFilter as any);
+
+      const result = await (resolver as any).applyPreFilters(
+        {
+          owner: "owner",
+          repo: "repo",
+          prNumber: 1,
+          showAll: false,
+        },
+        [
+          {
+            sha: "merge1111",
+            parents: [{ sha: "p1" }, { sha: "p2" }],
+            commit: { message: "chore: sync main" },
+          },
+        ],
+        [{ filename: "src/from-main.ts", status: "modified" }],
+        false,
+      );
+
+      expect(result.commits).toEqual([]);
+      expect(result.changedFiles).toEqual([]);
+      expect(issueFilter.getFilesForCommit).not.toHaveBeenCalled();
+    });
   });
 });

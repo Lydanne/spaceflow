@@ -852,6 +852,11 @@ export class GithubAdapter implements GitProvider {
     const ghCommitter = data.committer as Record<string, unknown> | undefined;
     return {
       sha: data.sha as string,
+      parents: Array.isArray(data.parents)
+        ? (data.parents as Array<Record<string, unknown>>).map((parent) => ({
+            sha: parent.sha as string | undefined,
+          }))
+        : undefined,
       commit: commit
         ? {
             message: commit.message as string,

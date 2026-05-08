@@ -331,10 +331,7 @@ export class ReviewSourceResolver {
     if (!showAll) {
       const before = commits.length;
       const beforeFiles = changedFiles.length;
-      commits = commits.filter((c) => {
-        const message = c.commit?.message || "";
-        return !/^merge\b/i.test(message);
-      });
+      commits = commits.filter((c) => !this.isMergeCommit(c));
       if (before !== commits.length && shouldLog(verbose, 1)) {
         console.log(`   跳过 Merge Commits: ${before} -> ${commits.length} 个`);
       }
@@ -428,6 +425,14 @@ export class ReviewSourceResolver {
     }
 
     return { commits, changedFiles: changedFiles.toArray() };
+  }
+
+  private isMergeCommit(commit: PullRequestCommit): boolean {
+    if ((commit.parents?.length ?? 0) > 1) {
+      return true;
+    }
+    const message = commit.commit?.message || "";
+    return /^merge\b/i.test(message);
   }
 
   private async collectCommitFilenames(

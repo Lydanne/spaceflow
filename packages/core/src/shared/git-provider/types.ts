@@ -217,6 +217,9 @@ export interface EditPullRequestOption {
 /** PR Commit 信息 */
 export interface PullRequestCommit {
   sha?: string;
+  parents?: Array<{
+    sha?: string;
+  }>;
   commit?: {
     message?: string;
     author?: {

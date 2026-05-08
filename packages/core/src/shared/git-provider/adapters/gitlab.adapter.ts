@@ -826,6 +826,9 @@ export class GitlabAdapter implements GitProvider {
   protected mapGitlabCommit(data: Record<string, unknown>): PullRequestCommit {
     return {
       sha: (data.id || data.sha) as string,
+      parents: Array.isArray(data.parent_ids)
+        ? (data.parent_ids as string[]).map((sha) => ({ sha }))
+        : undefined,
       commit: {
         message: (data.message || data.title) as string,
         author: {

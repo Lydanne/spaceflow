@@ -102,6 +102,20 @@ class TestReviewService extends ReviewService {
   buildReviewResult(context: ReviewContext, reviewPrompt: any, llmMode: any, source: any) {
     return super.buildReviewResult(context, reviewPrompt, llmMode, source);
   }
+  buildFinalModel(
+    context: ReviewContext,
+    result: ReviewResult,
+    source: {
+      prModel?: PullRequestModel;
+      commits: any[];
+      headSha: string;
+      specs: any[];
+      fileContents: any;
+    },
+    existingResultModel: ReviewResultModel | null,
+  ) {
+    return super.buildFinalModel(context, result, source, existingResultModel);
+  }
 }
 
 describe("ReviewService", () => {
@@ -949,6 +963,49 @@ describe("ReviewService", () => {
       expect(result.issues.map((issue) => ({ file: issue.file, line: issue.line }))).toEqual([
         { file: "src/large.ts", line: "2" },
       ]);
+    });
+  });
+
+  describe("ReviewService.buildFinalModel", () => {
+    it("普通审查合并历史问题前应同步 reviewer 标记的无效状态", async () => {
+      const prModel = new PullRequestModel(gitProvider as any, "o", "r", 1);
+      const historyIssues = [{ file: "a.ts", line: "1", ruleId: "R1" }] as any[];
+      const existingResultModel = ReviewResultModel.create(
+        prModel,
+        mockResult({ issues: historyIssues, round: 1 }),
+        service._resultModelDeps,
+      );
+      vi.spyOn(existingResultModel, "syncResolved").mockResolvedValue(undefined);
+      vi.spyOn(existingResultModel, "syncReactions").mockImplementation(async () => {
+        historyIssues[0].valid = "false";
+      });
+      vi.spyOn(existingResultModel, "invalidateChangedFiles").mockResolvedValue(undefined);
+
+      const finalModel = await service.buildFinalModel(
+        {
+          owner: "o",
+          repo: "r",
+          prNumber: 1,
+          ci: true,
+          dryRun: true,
+          verifyFixes: false,
+          specSources: ["/spec/dir"],
+        } as ReviewContext,
+        mockResult({ issues: [], round: 1 }),
+        {
+          prModel,
+          commits: [{ sha: "abc1234567890", commit: { message: "feat: update" } }],
+          headSha: "abc1234567890",
+          specs: [],
+          fileContents: new Map(),
+        },
+        existingResultModel,
+      );
+
+      expect(existingResultModel.syncResolved).toHaveBeenCalledTimes(1);
+      expect(existingResultModel.syncReactions).toHaveBeenCalledTimes(1);
+      expect(finalModel.issues).toHaveLength(1);
+      expect(finalModel.issues[0].valid).toBe("false");
     });
   });
 

@@ -528,8 +528,9 @@ export class ReviewService {
         console.log(`📋 已有评论中存在 ${existingResultModel.issues.length} 个问题`);
       }
 
-      // 预处理历史 issues：同步 resolved 状态
+      // 预处理历史 issues：同步 resolved 和 reviewer reaction 状态
       await existingResultModel.syncResolved();
+      await existingResultModel.syncReactions(verbose);
 
       // 如果文件有变更，将该文件的历史问题标记为无效
       const reviewConf = this.config.getPluginConfig<ReviewConfig>("review");

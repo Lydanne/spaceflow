@@ -1,5 +1,6 @@
 export interface GitCommit {
   sha: string;
+  parents?: string[];
   message: string;
   author?: {
     name?: string;

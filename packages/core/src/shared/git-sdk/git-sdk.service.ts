@@ -162,7 +162,7 @@ export class GitSdkService {
     const resolvedBase = await this.resolveRef(baseRef, options);
     const resolvedHead = await this.resolveRef(headRef, options);
     const result = await this.runCommand(
-      ["log", "--format=%H|%s|%an|%ae|%aI", `${resolvedBase}..${resolvedHead}`],
+      ["log", "--format=%H%x1f%P%x1f%s%x1f%an%x1f%ae%x1f%aI", `${resolvedBase}..${resolvedHead}`],
       options,
     );
 
@@ -170,9 +170,10 @@ export class GitSdkService {
     const lines = result.trim().split("\n").filter(Boolean);
 
     for (const line of lines) {
-      const [sha, message, authorName, authorEmail, date] = line.split("|");
+      const [sha, parentsRaw, message, authorName, authorEmail, date] = line.split("\x1f");
       commits.push({
         sha,
+        parents: parentsRaw ? parentsRaw.split(" ").filter(Boolean) : [],
         message,
         author: {
           name: authorName,

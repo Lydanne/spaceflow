@@ -490,6 +490,32 @@ describe("ReviewResultModel", () => {
       expect(issues[0].reactions).toEqual([{ content: "+1", users: ["viewer1"] }]);
     });
 
+    it("评审人点击 confused 时应标记为无效", async () => {
+      gitProvider.listPullReviews.mockResolvedValue([
+        { id: 1, body: "<!-- spaceflow-review-lines -->", user: { login: "spaceflow" } },
+        { id: 2, body: "human review", user: { login: "reviewer1" } },
+      ]);
+      gitProvider.getPullRequest.mockResolvedValue({
+        requested_reviewers: [],
+        requested_reviewers_teams: [],
+      });
+      gitProvider.listPullReviewComments.mockResolvedValue([
+        { id: 10, path: "a.ts", position: 1, body: "<!-- issue-key: a.ts:1:R1 -->" },
+      ]);
+      gitProvider.getPullReviewCommentReactions.mockResolvedValue([
+        { content: "confused", user: { login: "reviewer1" } },
+      ]);
+      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const issues = [{ file: "a.ts", line: "1", ruleId: "R1" }] as any[];
+      const model = ReviewResultModel.create(createPr(gitProvider), createResult({ issues }), deps);
+
+      await model.syncReactions();
+
+      expect(issues[0].valid).toBe("false");
+      expect(issues[0].reactions).toEqual([{ content: "confused", users: ["reviewer1"] }]);
+      consoleSpy.mockRestore();
+    });
+
     it("评审人点击 -1 时应撤销已解决和已验收状态", async () => {
       gitProvider.listPullReviews.mockResolvedValue([
         { id: 1, body: "<!-- spaceflow-review-lines -->", user: { login: "spaceflow" } },

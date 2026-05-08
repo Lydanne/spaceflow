@@ -115,6 +115,7 @@ export class ReviewIssueFilter {
     const gitCommits = await this.gitSdk.getCommitsBetweenRefs(baseRef, headRef);
     return gitCommits.map((c) => ({
       sha: c.sha,
+      parents: c.parents?.map((sha) => ({ sha })),
       commit: {
         message: c.message,
         author: c.author,
