@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.0.22](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.21...@spaceflow/review-summary@5.0.22) (2026-05-08)
+
+### 修复BUG
+
+* **review:** 为本地 diff 和分支 diff 审查添加变更行过滤单元测试 ([a9d7086](https://github.com/Lydanne/spaceflow/commit/a9d70867fa35a1ce9c876a493850cbe3782b1e5d))
+
+### 其他修改
+
+* **review:** released version 5.2.17 [no ci] ([35f5385](https://github.com/Lydanne/spaceflow/commit/35f5385b2d310b4eed418740ea824bd6db014eac))
+
 ## [5.0.21](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review-summary@5.0.20...@spaceflow/review-summary@5.0.21) (2026-04-30)
 
 ### 修复BUG
