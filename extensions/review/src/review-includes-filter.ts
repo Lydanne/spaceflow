@@ -45,6 +45,16 @@ const STATUS_ALIAS: Record<string, IncludeStatusPrefix> = {
   deleted: "deleted",
 };
 
+function matchesGlob(filename: string, glob: string): boolean {
+  const pattern = glob.startsWith("!") ? glob.slice(1) : glob;
+  const hasPathSeparator = pattern.includes("/") || pattern.includes("\\");
+  return micromatch.isMatch(filename, glob, { matchBase: !hasPathSeparator });
+}
+
+function matchesAnyGlob(filename: string, globs: string[]): boolean {
+  return globs.some((glob) => matchesGlob(filename, glob));
+}
+
 export interface ParsedIncludePattern {
   /** 变更类型前缀，undefined 表示不限类型 */
   status: IncludeStatusPrefix | undefined;
@@ -125,16 +135,13 @@ export function filterFilesByIncludes<T extends FileWithStatus>(
     if (!filename) return false;
 
     // 最终排除：命中排除模式的文件直接过滤掉
-    if (
-      negativeGlobs.length > 0 &&
-      micromatch.isMatch(filename, negativeGlobs, { matchBase: true })
-    ) {
+    if (negativeGlobs.length > 0 && matchesAnyGlob(filename, negativeGlobs)) {
       console.log(`[filterFilesByIncludes] ${filename} excluded by negativeGlobs`);
       return false;
     }
 
     // 正向匹配：无前缀 glob
-    if (plainGlobs.length > 0 && micromatch.isMatch(filename, plainGlobs, { matchBase: true })) {
+    if (plainGlobs.length > 0 && matchesAnyGlob(filename, plainGlobs)) {
       console.log(`[filterFilesByIncludes] ${filename} matched plainGlobs`);
       return true;
     }
@@ -153,10 +160,9 @@ export function filterFilesByIncludes<T extends FileWithStatus>(
           .filter((g) => g.startsWith("!"))
           .map((g) => g.slice(1));
         if (positiveGlobs.length > 0) {
-          const matchesPositive = micromatch.isMatch(filename, positiveGlobs, { matchBase: true });
+          const matchesPositive = matchesAnyGlob(filename, positiveGlobs);
           const matchesNegative =
-            negativeStatusGlobs.length > 0 &&
-            micromatch.isMatch(filename, negativeStatusGlobs, { matchBase: true });
+            negativeStatusGlobs.length > 0 && matchesAnyGlob(filename, negativeStatusGlobs);
           if (matchesPositive && !matchesNegative) {
             console.log(
               `[filterFilesByIncludes] ${filename} (status=${fileStatus}) matched statusPatterns`,
@@ -206,7 +212,12 @@ export function matchIncludes(includes: string[], filename: string, fileStatus?:
   if (!fileStatus) {
     const globs = extractGlobsFromIncludes(includes);
     if (globs.length === 0) return true;
-    return micromatch.isMatch(filename, globs, { matchBase: true });
+    const negativeGlobs = globs.filter((g) => g.startsWith("!")).map((g) => g.slice(1));
+    if (negativeGlobs.length > 0 && matchesAnyGlob(filename, negativeGlobs)) {
+      return false;
+    }
+    const positiveGlobs = globs.filter((g) => !g.startsWith("!"));
+    return positiveGlobs.length === 0 || matchesAnyGlob(filename, positiveGlobs);
   }
 
   const normalizedStatus = STATUS_ALIAS[fileStatus.toLowerCase()] ?? "modified";
@@ -223,15 +234,12 @@ export function matchIncludes(includes: string[], filename: string, fileStatus?:
   const statusPatterns = parsed.filter((p) => p.status !== undefined);
 
   // 最终排除：命中排除模式的文件直接过滤掉
-  if (
-    negativeGlobs.length > 0 &&
-    micromatch.isMatch(filename, negativeGlobs, { matchBase: true })
-  ) {
+  if (negativeGlobs.length > 0 && matchesAnyGlob(filename, negativeGlobs)) {
     return false;
   }
 
   // 正向匹配：无前缀 glob
-  if (plainGlobs.length > 0 && micromatch.isMatch(filename, plainGlobs, { matchBase: true })) {
+  if (plainGlobs.length > 0 && matchesAnyGlob(filename, plainGlobs)) {
     return true;
   }
 
@@ -246,10 +254,9 @@ export function matchIncludes(includes: string[], filename: string, fileStatus?:
         .filter((g) => g.startsWith("!"))
         .map((g) => g.slice(1));
       if (positiveGlobs.length > 0) {
-        const matchesPositive = micromatch.isMatch(filename, positiveGlobs, { matchBase: true });
+        const matchesPositive = matchesAnyGlob(filename, positiveGlobs);
         const matchesNegative =
-          negativeStatusGlobs.length > 0 &&
-          micromatch.isMatch(filename, negativeStatusGlobs, { matchBase: true });
+          negativeStatusGlobs.length > 0 && matchesAnyGlob(filename, negativeStatusGlobs);
         if (matchesPositive && !matchesNegative) {
           return true;
         }

@@ -128,6 +128,27 @@ describe("review-includes-filter", () => {
       expect(result.map((f) => f.filename)).toEqual(["src/foo.ts", "src/bar.ts", "src/old.ts"]);
     });
 
+    it("排除目录 glob 时过滤掉目录下文件", () => {
+      const directoryFiles = [
+        { filename: "public/foo.js", status: "modified" },
+        { filename: "public/assets/bar.ts", status: "modified" },
+        { filename: "src/foo.js", status: "modified" },
+        { filename: "src/bar.ts", status: "modified" },
+      ];
+      const result = filterFilesByIncludes(directoryFiles, ["**/*.js", "**/*.ts", "!public/**"]);
+      expect(result.map((f) => f.filename)).toEqual(["src/foo.js", "src/bar.ts"]);
+    });
+
+    it("无路径分隔符 glob 保持 basename 匹配", () => {
+      const nestedFiles = [
+        { filename: "src/foo.ts", status: "modified" },
+        { filename: "foo.ts", status: "modified" },
+        { filename: "src/foo.js", status: "modified" },
+      ];
+      const result = filterFilesByIncludes(nestedFiles, ["*.ts"]);
+      expect(result.map((f) => f.filename)).toEqual(["src/foo.ts", "foo.ts"]);
+    });
+
     it("排除模式优先于所有正向匹配", () => {
       const result = filterFilesByIncludes(files, [`added|${glob}`, `!${specGlob}`]);
       expect(result.map((f) => f.filename)).toEqual(["src/foo.ts"]);
@@ -330,6 +351,16 @@ describe("review-includes-filter", () => {
     it("排除模式 ! 优先过滤", () => {
       expect(matchIncludes([glob, "!**/*.spec.ts"], "src/foo.spec.ts", "added")).toBe(false);
       expect(matchIncludes([glob, "!**/*.spec.ts"], "src/foo.ts", "added")).toBe(true);
+    });
+
+    it("排除目录 glob 时返回 false", () => {
+      expect(matchIncludes(["**/*.js", "!public/**"], "public/foo.js", "modified")).toBe(false);
+      expect(matchIncludes(["**/*.js", "!public/**"], "src/foo.js", "modified")).toBe(true);
+    });
+
+    it("不传 fileStatus 时也支持排除目录 glob", () => {
+      expect(matchIncludes(["**/*.js", "!public/**"], "public/foo.js")).toBe(false);
+      expect(matchIncludes(["**/*.js", "!public/**"], "src/foo.js")).toBe(true);
     });
 
     it("多个 status 前缀之间是 OR 关系", () => {
