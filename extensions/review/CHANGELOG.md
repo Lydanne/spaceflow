@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.2.19](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.2.18...@spaceflow/review@5.2.19) (2026-05-09)
+
+### 修复BUG
+
+* **review:** 为目录排除和 basename 匹配添加 glob 过滤单元测试 ([9774d39](https://github.com/Lydanne/spaceflow/commit/9774d39c928b47bc1e07bb4f4aa73fdf24450ed8))
+
+### 其他修改
+
+* **review-summary:** released version 5.0.23 [no ci] ([9a8675d](https://github.com/Lydanne/spaceflow/commit/9a8675d65ab77296a7bf664bbc9024bc793265ba))
+* **scripts:** released version 5.0.12 [no ci] ([e0aa740](https://github.com/Lydanne/spaceflow/commit/e0aa7402d54bb122a62ee2967f794766b1b82146))
+* **shell:** released version 5.0.12 [no ci] ([2e46436](https://github.com/Lydanne/spaceflow/commit/2e4643672bb5f2116a6aa65b55bf18331e180c08))
+
 ## [5.2.18](https://github.com/Lydanne/spaceflow/compare/@spaceflow/review@5.2.17...@spaceflow/review@5.2.18) (2026-05-08)
 
 ### 修复BUG
