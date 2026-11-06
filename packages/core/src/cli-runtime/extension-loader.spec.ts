@@ -19,7 +19,9 @@ function createContext(): SpaceflowContext {
     output: {} as SpaceflowContext["output"],
     storage: {} as SpaceflowContext["storage"],
     registerService: vi.fn((key: string, service: unknown) => services.set(key, service)),
-    getService: vi.fn((key: string) => services.get(key)),
+    getService<T = unknown>(key: string): T {
+      return services.get(key) as T;
+    },
     hasService: vi.fn((key: string) => services.has(key)),
   };
 }

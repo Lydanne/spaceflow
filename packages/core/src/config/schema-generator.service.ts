@@ -30,6 +30,26 @@ export function getRegisteredSchemas(): Map<string, SchemaRegistry> {
   return schemaRegistry;
 }
 
+function toConfigInputSchema(schema: z.ZodType) {
+  return z.toJSONSchema(schema, {
+    target: "draft-07",
+    io: "input",
+    override: ({ zodSchema, jsonSchema }) => {
+      if (zodSchema instanceof z.core.$ZodTuple) {
+        const { items, rest } = zodSchema._zod.def;
+        // draft-07 的 items 数组只约束各位置的类型，仍需显式声明长度。
+        const requiredLength = items.reduce(
+          (length, item, index) => (item._zod.optin === "optional" ? length : index + 1),
+          0,
+        );
+        jsonSchema.minItems = Math.max(jsonSchema.minItems ?? 0, requiredLength);
+        if (!rest)
+          jsonSchema.maxItems = Math.min(jsonSchema.maxItems ?? items.length, items.length);
+      }
+    },
+  });
+}
+
 /**
  * Schema 生成服务
  * 用于生成 JSON Schema 文件
@@ -41,9 +61,10 @@ export class SchemaGeneratorService {
    */
   generateJsonSchema(outputPath: string): void {
     // 从 SpaceflowConfigSchema 生成基础 JSON Schema
-    const baseSchema = z.toJSONSchema(SpaceflowConfigSchema, {
-      target: "draft-07",
-    }) as { properties?: Record<string, unknown>; [key: string]: unknown };
+    const baseSchema = toConfigInputSchema(SpaceflowConfigSchema) as {
+      properties?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
 
     const properties: Record<string, unknown> = { ...baseSchema.properties };
 
@@ -51,9 +72,7 @@ export class SchemaGeneratorService {
     for (const [configKey, registry] of schemaRegistry) {
       try {
         const schema = registry.schemaFactory();
-        const jsonSchema = z.toJSONSchema(schema, {
-          target: "draft-07",
-        });
+        const jsonSchema = toConfigInputSchema(schema);
         properties[configKey] = {
           ...jsonSchema,
           description: registry.description || `${configKey} 插件配置`,
