@@ -1,5 +1,6 @@
 {
   "description": "CI publish command for branch lock/unlock during release",
+  "options.target": "Publish only this workspace package at the exact stable version",
   "options.prerelease": "Prerelease tag, e.g. rc, beta, alpha, nightly",
   "options.rehearsal": "Rehearsal mode: execute hooks but no file/git changes, sets PUBLISH_REHEARSAL=true",
   "rehearsalMode": "🎭 REHEARSAL mode: hooks will execute, but no file/git changes",

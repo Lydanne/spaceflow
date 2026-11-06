@@ -27,6 +27,25 @@ export class MonorepoService {
     this.cwd = process.cwd();
   }
 
+  resolveTarget(target: string): { pkg: PackageInfo; version: string } {
+    const separator = target.lastIndexOf("@");
+    const name = target.slice(0, separator);
+    const version = target.slice(separator + 1);
+    if (separator <= 0 || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
+      throw new Error("--target 需要完整包名和精确稳定版本，例如 @spaceflow/core@5.2.7");
+    }
+    const pkg = this.getAllPackageInfos(this.getWorkspacePackages()).find(
+      (pkg) => pkg.name === name,
+    );
+    if (!pkg) throw new Error(`找不到可发布的工作区包: ${name}`);
+    const [current, prerelease] = pkg.version.split("+")[0].split("-");
+    const order = version.localeCompare(current, "en", { numeric: true });
+    if (order < 0 || (order === 0 && !prerelease)) {
+      throw new Error(`目标版本必须高于当前版本 ${pkg.version}`);
+    }
+    return { pkg, version };
+  }
+
   /**
    * 分析 monorepo 变更，返回需要发布的包列表（拓扑排序后）
    * @param dryRun 是否为 dry-run 模式

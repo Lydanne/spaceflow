@@ -17,6 +17,7 @@ export const extension = defineExtension({
       name: "publish",
       description: t("publish:description"),
       options: [
+        { flags: "--target <package@version>", description: t("publish:options.target") },
         { flags: "-d, --dry-run", description: t("common.options.dryRun") },
         { flags: "-c, --ci", description: t("common.options.ci") },
         { flags: "-p, --prerelease <tag>", description: t("publish:options.prerelease") },
@@ -34,6 +35,7 @@ export const extension = defineExtension({
         const publishService = new PublishService(gitProvider, ctx.config, monorepoService);
 
         const publishOptions = {
+          target: options?.target as string | undefined,
           dryRun: !!options?.dryRun,
           ci: !!options?.ci,
           prerelease: options?.prerelease as string,

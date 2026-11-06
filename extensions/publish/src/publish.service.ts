@@ -18,6 +18,7 @@ const releaseItModule = require("release-it") as
 const releaseIt = typeof releaseItModule === "function" ? releaseItModule : releaseItModule.default;
 
 export interface PublishOptions {
+  target?: string;
   dryRun: boolean;
   ci: boolean;
   prerelease?: string;
@@ -84,6 +85,7 @@ export class PublishService {
     }
 
     return {
+      target: options.target,
       owner,
       repo,
       branch,
@@ -108,6 +110,8 @@ export class PublishService {
       return this.executeMonorepo(context, publishConf);
     }
 
+    if (context.target !== undefined) throw new Error("--target 需要启用 monorepo 模式");
+
     // 单包发布模式
     return this.executeSinglePackage(context, publishConf);
   }
@@ -127,31 +131,37 @@ export class PublishService {
     const propagateDeps = publishConf.monorepo?.propagateDeps ?? true;
 
     // 分析变更包
-    const analysis = await this.monorepoService.analyze(dryRun, propagateDeps);
+    const target =
+      context.target === undefined ? undefined : this.monorepoService.resolveTarget(context.target);
+    if (target && context.prerelease) throw new Error("--target 不能与 --prerelease 同时使用");
+    const packagesToPublish = target
+      ? [target.pkg]
+      : (await this.monorepoService.analyze(dryRun, propagateDeps)).packagesToPublish;
+    if (target) console.log(`🎯 发布目标: ${target.pkg.name}@${target.version}`);
 
-    if (analysis.packagesToPublish.length === 0) {
+    if (packagesToPublish.length === 0) {
       console.log("\n✅ 没有需要发布的包");
       return { success: true, message: "没有需要发布的包" };
     }
 
-    console.log(`\n🚀 将发布 ${analysis.packagesToPublish.length} 个包`);
+    console.log(`\n🚀 将发布 ${packagesToPublish.length} 个包`);
 
     await this.handleBegin(context, publishConf);
 
     try {
       // 按顺序发布每个包
-      for (let i = 0; i < analysis.packagesToPublish.length; i++) {
-        const pkg = analysis.packagesToPublish[i];
-        console.log(`\n[${i + 1}/${analysis.packagesToPublish.length}] 发布 ${pkg.name}`);
+      for (let i = 0; i < packagesToPublish.length; i++) {
+        const pkg = packagesToPublish[i];
+        console.log(`\n[${i + 1}/${packagesToPublish.length}] 发布 ${pkg.name}`);
         console.log("-".repeat(40));
 
-        await this.executePackageRelease(context, publishConf, pkg);
+        await this.executePackageRelease(context, publishConf, pkg, target?.version);
       }
 
       await this.handleEnd(context, publishConf);
       return {
         success: true,
-        message: `成功发布 ${analysis.packagesToPublish.length} 个包`,
+        message: `成功发布 ${packagesToPublish.length} 个包`,
       };
     } catch (error) {
       console.error("\n❌ Monorepo 发布失败:", error instanceof Error ? error.message : error);
@@ -174,6 +184,7 @@ export class PublishService {
     context: PublishContext,
     publishConf: PublishConfig,
     pkg: PackageInfo,
+    version?: string,
   ): Promise<void> {
     const { dryRun, prerelease, ci, rehearsal } = context;
 
@@ -200,7 +211,7 @@ export class PublishService {
     // 切换到包目录运行 release-it，确保读取正确的 package.json
     process.chdir(pkgDir);
     try {
-      await releaseIt(config);
+      await releaseIt(version ? { ...config, increment: version } : config);
       console.log(`✅ ${pkg.name} 发布完成`);
     } finally {
       // 恢复原工作目录

@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      target:
+        description: "指定单个工作区包及精确稳定版本，留空则自动选择变更包"
+        required: false
+        type: string
       dry_run:
         description: "Dry run mode (不实际执行)"
         required: false
@@ -61,20 +65,18 @@ jobs:
       - name: Install Extensions
         run: pnpm spaceflow install
 
-      - name: Publish (Dry Run)
-        if: ${{ github.event.inputs.dry_run == 'true' }}
-        run: pnpm spaceflow publish --dry-run --ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish (Rehearsal)
-        if: ${{ github.event.inputs.rehearsal == 'true' && github.event.inputs.dry_run != 'true' }}
-        run: pnpm spaceflow publish --rehearsal --ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Publish
-        if: ${{ github.event.inputs.dry_run != 'true' && github.event.inputs.rehearsal != 'true' }}
-        run: pnpm spaceflow publish --ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_TARGET: ${{ inputs.target }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          REHEARSAL: ${{ inputs.rehearsal }}
+        run: |
+          args=(--ci)
+          if [[ -n "$RELEASE_TARGET" ]]; then args+=(--target "$RELEASE_TARGET"); fi
+          if [[ "$DRY_RUN" == true ]]; then
+            args+=(--dry-run)
+          elif [[ "$REHEARSAL" == true ]]; then
+            args+=(--rehearsal)
+          fi
+          pnpm spaceflow publish "${args[@]}"
