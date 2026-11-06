@@ -23,7 +23,7 @@ env:
 
 permissions:
   contents: write
-  packages: write
+  id-token: write
 
 jobs:
   publish:
@@ -44,8 +44,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          registry-url: https://registry.npmjs.org
+          node-version: 24
+
+      - name: Check publishing tools
+        run: |
+          node --version
+          npm --version
+          pnpm --version
 
       - name: Setup Git
         run: |
@@ -64,17 +69,11 @@ jobs:
       - name: Publish (Dry Run)
         if: ${{ github.event.inputs.dry_run == 'true' }}
         run: pnpm spaceflow publish --dry-run --ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish (Rehearsal)
         if: ${{ github.event.inputs.rehearsal == 'true' && github.event.inputs.dry_run != 'true' }}
         run: pnpm spaceflow publish --rehearsal --ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish
         if: ${{ github.event.inputs.dry_run != 'true' && github.event.inputs.rehearsal != 'true' }}
         run: pnpm spaceflow publish --ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
