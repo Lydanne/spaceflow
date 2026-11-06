@@ -1,5 +1,26 @@
 # Changelog
 
+## [5.0.13](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@5.0.12...@spaceflow/scripts@5.0.13) (2026-11-06)
+
+### 新特性
+
+* **publish:** 支持按包名和精确版本发布 ([bbb54b1](https://github.com/Lydanne/spaceflow/commit/bbb54b1fea262d69d3eb37658b5211d667cb136a))
+
+### 修复BUG
+
+* **core:** 修复含转换和元组的配置模式生成 ([30bf5fb](https://github.com/Lydanne/spaceflow/commit/30bf5fb4296f0f1512a1ea179c6711b14d105bfc))
+* **review:** 为目录排除和 basename 匹配添加 glob 过滤单元测试 ([9774d39](https://github.com/Lydanne/spaceflow/commit/9774d39c928b47bc1e07bb4f4aa73fdf24450ed8))
+
+### 其他修改
+
+* **core:** released version 5.2.7 [no ci] ([1e6fe5e](https://github.com/Lydanne/spaceflow/commit/1e6fe5e842d90c6a1c210a54e00b5e751fb7d2d2))
+* **publish:** released version 5.1.0 [no ci] ([1f577b6](https://github.com/Lydanne/spaceflow/commit/1f577b60719b5fdcc027a7cff64b8df577593509))
+* **review-summary:** released version 5.0.23 [no ci] ([9a8675d](https://github.com/Lydanne/spaceflow/commit/9a8675d65ab77296a7bf664bbc9024bc793265ba))
+* **review-summary:** released version 5.0.24 [no ci] ([07ee9f1](https://github.com/Lydanne/spaceflow/commit/07ee9f10758fcb6bdbb17551124d056f83ad4be6))
+* **review:** released version 5.2.19 [no ci] ([977a5d5](https://github.com/Lydanne/spaceflow/commit/977a5d5832ff2c89933587065c3434b01918a698))
+* **review:** released version 5.2.20 [no ci] ([3a332e8](https://github.com/Lydanne/spaceflow/commit/3a332e8683f55d0dd4b0749423f50edda7439928))
+* **shell:** released version 5.0.12 [no ci] ([2e46436](https://github.com/Lydanne/spaceflow/commit/2e4643672bb5f2116a6aa65b55bf18331e180c08))
+
 ## [5.0.12](https://github.com/Lydanne/spaceflow/compare/@spaceflow/scripts@5.0.11...@spaceflow/scripts@5.0.12) (2026-05-08)
 
 ### 修复BUG
