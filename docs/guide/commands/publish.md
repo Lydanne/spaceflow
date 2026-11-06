@@ -17,8 +17,8 @@ spaceflow publish
 # 试运行
 spaceflow publish --dry-run
 
-# 在 monorepo 中预览单包的精确版本
-spaceflow publish --target @spaceflow/core@5.2.7 --dry-run
+# 指定版本号
+spaceflow publish --version 1.2.0
 ```
 
 ## 功能特性
@@ -65,8 +65,6 @@ spaceflow publish --target @spaceflow/core@5.2.7 --dry-run
 | 选项 | 说明 |
 |------|------|
 | `--dry-run` | 试运行，不实际发布 |
-| `--target <package@version>` | 仅发布指定工作区包，版本须为更高的精确稳定版本 |
+| `--version <version>` | 指定版本号 |
 | `--verbose` | 详细日志 |
 | `--ci` | CI 模式 |
-
-本仓库推送到 `main` 默认自动发布变更包及其依赖方。只发布一个包时，在推送的最后一条提交信息中加入 `[skip ci]`，然后手动运行 GitHub Actions 的 Publish 工作流，填写 `target`。先勾选 `dry_run` 核对包名和版本，再用相同目标正式运行。
